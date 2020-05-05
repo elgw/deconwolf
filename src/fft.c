@@ -5,7 +5,8 @@
 #include <string.h>
 
 const char swf[] = "fftw_wisdom_float_threads.dat";
-const unsigned int PREF_FFT_PLAN = FFTW_MEASURE;
+// FFTW_MEASURE, FFTW_PATIENT or FFTW_EXHAUSTIVE
+const unsigned int MYPLAN = FFTW_PATIENT;
 
 void myfftw_start(void)
 {
@@ -31,7 +32,7 @@ void dim3_real_float_inverse(fftwf_complex * in, float * out,
 
   p = fftwf_plan_dft_c2r_3d(n3, n2, n1, 
       in, out, 
-      FFTW_MEASURE);
+      MYPLAN);
   fftwf_execute(p);
   fftwf_destroy_plan(p);
 
@@ -53,7 +54,7 @@ void dim3_real_float(float * in, fftwf_complex* out,
   fftwf_plan p = fftwf_plan_dft_r2c_3d(n3, n2, n1, 
       in, // Float
       out, // fftwf_complex 
-      FFTW_MEASURE);
+      MYPLAN);
   fftwf_execute(p); 
   fftwf_destroy_plan(p);
 
@@ -68,7 +69,7 @@ fftwf_complex * fft(float * in, int n1, int n2, int n3)
   fftwf_plan p = fftwf_plan_dft_r2c_3d(n3, n2, n1, 
       in, // Float
       out, // fftwf_complex 
-      FFTW_MEASURE);
+      MYPLAN);
   fftwf_execute(p); 
   fftwf_destroy_plan(p);
   return out;
@@ -87,7 +88,7 @@ void fft_mul(fftwf_complex * C, fftwf_complex * A, fftwf_complex * B, size_t N)
   return;
 }
 
-float * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B, int M, int N, int P)
+float * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B, const int M, const int N, const int P)
 {
   fftwf_complex * C = fftwf_malloc(M*N*P*sizeof(fftwf_complex));
   fft_mul(C, A, B, M*N*P); 
@@ -96,10 +97,15 @@ float * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B, int M, int N, int 
 
   fftwf_plan p = fftwf_plan_dft_c2r_3d(P, N, M, 
       C, out, 
-      FFTW_MEASURE);
+      MYPLAN);
   fftwf_execute(p);
   fftwf_destroy_plan(p);
   fftwf_free(C);
+
+  for(size_t kk = 0; kk<M*N*P; kk++)
+  {
+    out[kk]/=(M*N*P);
+  }
   return out;
 }
 
@@ -110,15 +116,33 @@ void fft_train(size_t M, size_t N, size_t P)
   fftwf_complex * C = fftwf_malloc(MNP*sizeof(fftwf_complex));
   float * R = fftwf_malloc(MNP*sizeof(float));
 
+  fftwf_plan p0 = fftwf_plan_dft_c2r_3d(P, N, M, 
+      C, R, MYPLAN | FFTW_WISDOM_ONLY);
+
+  if(p0 == NULL)
+  {
+    printf("\t generation c2r\n");
   fftwf_plan p1 = fftwf_plan_dft_c2r_3d(P, N, M, 
-      C, R, FFTW_MEASURE);
+      C, R, MYPLAN);
   fftwf_execute(p1);
   fftwf_destroy_plan(p1);
+  } else {
+    printf("\tc2r -- ok\n");
+  }
 
+    p0 = fftwf_plan_dft_r2c_3d(P, N, M, 
+      R, C, MYPLAN | FFTW_WISDOM_ONLY);
+
+if(p0 == NULL)
+{
+    printf("\tgenerating c2r\n");
   fftwf_plan p2 = fftwf_plan_dft_r2c_3d(P, N, M, 
-      R, C, FFTW_MEASURE);
+      R, C, MYPLAN);
   fftwf_execute(p2);
   fftwf_destroy_plan(p2);
+} else {
+  printf("\tr2c -- ok\n");
+  }
 
   fftwf_free(R);
   fftwf_free(C);

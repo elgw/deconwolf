@@ -75,7 +75,7 @@ float iter(float * xp, float * g,
   float * sn  = y; // alias
   for(size_t kk = 0; kk<wMNP; kk++)
   {
-    y[kk] < 1e-7 ? y[kk] = 1e-7 : 0;
+    y[kk] < 1e-6 ? y[kk] = 1e-6 : 0;
     sn[kk] = G[kk]/y[kk];
   }
   fftwf_complex * F_sn = fft(sn, wM, wN, wP);
@@ -109,6 +109,14 @@ fftwf_complex * initial_guess(int M, int N, int P,
       }
     }
   }
+  float sum = 0;
+  float max = 0;
+  for(size_t kk = 0; kk<wM*wN*wP; kk++)
+  {
+    sum+=one[kk];
+    one[kk] > max ? max = one[kk] : 0;
+  }
+  printf("sum(one) = %f max(one) = %f\n", sum, max);
 
   fftwf_complex * Fone = fft(one, wM, wN, wP);
 
@@ -330,10 +338,9 @@ float update_alpha(float * g, float * gm, size_t wMNP)
 }
 
 float * deconvolve(float * im, int M, int N, int P,
-    float * psf, int pM, int pN, int pP)
+    float * psf, int pM, int pN, int pP,
+    int niter)
 {
-
-  int niter = 2;
   /* Deconvolve im using psf */
 
   if(psfIsCentered(psf, pM, pN, pP) == 0)
@@ -407,8 +414,14 @@ float * deconvolve(float * im, int M, int N, int P,
   fArray_insert(G, wM, wN, wP, im, M, N, P);
   writetif("G.tif", G, wM, wN, wP);
 
+  float sumg = 0;
+  for(size_t kk = 0; kk<M*N*P; kk++)
+  {
+    sumg+=im[kk];
+  }
+
   float alpha = 0;
-  float * f = fArray_constant(wMNP, 1/wMNP);
+  float * f = fArray_constant(wMNP, sumg/wMNP);
   float * x = fArray_copy(f, wMNP);
   float * y = fArray_copy(f, wMNP);
   float * xp = fArray_copy(f, wMNP);
@@ -419,14 +432,14 @@ float * deconvolve(float * im, int M, int N, int P,
   int it = 0;
   while(it<niter)
   {
-    if(alpha != 0)
-    {
+    
       for(size_t kk = 0; kk<wMNP; kk++)
       { 
         y[kk] = x[kk] + alpha*(x[kk]-xm[kk]);
         y[kk] < 0 ? y[kk] = 0 : 0;
       }
-    }
+    
+   // printf("y[0] = %f\n", y[0]);
 
     double err = iter(xp, // xp is updated
         im, 
@@ -435,22 +448,27 @@ float * deconvolve(float * im, int M, int N, int P,
         wM, wN, wP, 
         M, N, P);
     
-    printf("Iteration %d, error=%e\n", it, err);
+    printf("Iteration %d/%d, error=%e\n", it+1, niter, err);
     memcpy(gm, g, wMNP*sizeof(float));
+//    printf("xp[0] = %f, y[0] = %f\n", xp[0], y[0]);
     for(size_t kk = 0; kk<wMNP; kk++)
     { 
       g[kk] = xp[kk]-y[kk]; 
     }
+  //  if(it == 0)
+   //   writetif("g_iter0.tif",g, wM, wN, wP);
     if(it > 0) {
       alpha = update_alpha(g, gm, wMNP);
-      printf("alpha=%f\n", alpha);
+     // printf("alpha=%f\n", alpha);
     }
     memcpy(xm, x, wMNP*sizeof(float));
     memcpy(x, xp, wMNP*sizeof(float));
     it++;
+    //writetif("xp.tif", xp, wM, wN, wP);
   }
   fftwf_free(W); // is P1
   fftwf_free(G);
+  float * out = fArray_subregion(xp, wM, wN, wP, M, N, P);
   fftwf_free(x);
   fftwf_free(f);
   fftwf_free(xp);
@@ -459,9 +477,50 @@ float * deconvolve(float * im, int M, int N, int P,
   fftwf_free(gm);
   fftwf_free(cK);
   fftwf_free(cKr);
-  float * out = fArray_subregion(y, wM, wN, wP, M, N, P);
   fftwf_free(y);
   return out;
+}
+
+void fArray_flipall_ut()
+{
+
+float * a = malloc(3*3*3*sizeof(float));
+float * b = malloc(3*3*3*sizeof(float));
+float * c = malloc(3*3*3*sizeof(float));
+
+for(int kk = 0; kk<27; kk++)
+{
+  a[kk] = 0;
+}
+
+a[13] = 1;
+fArray_flipall(b, a, 3, 3, 3);
+assert(b[13] == 1);
+
+for(int kk = 0; kk<27; kk++)
+{
+  a[kk] = rand();
+}
+
+fArray_flipall(b, a, 3, 3, 3);
+fArray_flipall(c, b, 3, 3, 3);
+for(int kk = 0; kk<27; kk++)
+{
+  assert(a[kk] == c[kk]);
+}
+
+fArray_flipall(b, a, 4, 3, 2);
+fArray_flipall(c, b, 4, 3, 2);
+for(int kk = 0; kk<24; kk++)
+  assert(a[kk] == c[kk]);
+
+fArray_flipall(b, a, 2, 3, 4);
+fArray_flipall(c, b, 2, 3, 4);
+for(int kk = 0; kk<24; kk++)
+  assert(a[kk] == c[kk]);
+
+free(a); free(b); free(c);
+return;
 }
 
 void shift_vector_ut()
@@ -485,6 +544,7 @@ void shift_vector_ut()
 void unittests()
 {
   //  shift_vector_ut();
+  fArray_flipall_ut();
   //
 }
 
@@ -505,13 +565,16 @@ int main(int argc, char ** argv)
   sprintf(outFile, "dummy.tif");
   //  sprintf(outFile, "dw_%s", imFile);
 
+  int nIter = 20;
+
   printf("Settings:\n");
   printf("\t image:  %s\n", imFile);
   printf("\t psf:    %s\n", psfFile);
   printf("\t output: %s\n", outFile);
-  printf("Press enter to continue\n");
-  getchar();
+  printf("\t nIter:  %d\n", nIter);
+  printf("\n");
 
+  printf("Reading %s\n", imFile);
   int M = 0, N = 0, P = 0;
   float * im = readtif_asFloat(imFile, &M, &N, &P);
   writetif("im.tif", im, M, N, P);
@@ -519,35 +582,35 @@ int main(int argc, char ** argv)
   
   int pM = 0, pN = 0, pP = 0;
   float * psf = NULL;
-  if(0){
+  if(1){
+    printf("Reading %s\n", psfFile);
   psf = readtif_asFloat(psfFile, &pM, &pN, &pP);
   assert(psf != NULL);
   } else {
     pM = 3; pN = 3; pP = 3;
     psf = malloc(27*sizeof(float));
     memset(psf, 0, 27*sizeof(float));
-    psf[14] = 1;
+    psf[13] = 1;
   }
-
-
 
   myfftw_start();
   float * out = NULL;
-  out = deconvolve(im, M, N, P,       psf, pM, pN, pP);
+  printf("Deconvolving\n");
+  out = deconvolve(im, M, N, P, psf, pM, pN, pP, nIter);
 
-  int exitstatus = 0;
+  int exitstatus = 1;
   if(out == NULL)
   {
     printf("Nothing to write to disk :(\n");
   } else 
   {
     printf("Writing to %s\n", outFile); fflush(stdout);
-    floatimage_normalize(out, M*N*P);
+//    floatimage_normalize(out, M*N*P);
     writetif(outFile, out, M, N, P);
-    exitstatus = 1;
+    exitstatus = 0;
   }
 
-  printf("Closing down the office\n"); fflush(stdout);
+  printf("Finalizing\n"); fflush(stdout);
   free(im);
   free(psf);
   free(outFile);

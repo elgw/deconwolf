@@ -15,31 +15,30 @@
 void floatimage_normalize(float * restrict I, const size_t N)
 {
   // Scale image to span the whole 16 bit range.
-  float imax = 0;
+  float imax = 1e7; float imin = 1e7;
   int ok = 1;
   for(size_t kk=0; kk<N; kk++)
   {
     if(~isnormal(I[kk]))
-        {
-          I[kk] = 0;
-          ok = 0;
-        }
+    {
+      I[kk] = 0;
+      ok = 0;
+    }
     I[kk] > imax ? imax = I[kk] : 0 ;
+    I[kk] < imin ? imin = I[kk] : 0 ;
   }
 
   if(!ok)
   {
     printf("floatimage_normalize got non-normal numbers\n");
   }
-  if(imax == 0)
-  {
-    printf("floatimage_normalize imax: %f\n", imax);
-  }
+
+  printf("floatimage_normalize imin: %f imax: %f\n", imin, imax);
 
   if(imax>0)
   {
-  for(size_t kk=0; kk<N; kk++)
-    I[kk]*=(pow(2,16)-1)/imax;
+    for(size_t kk=0; kk<N; kk++)
+      I[kk]*=(pow(2,16)-1)/imax;
   }
 
 }
@@ -122,9 +121,12 @@ int writetif(char * fName, float * V,
   float imax = 0;
   for(size_t kk = 0; kk<M*N*P; kk++)
   {
-    if(V[kk] > imax)
+    if(isnormal(V[kk]))
     {
-      imax = V[kk];
+      if(V[kk] > imax)
+      {
+        imax = V[kk];
+      }
     }
   }
   float scaling = 1/imax*(pow(2,16)-1);
@@ -160,7 +162,12 @@ int writetif(char * fName, float * V,
     {
       for(size_t ll = 0; ll<N; ll++)
       {
-        buf[ll] = V[M*N*dd + kk*N + ll]*scaling;
+        float value = V[M*N*dd + kk*N + ll]*scaling;
+        if(!isnormal(value))
+        { value = 0; }
+
+        buf[ll] = value;
+
       }
 
       assert(TIFFWriteScanline(out, // TIFF
