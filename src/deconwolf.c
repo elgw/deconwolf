@@ -28,8 +28,8 @@ typedef struct{
 opts * opts_new(void)
 {
   opts * s = malloc(sizeof(opts));
-  s->nThreads = 4;
-  s->nIter = 1;
+  s->nThreads = 8;
+  s->nIter = 50;
   s->imFile = NULL;
   s->psfFile = NULL;
   s->outFile = NULL;
@@ -441,6 +441,11 @@ float * deconvolve(float * im, int M, int N, int P,
     float * psf, int pM, int pN, int pP,
     opts * s)
 {
+  if(s->verbosity > 0)
+  {
+    printf("Deconvolving\n");
+  }
+
   /*Deconvolve im using psf */
   const int nIter = s->nIter;
 
@@ -455,10 +460,19 @@ float * deconvolve(float * im, int M, int N, int P,
   int wM = M + pM -1;
   int wN = N + pN -1;
   int wP = P + pP -1;
+  size_t wMNP = wM*wN*wP;
+
+  if(s->verbosity > 0)
+  { printf("image: [%dx%dx%d], psf: [%dx%dx%d], job: [%dx%dx%d] (%zu voxels)\n",
+      M, N, P, pM, pN, pP, wM, wN, wP, wMNP);
+  printf("Estimated peak memory use: %.1f GB\n", wMNP*65.0/1e9);
+  }
+  fprintf(s->log, "image: [%dx%dx%d], psf: [%dx%dx%d], job: [%dx%dx%d] (%zu voxels)\n",
+      M, N, P, pM, pN, pP, wM, wN, wP, wMNP);
+  fflush(s->log);
 
   fft_train(wM, wN, wP, s->verbosity);
 
-  size_t wMNP = wM*wN*wP;
 
   // Prepare the full size cK and cKr
   // (K and Kr in MATLAB)
@@ -552,7 +566,7 @@ float * deconvolve(float * im, int M, int N, int P,
     if(s->log != NULL)
     { fprintf(s->log, "Iteration %d/%d, error=%e\n", it+1, nIter, err);}
 
-    memcpy(gm, g, wMNP*sizeof(float));
+    memcpy(gm, g, wMNP*sizeof(float)); // swap points instead
     //    printf("xp[0] = %f, y[0] = %f\n", xp[0], y[0]);
     for(size_t kk = 0; kk<wMNP; kk++)
     { 
@@ -564,8 +578,8 @@ float * deconvolve(float * im, int M, int N, int P,
       alpha = update_alpha(g, gm, wMNP);
       // printf("alpha=%f\n", alpha);
     }
-    memcpy(xm, x, wMNP*sizeof(float));
-    memcpy(x, xp, wMNP*sizeof(float));
+    memcpy(xm, x, wMNP*sizeof(float)); // swap pointers instead
+    memcpy(x, xp, wMNP*sizeof(float)); // really need tree of them?
     it++;
     //writetif("xp.tif", xp, wM, wN, wP);
   }
@@ -697,10 +711,6 @@ int main(int argc, char ** argv)
 
   myfftw_start(s->nThreads);
   float * out = NULL;
-  if(s->verbosity > 0)
-  {
-    printf("Deconvolving\n");
-  }
   out = deconvolve(im, M, N, P, // input image and size
       psf, pM, pN, pP, // psf and size
       s);// settings
@@ -732,6 +742,11 @@ int main(int argc, char ** argv)
   free(out);
   myfftw_stop();
   opts_free(&s);
+  if(0)
+  {
+  printf("Do a grep VmPeak /proc/%d/status now ...\n", getpid());
+  getchar();
+  }
   return(exitstatus);
 }
 

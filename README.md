@@ -10,6 +10,8 @@
  - [ ] Re-use plans to save some (micro) time.
  - [ ] Use logger
  - [ ] Documentation, examples and test data.
+ - [ ] Eliminate one or two arrays in the main loop to save memory.
+ - [ ] block mode for low memory systems
  - [x] Make use of symmetries to save memory?
  - [x] Save FFTW wisdom.
  - [x] Identical results to matlab code.
@@ -45,6 +47,7 @@ bin/deconwolf dapi_001.tif PSF_dapi.tif
 
 ## Notes
  * FFTW is self tuning and will perform some tuning every time it presented for a new problem size. The result of this tuning is called wisdom and is stored in `fftw_wisdom_float_threads.dat` by deconwolf. Do not transfer that file to other machines.
+ * Memory consumption: 26169630 voxels and VmPeak 1700132 kB -> 65 B per voxel.
 
 ## Resources
  * [fftw3 documentation](http://www.fftw.org/fftw3_doc/).

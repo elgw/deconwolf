@@ -6,7 +6,8 @@
 
 // FFTW_MEASURE, FFTW_PATIENT or FFTW_EXHAUSTIVE
 char * swf = NULL;
-const unsigned int MYPLAN = FFTW_PATIENT;
+const unsigned int MYPLAN = FFTW_MEASURE;
+//const unsigned int MYPLAN = FFTW_PATIENT;
 
 void myfftw_start(int nThreads)
 {  
@@ -26,43 +27,6 @@ void myfftw_stop(void)
   fftwf_cleanup();
 }
 
-void dim3_real_float_inverse(fftwf_complex * in, float * out,
-    const int n1, const int n2, const int n3)
-{
-  myfftw_start(4);
-
-  fftwf_plan p;
-
-  p = fftwf_plan_dft_c2r_3d(n3, n2, n1, 
-      in, out, 
-      MYPLAN);
-  fftwf_execute(p);
-  fftwf_destroy_plan(p);
-
-  myfftw_stop();
-}
-
-void dim3_real_float(float * in, fftwf_complex* out,
-    const int n1, const int n2, const int n3)
-{
-
-  if(0){
-    FILE * fh = fopen("/tmp/log.txt", "w");
-    fprintf(fh, "fftwf_version=%s\n", fftwf_version);
-    fclose(fh);
-  }
-
-  myfftw_start(4);
-
-  fftwf_plan p = fftwf_plan_dft_r2c_3d(n3, n2, n1, 
-      in, // Float
-      out, // fftwf_complex 
-      MYPLAN);
-  fftwf_execute(p); 
-  fftwf_destroy_plan(p);
-
-  myfftw_stop();
-}
 
 fftwf_complex * fft(float * in, int n1, int n2, int n3)
 {
