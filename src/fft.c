@@ -43,9 +43,9 @@ void dim3_real_float(float * in, fftwf_complex* out,
 {
 
   if(0){
-  FILE * fh = fopen("/tmp/log.txt", "w");
-  fprintf(fh, "fftwf_version=%s\n", fftwf_version);
-  fclose(fh);
+    FILE * fh = fopen("/tmp/log.txt", "w");
+    fprintf(fh, "fftwf_version=%s\n", fftwf_version);
+    fclose(fh);
   }
 
   myfftw_start();
@@ -65,7 +65,7 @@ fftwf_complex * fft(float * in, int n1, int n2, int n3)
   fftwf_complex * out = fftwf_malloc(n1*n2*n3*sizeof(fftwf_complex));
   memset(out, 0, n1*n2*n3*sizeof(fftwf_complex));
 
-fftwf_plan p = fftwf_plan_dft_r2c_3d(n3, n2, n1, 
+  fftwf_plan p = fftwf_plan_dft_r2c_3d(n3, n2, n1, 
       in, // Float
       out, // fftwf_complex 
       FFTW_MEASURE);
@@ -93,7 +93,7 @@ float * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B, int M, int N, int 
   fft_mul(C, A, B, M*N*P); 
 
   float * out = fftwf_malloc(M*N*P*sizeof(float));
- 
+
   fftwf_plan p = fftwf_plan_dft_c2r_3d(P, N, M, 
       C, out, 
       FFTW_MEASURE);
@@ -112,12 +112,12 @@ void fft_train(size_t M, size_t N, size_t P)
 
   fftwf_plan p1 = fftwf_plan_dft_c2r_3d(P, N, M, 
       C, R, FFTW_MEASURE);
-    fftwf_execute(p1);
+  fftwf_execute(p1);
   fftwf_destroy_plan(p1);
 
-fftwf_plan p2 = fftwf_plan_dft_r2c_3d(P, N, M, 
+  fftwf_plan p2 = fftwf_plan_dft_r2c_3d(P, N, M, 
       R, C, FFTW_MEASURE);
-    fftwf_execute(p2);
+  fftwf_execute(p2);
   fftwf_destroy_plan(p2);
 
   fftwf_free(R);

@@ -81,6 +81,7 @@ float iter(float * xp, float * g,
   fftwf_complex * F_sn = fft(sn, wM, wN, wP);
   fftwf_free(y); // = sn as well
   float * x = fft_convolve_cc(cKr, F_sn, wM, wN, wP);
+  fftwf_free(F_sn);
   for(size_t kk = 0; kk<wMNP; kk++)
   {
     xp[kk] = f[kk]*x[kk]*W[kk];
@@ -162,14 +163,18 @@ void fArray_insert(float * T, int t1, int t2, int t3,
 float * fArray_subregion(float * A, int M, int N, int P, int m, int n, int p)
 {
   float * S = fftwf_malloc(m*n*p*sizeof(float));
+  assert(S != NULL);
   for(int mm = 0; mm<m; mm++)
   {
     for(int nn = 0; nn<n; nn++)
     {
       for(int pp = 0; pp<p; pp++)
       {
-        float x = A[mm + nn*M + pp*M*N];
-        S[mm + nn*n + pp*m*n] = x;
+        size_t Aidx = mm + nn*M + pp*M*N;
+        size_t Sidx = mm + nn*m + pp*m*n;
+          assert(Aidx < M*N*P);
+        assert(Sidx < m*n*p);
+        S[Sidx] = A[Aidx];
       }
     }
   }
@@ -328,7 +333,7 @@ float * deconvolve(float * im, int M, int N, int P,
     float * psf, int pM, int pN, int pP)
 {
 
-  int niter = 5;
+  int niter = 2;
   /* Deconvolve im using psf */
 
   if(psfIsCentered(psf, pM, pN, pP) == 0)
@@ -382,6 +387,7 @@ float * deconvolve(float * im, int M, int N, int P,
   printf("initial guess\n"); fflush(stdout);
   fftwf_complex * F_one = initial_guess(M, N, P, wM, wN, wP);
   float * P1 = fft_convolve_cc(cKr, F_one, wM, wN, wP);
+  fftwf_free(F_one);
   printf("P1\n");
   fArray_stats(P1, pM*pN*pP); // DEBUG BEFORE THIS! EITHER the unused parameters of FFTW ... or?
 
@@ -428,7 +434,7 @@ float * deconvolve(float * im, int M, int N, int P,
         y, W, G, 
         wM, wN, wP, 
         M, N, P);
-
+    
     printf("Iteration %d, error=%e\n", it, err);
     memcpy(gm, g, wMNP*sizeof(float));
     for(size_t kk = 0; kk<wMNP; kk++)
@@ -443,7 +449,16 @@ float * deconvolve(float * im, int M, int N, int P,
     memcpy(x, xp, wMNP*sizeof(float));
     it++;
   }
-
+  fftwf_free(W); // is P1
+  fftwf_free(G);
+  fftwf_free(x);
+  fftwf_free(f);
+  fftwf_free(xp);
+  fftwf_free(xm);
+  fftwf_free(g);
+  fftwf_free(gm);
+  fftwf_free(cK);
+  fftwf_free(cKr);
   float * out = fArray_subregion(y, wM, wN, wP, M, N, P);
   fftwf_free(y);
   return out;
@@ -501,13 +516,24 @@ int main(int argc, char ** argv)
   float * im = readtif_asFloat(imFile, &M, &N, &P);
   writetif("im.tif", im, M, N, P);
 
+  
   int pM = 0, pN = 0, pP = 0;
-  float * psf = readtif_asFloat(psfFile, &pM, &pN, &pP);
+  float * psf = NULL;
+  if(0){
+  psf = readtif_asFloat(psfFile, &pM, &pN, &pP);
   assert(psf != NULL);
+  } else {
+    pM = 3; pN = 3; pP = 3;
+    psf = malloc(27*sizeof(float));
+    memset(psf, 0, 27*sizeof(float));
+    psf[14] = 1;
+  }
+
+
 
   myfftw_start();
-  float * out = deconvolve(im, M, N, P, 
-      psf, pM, pN, pP);
+  float * out = NULL;
+  out = deconvolve(im, M, N, P,       psf, pM, pN, pP);
 
   int exitstatus = 0;
   if(out == NULL)
@@ -522,9 +548,10 @@ int main(int argc, char ** argv)
   }
 
   printf("Closing down the office\n"); fflush(stdout);
-  fftwf_free(im);
-  fftwf_free(psf);
+  free(im);
+  free(psf);
   free(outFile);
+  free(out);
   myfftw_stop();
   return(exitstatus);
 }
