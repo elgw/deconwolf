@@ -47,7 +47,7 @@ bin/deconwolf dapi_001.tif PSF_dapi.tif
 
 ## Notes
  * FFTW is self tuning and will perform some tuning every time it presented for a new problem size. The result of this tuning is called wisdom and is stored in `fftw_wisdom_float_threads.dat` by deconwolf. Do not transfer that file to other machines.
- * Memory consumption: 26169630 voxels and VmPeak 1700132 kB -> 65 B per voxel.
+ * Memory consumption: 26169630 voxels and VmPeak 1700132 kB gives 65 B per voxel. 339982580 and VmPeak 19498732 gives 58 B per voxel.
 
 ## Resources
  * [fftw3 documentation](http://www.fftw.org/fftw3_doc/).
