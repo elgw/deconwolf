@@ -5,10 +5,91 @@
 #include <stdint.h>
 #include <string.h>
 #include <fftw3.h>
-
+#include <sys/types.h>
+#include <unistd.h>
 #include "tiffio.h"
 #include "fft.h"
+#include "deconwolf.h"
 
+typedef struct{
+  int nThreads;
+  int nIter;
+  char * imFile;
+  char * psfFile;
+  char * outFile;
+  int verbosity;
+  fftwf_plan fft_plan;
+  fftwf_plan ifft_plan;
+} opts;
+
+opts * opts_new(void)
+{
+  opts * s = malloc(sizeof(opts));
+  s->nThreads = 4;
+  s->nIter = 1;
+  s->imFile = NULL;
+  s->psfFile = NULL;
+  s->outFile = NULL;
+  s->verbosity = 1;
+  return s;
+}
+
+void nullfree(void * p)
+{
+  if(p != NULL)
+  {
+    free(p);
+  }
+}
+
+void opts_free(opts ** sp)
+{
+  opts * s = sp[0];
+  nullfree(s->imFile);
+  nullfree(s->psfFile);
+  nullfree(s->outFile);
+  free(s);
+}
+
+void opts_print(opts * s, FILE *f)
+{
+  if(f == NULL)
+  {
+    f = stdout;
+  }
+  fprintf(f, "Settings:\n");
+  fprintf(f, "\t image:  %s\n", s->imFile);
+  fprintf(f, "\t psf:    %s\n", s->psfFile);
+  fprintf(f, "\t output: %s\n", s->outFile);
+  fprintf(f, "\t nIter:  %d\n", s->nIter);
+  fprintf(f, "\t nThreads: %d\n", s->nThreads);
+  fprintf(f, "Info:\n");
+  fprintf(f, "\t PID: %d\n", (int) getpid());
+  fprintf(f, "\t FFTW: %s\n", fftwf_version);
+  fprintf(f, "\t TIFF: %s\n", TIFFGetVersion());
+  fprintf(f, "\n");
+  return;
+}
+
+void argparsing(int argc, char ** argv, opts * s)
+{
+if(argc < 3)
+  {
+    usage(argc, argv);
+    unittests();
+    exit(1);
+  }
+
+  s->imFile = malloc(strlen(argv[1])+1);
+  strcpy(s->imFile, argv[1]);
+
+  s->psfFile = malloc(strlen(argv[2])+1);
+  strcpy(s->psfFile, argv[2]);
+  s->outFile = malloc(100*sizeof(char));
+  sprintf(s->outFile, "dummy.tif");
+  s->nIter = 1;
+  s->nThreads = 4;
+}
 
 int psfIsCentered(float * V, int M, int N, int P)
 {
@@ -64,7 +145,8 @@ float iter(float * xp, float * g,
     float * W,
     float * G, 
     int wM, int wN, int wP,
-    int M, int N, int P)
+    int M, int N, int P,
+    opts * s)
 {
   size_t wMNP = wM*wN*wP;
 
@@ -116,6 +198,7 @@ fftwf_complex * initial_guess(int M, int N, int P,
     sum+=one[kk];
     one[kk] > max ? max = one[kk] : 0;
   }
+
   printf("sum(one) = %f max(one) = %f\n", sum, max);
 
   fftwf_complex * Fone = fft(one, wM, wN, wP);
@@ -339,9 +422,10 @@ float update_alpha(float * g, float * gm, size_t wMNP)
 
 float * deconvolve(float * im, int M, int N, int P,
     float * psf, int pM, int pN, int pP,
-    int niter)
+    opts * s)
 {
-  /* Deconvolve im using psf */
+  /*Deconvolve im using psf */
+  const int nIter = s->nIter;
 
   if(psfIsCentered(psf, pM, pN, pP) == 0)
   {
@@ -430,7 +514,7 @@ float * deconvolve(float * im, int M, int N, int P,
   float * g = fArray_zeros(wMNP);
 
   int it = 0;
-  while(it<niter)
+  while(it<nIter)
   {
     
       for(size_t kk = 0; kk<wMNP; kk++)
@@ -446,9 +530,9 @@ float * deconvolve(float * im, int M, int N, int P,
         cK, cKr, 
         y, W, G, 
         wM, wN, wP, 
-        M, N, P);
+        M, N, P, s);
     
-    printf("Iteration %d/%d, error=%e\n", it+1, niter, err);
+    printf("Iteration %d/%d, error=%e\n", it+1, nIter, err);
     memcpy(gm, g, wMNP*sizeof(float));
 //    printf("xp[0] = %f, y[0] = %f\n", xp[0], y[0]);
     for(size_t kk = 0; kk<wMNP; kk++)
@@ -543,7 +627,7 @@ void shift_vector_ut()
 
 void unittests()
 {
-  //  shift_vector_ut();
+  shift_vector_ut();
   fArray_flipall_ut();
   //
 }
@@ -551,40 +635,21 @@ void unittests()
 
 int main(int argc, char ** argv)
 {
-
-  unittests();
-
-  if(argc < 3)
-  {
-    usage(argc, argv);
-    exit(1);
-  }
-  char * imFile = argv[1];
-  char * psfFile = argv[2];
-  char * outFile = malloc(100*sizeof(char));
-  sprintf(outFile, "dummy.tif");
-  //  sprintf(outFile, "dw_%s", imFile);
-
-  int nIter = 20;
-
-  printf("Settings:\n");
-  printf("\t image:  %s\n", imFile);
-  printf("\t psf:    %s\n", psfFile);
-  printf("\t output: %s\n", outFile);
-  printf("\t nIter:  %d\n", nIter);
-  printf("\n");
-
-  printf("Reading %s\n", imFile);
+  
+  opts * s = opts_new(); 
+  argparsing(argc, argv, s);
+  opts_print(s, NULL);
+ 
+  printf("Reading %s\n", s->imFile);
   int M = 0, N = 0, P = 0;
-  float * im = readtif_asFloat(imFile, &M, &N, &P);
-  writetif("im.tif", im, M, N, P);
-
+  float * im = readtif_asFloat(s->imFile, &M, &N, &P);
+  // writetif("im.tif", im, M, N, P);
   
   int pM = 0, pN = 0, pP = 0;
   float * psf = NULL;
   if(1){
-    printf("Reading %s\n", psfFile);
-  psf = readtif_asFloat(psfFile, &pM, &pN, &pP);
+    printf("Reading %s\n", s->psfFile);
+  psf = readtif_asFloat(s->psfFile, &pM, &pN, &pP);
   assert(psf != NULL);
   } else {
     pM = 3; pN = 3; pP = 3;
@@ -593,10 +658,12 @@ int main(int argc, char ** argv)
     psf[13] = 1;
   }
 
-  myfftw_start();
+  myfftw_start(s->nThreads);
   float * out = NULL;
   printf("Deconvolving\n");
-  out = deconvolve(im, M, N, P, psf, pM, pN, pP, nIter);
+  out = deconvolve(im, M, N, P, // input image and size
+      psf, pM, pN, pP, // psf and size
+      s);// settings
 
   int exitstatus = 1;
   if(out == NULL)
@@ -604,18 +671,18 @@ int main(int argc, char ** argv)
     printf("Nothing to write to disk :(\n");
   } else 
   {
-    printf("Writing to %s\n", outFile); fflush(stdout);
+    printf("Writing to %s\n", s->outFile); fflush(stdout);
 //    floatimage_normalize(out, M*N*P);
-    writetif(outFile, out, M, N, P);
+    writetif(s->outFile, out, M, N, P);
     exitstatus = 0;
   }
 
   printf("Finalizing\n"); fflush(stdout);
   free(im);
   free(psf);
-  free(outFile);
   free(out);
   myfftw_stop();
+  opts_free(&s);
   return(exitstatus);
 }
 

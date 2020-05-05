@@ -4,21 +4,24 @@
 #include <fftw3.h>
 #include <string.h>
 
-const char swf[] = "fftw_wisdom_float_threads.dat";
 // FFTW_MEASURE, FFTW_PATIENT or FFTW_EXHAUSTIVE
+char * swf = NULL;
 const unsigned int MYPLAN = FFTW_PATIENT;
 
-void myfftw_start(void)
-{
-  int nThreads = 8;
+void myfftw_start(int nThreads)
+{  
+//  printf("\t using %s with %d threads\n", fftwf_version, nThreads);
   fftwf_init_threads();
   fftwf_plan_with_nthreads(nThreads);
+  swf = malloc(100*sizeof(char));
+  sprintf(swf, "fftw_wisdom_float_threads_%d.dat", nThreads);
   fftwf_import_wisdom_from_filename(swf);
 }
 
 void myfftw_stop(void)
 {
   fftwf_export_wisdom_to_filename(swf);
+  free(swf);
   fftwf_cleanup_threads();
   fftwf_cleanup();
 }
@@ -26,7 +29,7 @@ void myfftw_stop(void)
 void dim3_real_float_inverse(fftwf_complex * in, float * out,
     const int n1, const int n2, const int n3)
 {
-  myfftw_start();
+  myfftw_start(4);
 
   fftwf_plan p;
 
@@ -49,7 +52,7 @@ void dim3_real_float(float * in, fftwf_complex* out,
     fclose(fh);
   }
 
-  myfftw_start();
+  myfftw_start(4);
 
   fftwf_plan p = fftwf_plan_dft_r2c_3d(n3, n2, n1, 
       in, // Float
@@ -120,8 +123,8 @@ void fft_train(size_t M, size_t N, size_t P)
       C, R, MYPLAN | FFTW_WISDOM_ONLY);
 
   if(p0 == NULL)
-  {
-    printf("\t generation c2r\n");
+  {    
+    printf("\tgenerating c2r\n");
   fftwf_plan p1 = fftwf_plan_dft_c2r_3d(P, N, M, 
       C, R, MYPLAN);
   fftwf_execute(p1);
@@ -129,13 +132,14 @@ void fft_train(size_t M, size_t N, size_t P)
   } else {
     printf("\tc2r -- ok\n");
   }
+fftwf_destroy_plan(p0);
 
     p0 = fftwf_plan_dft_r2c_3d(P, N, M, 
       R, C, MYPLAN | FFTW_WISDOM_ONLY);
 
 if(p0 == NULL)
 {
-    printf("\tgenerating c2r\n");
+    printf("\tgenerating r2c\n");
   fftwf_plan p2 = fftwf_plan_dft_r2c_3d(P, N, M, 
       R, C, MYPLAN);
   fftwf_execute(p2);
@@ -143,6 +147,7 @@ if(p0 == NULL)
 } else {
   printf("\tr2c -- ok\n");
   }
+fftwf_destroy_plan(p0);
 
   fftwf_free(R);
   fftwf_free(C);
