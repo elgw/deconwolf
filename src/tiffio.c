@@ -16,14 +16,35 @@ void floatimage_normalize(float * restrict I, const size_t N)
 {
   // Scale image to span the whole 16 bit range.
   float imax = 0;
+  int ok = 1;
   for(size_t kk=0; kk<N; kk++)
+  {
+    if(~isnormal(I[kk]))
+        {
+          I[kk] = 0;
+          ok = 0;
+        }
     I[kk] > imax ? imax = I[kk] : 0 ;
-  //printf("imax: %f\n", imax);
+  }
+
+  if(!ok)
+  {
+    printf("floatimage_normalize got non-normal numbers\n");
+  }
+  if(imax == 0)
+  {
+    printf("floatimage_normalize imax: %f\n", imax);
+  }
+
+  if(imax>0)
+  {
   for(size_t kk=0; kk<N; kk++)
     I[kk]*=(pow(2,16)-1)/imax;
+  }
+
 }
 
-void floatimage_show_stats(float * I, size_t M, size_t N, size_t P)
+void floatimage_show_stats(float * I, size_t N, size_t M, size_t P)
 {
   float isum = 0;
   float imin = 100000;
@@ -95,14 +116,25 @@ void readFloat(TIFF * tfile, float * V,
 
 
 int writetif(char * fName, float * V, 
-    int M, int N, int P)
+    int N, int M, int P)
 {
+
+  float imax = 0;
+  for(size_t kk = 0; kk<M*N*P; kk++)
+  {
+    if(V[kk] > imax)
+    {
+      imax = V[kk];
+    }
+  }
+  float scaling = 1/imax*(pow(2,16)-1);
+
 
   size_t bytesPerSample = sizeof(uint16_t);
   TIFF* out = TIFFOpen(fName, "w");
   assert(out != NULL);
 
-  size_t linbytes = M*bytesPerSample;
+  size_t linbytes = (M+N)*bytesPerSample;
   uint16_t * buf = _TIFFmalloc(linbytes);
 
   for(size_t dd = 0; dd<P; dd++)
@@ -124,11 +156,11 @@ int writetif(char * fName, float * V,
     TIFFSetField(out, TIFFTAG_PAGENUMBER, dd, P); 
 
 
-    for(size_t kk = 0; kk<N; kk++)
+    for(size_t kk = 0; kk<M; kk++)
     {
-      for(size_t ll = 0; ll<M; ll++)
+      for(size_t ll = 0; ll<N; ll++)
       {
-        buf[ll] = V[M*N*dd + kk*M + ll];
+        buf[ll] = V[M*N*dd + kk*N + ll]*scaling;
       }
 
       assert(TIFFWriteScanline(out, // TIFF
@@ -148,7 +180,7 @@ int writetif(char * fName, float * V,
 }
 
 float * readtif_asFloat(char * fName, 
-    int * M0, int * N0, int * P0)
+    int * N0, int * M0, int * P0)
 {
   /* Reads the content of the tif file with fName
    * Puts the images size in M0, N0, P0
