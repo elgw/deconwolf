@@ -7,23 +7,14 @@
 #include <fftw3.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <getopt.h>
+#include <stdlib.h>
+#include <libgen.h>
 #include "tiffio.h"
 #include "fft.h"
 #include "deconwolf.h"
 
-typedef struct{
-  int nThreads;
-  int nIter;
-  char * imFile;
-  char * psfFile;
-  char * outFile;
-  char * logFile;
-  FILE * log;
 
-  int verbosity;
-  fftwf_plan fft_plan;
-  fftwf_plan ifft_plan;
-} opts;
 
 opts * opts_new(void)
 {
@@ -75,34 +66,95 @@ void show_info(FILE * f)
 {
   f == NULL ? f = stdout : 0;
   fprintf(f, "Info:\n");
-  fprintf(f, "\t PID: %d\n", (int) getpid());
-  fprintf(f, "\t FFTW: %s\n", fftwf_version);
-  fprintf(f, "\t TIFF: %s\n", TIFFGetVersion());
+  fprintf(f, "deconwolf: %s\n", deconwolf_version);
+  fprintf(f, "FFTW: %s\n", fftwf_version);
+  fprintf(f, "TIFF: %s\n", TIFFGetVersion());
+  fprintf(f, "running as PID: %d\n", (int) getpid());
   fprintf(f, "\n");
+  fflush(f);
   return;
 }
 
 void argparsing(int argc, char ** argv, opts * s)
 {
-  if(argc < 3)
+
+  struct option longopts[] = {
+    { "version",     no_argument,       NULL,   'v' }, 
+    { "help",         no_argument,       NULL,   'h' },
+    // Data
+    { "out",        required_argument, NULL,   'o' },
+    // Settings
+    { "iter",      required_argument, NULL,   'n' },
+    { "threads",      required_argument, NULL,   'c' },
+    { "verbose",      required_argument, NULL,   'l' },
+    { "test",        no_argument,        NULL,   't' },
+    { NULL,           0,                 NULL,   0   }
+  };
+
+  int ch;
+  while((ch = getopt_long(argc, argv, "vho:n:c:p:", longopts, NULL)) != -1)
   {
-    usage(argc, argv);
-    unittests();
+    switch(ch) {
+      case 'v':
+        show_info(NULL);
+        exit(0);
+        break;
+      case 'h':
+        usage(argc, argv);
+        exit(0);
+        break;
+      case 'o':
+        s->outFile = malloc(strlen(optarg)+1);
+        strcpy(s->outFile, optarg);
+        break;
+      case 'n':
+        s->nIter = atoi(optarg);
+        break;
+      case 'c':
+        s->nThreads = atoi(optarg);
+        break;
+      case 'l':
+        s->verbosity = atoi(optarg);
+        break;
+      case 't':
+        unittests();
+        exit(0);
+        break;
+    }
+  }
+
+  /* Take care of the positional arguments */
+  if(optind + 2 != argc)
+  {
+    printf("Both image and psf has to be specified\n");
     exit(1);
   }
 
-  s->imFile = malloc(strlen(argv[1])+1);
-  strcpy(s->imFile, argv[1]);
+  s->imFile = realpath(argv[optind++], 0);
+  s->psfFile = realpath(argv[optind++], 0);
 
-  s->psfFile = malloc(strlen(argv[2])+1);
-  strcpy(s->psfFile, argv[2]);
-  s->outFile = malloc(100*sizeof(char));
-  sprintf(s->outFile, "dummy.tif");
+  if(s->psfFile == NULL || s->imFile == NULL)
+  {
+    printf("realpath can't interpret the file names.\n");
+    assert(0);
+    exit(1);
+  }
 
-  s->logFile = malloc(100*sizeof(char));
+  if(s->outFile == NULL)
+  {
+char * dirc = strdup(s->imFile);
+char * basec = strdup(s->imFile);
+char * dname = dirname(dirc);
+char * bname = basename(basec);
+s->outFile = malloc(strlen(dname) + strlen(bname) + 10);
+sprintf(s->outFile, "%s/dcw_%s", dname, bname);
+printf("%s\n", s->outFile); fflush(stdout);
+  }
+
+  s->logFile = malloc(strlen(s->outFile) + 10);
   sprintf(s->logFile, "%s.log.txt", s->outFile);
-  s->log = fopen(s->logFile, "w");
-  assert(s->log != NULL);
+
+  printf("Options received\n"); fflush(stdout);
 }
 
 int psfIsCentered(float * V, int M, int N, int P)
@@ -415,7 +467,16 @@ float * expandIm_a(float * in,
 void usage(int argc, char ** argv)
 {
   printf("Usage:\n");
-  printf("$%s image.tif psf.tif\n", argv[0]);
+  printf("$%s <options> image.tif psf.tif\n", argv[0]);
+  printf("Options:\n");
+  printf(" --version\n\t Show version info\n");
+  printf(" --help\n\t Show this measage\n");
+  printf(" --out <file>\n\t Specify output image name\n");
+  printf(" --iter N\n\t Specify the number of iterations to use\n");
+  printf(" --threads N\n\t Specify the number of threads to use\n");
+  printf(" --verbose N\n\t Set verbosity level\n");
+  printf(" --test\n\t Run unit tests\n");
+  printf("\n");
 }
 
 
@@ -665,18 +726,25 @@ void unittests()
 
 int main(int argc, char ** argv)
 {
-
   opts * s = opts_new(); 
   argparsing(argc, argv, s);
+  return deconwolf(s);
+}
 
+int deconwolf(opts * s)
+{
+
+  s->log = fopen(s->logFile, "w");
+  assert(s->log != NULL);
+
+
+  opts_print(s, s->log); 
   if(s->verbosity > 0) 
   {
     opts_print(s, NULL); 
   }
-  if(s->verbosity > 1)
-  {
-    show_info(NULL);
-  }
+
+  show_info(s->log);
 
   if(s->verbosity > 0)
   {
@@ -741,8 +809,8 @@ int main(int argc, char ** argv)
   opts_free(&s);
   if(0)
   {
-  printf("Do a grep VmPeak /proc/%d/status now ...\n", getpid());
-  getchar();
+    printf("Do a grep VmPeak /proc/%d/status now ...\n", getpid());
+    getchar();
   }
   return(exitstatus);
 }
