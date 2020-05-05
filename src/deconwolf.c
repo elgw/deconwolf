@@ -103,9 +103,6 @@ void argparsing(int argc, char ** argv, opts * s)
   sprintf(s->logFile, "%s.log.txt", s->outFile);
   s->log = fopen(s->logFile, "w");
   assert(s->log != NULL);
-
-  s->nIter = 10;
-  s->nThreads = 4;
 }
 
 int psfIsCentered(float * V, int M, int N, int P)
