@@ -3,8 +3,6 @@
 `deconwolf` is a program written in C for deconvolution of fluorescent wide-field images.
 
 ## Todo
- - [ ] Argument parsing 
- - [ ] Proper automatic name on output file.
  - [ ] Automatic cropping of the PSF if it is too large.
  - [ ] Protect better against misuse.
  - [ ] Re-use plans to save some (micro) time.
@@ -12,6 +10,8 @@
  - [ ] Documentation, examples and test data.
  - [ ] Eliminate one or two arrays in the main loop to save memory.
  - [ ] block mode for low memory systems
+ - [x] Argument parsing 
+ - [x] Proper automatic name on output file.
  - [x] Make use of symmetries to save memory?
  - [x] Save FFTW wisdom.
  - [x] Identical results to matlab code.
@@ -42,7 +42,10 @@ sudo make install
 ```
 ## Usage:
 ```
-bin/deconwolf dapi_001.tif PSF_dapi.tif
+# for options, see
+deonwolf --help
+# basic usage
+deconwolf dapi_001.tif PSF_dapi.tif
 ```
 
 ## Notes

@@ -148,13 +148,16 @@ char * dname = dirname(dirc);
 char * bname = basename(basec);
 s->outFile = malloc(strlen(dname) + strlen(bname) + 10);
 sprintf(s->outFile, "%s/dcw_%s", dname, bname);
-printf("%s\n", s->outFile); fflush(stdout);
+free(dirc);
+free(basec);
+free(dname);
+free(bname);
   }
 
   s->logFile = malloc(strlen(s->outFile) + 10);
   sprintf(s->logFile, "%s.log.txt", s->outFile);
 
-  printf("Options received\n"); fflush(stdout);
+//  printf("Options received\n"); fflush(stdout);
 }
 
 int psfIsCentered(float * V, int M, int N, int P)
