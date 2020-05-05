@@ -738,7 +738,6 @@ void show_time(FILE * f)
 
 int main(int argc, char ** argv)
 {
-  show_time(NULL);
   opts * s = opts_new(); 
   argparsing(argc, argv, s);
   return deconwolf(s);
