@@ -117,7 +117,6 @@ void readFloat(TIFF * tfile, float * V,
 int writetif(char * fName, float * V, 
     int N, int M, int P)
 {
-
   float imax = 0;
   for(size_t kk = 0; kk<M*N*P; kk++)
   {
@@ -187,7 +186,7 @@ int writetif(char * fName, float * V,
 }
 
 float * readtif_asFloat(char * fName, 
-    int * N0, int * M0, int * P0)
+    int * N0, int * M0, int * P0, int verbosity)
 {
   /* Reads the content of the tif file with fName
    * Puts the images size in M0, N0, P0
@@ -198,7 +197,6 @@ float * readtif_asFloat(char * fName,
   TIFF * tfile = TIFFOpen(fName, "r");
 
   if(tfile == NULL) {
-    printf("TIFFOpen failed\n");
     return NULL;
   }
 
@@ -218,7 +216,6 @@ float * readtif_asFloat(char * fName,
       return NULL;
     }
   }
-
 
   int isUint = 0;
   int isFloat = 0;
@@ -266,14 +263,16 @@ float * readtif_asFloat(char * fName,
   uint32_t ndirs = TIFFNumberOfDirectories(tfile);
   P0[0] = (size_t) ndirs;
 
-  if(gotB){
-    printf(" TIFFTAG_IMAGEDEPTH: %u\n", B);}
-  printf(" TIFFTAG_BITSPERSAMPLE: %u\n", BPS);
-  printf(" size: %zu x %zu, %zu bits\n", (size_t) M, (size_t) N, (size_t) BPS);
-  printf(" # strips: %zu \n", (size_t) nstrips);
-  printf(" strip size (ssize): %zu bytes \n", (size_t) ssize);
-  printf(" # dirs (slices): %zu\n", (size_t) ndirs);
-
+  if(verbosity > 1)
+  {
+    if(gotB){
+      printf(" TIFFTAG_IMAGEDEPTH: %u\n", B);}
+    printf(" TIFFTAG_BITSPERSAMPLE: %u\n", BPS);
+    printf(" size: %zu x %zu, %zu bits\n", (size_t) M, (size_t) N, (size_t) BPS);
+    printf(" # strips: %zu \n", (size_t) nstrips);
+    printf(" strip size (ssize): %zu bytes \n", (size_t) ssize);
+    printf(" # dirs (slices): %zu\n", (size_t) ndirs);
+  }
 
   if(TIFFIsTiled(tfile))
   {
@@ -290,12 +289,18 @@ float * readtif_asFloat(char * fName,
 
   if(isFloat)
   {
-    printf("ReadFloat ...\n");
+    if(verbosity > 1)
+    {
+      printf("ReadFloat ...\n");
+    }
     readFloat(tfile, V, ssize, ndirs, nstrips, M*N);
   }
   if(isUint)
   {
-    printf("ReadUint ...\n");
+    if(verbosity > 1)
+    {
+      printf("ReadUint ...\n");
+    }
     readUint(tfile, V, ssize, ndirs, nstrips, M*N);
   }
 

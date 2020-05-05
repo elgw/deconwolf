@@ -14,4 +14,4 @@ void fft_mul(fftwf_complex * C, fftwf_complex * A, fftwf_complex * B, size_t N);
 
 float * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B, int M, int N, int P);
 
-void fft_train(size_t, size_t, size_t);
+void fft_train(size_t, size_t, size_t, int);

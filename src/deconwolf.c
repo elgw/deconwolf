@@ -17,6 +17,9 @@ typedef struct{
   char * imFile;
   char * psfFile;
   char * outFile;
+  char * logFile;
+  FILE * log;
+
   int verbosity;
   fftwf_plan fft_plan;
   fftwf_plan ifft_plan;
@@ -30,6 +33,8 @@ opts * opts_new(void)
   s->imFile = NULL;
   s->psfFile = NULL;
   s->outFile = NULL;
+  s->logFile = NULL;
+  s->log = NULL;
   s->verbosity = 1;
   return s;
 }
@@ -48,21 +53,27 @@ void opts_free(opts ** sp)
   nullfree(s->imFile);
   nullfree(s->psfFile);
   nullfree(s->outFile);
+  nullfree(s->logFile);
+  fclose(s->log);
   free(s);
 }
 
 void opts_print(opts * s, FILE *f)
 {
-  if(f == NULL)
-  {
-    f = stdout;
-  }
+  f == NULL ? f = stdout : 0;
   fprintf(f, "Settings:\n");
   fprintf(f, "\t image:  %s\n", s->imFile);
   fprintf(f, "\t psf:    %s\n", s->psfFile);
   fprintf(f, "\t output: %s\n", s->outFile);
   fprintf(f, "\t nIter:  %d\n", s->nIter);
   fprintf(f, "\t nThreads: %d\n", s->nThreads);
+  fprintf(f, "\t verbosity: %d\n", s->verbosity);
+  fprintf(f, "\t log file: %s\n", s->logFile);
+}
+
+void show_info(FILE * f)
+{
+  f == NULL ? f = stdout : 0;
   fprintf(f, "Info:\n");
   fprintf(f, "\t PID: %d\n", (int) getpid());
   fprintf(f, "\t FFTW: %s\n", fftwf_version);
@@ -73,7 +84,7 @@ void opts_print(opts * s, FILE *f)
 
 void argparsing(int argc, char ** argv, opts * s)
 {
-if(argc < 3)
+  if(argc < 3)
   {
     usage(argc, argv);
     unittests();
@@ -87,7 +98,13 @@ if(argc < 3)
   strcpy(s->psfFile, argv[2]);
   s->outFile = malloc(100*sizeof(char));
   sprintf(s->outFile, "dummy.tif");
-  s->nIter = 1;
+
+  s->logFile = malloc(100*sizeof(char));
+  sprintf(s->logFile, "%s.log.txt", s->outFile);
+  s->log = fopen(s->logFile, "w");
+  assert(s->log != NULL);
+
+  s->nIter = 10;
   s->nThreads = 4;
 }
 
@@ -199,7 +216,7 @@ fftwf_complex * initial_guess(int M, int N, int P,
     one[kk] > max ? max = one[kk] : 0;
   }
 
-  printf("sum(one) = %f max(one) = %f\n", sum, max);
+  //  printf("sum(one) = %f max(one) = %f\n", sum, max);
 
   fftwf_complex * Fone = fft(one, wM, wN, wP);
 
@@ -263,7 +280,7 @@ float * fArray_subregion(float * A, int M, int N, int P, int m, int n, int p)
       {
         size_t Aidx = mm + nn*M + pp*M*N;
         size_t Sidx = mm + nn*m + pp*m*n;
-          assert(Aidx < M*N*P);
+        assert(Aidx < M*N*P);
         assert(Sidx < m*n*p);
         S[Sidx] = A[Aidx];
       }
@@ -439,7 +456,7 @@ float * deconvolve(float * im, int M, int N, int P,
   int wN = N + pN -1;
   int wP = P + pP -1;
 
-  fft_train(wM, wN, wP);
+  fft_train(wM, wN, wP, s->verbosity);
 
   size_t wMNP = wM*wN*wP;
 
@@ -448,41 +465,39 @@ float * deconvolve(float * im, int M, int N, int P,
   float * Z = fftwf_malloc(wMNP*sizeof(float));
   memset(Z, 0, wMNP*sizeof(float));
 
-  printf("insert\n"); fflush(stdout);
+  //printf("insert\n"); fflush(stdout);
   fArray_insert(Z, wM, wN, wP, psf, pM, pN, pP);
   float * Zr = fftwf_malloc(wMNP*sizeof(float));
   memset(Zr, 0, wMNP*sizeof(float));
   float * psf_flipped = malloc(wMNP*sizeof(float));
   memset(psf_flipped, 0, sizeof(float)*wMNP);
-  printf("flipall\n"); fflush(stdout);
-  fArray_stats(psf, pM*pN*pP);
+  //fArray_stats(psf, pM*pN*pP);
   fArray_flipall(psf_flipped, psf, pM, pN, pP);
-  fArray_stats(psf_flipped, pM*pN*pP);
-  writetif("psf_flipped.tif", psf_flipped, pM, pN, pP);
+  //fArray_stats(psf_flipped, pM*pN*pP);
+  //writetif("psf_flipped.tif", psf_flipped, pM, pN, pP);
   fArray_insert(Zr, wM, wN, wP, psf_flipped, pM, pN, pP);
-  writetif("Zr0.tif", Zr, wM, wN, wP);
+  //writetif("Zr0.tif", Zr, wM, wN, wP);
   free(psf_flipped);
-  printf("circshift\n"); fflush(stdout);
   fArray_circshift(Z, wM, wN, wP, -(pM-1)/2, -(pN-1)/2, -(pP-1)/2);
   fArray_circshift(Zr, wM, wN, wP, -(pM-1)/2, -(pN-1)/2, -(pP-1)/2);
-  printf("...\n"); fflush(stdout);
-  fArray_stats(Z, pM*pN*pP);
-  fArray_stats(Zr, pM*pN*pP);
-  writetif("Z.tif", Z, wM, wN, wP);
-  writetif("Zr.tif", Zr, wM, wN, wP);
+  //printf("...\n"); fflush(stdout);
+  //fArray_stats(Z, pM*pN*pP);
+  //fArray_stats(Zr, pM*pN*pP);
+  //writetif("Z.tif", Z, wM, wN, wP);
+  //writetif("Zr.tif", Zr, wM, wN, wP);
 
   fftwf_complex * cK = fft(Z, wM, wN, wP);
   fftwf_free(Z);
   fftwf_complex * cKr = fft(Zr, wM, wN, wP);
   fftwf_free(Zr);
-  printf("initial guess\n"); fflush(stdout);
+  //printf("initial guess\n"); fflush(stdout);
   fftwf_complex * F_one = initial_guess(M, N, P, wM, wN, wP);
   float * P1 = fft_convolve_cc(cKr, F_one, wM, wN, wP);
   fftwf_free(F_one);
-  printf("P1\n");
-  fArray_stats(P1, pM*pN*pP); // DEBUG BEFORE THIS! EITHER the unused parameters of FFTW ... or?
+  //printf("P1\n");
+  //fArray_stats(P1, pM*pN*pP);
 
-  writetif("P1.tif", P1, wM, wN, wP);
+  //writetif("P1.tif", P1, wM, wN, wP);
   float sigma = 0.001;
   for(size_t kk = 0; kk<wMNP; kk++)
   {
@@ -490,13 +505,13 @@ float * deconvolve(float * im, int M, int N, int P,
     { P1[kk] = 0; } else { P1[kk] = 1/P1[kk]; }
   }
   float * W = P1;
-  writetif("W.tif", W, wM, wN, wP);
+  //writetif("W.tif", W, wM, wN, wP);
 
   // Original image -- expanded
   float * G = fftwf_malloc(wMNP*sizeof(float));
   memset(G, 0, wMNP*sizeof(float));
   fArray_insert(G, wM, wN, wP, im, M, N, P);
-  writetif("G.tif", G, wM, wN, wP);
+  //writetif("G.tif", G, wM, wN, wP);
 
   float sumg = 0;
   for(size_t kk = 0; kk<M*N*P; kk++)
@@ -516,14 +531,14 @@ float * deconvolve(float * im, int M, int N, int P,
   int it = 0;
   while(it<nIter)
   {
-    
-      for(size_t kk = 0; kk<wMNP; kk++)
-      { 
-        y[kk] = x[kk] + alpha*(x[kk]-xm[kk]);
-        y[kk] < 0 ? y[kk] = 0 : 0;
-      }
-    
-   // printf("y[0] = %f\n", y[0]);
+
+    for(size_t kk = 0; kk<wMNP; kk++)
+    { 
+      y[kk] = x[kk] + alpha*(x[kk]-xm[kk]);
+      y[kk] < 0 ? y[kk] = 0 : 0;
+    }
+
+    // printf("y[0] = %f\n", y[0]);
 
     double err = iter(xp, // xp is updated
         im, 
@@ -531,19 +546,23 @@ float * deconvolve(float * im, int M, int N, int P,
         y, W, G, 
         wM, wN, wP, 
         M, N, P, s);
-    
-    printf("Iteration %d/%d, error=%e\n", it+1, nIter, err);
+
+    if(s->verbosity >0){
+      printf("Iteration %d/%d, error=%e\n", it+1, nIter, err);}
+    if(s->log != NULL)
+    { fprintf(s->log, "Iteration %d/%d, error=%e\n", it+1, nIter, err);}
+
     memcpy(gm, g, wMNP*sizeof(float));
-//    printf("xp[0] = %f, y[0] = %f\n", xp[0], y[0]);
+    //    printf("xp[0] = %f, y[0] = %f\n", xp[0], y[0]);
     for(size_t kk = 0; kk<wMNP; kk++)
     { 
       g[kk] = xp[kk]-y[kk]; 
     }
-  //  if(it == 0)
-   //   writetif("g_iter0.tif",g, wM, wN, wP);
+    //  if(it == 0)
+    //   writetif("g_iter0.tif",g, wM, wN, wP);
     if(it > 0) {
       alpha = update_alpha(g, gm, wMNP);
-     // printf("alpha=%f\n", alpha);
+      // printf("alpha=%f\n", alpha);
     }
     memcpy(xm, x, wMNP*sizeof(float));
     memcpy(x, xp, wMNP*sizeof(float));
@@ -568,43 +587,43 @@ float * deconvolve(float * im, int M, int N, int P,
 void fArray_flipall_ut()
 {
 
-float * a = malloc(3*3*3*sizeof(float));
-float * b = malloc(3*3*3*sizeof(float));
-float * c = malloc(3*3*3*sizeof(float));
+  float * a = malloc(3*3*3*sizeof(float));
+  float * b = malloc(3*3*3*sizeof(float));
+  float * c = malloc(3*3*3*sizeof(float));
 
-for(int kk = 0; kk<27; kk++)
-{
-  a[kk] = 0;
-}
+  for(int kk = 0; kk<27; kk++)
+  {
+    a[kk] = 0;
+  }
 
-a[13] = 1;
-fArray_flipall(b, a, 3, 3, 3);
-assert(b[13] == 1);
+  a[13] = 1;
+  fArray_flipall(b, a, 3, 3, 3);
+  assert(b[13] == 1);
 
-for(int kk = 0; kk<27; kk++)
-{
-  a[kk] = rand();
-}
+  for(int kk = 0; kk<27; kk++)
+  {
+    a[kk] = rand();
+  }
 
-fArray_flipall(b, a, 3, 3, 3);
-fArray_flipall(c, b, 3, 3, 3);
-for(int kk = 0; kk<27; kk++)
-{
-  assert(a[kk] == c[kk]);
-}
+  fArray_flipall(b, a, 3, 3, 3);
+  fArray_flipall(c, b, 3, 3, 3);
+  for(int kk = 0; kk<27; kk++)
+  {
+    assert(a[kk] == c[kk]);
+  }
 
-fArray_flipall(b, a, 4, 3, 2);
-fArray_flipall(c, b, 4, 3, 2);
-for(int kk = 0; kk<24; kk++)
-  assert(a[kk] == c[kk]);
+  fArray_flipall(b, a, 4, 3, 2);
+  fArray_flipall(c, b, 4, 3, 2);
+  for(int kk = 0; kk<24; kk++)
+    assert(a[kk] == c[kk]);
 
-fArray_flipall(b, a, 2, 3, 4);
-fArray_flipall(c, b, 2, 3, 4);
-for(int kk = 0; kk<24; kk++)
-  assert(a[kk] == c[kk]);
+  fArray_flipall(b, a, 2, 3, 4);
+  fArray_flipall(c, b, 2, 3, 4);
+  for(int kk = 0; kk<24; kk++)
+    assert(a[kk] == c[kk]);
 
-free(a); free(b); free(c);
-return;
+  free(a); free(b); free(c);
+  return;
 }
 
 void shift_vector_ut()
@@ -635,22 +654,40 @@ void unittests()
 
 int main(int argc, char ** argv)
 {
-  
+
   opts * s = opts_new(); 
   argparsing(argc, argv, s);
-  opts_print(s, NULL);
- 
-  printf("Reading %s\n", s->imFile);
+
+  if(s->verbosity > 0) 
+  {
+    opts_print(s, NULL); 
+  }
+  if(s->verbosity > 1)
+  {
+    show_info(NULL);
+  }
+
+  if(s->verbosity > 0)
+  {
+    printf("Reading %s\n", s->imFile);
+  }
   int M = 0, N = 0, P = 0;
-  float * im = readtif_asFloat(s->imFile, &M, &N, &P);
+  float * im = readtif_asFloat(s->imFile, &M, &N, &P, s->verbosity);
   // writetif("im.tif", im, M, N, P);
-  
+
   int pM = 0, pN = 0, pP = 0;
   float * psf = NULL;
   if(1){
-    printf("Reading %s\n", s->psfFile);
-  psf = readtif_asFloat(s->psfFile, &pM, &pN, &pP);
-  assert(psf != NULL);
+    if(s->verbosity > 0)
+    {
+      printf("Reading %s\n", s->psfFile);
+    }
+    psf = readtif_asFloat(s->psfFile, &pM, &pN, &pP, s->verbosity);
+    if(psf == NULL)
+    {
+      printf("Failed to open %s\n", s->psfFile);
+      exit(1);
+    }
   } else {
     pM = 3; pN = 3; pP = 3;
     psf = malloc(27*sizeof(float));
@@ -660,7 +697,10 @@ int main(int argc, char ** argv)
 
   myfftw_start(s->nThreads);
   float * out = NULL;
-  printf("Deconvolving\n");
+  if(s->verbosity > 0)
+  {
+    printf("Deconvolving\n");
+  }
   out = deconvolve(im, M, N, P, // input image and size
       psf, pM, pN, pP, // psf and size
       s);// settings
@@ -668,16 +708,25 @@ int main(int argc, char ** argv)
   int exitstatus = 1;
   if(out == NULL)
   {
-    printf("Nothing to write to disk :(\n");
+    if(s->verbosity > 0)
+    {
+      printf("Nothing to write to disk :(\n");
+    }
   } else 
   {
-    printf("Writing to %s\n", s->outFile); fflush(stdout);
-//    floatimage_normalize(out, M*N*P);
+    if(s->verbosity > 0)
+    {
+      printf("Writing to %s\n", s->outFile); fflush(stdout);
+    }
+    //    floatimage_normalize(out, M*N*P);
     writetif(s->outFile, out, M, N, P);
     exitstatus = 0;
   }
 
-  printf("Finalizing\n"); fflush(stdout);
+  if(s->verbosity > 0)
+  {
+    printf("Finalizing\n"); fflush(stdout);
+  }
   free(im);
   free(psf);
   free(out);
@@ -689,10 +738,8 @@ int main(int argc, char ** argv)
 
 // Graveyard
 
-/*  float * im = fftwf_malloc(M*N*P*sizeof(float));
-    memcpy(im0, im, M*N*P*sizeof(float));
-    free(im0); 
-
+/* 
+ *
 // Determine optimal size to work with ...
 // Optimally pP_opt = 2*P+1
 // If nP > pP_opt it should be cropped.
@@ -717,7 +764,6 @@ assert(psf1 != NULL);
 printf("Expanding\n"); fflush(stdout);
 float * psf2 = expandIm_a(psf1, pM, pN, pP, M, N, P);
 free(psf1);
-
 
 */
 

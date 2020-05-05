@@ -11,10 +11,10 @@ debug: tiffio_dbg fft_dbg
 fft:
 	$(cc) -c src/fft.c $(cflags) -lm -lfftw3f -lfftw3f_threads -o fft.o
 fft_dbg:
-	$(cc) -c src/fft.c $(cflags) -lm -lfftw3f -lfftw3f_threads -o fft_dbg.o
+	$(cc) -c src/fft.c $(cflags_dbg) -lm -lfftw3f -lfftw3f_threads -o fft_dbg.o
 
 tiffio:
-	$(cc) -c src/tiffio.c $(cflags) -L/usr/lib/x86_64-linux-gnu/ -ltiff -lm -o tiffio.o:
+	$(cc) -c src/tiffio.c $(cflags) -L/usr/lib/x86_64-linux-gnu/ -ltiff -lm -o tiffio.o
 
 tiffio_dbg:
-	$(cc) -c src/tiffio.c $(cflags) -L/usr/lib/x86_64-linux-gnu/ -ltiff -lm -o tiffio_dbg.o
+	$(cc) -c src/tiffio.c $(cflags_dbg) -L/usr/lib/x86_64-linux-gnu/ -ltiff -lm -o tiffio_dbg.o

@@ -66,8 +66,9 @@ void dim3_real_float(float * in, fftwf_complex* out,
 
 fftwf_complex * fft(float * in, int n1, int n2, int n3)
 {
-  fftwf_complex * out = fftwf_malloc(n1*n2*n3*sizeof(fftwf_complex));
-  memset(out, 0, n1*n2*n3*sizeof(fftwf_complex));
+  int n3red = (n3+3)/2;
+  fftwf_complex * out = fftwf_malloc(n1*n2*n3red*sizeof(fftwf_complex));
+  memset(out, 0, n1*n2*n3red*sizeof(fftwf_complex));
 
   fftwf_plan p = fftwf_plan_dft_r2c_3d(n3, n2, n1, 
       in, // Float
@@ -78,8 +79,10 @@ fftwf_complex * fft(float * in, int n1, int n2, int n3)
   return out;
 }
 
-void fft_mul(fftwf_complex * C, fftwf_complex * A, fftwf_complex * B, size_t N)
+void fft_mul(fftwf_complex * C, fftwf_complex * A, fftwf_complex * B, size_t n1, size_t n2, size_t n3)
 {
+  int n3red = (n3+3)/2;
+  size_t N = n1*n2*n3red;
   // C = A*B
   for(size_t kk = 0; kk<N; kk++)
   {
@@ -93,8 +96,9 @@ void fft_mul(fftwf_complex * C, fftwf_complex * A, fftwf_complex * B, size_t N)
 
 float * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B, const int M, const int N, const int P)
 {
-  fftwf_complex * C = fftwf_malloc(M*N*P*sizeof(fftwf_complex));
-  fft_mul(C, A, B, M*N*P); 
+  size_t n3red = (P+3)/2;
+  fftwf_complex * C = fftwf_malloc(M*N*n3red*sizeof(fftwf_complex));
+  fft_mul(C, A, B, M, N, P); 
 
   float * out = fftwf_malloc(M*N*P*sizeof(float));
 
@@ -112,9 +116,11 @@ float * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B, const int M, const
   return out;
 }
 
-void fft_train(size_t M, size_t N, size_t P)
+void fft_train(size_t M, size_t N, size_t P, int verbosity)
 {
-  printf("fftw3 training ... \n"); fflush(stdout);
+  if(verbosity > 1){
+    printf("fftw3 training ... \n"); fflush(stdout);
+  }
   size_t MNP = M*N*P;
   fftwf_complex * C = fftwf_malloc(MNP*sizeof(fftwf_complex));
   float * R = fftwf_malloc(MNP*sizeof(float));
@@ -124,13 +130,19 @@ void fft_train(size_t M, size_t N, size_t P)
 
   if(p0 == NULL)
   {    
-    printf("\tgenerating c2r\n");
+    if(verbosity > 0)
+    {
+    printf("> generating c2r plan\n");
+    }
   fftwf_plan p1 = fftwf_plan_dft_c2r_3d(P, N, M, 
       C, R, MYPLAN);
   fftwf_execute(p1);
   fftwf_destroy_plan(p1);
   } else {
-    printf("\tc2r -- ok\n");
+    if(verbosity > 1)
+    {
+      printf("\tc2r -- ok\n");
+    }
   }
 fftwf_destroy_plan(p0);
 
@@ -139,13 +151,18 @@ fftwf_destroy_plan(p0);
 
 if(p0 == NULL)
 {
-    printf("\tgenerating r2c\n");
+  if(verbosity > 0){
+    printf("> generating r2c plan \n");
+  }
   fftwf_plan p2 = fftwf_plan_dft_r2c_3d(P, N, M, 
       R, C, MYPLAN);
   fftwf_execute(p2);
   fftwf_destroy_plan(p2);
 } else {
+  if(verbosity > 1)
+  {
   printf("\tr2c -- ok\n");
+  }
   }
 fftwf_destroy_plan(p0);
 
