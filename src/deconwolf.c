@@ -10,6 +10,7 @@
 #include <getopt.h>
 #include <stdlib.h>
 #include <libgen.h>
+#include <time.h>
 #include "tiffio.h"
 #include "fft.h"
 #include "deconwolf.h"
@@ -56,10 +57,10 @@ void opts_print(opts * s, FILE *f)
   fprintf(f, "\t image:  %s\n", s->imFile);
   fprintf(f, "\t psf:    %s\n", s->psfFile);
   fprintf(f, "\t output: %s\n", s->outFile);
+  fprintf(f, "\t log file: %s\n", s->logFile);
   fprintf(f, "\t nIter:  %d\n", s->nIter);
   fprintf(f, "\t nThreads: %d\n", s->nThreads);
   fprintf(f, "\t verbosity: %d\n", s->verbosity);
-  fprintf(f, "\t log file: %s\n", s->logFile);
 }
 
 void show_info(FILE * f)
@@ -70,6 +71,9 @@ void show_info(FILE * f)
   fprintf(f, "FFTW: %s\n", fftwf_version);
   fprintf(f, "TIFF: %s\n", TIFFGetVersion());
   fprintf(f, "running as PID: %d\n", (int) getpid());
+  char * host = getenv("HOSTNAME");
+  if(host != NULL)
+  { fprintf(f, "HOSTNAME: %s\n", host); }
   fprintf(f, "\n");
   fflush(f);
   return;
@@ -142,22 +146,20 @@ void argparsing(int argc, char ** argv, opts * s)
 
   if(s->outFile == NULL)
   {
-char * dirc = strdup(s->imFile);
-char * basec = strdup(s->imFile);
-char * dname = dirname(dirc);
-char * bname = basename(basec);
-s->outFile = malloc(strlen(dname) + strlen(bname) + 10);
-sprintf(s->outFile, "%s/dcw_%s", dname, bname);
-free(dirc);
-free(basec);
-free(dname);
-free(bname);
+    char * dirc = strdup(s->imFile);
+    char * basec = strdup(s->imFile);
+    char * dname = dirname(dirc);
+    char * bname = basename(basec);
+    s->outFile = malloc(strlen(dname) + strlen(bname) + 10);
+    sprintf(s->outFile, "%s/dcw_%s", dname, bname);
+    free(dirc);
+    free(basec);
   }
 
   s->logFile = malloc(strlen(s->outFile) + 10);
   sprintf(s->logFile, "%s.log.txt", s->outFile);
 
-//  printf("Options received\n"); fflush(stdout);
+  //  printf("Options received\n"); fflush(stdout);
 }
 
 int psfIsCentered(float * V, int M, int N, int P)
@@ -526,7 +528,7 @@ float * deconvolve(float * im, int M, int N, int P,
   if(s->verbosity > 0)
   { printf("image: [%dx%dx%d], psf: [%dx%dx%d], job: [%dx%dx%d] (%zu voxels)\n",
       M, N, P, pM, pN, pP, wM, wN, wP, wMNP);
-  printf("Estimated peak memory use: %.1f GB\n", wMNP*65.0/1e9);
+  printf("Estimated peak memory usage: %.1f GB\n", wMNP*65.0/1e9);
   }
   fprintf(s->log, "image: [%dx%dx%d], psf: [%dx%dx%d], job: [%dx%dx%d] (%zu voxels)\n",
       M, N, P, pM, pN, pP, wM, wN, wP, wMNP);
@@ -726,9 +728,17 @@ void unittests()
   //
 }
 
+void show_time(FILE * f)
+{
+  f == NULL ? f = stdout : 0;
+  time_t now = time(NULL);
+  char * tstring = ctime(&now);
+  fprintf(f, "%s\n", tstring);
+}
 
 int main(int argc, char ** argv)
 {
+  show_time(NULL);
   opts * s = opts_new(); 
   argparsing(argc, argv, s);
   return deconwolf(s);
@@ -736,18 +746,20 @@ int main(int argc, char ** argv)
 
 int deconwolf(opts * s)
 {
-
   s->log = fopen(s->logFile, "w");
   assert(s->log != NULL);
-
+  
+  show_time(s->log);
 
   opts_print(s, s->log); 
   if(s->verbosity > 0) 
   {
     opts_print(s, NULL); 
+    printf("\n");
   }
 
   show_info(s->log);
+  s->verbosity > 1 ? show_info(NULL) : 0;
 
   if(s->verbosity > 0)
   {
@@ -800,6 +812,8 @@ int deconwolf(opts * s)
     writetif(s->outFile, out, M, N, P);
     exitstatus = 0;
   }
+
+  show_time(s->log);
 
   if(s->verbosity > 0)
   {

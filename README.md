@@ -6,10 +6,10 @@
  - [ ] Automatic cropping of the PSF if it is too large.
  - [ ] Protect better against misuse.
  - [ ] Re-use plans to save some (micro) time.
- - [ ] Use logger
  - [ ] Documentation, examples and test data.
  - [ ] Eliminate one or two arrays in the main loop to save memory.
  - [ ] block mode for low memory systems
+ - [x] Use some kind of logging
  - [x] Argument parsing 
  - [x] Proper automatic name on output file.
  - [x] Make use of symmetries to save memory?
