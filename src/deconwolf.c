@@ -695,6 +695,16 @@ float * deconvolve_tiles(float * im, int M, int N, int P,
     exit(1);
   }
 
+  if( T->nTiles == 1)
+  {
+    printf("\n"
+        "ERROR: Only one tile! Please omit the `--tilesize` parameter if "
+        "that is what you intended to to or decrease the value if you "
+        "want to process the image in tiles."
+        "\n\n");
+    exit(1);
+  }
+
   if(s->verbosity > 0)
   {
     printf("-> Divided the [%d x %d x %d] image into %d tiles\n", M, N, P, T->nTiles);

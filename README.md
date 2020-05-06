@@ -7,6 +7,9 @@
  - [ ] Protect better against misuse.
  - [ ] Documentation, examples and test data.
  - [ ] Eliminate one or two arrays in the main loop to save memory.
+ - [ ] Utilities for processing of multiple images and handling of PSFs.
+ - [ ] Flag to save one image after each iteration (to facilitate setting the number of iterations).
+ - [ ] Demos, for example on the effect of the tiling.
  - [x] Block mode for low memory systems, accessible through the options `--tilesize` and `--tilepad`
  - [x] Use some kind of logging
  - [x] Argument parsing 
