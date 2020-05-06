@@ -547,6 +547,9 @@ float * deconvolve(float * im, int M, int N, int P,
   if(s->verbosity > 0)
   { printf("image: [%dx%dx%d], psf: [%dx%dx%d], job: [%dx%dx%d] (%zu voxels)\n",
       M, N, P, pM, pN, pP, wM, wN, wP, wMNP);
+  }
+  if(s->verbosity > 1)
+  {
   printf("Estimated peak memory usage: %.1f GB\n", wMNP*65.0/1e9);
   }
   fprintf(s->log, "image: [%dx%dx%d], psf: [%dx%dx%d], job: [%dx%dx%d] (%zu voxels)\n",
