@@ -487,9 +487,10 @@ float * expandIm_a(float * in,
 
 void usage(int argc, char ** argv)
 {
-  printf("Usage:\n");
-  printf("$%s <options> image.tif psf.tif\n", argv[0]);
-  printf("Options:\n");
+  printf(" Usage:\n");
+  printf("\t$ %s <options> image.tif psf.tif\n", argv[0]);
+  printf("\n");
+  printf(" Options:\n");
   printf(" --version\n\t Show version info\n");
   printf(" --help\n\t Show this measage\n");
   printf(" --out <file>\n\t Specify output image name\n");
@@ -497,7 +498,7 @@ void usage(int argc, char ** argv)
   printf(" --threads N\n\t Specify the number of threads to use\n");
   printf(" --verbose N\n\t Set verbosity level\n");
   printf(" --test\n\t Run unit tests\n");
-  printf(" --tilesize N\n\t Enables tiling mode and sets the largest tile size to N voxels in x and y.");
+  printf(" --tilesize N\n\t Enables tiling mode and sets the largest tile size to N voxels in x and y.\n");
   printf(" --tilepad N\n\t Sets the tiles to overlap by N voxels in tile mode.\n");
   printf("\n");
 }
@@ -691,9 +692,9 @@ float * deconvolve_tiles(float * im, int M, int N, int P,
     exit(1);
   }
 
-  if(s->verbose > 0)
+  if(s->verbosity > 0)
   {
-  printf("-> Divided the image into %d tiles\n", T->nTiles);
+    printf("-> Divided the image into %d tiles\n", T->nTiles);
   }
 
   // Output image
@@ -702,6 +703,12 @@ float * deconvolve_tiles(float * im, int M, int N, int P,
 
   for(int tt = 0; tt<T->nTiles; tt++)
   {
+    if(s->verbosity > 0)
+    {
+      printf("-> Processing tile %d / %d\n", tt+1, T->nTiles);
+      fprintf(s->log, "-> Processing tile %d / %d\n", tt+1, T->nTiles);
+    }
+
     float * im_tile = tiling_get_tile(T, tt, im);
 
     int tM = T->tiles[tt]->xsize[0];
@@ -709,8 +716,8 @@ float * deconvolve_tiles(float * im, int M, int N, int P,
     int tP = T->tiles[tt]->xsize[2];
 
     float * dw_im_tile = deconvolve(im_tile, tM, tN, tP, // input image and size
-      psf, pM, pN, pP, // psf and size
-      s);
+        psf, pM, pN, pP, // psf and size
+        s);
 
     tiling_put_tile(T, tt, V, dw_im_tile);
     free(im_tile);
@@ -809,7 +816,7 @@ int deconwolf(opts * s)
 {
   s->log = fopen(s->logFile, "w");
   assert(s->log != NULL);
-  
+
   show_time(s->log);
 
   opts_print(s, s->log); 
@@ -854,13 +861,13 @@ int deconwolf(opts * s)
   float * out = NULL;
   if(s->tiling_maxSize < 0)
   {
-  out = deconvolve(im, M, N, P, // input image and size
-      psf, pM, pN, pP, // psf and size
-      s);// settings
+    out = deconvolve(im, M, N, P, // input image and size
+        psf, pM, pN, pP, // psf and size
+        s);// settings
   } else {
-  out = deconvolve_tiles(im, M, N, P, // input image and size
-      psf, pM, pN, pP, // psf and size
-      s);// settings
+    out = deconvolve_tiles(im, M, N, P, // input image and size
+        psf, pM, pN, pP, // psf and size
+        s);// settings
   }
 
   int exitstatus = 1;
