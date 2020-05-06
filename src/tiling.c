@@ -9,10 +9,14 @@ int * tiling_getDivision(int M, int m, int * nDiv)
 {
 
   // How many sections in M?
-  float ns = (float) ceil(M/m);
+  float ns = (float) ceil((double) M/ (double) m);
+//  printf("%.0f sections\n", ns);
+//  exit(1);
   // Size of the sections?
   float width = M/ns;
+#ifndef NDEBUG
   printf("nb: %.0f, w: %.0f\n", ns, width);
+#endif
   int * divs = malloc(2*ns*sizeof(int));
   divs[0] = 0;
   divs[(int)( 2*ns-1)] = M-1;
@@ -45,11 +49,13 @@ tiling * tiling_create(int M, int N, int P, int maxSize, int overlap)
   int nN = 0;
   int * divN = tiling_getDivision(N, maxSize, &nN);
 
+#ifndef NDEBUG
   printf("Dividing %d into:\n", M);
   for(int kk = 0; kk<nM; kk++)
   {
     printf("[%d, %d]\n", divM[2*kk], divM[2*kk+1]);
   }
+#endif
 
   // Create tiles
   tiling * T = malloc(sizeof(tiling));
@@ -70,9 +76,10 @@ tiling * tiling_create(int M, int N, int P, int maxSize, int overlap)
     {
       T->tiles[bb] = tile_create();
       tile * t = T->tiles[bb]; 
-      t->size[0] = divM[mm*2+1] - divM[mm*2];
-      t->size[1] = divN[nn*2+1] - divN[nn*2];
+      t->size[0] = divM[mm*2+1] - divM[mm*2] + 1;
+      t->size[1] = divN[nn*2+1] - divN[nn*2] + 1;
       t->size[2] = P;
+
       t->pos[0]=divM[mm*2]; t->pos[1]=divM[mm*2+1];
       t->pos[2]=divN[nn*2]; t->pos[3]=divN[nn*2+1];
       t->pos[4]=0; t->pos[5] = P-1;
@@ -82,6 +89,10 @@ tiling * tiling_create(int M, int N, int P, int maxSize, int overlap)
       t->xpos[2] = imax(0, t->pos[2]-overlap);
       t->xpos[3] = imin(t->pos[3]+overlap, N-1);
       t->xpos[4] = t->pos[4]; t->xpos[5] = t->pos[5];
+
+      t->xsize[0] = t->xpos[1] - t->xpos[0] + 1;
+      t->xsize[1] = t->xpos[3] - t->xpos[2] + 1;
+      t->xsize[2] = t->xpos[5] - t->xpos[4] + 1;
 
       bb++;
     }
@@ -114,8 +125,11 @@ void tiling_free(tiling * T)
 
 void tile_show(tile * T)
 {
-  printf("tile: [%d x %d x %d]\n", 
+  printf("-> tile_show\n");
+  printf("size: [%d x %d x %d]\n", 
       T->size[0], T->size[1], T->size[2]);
+printf("xsize: [%d x %d x %d]\n", 
+      T->xsize[0], T->xsize[1], T->xsize[2]);
   printf("pos: %d--%d, %d--%d, %d--%d\n", 
       T->pos[0], T->pos[1], T->pos[2],
       T->pos[3], T->pos[4], T->pos[5]);
@@ -130,7 +144,7 @@ float getWeight1d(float a, float b, float c, float d, int x)
   // f(x) = 0, x<a, or x>d
   //        1    b < x < c
   //        and linear ramp between a,b and c,d
-  if(x<=a || x>=d)
+  if(x<a || x>d)
   {
     return 0;
   }
@@ -142,11 +156,12 @@ float getWeight1d(float a, float b, float c, float d, int x)
   {
     return (x-a)/(b-a);
   }
-if(x>=c && x <=d)
+  if(x>=c && x <=d)
   {
     return 1 -(x-c)/(d-c);
   }
-assert(0);
+  assert(0);
+  return -1;
 }
 
 float tile_getWeight(tile * t, int m, int n, int p, float pad)
@@ -155,9 +170,9 @@ float tile_getWeight(tile * t, int m, int n, int p, float pad)
   assert(p<=t->xpos[5]);
   float wm = getWeight1d(t->xpos[0], t->pos[0], t->pos[1], t->xpos[1], m);
   float wn = getWeight1d(t->xpos[2], t->pos[2], t->pos[3], t->xpos[3], n);
-//  float w = sqrt( pow((wm-pad), 2) + pow((wn-pad),2));
+  //  float w = sqrt( pow((wm-pad), 2) + pow((wn-pad),2));
   float w = fmin(wm,wn);
-//  printf("wm: %f, wn: %f, w: %f\n", wm, wn, w);
+  //  printf("wm: %f, wn: %f, w: %f\n", wm, wn, w);
   assert(w>= 0);
   assert(w<=1);
   return w;
@@ -177,6 +192,7 @@ tile * tile_create()
 {
   tile * t = malloc(sizeof(tile));
   t->size = malloc(3*sizeof(int));
+  t->xsize = malloc(3*sizeof(int));
   t->pos = malloc(6*sizeof(int));
   t->xpos = malloc(6*sizeof(int));
   return t;
@@ -185,6 +201,67 @@ tile * tile_create()
 void tile_free(tile * t)
 {
   free(t->size);
+  free(t->xsize);
   free(t->pos);
   free(t->xpos);
+}
+
+
+float * tiling_get_tile(tiling * T, int tid, float * V)
+{
+  tile * t = T->tiles[tid];
+  int M = T->M; int N = T->N; 
+#ifndef NDEBUG
+  int P = T->P;
+  tile_show(t);
+#endif
+  int m = t->xsize[0];
+  int n = t->xsize[1];
+  int p = t->xsize[2];
+  float * R = malloc(m*n*p*sizeof(float));
+  for(int aa = t->xpos[0]; aa <= t->xpos[1]; aa++)
+  {
+    for(int bb = t->xpos[2]; bb <= t->xpos[3]; bb++)
+    {
+      for(int cc = t->xpos[4]; cc <= t->xpos[5]; cc++)
+      {
+       // printf("aa:%d, bb:%d, cc:%d\n", aa, bb, cc);
+        size_t Vidx = aa + bb*M + cc*M*N;
+        assert(Vidx < M*N*P);
+        // New coordinates are offset ...
+        size_t Ridx = (aa - t->xpos[0]) + 
+                      (bb - t->xpos[2])*m + 
+                      (cc - t->xpos[4])*m*n;
+        assert(Ridx < m*n*p);
+        R[Ridx] = V[Vidx];
+      }
+    }
+  }
+  return R;
+}
+
+
+void tiling_put_tile(tiling * T, int tid, float * V, float * S)
+{
+  tile * t = T->tiles[tid];
+  int M = T->M; int N = T->N; 
+  int m = t->xsize[0];
+  int n = t->xsize[1];
+  for(int aa = t->xpos[0]; aa <= t->xpos[1]; aa++)
+  {
+    for(int bb = t->xpos[2]; bb <= t->xpos[3]; bb++)
+    {
+      for(int cc = t->xpos[4]; cc <= t->xpos[5]; cc++)
+      {
+        size_t Vidx = aa + bb*M + cc*M*N;
+        size_t Sidx = (aa-t->xpos[0]) + 
+                      (bb-t->xpos[2])*m + 
+                      (cc-t->xpos[4])*m*n;
+        float w = tile_getWeight(t, aa, bb, cc, T->overlap);
+        w/= tiling_getWeights(T, aa, bb, cc);
+        V[Vidx] = w*S[Sidx];
+      }
+    }
+  }
+
 }

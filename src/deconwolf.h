@@ -8,6 +8,8 @@ typedef struct{
   char * outFile;
   char * logFile;
   FILE * log;
+  int tiling_maxSize;
+  int tiling_padding;
 
   int verbosity;
   fftwf_plan fft_plan;

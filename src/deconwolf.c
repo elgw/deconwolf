@@ -14,8 +14,7 @@
 #include "tiffio.h"
 #include "fft.h"
 #include "deconwolf.h"
-
-
+#include "tiling.h"
 
 opts * opts_new(void)
 {
@@ -28,6 +27,8 @@ opts * opts_new(void)
   s->logFile = NULL;
   s->log = NULL;
   s->verbosity = 1;
+  s->tiling_maxSize = -1;
+  s->tiling_padding = 10;
   return s;
 }
 
@@ -61,6 +62,13 @@ void opts_print(opts * s, FILE *f)
   fprintf(f, "\t nIter:  %d\n", s->nIter);
   fprintf(f, "\t nThreads: %d\n", s->nThreads);
   fprintf(f, "\t verbosity: %d\n", s->verbosity);
+  if(s->tiling_maxSize > 0)
+  {
+    fprintf(f, "\t tiling, maxSize: %d\n", s->tiling_maxSize);
+    fprintf(f, "\t tiling, padding: %d\n", s->tiling_padding);
+  } else {
+    fprintf(f, "\t tiling: OFF\n");
+  }
 }
 
 void show_info(FILE * f)
@@ -92,11 +100,13 @@ void argparsing(int argc, char ** argv, opts * s)
     { "threads",      required_argument, NULL,   'c' },
     { "verbose",      required_argument, NULL,   'l' },
     { "test",        no_argument,        NULL,   't' },
+    { "tilesize",    required_argument,  NULL,   's' }, 
+    { "tilepad",     required_argument,  NULL,   'p' },
     { NULL,           0,                 NULL,   0   }
   };
 
   int ch;
-  while((ch = getopt_long(argc, argv, "vho:n:c:p:", longopts, NULL)) != -1)
+  while((ch = getopt_long(argc, argv, "vho:n:c:p:s:p:", longopts, NULL)) != -1)
   {
     switch(ch) {
       case 'v':
@@ -123,6 +133,12 @@ void argparsing(int argc, char ** argv, opts * s)
       case 't':
         unittests();
         exit(0);
+        break;
+      case 's':
+        s->tiling_maxSize = atoi(optarg);
+        break;
+      case 'p':
+        s->tiling_padding = atoi(optarg);
         break;
     }
   }
@@ -661,6 +677,48 @@ float * deconvolve(float * im, int M, int N, int P,
   return out;
 }
 
+float * deconvolve_tiles(float * im, int M, int N, int P,
+    float * psf, int pM, int pN, int pP,
+    opts * s)
+{
+
+  tiling * T = tiling_create(M,N,P, s->tiling_maxSize, s->tiling_padding);
+  if( T == NULL)
+  {
+    printf("Tiling failed, please check your settings\n");
+    exit(1);
+  }
+
+  if(s.verbose > 0)
+  {
+  printf("-> Divided the image into %d tiles\n", T->nTiles);
+  }
+
+  // Output image
+  float * V = malloc(M*N*P*sizeof(float));
+  memset(V, 0, M*N*P*sizeof(float));
+
+  for(int tt = 0; tt<T->nTiles; tt++)
+  {
+    float * im_tile = tiling_get_tile(T, tt, im);
+
+    int tM = T->tiles[tt]->xsize[0];
+    int tN = T->tiles[tt]->xsize[1];
+    int tP = T->tiles[tt]->xsize[2];
+
+    float * dw_im_tile = deconvolve(im_tile, tM, tN, tP, // input image and size
+      psf, pM, pN, pP, // psf and size
+      s);
+
+    tiling_put_tile(T, tt, V, dw_im_tile);
+    free(im_tile);
+    free(dw_im_tile);
+  }
+
+
+  return V;
+}
+
 void fArray_flipall_ut()
 {
 
@@ -743,6 +801,8 @@ int main(int argc, char ** argv)
   return deconwolf(s);
 }
 
+
+
 int deconwolf(opts * s)
 {
   s->log = fopen(s->logFile, "w");
@@ -790,9 +850,16 @@ int deconwolf(opts * s)
 
   myfftw_start(s->nThreads);
   float * out = NULL;
+  if(s->tiling_maxSize < 0)
+  {
   out = deconvolve(im, M, N, P, // input image and size
       psf, pM, pN, pP, // psf and size
       s);// settings
+  } else {
+  out = deconvolve_tiles(im, M, N, P, // input image and size
+      psf, pM, pN, pP, // psf and size
+      s);// settings
+  }
 
   int exitstatus = 1;
   if(out == NULL)
