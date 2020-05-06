@@ -33,5 +33,6 @@ tile * tile_create();
 void tile_free(tile *);
 void tile_show(tile *);
 float tile_getWeight(tile *, int m, int n, int p, float pad);
+float getWeight1d(float a, float b, float c, float d, int x);
 
 #endif

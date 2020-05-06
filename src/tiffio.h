@@ -13,3 +13,5 @@ float * readtif_asFloat(char * fName,
     int * M0, int * N0, int * P0, int verbosity);
 
 void floatimage_normalize(float * restrict, const size_t);
+void floatimage_show_stats(float * I, size_t N, size_t M, size_t P);
+

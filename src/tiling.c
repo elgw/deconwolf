@@ -141,6 +141,9 @@ printf("xsize: [%d x %d x %d]\n",
 
 float getWeight1d(float a, float b, float c, float d, int x)
 {
+  assert(a<=b);
+  assert(b<c); // a tile has to have a size
+  assert(c<=d);
   // f(x) = 0, x<a, or x>d
   //        1    b < x < c
   //        and linear ramp between a,b and c,d
@@ -154,24 +157,28 @@ float getWeight1d(float a, float b, float c, float d, int x)
   }
   if(x>=a && x <=b)
   {
-    return (x-a)/(b-a);
+    return (x-a+1)/(b-a+1);
   }
   if(x>=c && x <=d)
   {
-    return 1 -(x-c)/(d-c);
+    return 1 -(x-c)/(d-c+1);
   }
   assert(0);
   return -1;
 }
 
-float tile_getWeight(tile * t, int m, int n, int p, float pad)
+float tile_getWeight(tile * t, 
+    int m, int n, int p, 
+    float pad)
+  /* Calculate the weight for tile t at position (m,n,p) */
 {
   assert(p>=t->xpos[4]);
   assert(p<=t->xpos[5]);
   float wm = getWeight1d(t->xpos[0], t->pos[0], t->pos[1], t->xpos[1], m);
   float wn = getWeight1d(t->xpos[2], t->pos[2], t->pos[3], t->xpos[3], n);
   //  float w = sqrt( pow((wm-pad), 2) + pow((wn-pad),2));
-  float w = fmin(wm,wn);
+  assert(wm>=0); assert(wn>=0); assert(wm<=1); assert(wn<=1);
+  float w = fminf(wm,wn);
   //  printf("wm: %f, wn: %f, w: %f\n", wm, wn, w);
   assert(w>= 0);
   assert(w<=1);
@@ -188,6 +195,7 @@ float tiling_getWeights(tiling * T, int M, int N, int P)
   }
   return w;
 }
+
 tile * tile_create()
 {
   tile * t = malloc(sizeof(tile));
@@ -259,7 +267,7 @@ void tiling_put_tile(tiling * T, int tid, float * V, float * S)
                       (cc-t->xpos[4])*m*n;
         float w = tile_getWeight(t, aa, bb, cc, T->overlap);
         w/= tiling_getWeights(T, aa, bb, cc);
-        V[Vidx] = w*S[Sidx];
+        V[Vidx] += w*S[Sidx];
       }
     }
   }

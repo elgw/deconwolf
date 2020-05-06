@@ -4,7 +4,20 @@
 #include "tiling.h"
 #include "tiffio.h"
 
-  void test_weights(int M, int N, int P, int maxSize, int overlap)
+void test_getWeight1d()
+{
+  float a = 1, b = 6, c = 8, d = 12;
+  printf("test_getWeight1d\n");
+  printf("[%.0f %.0f %.0f %.0f]\n", a, b, c, d);
+  for(int kk = 0; kk<14; kk++)
+  {
+    printf("%d %.2f\n", kk, getWeight1d(a, b, c, d, kk));
+  }
+  printf("\n");
+}
+
+
+void test_weights(int M, int N, int P, int maxSize, int overlap)
   {
   tiling * T = tiling_create(M,N,P, maxSize, overlap);
   tiling_show(T);
@@ -48,21 +61,30 @@ void test_copy_paste(int M, int N, int P, int maxSize, int overlap)
 
   float * source = malloc(M*N*P*sizeof(float));
   for(size_t kk = 0; kk<M*N*P; kk++)
-  { source[kk] = rand()/RAND_MAX; }
+  { 
+    source[kk] = 7; //rand()/RAND_MAX; 
+  }
 
   float * target = malloc(M*N*P*sizeof(float));
-  
+  char * fname = malloc(100);
+
   for(int tt = 0; tt<T->nTiles; tt++)
   {
-    float * P = tiling_get_tile(T, tt, source);
+    float * Ttile = tiling_get_tile(T, tt, source);
+    tile * tl = T->tiles[tt];
+    sprintf(fname, "tile%d.tif", tt);
+    writetif(fname, Ttile, tl->xsize[0], tl->xsize[1], tl->xsize[2]);
+
     // P has size T->tiles[kk]->xsize;
-    tiling_put_tile(T, tt, target, P);
-    free(P);
+    tiling_put_tile(T, tt, target, Ttile);
+    free(Ttile);
   }
+free(fname);
+  writetif("joined.tif", target, M, N, P);
 
   for(size_t kk = 0; kk<M*N*P; kk++)
   { 
-    assert( fabs(source[kk]-target[kk]) < 1e-6); 
+    assert( fabs(source[kk]-target[kk]) < 1e-4); 
   }
 
   free(target);
@@ -90,6 +112,7 @@ int main(int argc, char ** argv)
     exit(1);
   }
 
+  test_getWeight1d();
   test_weights(M, N, P, maxSize, overlap);
   test_copy_paste(M, N, P, maxSize, overlap);
 

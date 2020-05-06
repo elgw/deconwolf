@@ -18,7 +18,7 @@ typedef struct{
 
 int deconwolf(opts *);
 
-void usage(int argc, char ** argv);
+void usage(int argc, char ** argv, opts * );
 void unittests();
 void shift_vector_ut();
 void fArray_flipall_ut();

@@ -19,7 +19,7 @@ void floatimage_normalize(float * restrict I, const size_t N)
   int ok = 1;
   for(size_t kk=0; kk<N; kk++)
   {
-    if(~isnormal(I[kk]))
+    if(~isfinite(I[kk]))
     {
       I[kk] = 0;
       ok = 0;
@@ -46,8 +46,8 @@ void floatimage_normalize(float * restrict I, const size_t N)
 void floatimage_show_stats(float * I, size_t N, size_t M, size_t P)
 {
   float isum = 0;
-  float imin = 100000;
-  float imax = 0;
+  float imin = INFINITY;
+  float imax = -INFINITY;
   for(size_t kk = 0; kk<M*N*P; kk++)
   {
     I[kk] > imax ? imax = I[kk] : 0 ;
@@ -117,10 +117,10 @@ void readFloat(TIFF * tfile, float * V,
 int writetif(char * fName, float * V, 
     int N, int M, int P)
 {
-  float imax = 0;
+  float imax = -INFINITY;
   for(size_t kk = 0; kk<M*N*P; kk++)
   {
-    if(isnormal(V[kk]))
+    if(isfinite(V[kk]))
     {
       if(V[kk] > imax)
       {
@@ -128,8 +128,8 @@ int writetif(char * fName, float * V,
       }
     }
   }
-  float scaling = 1/imax*(pow(2,16)-1);
-
+  float scaling = 1.0/imax*(pow(2,16)-1.0);
+//  printf("scaling: %f\n", scaling);
 
   size_t bytesPerSample = sizeof(uint16_t);
   TIFF* out = TIFFOpen(fName, "w");
@@ -162,18 +162,22 @@ int writetif(char * fName, float * V,
       for(size_t ll = 0; ll<N; ll++)
       {
         float value = V[M*N*dd + kk*N + ll]*scaling;
-        if(!isnormal(value))
+        if(!isfinite(value))
         { value = 0; }
 
-        buf[ll] = value;
+        buf[ll] = (uint16_t) round(value);
 
       }
 
-      assert(TIFFWriteScanline(out, // TIFF
+      
+          int ok = TIFFWriteScanline(out, // TIFF
             buf, 
             kk, // row
-            0) //sample
-          == 1);
+            0); //sample
+        if(ok != 1)
+        {
+          printf("TIFFWriteScanline failed\n");
+        }
     }
 
     TIFFWriteDirectory(out);

@@ -19,7 +19,7 @@
 opts * opts_new(void)
 {
   opts * s = malloc(sizeof(opts));
-  s->nThreads = 8;
+  s->nThreads = 4;
   s->nIter = 50;
   s->imFile = NULL;
   s->psfFile = NULL;
@@ -114,7 +114,7 @@ void argparsing(int argc, char ** argv, opts * s)
         exit(0);
         break;
       case 'h':
-        usage(argc, argv);
+        usage(argc, argv, s);
         exit(0);
         break;
       case 'o':
@@ -146,7 +146,7 @@ void argparsing(int argc, char ** argv, opts * s)
   /* Take care of the positional arguments */
   if(optind + 2 != argc)
   {
-    printf("Both image and psf has to be specified\n");
+    printf("At least image and PSF has to be specified, hint: try '--help'!\n");
     exit(1);
   }
 
@@ -485,7 +485,7 @@ float * expandIm_a(float * in,
   return out;
 }
 
-void usage(int argc, char ** argv)
+void usage(int argc, char ** argv, opts * s)
 {
   printf(" Usage:\n");
   printf("\t$ %s <options> image.tif psf.tif\n", argv[0]);
@@ -494,12 +494,12 @@ void usage(int argc, char ** argv)
   printf(" --version\n\t Show version info\n");
   printf(" --help\n\t Show this measage\n");
   printf(" --out <file>\n\t Specify output image name\n");
-  printf(" --iter N\n\t Specify the number of iterations to use\n");
+  printf(" --iter N\n\t Specify the number of iterations to use (default: %d)\n", s->nIter);
   printf(" --threads N\n\t Specify the number of threads to use\n");
-  printf(" --verbose N\n\t Set verbosity level\n");
+  printf(" --verbose N\n\t Set verbosity level (default: %d)\n", s->verbosity);
   printf(" --test\n\t Run unit tests\n");
   printf(" --tilesize N\n\t Enables tiling mode and sets the largest tile size to N voxels in x and y.\n");
-  printf(" --tilepad N\n\t Sets the tiles to overlap by N voxels in tile mode.\n");
+  printf(" --tilepad N\n\t Sets the tiles to overlap by N voxels in tile mode (default: %d)\n", s->tiling_padding);
   printf("\n");
 }
 
@@ -697,7 +697,7 @@ float * deconvolve_tiles(float * im, int M, int N, int P,
 
   if(s->verbosity > 0)
   {
-    printf("-> Divided the image into %d tiles\n", T->nTiles);
+    printf("-> Divided the [%d x %d x %d] image into %d tiles\n", M, N, P, T->nTiles);
   }
 
   // Output image
@@ -726,7 +726,6 @@ float * deconvolve_tiles(float * im, int M, int N, int P,
     free(im_tile);
     free(dw_im_tile);
   }
-
 
   return V;
 }
@@ -808,12 +807,10 @@ void show_time(FILE * f)
 
 int main(int argc, char ** argv)
 {
-  opts * s = opts_new(); 
-  argparsing(argc, argv, s);
-  return deconwolf(s);
+  opts * s = opts_new(); // Load default settings and initialize
+  argparsing(argc, argv, s); // Parse command line
+  return deconwolf(s); // And go!
 }
-
-
 
 int deconwolf(opts * s)
 {
@@ -871,8 +868,8 @@ int deconwolf(opts * s)
     out = deconvolve_tiles(im, M, N, P, // input image and size
         psf, pM, pN, pP, // psf and size
         s);// settings
-  }
-
+ }
+    // floatimage_show_stats(out, M, N, P);
   int exitstatus = 1;
   if(out == NULL)
   {

@@ -1,11 +1,10 @@
 # deconwolf
 
-`deconwolf` is a program written in C for deconvolution of fluorescent wide-field images.
+`deconwolf` is a program written in C for deconvolution of fluorescent wide-field images. It is reasonably fast and memory efficient and can be run on systems with low memory due to optional tiling.
 
 ## Todo
  - [ ] Automatic cropping of the PSF if it is too large.
  - [ ] Protect better against misuse.
- - [ ] Re-use plans to save some (micro) time.
  - [ ] Documentation, examples and test data.
  - [ ] Eliminate one or two arrays in the main loop to save memory.
  - [x] Block mode for low memory systems, accessible through the options `--tilesize` and `--tilepad`
@@ -15,6 +14,9 @@
  - [x] Make use of symmetries to save memory?
  - [x] Save FFTW wisdom.
  - [x] Identical results to matlab code.
+Low priority:
+ - [ ] Re-use plans to save some (micro) time.
+ - [ ] Faster calculation of tiling weights.
 
 ## Building
 deconwolf requires `libtiff` and `fftw3` to run, usually those libraries are already installed. However you might need the header files.
