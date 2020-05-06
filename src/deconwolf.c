@@ -497,6 +497,8 @@ void usage(int argc, char ** argv)
   printf(" --threads N\n\t Specify the number of threads to use\n");
   printf(" --verbose N\n\t Set verbosity level\n");
   printf(" --test\n\t Run unit tests\n");
+  printf(" --tilesize N\n\t Enables tiling mode and sets the largest tile size to N voxels in x and y.");
+  printf(" --tilepad N\n\t Sets the tiles to overlap by N voxels in tile mode.\n");
   printf("\n");
 }
 
@@ -689,7 +691,7 @@ float * deconvolve_tiles(float * im, int M, int N, int P,
     exit(1);
   }
 
-  if(s.verbose > 0)
+  if(s->verbose > 0)
   {
   printf("-> Divided the image into %d tiles\n", T->nTiles);
   }

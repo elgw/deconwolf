@@ -8,7 +8,7 @@
  - [ ] Re-use plans to save some (micro) time.
  - [ ] Documentation, examples and test data.
  - [ ] Eliminate one or two arrays in the main loop to save memory.
- - [ ] block mode for low memory systems
+ - [x] Block mode for low memory systems, accessible through the options `--tilesize` and `--tilepad`
  - [x] Use some kind of logging
  - [x] Argument parsing 
  - [x] Proper automatic name on output file.
