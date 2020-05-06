@@ -28,7 +28,7 @@ opts * opts_new(void)
   s->log = NULL;
   s->verbosity = 1;
   s->tiling_maxSize = -1;
-  s->tiling_padding = 10;
+  s->tiling_padding = 20;
   return s;
 }
 
