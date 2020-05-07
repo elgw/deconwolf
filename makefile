@@ -1,6 +1,13 @@
 cc=gcc
-cflags_dbg=-Wall -g
-cflags=-Wall -O3 -flto -DNDEBUG -march=native
+
+CC_VERSION = "$(shell gcc --version | head -n 1)"
+GIT_VERSION = "$(shell git log --pretty=format:'%aD:%H' -n 1)"
+
+f1 = -DCC_VERSION=\"$(CC_VERSION)\"
+f2 = $(f1) -DGIT_VERSION=\"$(GIT_VERSION)\"
+
+cflags_dbg=-Wall -g $(f2)
+cflags=-Wall -O3 -flto -DNDEBUG -march=native $(f2)
 
 deconwolf: tiffio fft tiling
 	$(cc) src/deconwolf.c $(cflags) fft.o tiffio.o tiling.o -lm -lfftw3f -ltiff -lfftw3f_threads  -o bin/deconwolf

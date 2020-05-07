@@ -76,14 +76,26 @@ void opts_print(opts * s, FILE *f)
 void show_info(FILE * f)
 {
   f == NULL ? f = stdout : 0;
-  fprintf(f, "Info:\n");
-  fprintf(f, "deconwolf: %s\n", deconwolf_version);
-  fprintf(f, "FFTW: %s\n", fftwf_version);
-  fprintf(f, "TIFF: %s\n", TIFFGetVersion());
-  fprintf(f, "running as PID: %d\n", (int) getpid());
-  char * host = getenv("HOSTNAME");
-  if(host != NULL)
-  { fprintf(f, "HOSTNAME: %s\n", host); }
+  fprintf(f, "deconwolf: '%s' PID: %d\n", deconwolf_version, (int) getpid());
+#ifdef GIT_VERSION
+  fprintf(f, "GIT_VERSION: '%s'\n", GIT_VERSION);
+#endif
+#ifdef CC_VERSION
+  fprintf(f, "COMPILER: '%s'\n", CC_VERSION);
+#endif
+  fprintf(f, "FFTW: '%s'\n", fftwf_version);
+  fprintf(f, "TIFF: '%s'\n", TIFFGetVersion());
+  char * user = getenv("USER");
+  if(user != NULL)
+  { fprintf(f, "USER: '%s'\n", user); }
+
+  char * hname = malloc(1024*sizeof(char));
+  if(gethostname(hname, 1023) == 0)
+  { 
+    fprintf(f, "HOSTNAME: '%s'\n", hname); 
+    free(hname);
+  }
+
   fprintf(f, "\n");
   fflush(f);
   return;
