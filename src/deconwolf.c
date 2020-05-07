@@ -293,13 +293,14 @@ fftwf_complex * initial_guess(int M, int N, int P,
   for(size_t kk = 0; kk<wM*wN*wP; kk++)
     one[kk] = 0;
 
-  for(int aa = 0; aa < M; aa++) {
+  for(int cc = 0; cc < P; cc++) {
     for(int bb = 0; bb < N; bb++) {
-      for(int cc = 0; cc < P; cc++) {
+      for(int aa = 0; aa < M; aa++) {
         one[aa + wM*bb + wM*wN*cc] = 1;
       }
     }
   }
+
   float sum = 0;
   float max = 0;
   for(size_t kk = 0; kk<wM*wN*wP; kk++)
@@ -346,6 +347,24 @@ void fArray_insert(float * T, int t1, int t2, int t3,
     float * F, int f1, int f2, int f3)
   /* Insert F [f1xf2xf3] into T [t1xt2xt3] in the "upper left" corner */
 {
+  for(int pp = 0; pp<f3; pp++)
+  {
+    for(int nn = 0; nn<f2; nn++)
+    {
+      for(int mm = 0; mm<f1; mm++)
+      {
+        float x = F[mm + nn*f1 + pp*f1*f2];
+        T[mm + nn*t1 + pp*t1*t2] = x;
+      }
+    }
+  }
+  return;
+}
+
+void fArray_insert_ref(float * T, int t1, int t2, int t3, 
+    float * F, int f1, int f2, int f3)
+  /* Insert F [f1xf2xf3] into T [t1xt2xt3] in the "upper left" corner */
+{
   for(int mm = 0; mm<f1; mm++)
   {
     for(int nn = 0; nn<f2; nn++)
@@ -364,11 +383,11 @@ float * fArray_subregion(float * A, int M, int N, int P, int m, int n, int p)
 {
   float * S = fftwf_malloc(m*n*p*sizeof(float));
   assert(S != NULL);
-      for(int pp = 0; pp<p; pp++)
+  for(int pp = 0; pp<p; pp++)
   {
     for(int nn = 0; nn<n; nn++)
     {
-  for(int mm = 0; mm<m; mm++)
+      for(int mm = 0; mm<m; mm++)
       {
         size_t Aidx = mm + nn*M + pp*M*N;
         size_t Sidx = mm + nn*m + pp*m*n;
@@ -663,10 +682,15 @@ float * deconvolve(float * im, int M, int N, int P,
 
   float alpha = 0;
   float * f = fArray_constant(wMNP, sumg/wMNP);
-  float * x = fArray_copy(f, wMNP);
   float * y = fArray_copy(f, wMNP);
-  float * xp = fArray_copy(f, wMNP);
-  float * xm = fArray_copy(f, wMNP);
+
+  float * x1 = fArray_copy(f, wMNP);
+  float * x2 = fArray_copy(f, wMNP);
+
+  float * x = x1;
+  float * xp = x2;
+  float * xm = x2; // fArray_copy(f, wMNP);
+
   float * gm = fArray_zeros(wMNP);
   float * g = fArray_zeros(wMNP);
 
@@ -681,7 +705,7 @@ float * deconvolve(float * im, int M, int N, int P,
     }
 
     // printf("y[0] = %f\n", y[0]);
-
+    xp = xm;
     double err = iter(xp, // xp is updated
         im, 
         cK, cKr, 
@@ -706,18 +730,20 @@ float * deconvolve(float * im, int M, int N, int P,
       alpha = update_alpha(g, gm, wMNP);
       // printf("alpha=%f\n", alpha);
     }
-    memcpy(xm, x, wMNP*sizeof(float)); // swap pointers instead
-    memcpy(x, xp, wMNP*sizeof(float)); // really need tree of them?
+  //  memcpy(xm, x, wMNP*sizeof(float)); // swap pointers instead
+  //  memcpy(x, xp, wMNP*sizeof(float)); // really need tree of them?
+    xm = x;
+    x = xp;
+    xp = NULL;
     it++;
     //writetif("xp.tif", xp, wM, wN, wP);
   }
   fftwf_free(W); // is P1
   fftwf_free(G);
-  float * out = fArray_subregion(xp, wM, wN, wP, M, N, P);
-  fftwf_free(x);
+  float * out = fArray_subregion(x, wM, wN, wP, M, N, P);
   fftwf_free(f);
-  fftwf_free(xp);
-  fftwf_free(xm);
+  fftwf_free(x1);
+  fftwf_free(x2);
   fftwf_free(g);
   fftwf_free(gm);
   fftwf_free(cK);
@@ -856,6 +882,7 @@ static double timespec_diff(struct timespec* end, struct timespec * start)
 
 void timings()
 {
+  printf("-> Timings\n");
   tictoc
     int M = 1024, N = 1024, P = 50;
   float temp = 0;
@@ -879,39 +906,64 @@ void timings()
     A[kk] = (float) rand()/(float) RAND_MAX;
   }
 
+  // ---
+  tic
+  fftwf_plan p = fftwf_plan_dft_r2c_3d(P, N, M, 
+      V, NULL, 
+      FFTW_WISDOM_ONLY | FFTW_MEASURE);
+  fftwf_destroy_plan(p);
+  toc(fftwf_plan_create_and_destroy)
 
+
+  // ---
+  tic
+    fArray_flipall(V, A, M, N, P);
+  toc(fArray_flipall)
+
+    // ---
     tic 
     temp = update_alpha(V, A, M*N*P);
   toc(update_alpha)
     V[0]+= temp;
 
+  // ---
   tic
-  float e1 = getError_ref(V, A, M, N, P, M, N, P);
+    float e1 = getError_ref(V, A, M, N, P, M, N, P);
   toc(getError_ref)
     V[0]+= e1;
-  
 
   tic
     float e2 = getError(V, A, M, N, P, M, N, P);
   toc(getError)
+    V[0]+=e2;
 
-    tic
+  printf("e1: %f, e2: %f, fabs(e1-e2): %f\n", e1, e1, fabs(e1-e2));
+
+  // ---
+  tic
     float * S1 = fArray_subregion(V, M, N, P, M-1, N-1, P-1);
   toc(fArray_subregion)
 
     tic
     float * S2 = fArray_subregion_ref(V, M, N, P, M-1, N-1, P-1);
   toc(fArray_subregion_ref)
-
     printf("S1 - S2 = %f\n", getError(S1, S1, M-1, N-1, P-1, M-1, N-1, P-1));
   free(S1);
   free(S2);
 
+  // ---
+  tic
+    fArray_insert(V, M, N, P, A, M-1, N-1, P-1);
+  toc(fArray_subregion)      
 
-    V[0]+=e2;
-  printf("e1: %f, e2: %f, fabs(e1-e2): %f\n", e1, e1, fabs(e1-e2));
+    tic
+    fArray_insert_ref(V, M, N, P, A, M-1, N-1, P-1);
+  toc(fArray_subregion_ref)
 
-  ((float volatile *)V)[0] = V[0];
+    // ---
+
+
+    ((float volatile *)V)[0] = V[0];
   printf("V[0] = %f\n", V[0]);
 }
 
