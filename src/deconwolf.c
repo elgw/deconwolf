@@ -687,8 +687,8 @@ float * deconvolve(const float * restrict im, const int M, const int N, const in
       M, N, P, pM, pN, pP, wM, wN, wP, wMNP);
   fflush(s->log);
 
-  fft_train(wM, wN, wP, s->verbosity);
-
+  fft_train(wM, wN, wP, 
+      s->verbosity, s->nThreads);
 
   // Prepare the full size cK and cKr
   // (K and Kr in MATLAB)

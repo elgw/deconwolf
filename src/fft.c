@@ -1,30 +1,109 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <fftw3.h>
 #include <string.h>
+#include <dirent.h>
+#include <errno.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 // FFTW_MEASURE, FFTW_PATIENT or FFTW_EXHAUSTIVE
-char * swf = NULL;
 const unsigned int MYPLAN = FFTW_MEASURE;
 //const unsigned int MYPLAN = FFTW_PATIENT;
 
+static int isdir(char * dir)
+{
+  /* Check if directory exist, do not create if missing 
+   * returns 1 if it exist
+   * */
+
+  DIR* odir = opendir(dir);
+  if (odir) {
+    /* Directory exists. */
+    closedir(odir);
+    return 1;
+  } else if (ENOENT == errno) {
+    /* Directory does not exist. */
+    return 0;
+  } else {
+    /* opendir() failed for some other reason. */
+    return 0;
+  }
+}
+
+static int ensuredir(char * dir)
+  /* Create dir if it does not exist. 
+   * Returns 0 if the dir already existed or could be created
+   * returns non-zeros if the dir can't be created
+   */
+{
+  if(isdir(dir) == 1)
+  {
+    return 0;
+  }
+
+  if(mkdir(dir, 0700) == 0)
+  {
+    return 0;
+  }
+
+  return 1;
+}
+
+static char * get_swf_file_name(int nThreads)
+{
+  char * dir_home = getenv("HOME");
+  char * dir_config = malloc(1024*sizeof(char));
+  char * swf = malloc(1024*sizeof(char));
+  sprintf(swf, "fftw_wisdom_float_threads_%d.dat", nThreads);    
+
+  sprintf(dir_config, "%s/.config/", dir_home);
+ // printf("dir_config = %s\n", dir_config);
+  if( !isdir(dir_config) )
+  {     
+    free(dir_config);
+    return swf;
+  }
+
+  sprintf(dir_config, "%s/.config/deconwolf/", dir_home);
+//  printf("dir_config = %s\n", dir_config);
+  if( ensuredir(dir_config) == 0 )
+  {
+    char * prefered = malloc(1024*sizeof(char));
+    sprintf(prefered, "%s%s", dir_config, swf);
+    free(dir_config);
+    free(swf);
+    return prefered;
+  } else {
+    free(dir_config);
+    return swf;
+  }
+}
+
 void myfftw_start(const int nThreads)
 {  
-//  printf("\t using %s with %d threads\n", fftwf_version, nThreads);
+  //  printf("\t using %s with %d threads\n", fftwf_version, nThreads);
   fftwf_init_threads();
   fftwf_plan_with_nthreads(nThreads);
-  swf = malloc(100*sizeof(char));
-  sprintf(swf, "fftw_wisdom_float_threads_%d.dat", nThreads);
-  fftwf_import_wisdom_from_filename(swf);
+  char * swf = get_swf_file_name(nThreads);
+  if(swf == NULL)
+  { 
+    assert(0);
+  } 
+  else
+  {
+    fftwf_import_wisdom_from_filename(swf);
+    free(swf);
+  }
 }
 
 void myfftw_stop(void)
 {
-  fftwf_export_wisdom_to_filename(swf);
-  free(swf);
   fftwf_cleanup_threads();
   fftwf_cleanup();
+  // Note: wisdom is only exported by fft_train
 }
 
 
@@ -84,7 +163,7 @@ float * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B,
   return out;
 }
 
-void fft_train(const size_t M, const size_t N, const size_t P, const int verbosity)
+void fft_train(const size_t M, const size_t N, const size_t P, const int verbosity, const int nThreads)
 {
   if(verbosity > 1){
     printf("fftw3 training ... \n"); fflush(stdout);
@@ -100,43 +179,49 @@ void fft_train(const size_t M, const size_t N, const size_t P, const int verbosi
   {    
     if(verbosity > 0)
     {
-    printf("> generating c2r plan\n");
+      printf("> generating c2r plan\n");
     }
-  fftwf_plan p1 = fftwf_plan_dft_c2r_3d(P, N, M, 
-      C, R, MYPLAN);
-  fftwf_execute(p1);
-  fftwf_destroy_plan(p1);
+    fftwf_plan p1 = fftwf_plan_dft_c2r_3d(P, N, M, 
+        C, R, MYPLAN);
+    fftwf_execute(p1);
+    fftwf_destroy_plan(p1);
   } else {
     if(verbosity > 1)
     {
       printf("\tc2r -- ok\n");
     }
   }
-fftwf_destroy_plan(p0);
+  fftwf_destroy_plan(p0);
 
-    p0 = fftwf_plan_dft_r2c_3d(P, N, M, 
+  p0 = fftwf_plan_dft_r2c_3d(P, N, M, 
       R, C, MYPLAN | FFTW_WISDOM_ONLY);
 
-if(p0 == NULL)
-{
-  if(verbosity > 0){
-    printf("> generating r2c plan \n");
-  }
-  fftwf_plan p2 = fftwf_plan_dft_r2c_3d(P, N, M, 
-      R, C, MYPLAN);
-  fftwf_execute(p2);
-  fftwf_destroy_plan(p2);
-} else {
-  if(verbosity > 1)
+  if(p0 == NULL)
   {
-  printf("\tr2c -- ok\n");
+    if(verbosity > 0){
+      printf("> generating r2c plan \n");
+    }
+    fftwf_plan p2 = fftwf_plan_dft_r2c_3d(P, N, M, 
+        R, C, MYPLAN);
+    fftwf_execute(p2);
+    fftwf_destroy_plan(p2);
+  } else {
+    if(verbosity > 1)
+    {
+      printf("\tr2c -- ok\n");
+    }
   }
-  }
-fftwf_destroy_plan(p0);
+  fftwf_destroy_plan(p0);
 
   fftwf_free(R);
   fftwf_free(C);
-  fftwf_export_wisdom_to_filename(swf);
+
+  char * swf = get_swf_file_name(nThreads);
+  if(swf == NULL)
+  { assert(0); } 
+  else {
+    fftwf_export_wisdom_to_filename(swf);
+  }
 
   return;
 }

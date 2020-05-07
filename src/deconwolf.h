@@ -1,5 +1,17 @@
 #define deconwolf_version "alpha-0.001"
 
+/* deconwolf
+ * Erik Wernersson, 2020
+ *
+ * Configuration files.
+ * If $home/.config/ exists deconwolf will store its settings there
+ * specifically the fftw3 wisdom data is stored in
+ * ./config/deconwolf/wisdom/
+ *
+ * The choice of folder is recommended by "XDG Base Directory Specification", see:
+ * https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
+ */
+
 typedef struct{
   int nThreads;
   int nIter;
