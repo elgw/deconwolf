@@ -1,4 +1,4 @@
-#define deconwolf_version "alpha-0.001"
+#define deconwolf_version "alpha-0.002"
 
 /* deconwolf
  * Erik Wernersson, 2020
