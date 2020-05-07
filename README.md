@@ -6,21 +6,23 @@
  - [ ] Automatic cropping of the PSF if it is too large.
  - [ ] Protect better against misuse.
  - [ ] Documentation, examples and test data.
- - [ ] Eliminate one or two arrays in the main loop to save memory.
  - [ ] Utilities for processing of multiple images and handling of PSFs.
  - [ ] Flag to save one image after each iteration (to facilitate setting the number of iterations).
  - [ ] Demos, for example on the effect of the tiling.
  - [ ] Use tif tags to write meta data (also to transfer from input image).
+ - [ ] Faster calculation of tiling weights.
+ - [ ] Make sure that it can be compiled on windows and mac...
+ - [x] Report VmPeak to the log, i.e., the peak memory usage.
  - [x] Block mode for low memory systems, accessible through the options `--tilesize` and `--tilepad`
+ - [x] Eliminate one or two arrays in the main loop to save memory.
  - [x] Use some kind of logging
  - [x] Argument parsing 
  - [x] Proper automatic name on output file.
  - [x] Make use of symmetries to save memory?
  - [x] Save FFTW wisdom.
  - [x] Identical results to matlab code.
-Low priority:
- - [ ] Re-use plans to save some (micro) time.
- - [ ] Faster calculation of tiling weights.
+Will not do:
+ - Re-use plans to save some (micro) time.
 
 ## Building
 deconwolf requires `libtiff` and `fftw3` to run, usually those libraries are already installed. However you might need the header files. It is good to build it on your specific machine to get the last drops of juice out of your CPU.

@@ -181,6 +181,36 @@ void argparsing(int argc, char ** argv, opts * s)
   //  printf("Options received\n"); fflush(stdout);
 }
 
+void printVmPeak(FILE * fout)
+{
+  if(fout == NULL) fout = stdout;
+
+  char * statfile = malloc(100*sizeof(char));
+  sprintf(statfile, "/proc/%d/status", getpid());
+  FILE * sf = fopen(statfile, "r");
+  if(sf == NULL)
+  {
+    fprintf(fout, "Failed to open %s\n", statfile);
+    return;
+  }
+
+  char * line = NULL;
+  size_t len = 0;
+
+  while( getline(&line, &len, sf) > 0)
+  {
+    if(strlen(line) > 6)
+    {
+      if(strncmp(line, "VmPeak", 6) == 0)
+          {
+            fprintf(fout, "%s", line);
+        }
+    }
+  }
+  fclose(sf);
+  return;
+}
+
 int psfIsCentered(float * V, int M, int N, int P)
 {
   // Check that the PSF looks reasonable
@@ -905,15 +935,15 @@ void timings()
 
   // ---
   tic
-  fftwf_plan p = fftwf_plan_dft_r2c_3d(P, N, M, 
-      V, NULL, 
-      FFTW_WISDOM_ONLY | FFTW_MEASURE);
+    fftwf_plan p = fftwf_plan_dft_r2c_3d(P, N, M, 
+        V, NULL, 
+        FFTW_WISDOM_ONLY | FFTW_MEASURE);
   fftwf_destroy_plan(p);
   toc(fftwf_plan_create_and_destroy)
 
 
-  // ---
-  tic
+    // ---
+    tic
     fArray_flipall(V, A, M, N, P);
   toc(fArray_flipall)
 
@@ -1074,12 +1104,11 @@ int deconwolf(opts * s)
   free(psf);
   free(out);
   myfftw_stop();
+  if(s->verbosity > 1) printVmPeak(NULL);
+  printVmPeak(s->log);
   opts_free(&s);
-  if(0)
-  {
-    printf("Do a grep VmPeak /proc/%d/status now ...\n", getpid());
-    getchar();
-  }
+
+
   return(exitstatus);
 }
 
