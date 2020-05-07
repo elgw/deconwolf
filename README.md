@@ -9,9 +9,9 @@
  - [ ] Flag to save one image after each iteration (to facilitate setting the number of iterations).
  - [ ] Demos, for example on the effect of the tiling.
  - [ ] Use tif tags to write meta data (also to transfer from input image).
- - [ ] Faster calculation of tiling weights.
  - [ ] Make sure that it can be compiled on windows and mac...
- - [ ] Crop PSF also in x and y.
+ - [x] Crop PSF also in x and y (individual crop per tile as well).
+ - [x] Faster calculation of tiling weights.
  - [x] Report VmPeak to the log, i.e., the peak memory usage.
  - [x] Automatic cropping of the PSF if it has too many stacks.
  - [x] Block mode for low memory systems, accessible through the options `--tilesize` and `--tilepad`
@@ -60,7 +60,7 @@ deconwolf dapi_001.tif PSF_dapi.tif
 however the tricky part is to find a good points spread function (PSF).
 
 ### PSF
-PSFs can be generate from ImageJ with a [plugin](http://bigwww.epfl.ch/algorithms/psfgenerator/). It the image has N slices, it is recommended that the PSF has 2xN+1 slices. Unfortunately that will require a lot of memory and processing out of your machine.
+PSFs can be generate from ImageJ with a [plugin](http://bigwww.epfl.ch/algorithms/psfgenerator/). If the image has N slices, it is recommended that the PSF has 2xN-1 slices. Unfortunately that will require a lot of memory and processing out of your machine. If the PSF is larger than required it will automatically be cropped.
 
 ## Notes
  * FFTW is self tuning and will perform some tuning every time it presented for a new problem size. The result of this tuning is called wisdom and is stored in files like `fftw_wisdom_float_threads_16.dat` by deconwolf. Do not transfer that file to other machines and expect the tuning to take some time.

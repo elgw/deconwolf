@@ -58,10 +58,10 @@ void floatimage_show_stats(float * I, size_t N, size_t M, size_t P)
 }
 
 void readUint(TIFF * tfile, float * V, 
-    uint32_t ssize, 
-    uint32_t ndirs,
-    uint32_t nstrips,
-    uint32_t perDirectory
+    const uint32_t ssize, 
+    const uint32_t ndirs,
+    const uint32_t nstrips,
+    const uint32_t perDirectory
     )
 {
   // Number of elements per strip

@@ -5,7 +5,7 @@
 #include "tiling.h"
 
 
-int * tiling_getDivision(int M, int m, int * nDiv)
+int * tiling_getDivision(const int M, const int m, int * nDiv)
 {
 
   // How many sections in M?
@@ -41,7 +41,7 @@ int imax(int a, int b)
   if(a > b){ return(a); } else { return(b); } ;
 }
 
-tiling * tiling_create(int M, int N, int P, int maxSize, int overlap)
+tiling * tiling_create(const int M, const int N, const int P, const int maxSize, const int overlap)
 {
 
   int nM = 0;
@@ -139,7 +139,7 @@ void tile_show(tile * T)
 }
 
 
-float getWeight1d(float a, float b, float c, float d, int x)
+float getWeight1d(const float a, const float b, const float c, const float d, const int x)
 {
   assert(a<=b);
   assert(b<c); // a tile has to have a size
@@ -168,8 +168,8 @@ float getWeight1d(float a, float b, float c, float d, int x)
 }
 
 float tile_getWeight(tile * t, 
-    int m, int n, int p, 
-    float pad)
+    const int m, const int n, const int p, 
+    const float pad)
   /* Calculate the weight for tile t at position (m,n,p) */
 {
   assert(p>=t->xpos[4]);
@@ -185,7 +185,7 @@ float tile_getWeight(tile * t,
   return w;
 }
 
-float tiling_getWeights(tiling * T, int M, int N, int P)
+float tiling_getWeights(tiling * T, const int M, const int N, const int P)
 {
   float w = 0;
   const float pad = (float) T->overlap;
@@ -215,7 +215,8 @@ void tile_free(tile * t)
 }
 
 
-float * tiling_get_tile(tiling * T, int tid, float * V)
+float * tiling_get_tile(tiling * T, const int tid, const float * restrict V)
+  /* Extract tile number tid from the image V */
 {
   tile * t = T->tiles[tid];
   int M = T->M; int N = T->N; 
@@ -227,11 +228,11 @@ float * tiling_get_tile(tiling * T, int tid, float * V)
   int n = t->xsize[1];
   int p = t->xsize[2];
   float * R = malloc(m*n*p*sizeof(float));
-  for(int aa = t->xpos[0]; aa <= t->xpos[1]; aa++)
+  for(int cc = t->xpos[4]; cc <= t->xpos[5]; cc++)
   {
     for(int bb = t->xpos[2]; bb <= t->xpos[3]; bb++)
     {
-      for(int cc = t->xpos[4]; cc <= t->xpos[5]; cc++)
+      for(int aa = t->xpos[0]; aa <= t->xpos[1]; aa++)
       {
         // printf("aa:%d, bb:%d, cc:%d\n", aa, bb, cc);
         size_t Vidx = aa + bb*M + cc*M*N;
@@ -249,7 +250,7 @@ float * tiling_get_tile(tiling * T, int tid, float * V)
 }
 
 
-void tiling_put_tile(tiling * T, int tid, float * V, float * S)
+void tiling_put_tile(tiling * T, int tid, float * restrict V, float * restrict S)
 {
   tile * t = T->tiles[tid];
   int M = T->M; int N = T->N; 

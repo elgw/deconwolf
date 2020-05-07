@@ -50,7 +50,6 @@ void opts_free(opts ** sp)
   nullfree(s->psfFile);
   nullfree(s->outFile);
   nullfree(s->logFile);
-  fclose(s->log);
   free(s);
 }
 
@@ -203,9 +202,9 @@ void printVmPeak(FILE * fout)
     if(strlen(line) > 6)
     {
       if(strncmp(line, "VmPeak", 6) == 0)
-          {
-            fprintf(fout, "%s", line);
-        }
+      {
+        fprintf(fout, "%s", line);
+      }
     }
   }
   free(line);
@@ -214,7 +213,7 @@ void printVmPeak(FILE * fout)
   return;
 }
 
-int psfIsCentered(float * V, int M, int N, int P)
+int psfIsCentered(const float * restrict V, const int M, const int N, const int P)
 {
   // Check that the PSF looks reasonable
   if( M % 2 == 0)
@@ -241,7 +240,7 @@ int psfIsCentered(float * V, int M, int N, int P)
   return 1;
 }
 
-float getError(float * y, float * g, int M, int N, int P, int wM, int wN, int wP)
+float getError(const float * restrict y, const float * restrict g, const int M, const int N, const int P, const int wM, const int wN, const int wP)
 {
   double e = 0;
   for(int c = 0; c<P; c++)
@@ -280,17 +279,17 @@ float getError_ref(float * y, float * g, int M, int N, int P, int wM, int wN, in
 }
 
 
-float iter(float * xp, float * g, 
-    fftwf_complex * cK,
-    fftwf_complex * cKr,
-    float * f, 
-    float * W,
-    float * G, 
-    int wM, int wN, int wP,
-    int M, int N, int P,
-    opts * s)
+float iter(float * xp, const float * restrict g, 
+    fftwf_complex * restrict cK,
+    fftwf_complex * restrict cKr,
+    float * restrict f, 
+    float * restrict W,
+    float * restrict G, 
+    const int wM, const int wN, const int wP,
+    const int M, const int N, const int P,
+    const opts * s)
 {
-  size_t wMNP = wM*wN*wP;
+  const size_t wMNP = wM*wN*wP;
 
   fftwf_complex * F = fft(f, wM, wN, wP);
   float * y = fft_convolve_cc(cK, F, wM, wN, wP);
@@ -314,8 +313,8 @@ float iter(float * xp, float * g,
   return error;
 }
 
-fftwf_complex * initial_guess(int M, int N, int P, 
-    int wM, int wN, int wP)
+fftwf_complex * initial_guess(const int M, const int N, const int P, 
+    const int wM, const int wN, const int wP)
 {
   /* Create initial guess: the fft of an image that is 1 in MNP and 0 outside
    * M, N, P is the dimension of the microscopic image
@@ -361,7 +360,7 @@ void fArray_stats(float * A, size_t N)
   printf("max: %f\n", amax);
 }
 
-void fArray_flipall(float * T, float * A, int a1, int a2, int a3)
+void fArray_flipall(float * restrict T, const float * restrict A, const int a1, const int a2, const int a3)
   /* Equivalent to T = flip(flip(flip(A,1),2),3) in matlab */
 {
   for(int aa = 0; aa<a1; aa++){
@@ -376,8 +375,8 @@ void fArray_flipall(float * T, float * A, int a1, int a2, int a3)
   }
 }
 
-void fArray_insert(float * T, int t1, int t2, int t3, 
-    float * F, int f1, int f2, int f3)
+void fArray_insert(float * restrict T, const int t1, const int t2, const int t3, 
+    const float * restrict F, const int f1, const int f2, const int f3)
   /* Insert F [f1xf2xf3] into T [t1xt2xt3] in the "upper left" corner */
 {
   for(int pp = 0; pp<f3; pp++)
@@ -412,8 +411,41 @@ void fArray_insert_ref(float * T, int t1, int t2, int t3,
   return;
 }
 
-float * fArray_subregion(float * A, int M, int N, int P, int m, int n, int p)
+float * fArray_get_cuboid(float * restrict A, const int M, const int N, const int P,
+    const int m0, const int m1, const int n0, const int n1, const int p0, const int p1)
 {
+  /* Create a new array from V using [m0, m1]x[n0, n1]x[p0, p1] */
+  int m = m1-m0+1;
+  int n = n1-n0+1;
+  int p = p1-p0+1;
+
+  float * C = fftwf_malloc(m*n*p*sizeof(float));
+  assert(C != NULL);
+
+  for(int aa = m0; aa <= m1; aa++)
+  {
+    for(int bb = n0; bb <= n1; bb++)
+    {
+      for(int cc = p0; cc <= p1; cc++)
+      {
+        // printf("aa:%d, bb:%d, cc:%d\n", aa, bb, cc);
+        size_t Aidx = aa + bb*M + cc*M*N;
+        assert(Aidx < M*N*P);
+        // New coordinates are offset ...
+        size_t Cidx = (aa - m0) + 
+          (bb - n0)*m + 
+          (cc - p0)*m*n;
+        assert(Cidx < m*n*p);
+        C[Cidx] = A[Aidx];
+      }
+    }
+  }
+  return C;
+}
+
+float * fArray_subregion(float * restrict A, const int M, const int N, const int P, const int m, const int n, const int p)
+{
+  /* Extract sub region starting at (0,0,0) */
   float * S = fftwf_malloc(m*n*p*sizeof(float));
   assert(S != NULL);
   for(int pp = 0; pp<p; pp++)
@@ -454,18 +486,17 @@ float * fArray_subregion_ref(float * A, int M, int N, int P, int m, int n, int p
   return S;
 }
 
-int mod(int a, int b)
+
+INLINED int mod(const int a, const int b)
 {
   int r = a % b;
   return r < 0 ? r + b : r;
 }
 
-
-
-void shift_vector_buf(float * V, 
-    int S, 
-    int N,
-    int k, float * buffer)
+void shift_vector_buf(float * restrict V, 
+    const int S, 
+    const int N,
+    int k, float * restrict buffer)
   /* Circular shift of a vector of length N with stride S by step k */
 {
 
@@ -481,10 +512,10 @@ void shift_vector_buf(float * V,
   return;
 }
 
-void shift_vector(float * V, 
-    int S, 
-    int N,
-    int k)
+void shift_vector(float * restrict V, 
+    const int S, 
+    const int N,
+    const int k)
   /* Circular shift of a vector of length N with stride S by step k */
 {
 
@@ -494,7 +525,7 @@ void shift_vector(float * V,
   return;
 }
 
-float * fArray_copy(float * V, size_t N)
+float * fArray_copy(const float * restrict V, const size_t N)
   // Return a newly allocated copy of V
 {
   float * C = fftwf_malloc(N*sizeof(float));
@@ -502,8 +533,8 @@ float * fArray_copy(float * V, size_t N)
   return C;
 }
 
-float * fArray_constant(size_t N, float value)
-  // Allocate and return an array of N floats
+float * fArray_constant(const size_t N, const float value)
+  // Allocate and return an array of N floats sets to a constant value
 {
   float * A = fftwf_malloc(N*sizeof(float));
   for(size_t kk = 0; kk<N; kk++)
@@ -512,7 +543,8 @@ float * fArray_constant(size_t N, float value)
   }
   return A;
 }
-float * fArray_zeros(size_t N)
+
+float * fArray_zeros(const size_t N)
   // Allocate and return an array of N floats
 {
   float * A = fftwf_malloc(N*sizeof(float));
@@ -520,40 +552,40 @@ float * fArray_zeros(size_t N)
   return A;
 }
 
-void fArray_circshift(float * A, 
-    int M, int N, int P, 
-    int sm, int sn, int sp)
+void fArray_circshift(float * restrict A, 
+    const int M, const int N, const int P, 
+    const int sm, const int sn, const int sp)
   /* Shift the image A [MxNxP] by sm, sn, sp in each dimension */
 {
 
-  size_t bsize = fmax(fmax(M, N), P);
-  float * buf = malloc(bsize*sizeof(float));
+  const size_t bsize = fmax(fmax(M, N), P);
+  float * restrict buf = malloc(bsize*sizeof(float));
 
   // Dimension 1
-  for(int bb = 0; bb<N; bb++)
-  {
     for(int cc = 0; cc<P; cc++)
     {
+  for(int bb = 0; bb<N; bb++)
+  {    
       //shift_vector(A + bb*M + cc*M*N, 1, M, sm);
       shift_vector_buf(A + bb*M + cc*M*N, 1, M, sm, buf);
     }
   }
 
   // Dimension 2
-  for(int aa = 0; aa<M; aa++)
-  {
     for(int cc = 0; cc<P; cc++)
     {
+  for(int aa = 0; aa<M; aa++)
+  {    
       //shift_vector(A + aa+cc*M*N, M, N, sn);
       shift_vector_buf(A + aa+cc*M*N, M, N, sn, buf);
     }
   }
 
   // Dimension 3
-  for(int aa = 0; aa<M; aa++)
-  {
     for(int bb = 0; bb<N; bb++)
     {
+  for(int aa = 0; aa<M; aa++)
+  {  
       //shift_vector(A + aa+bb*M, M*N, P, sp);
       shift_vector_buf(A + aa+bb*M, M*N, P, sp, buf);
     }
@@ -563,9 +595,13 @@ void fArray_circshift(float * A,
   return;
 }
 
-float * expandIm_a(float * in, 
-    int pM, int pN, int pP, 
-    int M, int N, int P)
+float * expandIm_a(const float * restrict in, 
+    const int pM, const int pN, const int pP, 
+    const int M, const int N, const int P)
+  /* "expand an image" by making it larger 
+   * pM, ... current size
+   * M, Nm ... new size
+   * */
 {
   assert(pM<=M);
   assert(pN<=N);
@@ -580,7 +616,7 @@ float * expandIm_a(float * in,
   return out;
 }
 
-void usage(int argc, char ** argv, opts * s)
+void usage(const int argc, char ** argv, const opts * s)
 {
   printf(" Usage:\n");
   printf("\t$ %s <options> image.tif psf.tif\n", argv[0]);
@@ -599,7 +635,7 @@ void usage(int argc, char ** argv, opts * s)
 }
 
 
-float update_alpha(float * g, float * gm, size_t wMNP)
+float update_alpha(const float * restrict g, const float * restrict gm, const size_t wMNP)
 {
   double ggm = 0;
   double gmgm = 0;
@@ -614,8 +650,8 @@ float update_alpha(float * g, float * gm, size_t wMNP)
   return alpha;
 }
 
-float * deconvolve(float * im, int M, int N, int P,
-    float * psf, int pM, int pN, int pP,
+float * deconvolve(const float * restrict im, const int M, const int N, const int P,
+    const float * restrict psf, const int pM, const int pN, const int pP,
     opts * s)
 {
   if(s->verbosity > 0)
@@ -782,8 +818,8 @@ float * deconvolve(float * im, int M, int N, int P,
   return out;
 }
 
-float * deconvolve_tiles(float * im, int M, int N, int P,
-    float * psf, int pM, int pN, int pP,
+float * deconvolve_tiles(const float * restrict im, int M, int N, int P,
+    const float * restrict psf, const int pM, const int pN, const int pP,
     opts * s)
 {
 
@@ -813,8 +849,13 @@ float * deconvolve_tiles(float * im, int M, int N, int P,
   float * V = malloc(M*N*P*sizeof(float));
   memset(V, 0, M*N*P*sizeof(float));
 
+
   for(int tt = 0; tt<T->nTiles; tt++)
   {
+    // Temporal copy of the PSF that might be cropped to fit the tile
+    float * tpsf = fArray_copy(psf, pM*pN*pP);
+    int tpM = pM, tpN = pN, tpP = pP;
+
     if(s->verbosity > 0)
     {
       printf("-> Processing tile %d / %d\n", tt+1, T->nTiles);
@@ -823,17 +864,21 @@ float * deconvolve_tiles(float * im, int M, int N, int P,
 
     float * im_tile = tiling_get_tile(T, tt, im);
 
-    int tM = T->tiles[tt]->xsize[0];
-    int tN = T->tiles[tt]->xsize[1];
-    int tP = T->tiles[tt]->xsize[2];
+    int tileM = T->tiles[tt]->xsize[0];
+    int tileN = T->tiles[tt]->xsize[1];
+    int tileP = T->tiles[tt]->xsize[2];
 
-    float * dw_im_tile = deconvolve(im_tile, tM, tN, tP, // input image and size
-        psf, pM, pN, pP, // psf and size
+   tpsf = autocrop_psf(tpsf, &tpM, &tpN, &tpP, 
+      tileM, tileN, tileP, s);
+
+    float * dw_im_tile = deconvolve(im_tile, tileM, tileN, tileP, // input image and size
+        tpsf, tpM, tpN, tpP, // psf and size
         s);
 
     tiling_put_tile(T, tt, V, dw_im_tile);
     free(im_tile);
     free(dw_im_tile);
+    free(tpsf);
   }
   tiling_free(T);
   free(T);
@@ -1015,7 +1060,7 @@ void show_time(FILE * f)
   fprintf(f, "%s\n", tstring);
 }
 
-void autocrop_psf(float * psf, int * pM, int * pN, int * pP,  // psf and size
+float * autocrop_psf(float * psf, int * pM, int * pN, int * pP,  // psf and size
     int M, int N, int P, // image size
     opts * s)
 {
@@ -1029,51 +1074,87 @@ void autocrop_psf(float * psf, int * pM, int * pN, int * pP,  // psf and size
     exit(1);
   }
 
+  // Optimal size
+  int mopt = (M-1)*2 + 1;
+  int nopt = (N-1)*2 + 1;
   int popt = (P-1)*2 + 1;
+
   if(p < popt)
   {
     fprintf(s->log, "The PSF does seem to have too few slices\n");
-    return;
+    return psf;
   }
 
-  if(p>popt)
-  {  
+  if(m > mopt || n > nopt || p > popt)
+  { 
+    int m0 = 0, m1 = m-1;
+    int n0 = 0, n1 = n-1;
+    int p0 = 0, p1 = p-1;
+    if(m > mopt)
+    {
+      m0 = (m-mopt)/2-1;
+      m1 = m1-(m-mopt)/2-1;
+    }
+    if(n > nopt)
+    {
+      n0 = (n-nopt)/2-1;
+      n1 = n1-(n-nopt)/2-1;
+    }
+    if(p > popt)
+    {
+      p0 = (p-popt)/2-1;
+      p1 = p1-(p-popt)/2-1;
+    }
+
+//    printf("! %d %d : %d %d : %d %d\n", m0, m1, n0, n1, p0, p1);
+    float * psf_cropped = fArray_get_cuboid(psf, m, n, p,
+        m0, m1, n0, n1, p0, p1);
+    free(psf);
+
+    pM[0] = m1-m0+1;
+    pN[0] = n1-n0+1;
+    pP[0] = p1-p0+1;
+
     if(s->verbosity > 0)
     {
-    fprintf(stdout, "Cropping the psf from %d to %d slices\n", p, popt);
+      fprintf(stdout, "The PSF was cropped to [%d x %d x %d]\n", pM[0], pN[0], pP[0]);
     }
-    fprintf(s->log, "Cropping the psf from %d to %d slices\n", p, popt);
-    memmove(psf, psf + m*n*(p-popt)/2, m*n*popt*sizeof(float));
-//    writetif("psfcrop.tif", psf, m, n, popt);
-    pP[0] = popt;
-    return;
+    fprintf(s->log, "The PSF was cropped to [%d x %d x %d]\n", pM[0], pN[0], pP[0]);
+    return psf_cropped;
+
+  } else {
+    return psf;
   }
+
 }
 
-
-
-int main(int argc, char ** argv)
-{
-  opts * s = opts_new(); // Load default settings and initialize
-  argparsing(argc, argv, s); // Parse command line
-  return deconwolf(s); // And go!
-}
-
-int deconwolf(opts * s)
+void dcw_init_log(opts * s)
 {
   s->log = fopen(s->logFile, "w");
   assert(s->log != NULL);
-
   show_time(s->log);
-
   opts_print(s, s->log); 
+  show_info(s->log);
+}
+
+void dcw_close_log(opts * s)
+{
+  printVmPeak(s->log);
+  show_time(s->log);
+  fclose(s->log);
+}
+
+
+int deconwolf(opts * s)
+{
+  dcw_init_log(s);
+
   if(s->verbosity > 0) 
   {
     opts_print(s, NULL); 
     printf("\n");
   }
 
-  show_info(s->log);
   s->verbosity > 1 ? show_info(NULL) : 0;
 
   if(s->verbosity > 0)
@@ -1104,14 +1185,15 @@ int deconwolf(opts * s)
     psf[13] = 1;
   }
 
-  autocrop_psf(psf, &pM, &pN, &pP, 
+  // Possibly the PSF will be cropped even more per tile later on
+   psf = autocrop_psf(psf, &pM, &pN, &pP, 
       M, N, P, s);
 
   myfftw_start(s->nThreads);
   float * out = NULL;
   if(s->tiling_maxSize < 0)
   {
-    out = deconvolve(im, M, N, P, // input image and size
+   out = deconvolve(im, M, N, P, // input image and size
         psf, pM, pN, pP, // psf and size
         s);// settings
   } else {
@@ -1138,7 +1220,6 @@ int deconwolf(opts * s)
     exitstatus = 0;
   }
 
-  show_time(s->log);
 
   if(s->verbosity > 0)
   {
@@ -1149,42 +1230,16 @@ int deconwolf(opts * s)
   free(out);
   myfftw_stop();
   if(s->verbosity > 1) printVmPeak(NULL);
-  printVmPeak(s->log);
+  dcw_close_log(s);
   opts_free(&s);
-
 
   return(exitstatus);
 }
 
-
-// Graveyard
-
-/* 
- *
-// Determine optimal size to work with ...
-// Optimally pP_opt = 2*P+1
-// If nP > pP_opt it should be cropped.
-int pP_opt = 2*P+1;
-
-float * psf1 = NULL;
-if(pP > 2*P+1)
+int main(int argc, char ** argv)
 {
-printf("Cropping PSF in Z, from %d slices to %d\n", pP, pP_opt);
-
-psf1 = malloc(pM*pN*pP_opt*sizeof(float));
-assert(psf1 != NULL);
-size_t skip = pM*pN*(pP-pP_opt)/2;
-memcpy(psf1+skip, psf, pM*pN*pP_opt*sizeof(float));
-pP = P;
-free(psf);
-} else {
-psf1 = psf;
+  opts * s = opts_new(); // Load default settings and initialize
+  argparsing(argc, argv, s); // Parse command line
+  return deconwolf(s); // And go!
 }
-
-assert(psf1 != NULL);
-printf("Expanding\n"); fflush(stdout);
-float * psf2 = expandIm_a(psf1, pM, pN, pP, M, N, P);
-free(psf1);
-
-*/
 

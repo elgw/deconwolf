@@ -1,6 +1,6 @@
 cc=gcc
 cflags_dbg=-Wall -g
-cflags=-Wall -O3 -flto -DNDEBUG
+cflags=-Wall -O3 -flto -DNDEBUG -march=native
 
 deconwolf: tiffio fft tiling
 	$(cc) src/deconwolf.c $(cflags) fft.o tiffio.o tiling.o -lm -lfftw3f -ltiff -lfftw3f_threads  -o bin/deconwolf

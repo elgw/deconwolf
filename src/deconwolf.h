@@ -18,7 +18,8 @@ typedef struct{
 
 int deconwolf(opts *);
 
-void usage(int argc, char ** argv, opts * );
+void usage(const int argc, char ** argv, const opts * );
 void unittests();
 void shift_vector_ut();
 void fArray_flipall_ut();
+float * autocrop_psf(float *, int *, int *, int *, int, int , int, opts * );

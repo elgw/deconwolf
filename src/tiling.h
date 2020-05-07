@@ -21,7 +21,7 @@ void tiling_show(tiling * T);
 void tiling_free(tiling * T);
 float tiling_getWeights(tiling * T, int m, int n, int p);
 /* Extract tile #t from V */
-float * tiling_get_tile(tiling * T, int t, float * V);
+float * tiling_get_tile(tiling * T, int t, const float * restrict V);
 /* Put back data extracted by tiling_get_tile
  * S extracted data from tile t
  * V target image, dimensions given by T->M, N, P
