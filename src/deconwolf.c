@@ -191,6 +191,7 @@ void printVmPeak(FILE * fout)
   if(sf == NULL)
   {
     fprintf(fout, "Failed to open %s\n", statfile);
+    free(statfile);
     return;
   }
 
@@ -207,7 +208,9 @@ void printVmPeak(FILE * fout)
         }
     }
   }
+  free(line);
   fclose(sf);
+  free(statfile);
   return;
 }
 
@@ -832,7 +835,8 @@ float * deconvolve_tiles(float * im, int M, int N, int P,
     free(im_tile);
     free(dw_im_tile);
   }
-
+  tiling_free(T);
+  free(T);
   return V;
 }
 
