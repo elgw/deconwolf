@@ -1015,6 +1015,43 @@ void show_time(FILE * f)
   fprintf(f, "%s\n", tstring);
 }
 
+void autocrop_psf(float * psf, int * pM, int * pN, int * pP,  // psf and size
+    int M, int N, int P, // image size
+    opts * s)
+{
+  int m = pM[0];
+  int n = pN[0];
+  int p = pP[0];
+
+  if((p % 2) == 0)
+  {
+    printf("Error: The PSF should have odd number of slices\n");
+    exit(1);
+  }
+
+  int popt = (P-1)*2 + 1;
+  if(p < popt)
+  {
+    fprintf(s->log, "The PSF does seem to have too few slices\n");
+    return;
+  }
+
+  if(p>popt)
+  {  
+    if(s->verbosity > 0)
+    {
+    fprintf(stdout, "Cropping the psf from %d to %d slices\n", p, popt);
+    }
+    fprintf(s->log, "Cropping the psf from %d to %d slices\n", p, popt);
+    memmove(psf, psf + m*n*(p-popt)/2, m*n*popt*sizeof(float));
+//    writetif("psfcrop.tif", psf, m, n, popt);
+    pP[0] = popt;
+    return;
+  }
+}
+
+
+
 int main(int argc, char ** argv)
 {
   opts * s = opts_new(); // Load default settings and initialize
@@ -1066,6 +1103,9 @@ int deconwolf(opts * s)
     memset(psf, 0, 27*sizeof(float));
     psf[13] = 1;
   }
+
+  autocrop_psf(psf, &pM, &pN, &pP, 
+      M, N, P, s);
 
   myfftw_start(s->nThreads);
   float * out = NULL;

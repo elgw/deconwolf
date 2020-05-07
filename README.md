@@ -3,7 +3,6 @@
 `deconwolf` is a program written in C for deconvolution of fluorescent wide-field images. It is reasonably fast and memory efficient. Optional tiling enables it to be run on machines with low memory. The most critical parts are parallelised to make use of high-core-count machines.
 
 ## Todo
- - [ ] Automatic cropping of the PSF if it is too large.
  - [ ] Protect better against misuse.
  - [ ] Documentation, examples and test data.
  - [ ] Utilities for processing of multiple images and handling of PSFs.
@@ -12,7 +11,9 @@
  - [ ] Use tif tags to write meta data (also to transfer from input image).
  - [ ] Faster calculation of tiling weights.
  - [ ] Make sure that it can be compiled on windows and mac...
+ - [ ] Crop PSF also in x and y.
  - [x] Report VmPeak to the log, i.e., the peak memory usage.
+ - [x] Automatic cropping of the PSF if it has too many stacks.
  - [x] Block mode for low memory systems, accessible through the options `--tilesize` and `--tilepad`
  - [x] Eliminate one or two arrays in the main loop to save memory.
  - [x] Use some kind of logging
