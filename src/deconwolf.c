@@ -686,7 +686,6 @@ float * deconvolve(float * im, int M, int N, int P,
 
   float * x1 = fArray_copy(f, wMNP);
   float * x2 = fArray_copy(f, wMNP);
-
   float * x = x1;
   float * xp = x2;
   float * xm = x2; // fArray_copy(f, wMNP);
@@ -704,7 +703,6 @@ float * deconvolve(float * im, int M, int N, int P,
       y[kk] < 0 ? y[kk] = 0 : 0;
     }
 
-    // printf("y[0] = %f\n", y[0]);
     xp = xm;
     double err = iter(xp, // xp is updated
         im, 
@@ -718,26 +716,25 @@ float * deconvolve(float * im, int M, int N, int P,
     if(s->log != NULL)
     { fprintf(s->log, "Iteration %d/%d, error=%e\n", it+1, nIter, err);}
 
-    memcpy(gm, g, wMNP*sizeof(float)); // swap points instead
-    //    printf("xp[0] = %f, y[0] = %f\n", xp[0], y[0]);
+    float * swap = g;
+    g = gm; gm = swap;
+
     for(size_t kk = 0; kk<wMNP; kk++)
     { 
       g[kk] = xp[kk]-y[kk]; 
     }
-    //  if(it == 0)
-    //   writetif("g_iter0.tif",g, wM, wN, wP);
+
     if(it > 0) {
       alpha = update_alpha(g, gm, wMNP);
-      // printf("alpha=%f\n", alpha);
     }
-  //  memcpy(xm, x, wMNP*sizeof(float)); // swap pointers instead
-  //  memcpy(x, xp, wMNP*sizeof(float)); // really need tree of them?
+
     xm = x;
     x = xp;
     xp = NULL;
+
     it++;
-    //writetif("xp.tif", xp, wM, wN, wP);
   }
+
   fftwf_free(W); // is P1
   fftwf_free(G);
   float * out = fArray_subregion(x, wM, wN, wP, M, N, P);
