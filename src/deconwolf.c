@@ -56,21 +56,22 @@ void opts_free(opts ** sp)
 void opts_print(opts * s, FILE *f)
 {
   f == NULL ? f = stdout : 0;
-  fprintf(f, "Settings:\n");
-  fprintf(f, "\t image:  %s\n", s->imFile);
-  fprintf(f, "\t psf:    %s\n", s->psfFile);
-  fprintf(f, "\t output: %s\n", s->outFile);
-  fprintf(f, "\t log file: %s\n", s->logFile);
-  fprintf(f, "\t nIter:  %d\n", s->nIter);
-  fprintf(f, "\t nThreads: %d\n", s->nThreads);
-  fprintf(f, "\t verbosity: %d\n", s->verbosity);
+  fprintf(f, "> Settings:\n");
+  fprintf(f, "image:  %s\n", s->imFile);
+  fprintf(f, "psf:    %s\n", s->psfFile);
+  fprintf(f, "output: %s\n", s->outFile);
+  fprintf(f, "log file: %s\n", s->logFile);
+  fprintf(f, "nIter:  %d\n", s->nIter);
+  fprintf(f, "nThreads: %d\n", s->nThreads);
+  fprintf(f, "verbosity: %d\n", s->verbosity);
   if(s->tiling_maxSize > 0)
   {
-    fprintf(f, "\t tiling, maxSize: %d\n", s->tiling_maxSize);
-    fprintf(f, "\t tiling, padding: %d\n", s->tiling_padding);
+    fprintf(f, "tiling, maxSize: %d\n", s->tiling_maxSize);
+    fprintf(f, "tiling, padding: %d\n", s->tiling_padding);
   } else {
-    fprintf(f, "\t tiling: OFF\n");
+    fprintf(f, "tiling: OFF\n");
   }
+  fprintf(f, "\n");
 }
 
 void show_info(FILE * f)
@@ -1098,7 +1099,7 @@ float * autocrop_psf(float * psf, int * pM, int * pN, int * pP,  // psf and size
 
   if(p < popt)
   {
-    fprintf(s->log, "The PSF does seem to have too few slices\n");
+    fprintf(s->log, "WARNING: The PSF has only %d slices, %d would be better.\n", p, popt);
     return psf;
   }
 
@@ -1164,6 +1165,9 @@ void dcw_close_log(opts * s)
 
 int deconwolf(opts * s)
 {
+  struct timespec tstart, tend;
+  clock_gettime(CLOCK_REALTIME, &tstart);
+
   dcw_init_log(s);
 
   if(s->verbosity > 0) 
@@ -1247,6 +1251,8 @@ int deconwolf(opts * s)
   free(out);
   myfftw_stop();
   if(s->verbosity > 1) printVmPeak(NULL);
+  clock_gettime(CLOCK_REALTIME, &tend);
+  fprintf(s->log, "Took %f s\n", timespec_diff(&tend, &tstart));
   dcw_close_log(s);
   opts_free(&s);
 
