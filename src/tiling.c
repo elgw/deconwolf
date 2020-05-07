@@ -10,8 +10,8 @@ int * tiling_getDivision(int M, int m, int * nDiv)
 
   // How many sections in M?
   float ns = (float) ceil((double) M/ (double) m);
-//  printf("%.0f sections\n", ns);
-//  exit(1);
+  //  printf("%.0f sections\n", ns);
+  //  exit(1);
   // Size of the sections?
   float width = M/ns;
 #ifndef NDEBUG
@@ -128,7 +128,7 @@ void tile_show(tile * T)
   printf("-> tile_show\n");
   printf("size: [%d x %d x %d]\n", 
       T->size[0], T->size[1], T->size[2]);
-printf("xsize: [%d x %d x %d]\n", 
+  printf("xsize: [%d x %d x %d]\n", 
       T->xsize[0], T->xsize[1], T->xsize[2]);
   printf("pos: %d--%d, %d--%d, %d--%d\n", 
       T->pos[0], T->pos[1], T->pos[2],
@@ -233,13 +233,13 @@ float * tiling_get_tile(tiling * T, int tid, float * V)
     {
       for(int cc = t->xpos[4]; cc <= t->xpos[5]; cc++)
       {
-       // printf("aa:%d, bb:%d, cc:%d\n", aa, bb, cc);
+        // printf("aa:%d, bb:%d, cc:%d\n", aa, bb, cc);
         size_t Vidx = aa + bb*M + cc*M*N;
         assert(Vidx < M*N*P);
         // New coordinates are offset ...
         size_t Ridx = (aa - t->xpos[0]) + 
-                      (bb - t->xpos[2])*m + 
-                      (cc - t->xpos[4])*m*n;
+          (bb - t->xpos[2])*m + 
+          (cc - t->xpos[4])*m*n;
         assert(Ridx < m*n*p);
         R[Ridx] = V[Vidx];
       }
@@ -255,16 +255,16 @@ void tiling_put_tile(tiling * T, int tid, float * V, float * S)
   int M = T->M; int N = T->N; 
   int m = t->xsize[0];
   int n = t->xsize[1];
-  for(int aa = t->xpos[0]; aa <= t->xpos[1]; aa++)
+  for(int cc = t->xpos[4]; cc <= t->xpos[5]; cc++)
   {
     for(int bb = t->xpos[2]; bb <= t->xpos[3]; bb++)
     {
-      for(int cc = t->xpos[4]; cc <= t->xpos[5]; cc++)
+      for(int aa = t->xpos[0]; aa <= t->xpos[1]; aa++)
       {
         size_t Vidx = aa + bb*M + cc*M*N;
         size_t Sidx = (aa-t->xpos[0]) + 
-                      (bb-t->xpos[2])*m + 
-                      (cc-t->xpos[4])*m*n;
+          (bb-t->xpos[2])*m + 
+          (cc-t->xpos[4])*m*n;
         float w = tile_getWeight(t, aa, bb, cc, T->overlap);
         w/= tiling_getWeights(T, aa, bb, cc);
         V[Vidx] += w*S[Sidx];
