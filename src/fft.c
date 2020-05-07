@@ -9,7 +9,7 @@ char * swf = NULL;
 const unsigned int MYPLAN = FFTW_MEASURE;
 //const unsigned int MYPLAN = FFTW_PATIENT;
 
-void myfftw_start(int nThreads)
+void myfftw_start(const int nThreads)
 {  
 //  printf("\t using %s with %d threads\n", fftwf_version, nThreads);
   fftwf_init_threads();
@@ -28,7 +28,7 @@ void myfftw_stop(void)
 }
 
 
-fftwf_complex * fft(float * in, int n1, int n2, int n3)
+fftwf_complex * fft(float * restrict in, const int n1, const int n2, const int n3)
 {
   int n3red = (n3+3)/2;
   fftwf_complex * out = fftwf_malloc(n1*n2*n3red*sizeof(fftwf_complex));
@@ -43,10 +43,13 @@ fftwf_complex * fft(float * in, int n1, int n2, int n3)
   return out;
 }
 
-void fft_mul(fftwf_complex * C, fftwf_complex * A, fftwf_complex * B, size_t n1, size_t n2, size_t n3)
+void fft_mul(fftwf_complex * restrict C, 
+    fftwf_complex * restrict A, 
+    fftwf_complex * restrict B, 
+    const size_t n1, const size_t n2, const size_t n3)
 {
-  int n3red = (n3+3)/2;
-  size_t N = n1*n2*n3red;
+  const int n3red = (n3+3)/2;
+  const size_t N = n1*n2*n3red;
   // C = A*B
   for(size_t kk = 0; kk<N; kk++)
   {
@@ -58,7 +61,8 @@ void fft_mul(fftwf_complex * C, fftwf_complex * A, fftwf_complex * B, size_t n1,
   return;
 }
 
-float * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B, const int M, const int N, const int P)
+float * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B, 
+    const int M, const int N, const int P)
 {
   size_t n3red = (P+3)/2;
   fftwf_complex * C = fftwf_malloc(M*N*n3red*sizeof(fftwf_complex));
@@ -80,7 +84,7 @@ float * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B, const int M, const
   return out;
 }
 
-void fft_train(size_t M, size_t N, size_t P, int verbosity)
+void fft_train(const size_t M, const size_t N, const size_t P, const int verbosity)
 {
   if(verbosity > 1){
     printf("fftw3 training ... \n"); fflush(stdout);

@@ -23,7 +23,7 @@ opts * opts_new(void)
 {
   opts * s = malloc(sizeof(opts));
   s->nThreads = 4;
-  s->nIter = 50;
+  s->nIter = 25;
   s->imFile = NULL;
   s->psfFile = NULL;
   s->outFile = NULL;
@@ -562,30 +562,30 @@ void fArray_circshift(float * restrict A,
   float * restrict buf = malloc(bsize*sizeof(float));
 
   // Dimension 1
-    for(int cc = 0; cc<P; cc++)
-    {
-  for(int bb = 0; bb<N; bb++)
-  {    
+  for(int cc = 0; cc<P; cc++)
+  {
+    for(int bb = 0; bb<N; bb++)
+    {    
       //shift_vector(A + bb*M + cc*M*N, 1, M, sm);
       shift_vector_buf(A + bb*M + cc*M*N, 1, M, sm, buf);
     }
   }
 
   // Dimension 2
-    for(int cc = 0; cc<P; cc++)
-    {
-  for(int aa = 0; aa<M; aa++)
-  {    
+  for(int cc = 0; cc<P; cc++)
+  {
+    for(int aa = 0; aa<M; aa++)
+    {    
       //shift_vector(A + aa+cc*M*N, M, N, sn);
       shift_vector_buf(A + aa+cc*M*N, M, N, sn, buf);
     }
   }
 
   // Dimension 3
-    for(int bb = 0; bb<N; bb++)
-    {
-  for(int aa = 0; aa<M; aa++)
-  {  
+  for(int bb = 0; bb<N; bb++)
+  {
+    for(int aa = 0; aa<M; aa++)
+    {  
       //shift_vector(A + aa+bb*M, M*N, P, sp);
       shift_vector_buf(A + aa+bb*M, M*N, P, sp, buf);
     }
@@ -780,8 +780,13 @@ float * deconvolve(const float * restrict im, const int M, const int N, const in
         wM, wN, wP, 
         M, N, P, s);
 
-    if(s->verbosity >0){
-      printf("Iteration %d/%d, error=%e\n", it+1, nIter, err);}
+    if(s->verbosity > 0){
+      if(s->verbosity> 1 || it+1 == nIter) {
+        {printf("Iteration %d/%d, error=%e\n", it+1, nIter, err);}
+      } else 
+        if(it % 5 == 0)  {printf("Iteration %d/%d, error=%e\n", it+1, nIter, err);}
+    }
+
     if(s->log != NULL)
     { fprintf(s->log, "Iteration %d/%d, error=%e\n", it+1, nIter, err);}
 
@@ -868,8 +873,8 @@ float * deconvolve_tiles(const float * restrict im, int M, int N, int P,
     int tileN = T->tiles[tt]->xsize[1];
     int tileP = T->tiles[tt]->xsize[2];
 
-   tpsf = autocrop_psf(tpsf, &tpM, &tpN, &tpP, 
-      tileM, tileN, tileP, s);
+    tpsf = autocrop_psf(tpsf, &tpM, &tpN, &tpP, 
+        tileM, tileN, tileP, s);
 
     float * dw_im_tile = deconvolve(im_tile, tileM, tileN, tileP, // input image and size
         tpsf, tpM, tpN, tpP, // psf and size
@@ -1106,7 +1111,7 @@ float * autocrop_psf(float * psf, int * pM, int * pN, int * pP,  // psf and size
       p1 = p1-(p-popt)/2-1;
     }
 
-//    printf("! %d %d : %d %d : %d %d\n", m0, m1, n0, n1, p0, p1);
+    //    printf("! %d %d : %d %d : %d %d\n", m0, m1, n0, n1, p0, p1);
     float * psf_cropped = fArray_get_cuboid(psf, m, n, p,
         m0, m1, n0, n1, p0, p1);
     free(psf);
@@ -1186,14 +1191,14 @@ int deconwolf(opts * s)
   }
 
   // Possibly the PSF will be cropped even more per tile later on
-   psf = autocrop_psf(psf, &pM, &pN, &pP, 
+  psf = autocrop_psf(psf, &pM, &pN, &pP, 
       M, N, P, s);
 
   myfftw_start(s->nThreads);
   float * out = NULL;
   if(s->tiling_maxSize < 0)
   {
-   out = deconvolve(im, M, N, P, // input image and size
+    out = deconvolve(im, M, N, P, // input image and size
         psf, pM, pN, pP, // psf and size
         s);// settings
   } else {

@@ -22,6 +22,7 @@
  - [x] Make use of symmetries to save memory?
  - [x] Save FFTW wisdom.
  - [x] Identical results to matlab code.
+
 Will not do:
  - Re-use plans to save some (micro) time.
 
