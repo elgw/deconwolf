@@ -16,6 +16,9 @@
 #include "deconwolf.h"
 #include "tiling.h"
 
+// use ldd to check where possibly neede
+#define INLINED inline __attribute__((always_inline))
+
 opts * opts_new(void)
 {
   opts * s = malloc(sizeof(opts));
@@ -208,6 +211,25 @@ int psfIsCentered(float * V, int M, int N, int P)
 float getError(float * y, float * g, int M, int N, int P, int wM, int wN, int wP)
 {
   double e = 0;
+  for(int c = 0; c<P; c++)
+  {
+    for(int b = 0; b<N; b++)
+    {
+      for(int a = 0; a<M; a++)
+      {
+        double yval = y[a + b*wM + c*wM*wN];
+        double gval = g[a + b*M + c * M*N];
+        e+=pow(yval-gval, 2);
+      }
+    }
+  }
+  e/=(M*N*P);
+  return (float) e;
+}
+
+float getError_ref(float * y, float * g, int M, int N, int P, int wM, int wN, int wP)
+{
+  double e = 0;
   for(int a = 0; a<M; a++)
   {
     for(int b = 0; b<N; b++)
@@ -339,6 +361,27 @@ void fArray_insert(float * T, int t1, int t2, int t3,
 }
 
 float * fArray_subregion(float * A, int M, int N, int P, int m, int n, int p)
+{
+  float * S = fftwf_malloc(m*n*p*sizeof(float));
+  assert(S != NULL);
+      for(int pp = 0; pp<p; pp++)
+  {
+    for(int nn = 0; nn<n; nn++)
+    {
+  for(int mm = 0; mm<m; mm++)
+      {
+        size_t Aidx = mm + nn*M + pp*M*N;
+        size_t Sidx = mm + nn*m + pp*m*n;
+        assert(Aidx < M*N*P);
+        assert(Sidx < m*n*p);
+        S[Sidx] = A[Aidx];
+      }
+    }
+  }
+  return S;
+}
+
+float * fArray_subregion_ref(float * A, int M, int N, int P, int m, int n, int p)
 {
   float * S = fftwf_malloc(m*n*p*sizeof(float));
   assert(S != NULL);
@@ -550,7 +593,7 @@ float * deconvolve(float * im, int M, int N, int P,
   }
   if(s->verbosity > 1)
   {
-  printf("Estimated peak memory usage: %.1f GB\n", wMNP*65.0/1e9);
+    printf("Estimated peak memory usage: %.1f GB\n", wMNP*65.0/1e9);
   }
   fprintf(s->log, "image: [%dx%dx%d], psf: [%dx%dx%d], job: [%dx%dx%d] (%zu voxels)\n",
       M, N, P, pM, pN, pP, wM, wN, wP, wMNP);
@@ -800,8 +843,82 @@ void shift_vector_ut()
   }
 }
 
+static double timespec_diff(struct timespec* end, struct timespec * start)
+{
+  double elapsed = (end->tv_sec - start->tv_sec);
+  elapsed += (end->tv_nsec - start->tv_nsec) / 1000000000.0;
+  return elapsed;
+}
+
+#define tictoc struct timespec tictoc_start, tictoc_end;
+#define tic clock_gettime(CLOCK_REALTIME, &tictoc_start);
+#define toc(X) clock_gettime(CLOCK_REALTIME, &tictoc_end); printf(#X); printf(" %f s\n", timespec_diff(&tictoc_end, &tictoc_start));
+
+void timings()
+{
+  tictoc
+    int M = 1024, N = 1024, P = 50;
+  float temp = 0;
+
+  tic
+    usleep(1000);
+  toc(usleep_1000)
+
+    tic
+    float * V = malloc(M*N*P*sizeof(float));
+  toc(malloc)
+
+    float * A = malloc(M*N*P*sizeof(float));
+
+  tic
+    memset(V, 0, M*N*P*sizeof(float));
+  toc(memset)
+    memset(A, 0, M*N*P*sizeof(float));
+  for(int kk = 0; kk<M*N*P; kk++)
+  {
+    A[kk] = (float) rand()/(float) RAND_MAX;
+  }
+
+
+    tic 
+    temp = update_alpha(V, A, M*N*P);
+  toc(update_alpha)
+    V[0]+= temp;
+
+  tic
+  float e1 = getError_ref(V, A, M, N, P, M, N, P);
+  toc(getError_ref)
+    V[0]+= e1;
+  
+
+  tic
+    float e2 = getError(V, A, M, N, P, M, N, P);
+  toc(getError)
+
+    tic
+    float * S1 = fArray_subregion(V, M, N, P, M-1, N-1, P-1);
+  toc(fArray_subregion)
+
+    tic
+    float * S2 = fArray_subregion_ref(V, M, N, P, M-1, N-1, P-1);
+  toc(fArray_subregion_ref)
+
+    printf("S1 - S2 = %f\n", getError(S1, S1, M-1, N-1, P-1, M-1, N-1, P-1));
+  free(S1);
+  free(S2);
+
+
+    V[0]+=e2;
+  printf("e1: %f, e2: %f, fabs(e1-e2): %f\n", e1, e1, fabs(e1-e2));
+
+  ((float volatile *)V)[0] = V[0];
+  printf("V[0] = %f\n", V[0]);
+}
+
+
 void unittests()
 {
+  timings();
   shift_vector_ut();
   fArray_flipall_ut();
   //
@@ -878,8 +995,8 @@ int deconwolf(opts * s)
     out = deconvolve_tiles(im, M, N, P, // input image and size
         psf, pM, pN, pP, // psf and size
         s);// settings
- }
-    // floatimage_show_stats(out, M, N, P);
+  }
+  // floatimage_show_stats(out, M, N, P);
   int exitstatus = 1;
   if(out == NULL)
   {
