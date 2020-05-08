@@ -19,9 +19,11 @@ typedef struct{
   char * psfFile;
   char * outFile;
   char * logFile;
+  char * prefix;
   FILE * log;
   int tiling_maxSize;
   int tiling_padding;
+  int overwrite; // overwrite output tif file?
 
   int verbosity;
   fftwf_plan fft_plan;

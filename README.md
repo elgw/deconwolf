@@ -2,29 +2,6 @@
 
 `deconwolf` is a program written in C for deconvolution of fluorescent wide-field images. It is reasonably fast and memory efficient. Optional tiling enables it to be run on machines with low memory. The most critical parts are parallelised to make use of high-core-count machines.
 
-## Todo
- - [ ] Protect better against misuse.
- - [ ] Documentation, examples and test data.
- - [ ] Utilities for processing of multiple images and handling of PSFs.
- - [ ] Flag to save one image after each iteration (to facilitate setting the number of iterations).
- - [ ] Demos, for example on the effect of the tiling.
- - [ ] Use tif tags to write meta data (also to transfer from input image).
- - [ ] Make sure that it can be compiled on windows and mac...
- - [x] Crop PSF also in x and y (individual crop per tile as well).
- - [x] Faster calculation of tiling weights.
- - [x] Report VmPeak to the log, i.e., the peak memory usage.
- - [x] Automatic cropping of the PSF if it has too many stacks.
- - [x] Block mode for low memory systems, accessible through the options `--tilesize` and `--tilepad`
- - [x] Eliminate one or two arrays in the main loop to save memory.
- - [x] Use some kind of logging
- - [x] Argument parsing 
- - [x] Proper automatic name on output file.
- - [x] Make use of symmetries to save memory?
- - [x] Save FFTW wisdom.
- - [x] Identical results to matlab code.
-
-Will not do:
- - Re-use plans to save some (micro) time.
 
 ## Building
 deconwolf requires `libtiff` and `fftw3` to run, usually those libraries are already installed. However you might need the header files. It is good to build it on your specific machine to get the last drops of juice out of your CPU.
@@ -60,12 +37,14 @@ deconwolf dapi_001.tif PSF_dapi.tif
 ```
 however the tricky part is to find a good points spread function (PSF).
 
+### Memory considerations
+Memory consumption is somewhere between 60 and 70 B per voxel, and drops when tiling is enabled. (Some data: 26169630 voxels, VmPeak 1700132 kB gives 65 B per voxel. 339982580 voxels and VmPeak 19498732 gives 58 B per voxel.
+
 ### PSF
 PSFs can be generate from ImageJ with a [plugin](http://bigwww.epfl.ch/algorithms/psfgenerator/). If the image has N slices, it is recommended that the PSF has 2xN-1 slices. Unfortunately that will require a lot of memory and processing out of your machine. If the PSF is larger than required it will automatically be cropped.
 
 ## Notes
- * FFTW is self tuning and will perform some tuning every time it presented for a new problem size. The result of this tuning is called wisdom and is stored in files like `fftw_wisdom_float_threads_16.dat` by deconwolf. Do not transfer that file to other machines and expect the tuning to take some time.
- * Memory consumption is somewhere between 60 and 70 B per voxel, and drops when tiling is enabled. (Some data: 26169630 voxels, VmPeak 1700132 kB gives 65 B per voxel. 339982580 voxels and VmPeak 19498732 gives 58 B per voxel.
+ * FFTW is self tuning and will perform some tuning every time it presented for a new problem size. The result of this tuning is called wisdom and is stored in files like `fftw_wisdom_float_threads_16.dat` by deconwolf (in `~/config/deonwolf/`). Do not transfer that file to other machines and expect the tuning to take some time.
 
 
 ## Resources
@@ -78,4 +57,40 @@ The algoritm is based on these papers:
 A&A 437, 369-374 (2005), [doi](https://doi.org/10.1051/0004-6361:20052717)
  * Lee, Ji-Yeon & Lee, Nam-Yong. (2014). Cause Analysis and Removal of Boundary Artifacts in Image Deconvolution. Journal of Korea Multimedia Society. 17. 838-848. [doi](https://doi.org/10.9717/kmms.2014.17.7.838).
 
+## Todo
+ - [ ] Protect better against misuse.
+ - [ ] Documentation, examples and test data.
+ - [ ] Utilities for processing of multiple images and handling of PSFs.
+ - [ ] Flag to save one image after each iteration (to facilitate setting the number of iterations).
+ - [ ] Demos, for example on the effect of the tiling.
+ - [ ] Use tif tags to write meta data (also to transfer from input image).
+ - [ ] Make sure that it can be compiled on windows and mac...
+ - [ ] Use cmake to facilitate cross platform builds
+ - [x] Refuse to run if output file already exist (unless `--overwrite`) with status `0`.
+ - [x] Crop PSF also in x and y (individual crop per tile as well).
+ - [x] Faster calculation of tiling weights.
+ - [x] Report VmPeak to the log, i.e., the peak memory usage.
+ - [x] Automatic cropping of the PSF if it has too many stacks.
+ - [x] Block mode for low memory systems, accessible through the options `--tilesize` and `--tilepad`
+ - [x] Eliminate one or two arrays in the main loop to save memory.
+ - [x] Use some kind of logging
+ - [x] Argument parsing 
+ - [x] Proper automatic name on output file.
+ - [x] Make use of symmetries to save memory?
+ - [x] Save FFTW wisdom (saved to `./config/deconwolf/`)
+ - [x] Identical results to matlab code.
+
+Will not do:
+ - Re-use plans to save some (micro) time.
+
+### Utils (that does not exist yet)
+
+```
+# generate a list of things to run
+deconwolf --batch (--iter ...) image_folder psf_folder
+# run them
+./deconwolf_batch
+# possibly like this (if you know what you are doing)
+parallel --halt-on-error 2 --jobs $nCores --joblog parallel.log < deconwolf_batch
+```
 

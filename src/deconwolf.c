@@ -28,8 +28,11 @@ opts * opts_new(void)
   s->psfFile = NULL;
   s->outFile = NULL;
   s->logFile = NULL;
+  s->prefix = malloc(10*sizeof(char));
+  sprintf(s->prefix, "dcw");
   s->log = NULL;
   s->verbosity = 1;
+  s->overwrite = 0;
   s->tiling_maxSize = -1;
   s->tiling_padding = 20;
   return s;
@@ -50,6 +53,7 @@ void opts_free(opts ** sp)
   nullfree(s->psfFile);
   nullfree(s->outFile);
   nullfree(s->logFile);
+  nullfree(s->prefix);
   free(s);
 }
 
@@ -64,6 +68,10 @@ void opts_print(opts * s, FILE *f)
   fprintf(f, "nIter:  %d\n", s->nIter);
   fprintf(f, "nThreads: %d\n", s->nThreads);
   fprintf(f, "verbosity: %d\n", s->verbosity);
+  if(s->overwrite == 1)
+  { fprintf(f, "overwrite: YES\n"); } else
+  { fprintf(f, "overwrite: NO\n"); }
+
   if(s->tiling_maxSize > 0)
   {
     fprintf(f, "tiling, maxSize: %d\n", s->tiling_maxSize);
@@ -72,6 +80,15 @@ void opts_print(opts * s, FILE *f)
     fprintf(f, "tiling: OFF\n");
   }
   fprintf(f, "\n");
+}
+
+int file_exist(char * fname)
+{
+if( access( fname, F_OK ) != -1 ) {
+    return 1; // File exist
+} else {
+    return 0;
+}
 }
 
 void show_info(FILE * f)
@@ -102,8 +119,16 @@ void show_info(FILE * f)
   return;
 }
 
+void deconwolf_batch(opts * s)
+{
+  // Better to do in Lua/Python/bash/...
+  printf("Not implemented !\n");
+}
+
 void argparsing(int argc, char ** argv, opts * s)
 {
+
+  int generate_batch = 0;
 
   struct option longopts[] = {
     { "version",     no_argument,       NULL,   'v' }, 
@@ -117,6 +142,9 @@ void argparsing(int argc, char ** argv, opts * s)
     { "test",        no_argument,        NULL,   't' },
     { "tilesize",    required_argument,  NULL,   's' }, 
     { "tilepad",     required_argument,  NULL,   'p' },
+    { "overwrite",   no_argument,        NULL,   'w' },
+    { "prefix",       required_argument, NULL,   'f' },
+    { "batch",        no_argument, NULL, 'b' },
     { NULL,           0,                 NULL,   0   }
   };
 
@@ -155,6 +183,17 @@ void argparsing(int argc, char ** argv, opts * s)
       case 'p':
         s->tiling_padding = atoi(optarg);
         break;
+      case 'w':
+        s->overwrite = 1;
+        break;
+      case 'f':
+        free(s->prefix);
+        s->prefix = malloc(strlen(optarg) + 1);
+        strcpy(s->prefix, optarg);
+        break;
+      case 'b':
+        generate_batch = 1;
+        break;
     }
   }
 
@@ -163,6 +202,12 @@ void argparsing(int argc, char ** argv, opts * s)
   {
     printf("At least image and PSF has to be specified, hint: try '--help'!\n");
     exit(1);
+  }
+
+  if(generate_batch)
+  {
+    deconwolf_batch(s);
+    exit(0);
   }
 
   s->imFile = realpath(argv[optind++], 0);
@@ -182,9 +227,15 @@ void argparsing(int argc, char ** argv, opts * s)
     char * dname = dirname(dirc);
     char * bname = basename(basec);
     s->outFile = malloc(strlen(dname) + strlen(bname) + 10);
-    sprintf(s->outFile, "%s/dcw_%s", dname, bname);
+    sprintf(s->outFile, "%s/%s_%s", dname, s->prefix, bname);
     free(dirc);
     free(basec);
+  }
+
+  if( s->overwrite == 0 && file_exist(s->outFile))
+  {
+    printf("%s already exist. Doing nothing\n", s->outFile);
+    exit(0);
   }
 
   s->logFile = malloc(strlen(s->outFile) + 10);
@@ -633,6 +684,8 @@ void usage(const int argc, char ** argv, const opts * s)
 {
   printf(" Usage:\n");
   printf("\t$ %s <options> image.tif psf.tif\n", argv[0]);
+//  printf("or\n");
+//  printf("\t$ %s --batch <options> image_dir psf_dir\n", argv[0]);
   printf("\n");
   printf(" Options:\n");
   printf(" --version\n\t Show version info\n");
@@ -644,6 +697,9 @@ void usage(const int argc, char ** argv, const opts * s)
   printf(" --test\n\t Run unit tests\n");
   printf(" --tilesize N\n\t Enables tiling mode and sets the largest tile size to N voxels in x and y.\n");
   printf(" --tilepad N\n\t Sets the tiles to overlap by N voxels in tile mode (default: %d)\n", s->tiling_padding);
+  printf(" --prefix str\n\t Set the prefix of the output files (default: '%s')\n", s->prefix);
+  printf(" --overwrite\n\t Allows deconwolf to overwrite already existing output files\n");
+//  printf(" --batch\n\t Generate a batch file to deconvolve all images in the `image_dir`\n");
   printf("\n");
 }
 
