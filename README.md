@@ -41,7 +41,8 @@ deconwolf requires `fftw3f`, `fftw3f_threads` and `tiff-5` and can be built with
 Typical installation procedure:
 ```
 meson builddir
-ninja -C builddir
+cd builddir
+ninja builddir
 # to install deconwolf to a standard location, use
 sudo ninja install
 # if you for some reason don't want it anymore, use
@@ -61,7 +62,7 @@ sudo apt-get install libfftw3-dev
 sudo apt-get install meson
 ```
 
-If you need to build fftw3 from source, that was not to tricky:
+If you need to build fftw3 from source, that was not too tricky:
 ```
 # download source first ...
 ./configure --help
