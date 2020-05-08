@@ -4,9 +4,19 @@
 
 
 ## Building
-deconwolf requires `libtiff` and `fftw3` to run, usually those libraries are already installed. However you might need the header files. It is good to build it on your specific machine to get the last drops of juice out of your CPU.
+deconwolf requires `fftw3f`, `fftw3f_threads` and `tiff-5` and can be built with meason. 
 
-On Ubuntu this might be enough:
+The installation is typically something like this:
+```
+meson builddir
+ninja -C builddir
+# to install deconwolf to a standard location, use
+sudo ninja install
+# if you for some reason don't want it anymore
+sudo ninja uninstall
+```
+
+If meson or some of the libraries are missing, use google search! On Ubuntu 19.10 this did the job:
 ```
 sudo apt-get update
 
@@ -16,10 +26,10 @@ sudo apt-get install libtiff5-dev
 # sudo apt-cache search libfftw3
 sudo apt-get install libfftw3-dev
 
-make deconwolf -B
+sudo apt-get install meson
 ```
 
-Optionally you can build fftw3 from source, the you will need to build with support for threads and single precision calculations:
+If you need to build fftw3 from source, that was not to tricky:
 ```
 # download source first ...
 ./configure --help
@@ -27,6 +37,8 @@ Optionally you can build fftw3 from source, the you will need to build with supp
 make
 sudo make install
 ```
+
+
 ## Usage:
 deconwolf reads tif images (16-bit unsigned and 32-bit floats with some limitations). Usage is as simple as:
 ```
@@ -75,6 +87,9 @@ A&A 437, 369-374 (2005), [doi](https://doi.org/10.1051/0004-6361:20052717)
  - [ ] Make sure that it can be compiled on windows and mac...
  - [ ] Use cmake to facilitate cross platform builds
  - [ ] Crash-safe writing, write to temporary file and move when write is complete to avoid bad luck.
+ - [ ] Highly parsable log file.
+ - [ ] Break out the image processing functions to separate library.
+ - [ ] Proper logger.
  - [x] Possible to change the prefix with the `--prefix` flag.
  - [x] Refuse to run if output file already exist (unless `--overwrite`) with status `0`.
  - [x] Crop PSF also in x and y (individual crop per tile as well).

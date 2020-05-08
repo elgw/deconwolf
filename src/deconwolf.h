@@ -10,6 +10,12 @@
  *
  * The choice of folder is recommended by "XDG Base Directory Specification", see:
  * https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
+ *
+ * 
+ * All algorithms assumes column major indexing, i.e., the distance 
+ * between elements is 1 for the first dimension and increases with 
+ * each new dimension.
+ *
  */
 
 typedef struct{
