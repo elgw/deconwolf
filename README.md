@@ -35,7 +35,15 @@ deonwolf --help
 # basic usage
 deconwolf dapi_001.tif PSF_dapi.tif
 ```
-however the tricky part is to find a good points spread function (PSF).
+There is a small script that might be useful for batch processing, example:
+```
+$ deconwolf_batch.py iMERULA91_20200125_001/ ../PSF/ '--iter 50 --tilesize 512'
+deconwolf --iter 50 --tilesize 512 iMERULA91_20200125_001/Cy5_012.tif ../PSF/PSF_Cy5.tif
+deconwolf --iter 50 --tilesize 512 iMERULA91_20200125_001/Cy5_013.tif ../PSF/PSF_Cy5.tif
+deconwolf --iter 50 --tilesize 512 iMERULA91_20200125_001/dapi_013.tif ../PSF/PSF_dapi.tif
+...
+```
+the output can be run directly with `| bash` or piped to a file and executed later (possibly using `parallel`). Since deconwolf does not overwrite output files such list of jobs to be run can be aborted and restarted.
 
 ### Memory considerations
 Memory consumption is somewhere between 60 and 70 B per voxel, and drops when tiling is enabled. (Some data: 26169630 voxels, VmPeak 1700132 kB gives 65 B per voxel. 339982580 voxels and VmPeak 19498732 gives 58 B per voxel.
@@ -60,12 +68,14 @@ A&A 437, 369-374 (2005), [doi](https://doi.org/10.1051/0004-6361:20052717)
 ## Todo
  - [ ] Protect better against misuse.
  - [ ] Documentation, examples and test data.
- - [ ] Utilities for processing of multiple images and handling of PSFs.
+ - [ ] A higher level interface with facilities for handling and generation of PSFs.
  - [ ] Flag to save one image after each iteration (to facilitate setting the number of iterations).
  - [ ] Demos, for example on the effect of the tiling.
  - [ ] Use tif tags to write meta data (also to transfer from input image).
  - [ ] Make sure that it can be compiled on windows and mac...
  - [ ] Use cmake to facilitate cross platform builds
+ - [ ] Crash-safe writing, write to temporary file and move when write is complete to avoid bad luck.
+ - [x] Possible to change the prefix with the `--prefix` flag.
  - [x] Refuse to run if output file already exist (unless `--overwrite`) with status `0`.
  - [x] Crop PSF also in x and y (individual crop per tile as well).
  - [x] Faster calculation of tiling weights.
