@@ -9,7 +9,10 @@ def im_to_psf(imfile):
     imfile = os.path.basename(imfile)
     imfile = imfile[0:-4]
     parts = imfile.split('_')
-    return(f"PSF_{parts[0]}.tif")
+    if(len(parts) == 2):
+        return(f"PSF_{parts[0]}.tif")
+    else:
+        return ''
 
 
 def usage():
@@ -34,6 +37,7 @@ if __name__ == '__main__':
 
     for im in images:
         psf_file = os.path.join(psd, im_to_psf(im))
-        print(f"deconwolf {dcw} {im} {psf_file}")
+        if(len(psf_file)>0):
+            print(f"deconwolf {dcw} {im} {psf_file}")
 
     sys.exit(0)
