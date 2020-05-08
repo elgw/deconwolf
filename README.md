@@ -1,10 +1,10 @@
 # deconwolf
 
-`deconwolf` is a program for deconvolution of fluorescent wide-field image stacks. Here is a highlight of the properties:
- * The algorithm reduces most boundary effects that can be seen with ordinary linear deconvolution.
- * Tiling can be used if not enough RAM is available, at the cost of slightly longer computation times.
- * It is highly parallelised and can make use of multi-core CPUs, and can of course be used in parallel if there is enough memory.
- * Extremely tiny, the nstallation size is less than 0.1 MB (excluding dependencies) -- fits most floppy discs :)
+`deconwolf` is a program for deconvolution of fluorescent wide-field image stacks, the highlights are:
+ - almost no most boundary effects compared to ordinary linear deconvolution due to clever algorithm.
+ - optional low RAM usage at the cost of slightly longer computation times which makes it possible to use low-cost hardware.
+ - highly parallelised so that it can use all the juice in your fancy multi-core computer.
+ - extremely tiny: with an installation size of less than 0.1 MB it would fit most floppy drives (if you are fortunate enough to own one of those antiquities).
 
 ## Usage:
 deconwolf has a simple command line interface and only need to know which image that you want to deconvolve and what PSF that should be used. For example, to deconvolve the image `dapi_001.tif` by the PSF in `PSF_dapi.tif`, just type:
@@ -18,7 +18,7 @@ deonwolf --help
 
 In the source directory there is also a small script that might be useful for batch processing, example:
 ```
-$ ptyhon3 deconwolf_batch.py iMERULA91_20200125_001/ ../PSF/ '--iter 50 --tilesize 512'
+$ python3 deconwolf_batch.py iMERULA91_20200125_001/ ../PSF/ '--iter 50 --tilesize 512'
 deconwolf --iter 50 --tilesize 512 iMERULA91_20200125_001/Cy5_012.tif ../PSF/PSF_Cy5.tif
 deconwolf --iter 50 --tilesize 512 iMERULA91_20200125_001/Cy5_013.tif ../PSF/PSF_Cy5.tif
 deconwolf --iter 50 --tilesize 512 iMERULA91_20200125_001/dapi_013.tif ../PSF/PSF_dapi.tif
