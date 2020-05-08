@@ -1,5 +1,6 @@
 project('deconwolf', 'c',
-        default_options : ['c_std=gnu99', 'optimization=3', 'warning_level=1'])
+        default_options : ['c_std=gnu99', 'optimization=3', 
+        'warning_level=1', 'b_ndebug=true', 'b_lto=true'])
 
 cc = meson.get_compiler('c')
 
