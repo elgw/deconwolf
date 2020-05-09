@@ -1115,6 +1115,8 @@ void timings()
 
     ((float volatile *)V)[0] = V[0];
   printf("V[0] = %f\n", V[0]);
+  free(A);
+  free(V);
 }
 
 void tiffio_ut()
