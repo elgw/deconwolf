@@ -42,7 +42,7 @@ Typical installation procedure:
 ```
 meson builddir
 cd builddir
-ninja builddir
+ninja 
 # to install deconwolf to a standard location, use
 sudo ninja install
 # if you for some reason don't want it anymore, use

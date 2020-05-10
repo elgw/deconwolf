@@ -246,6 +246,11 @@ void argparsing(int argc, char ** argv, opts * s)
 
 void printVmPeak(FILE * fout)
 {
+#ifdef __APPLE__
+	struct rusage r_usage;
+	getrusage(RUSAGE_SELF, &r_usage);
+	fprintf(fout, "VmPeak : %zu\n"), (size_t) r_usage.ru_maxrss);
+#else
   if(fout == NULL) fout = stdout;
 
   char * statfile = malloc(100*sizeof(char));
@@ -274,6 +279,7 @@ void printVmPeak(FILE * fout)
   free(line);
   fclose(sf);
   free(statfile);
+#endif
   return;
 }
 
