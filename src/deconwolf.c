@@ -84,11 +84,11 @@ void opts_print(opts * s, FILE *f)
 
 int file_exist(char * fname)
 {
-if( access( fname, F_OK ) != -1 ) {
+  if( access( fname, F_OK ) != -1 ) {
     return 1; // File exist
-} else {
+  } else {
     return 0;
-}
+  }
 }
 
 void show_info(FILE * f)
@@ -244,24 +244,29 @@ void argparsing(int argc, char ** argv, opts * s)
   //  printf("Options received\n"); fflush(stdout);
 }
 
-void printVmPeak(FILE * fout)
-{
 #ifdef __APPLE__
-	struct rusage r_usage;
-	getrusage(RUSAGE_SELF, &r_usage);
-	fprintf(fout, "VmPeak : %zu\n", (size_t) r_usage.ru_maxrss);
-#else
-  if(fout == NULL) fout = stdout;
+size_t get_peakMemoryKB(void)
+{
+  struct rusage r_usage;
+  getrusage(RUSAGE_SELF, &r_usage);
+  return (size_t) round((double) r_usage.ru_maxrss/1024.0);
+}
+#endif
 
+#ifndef __APPLE__
+size_t get_peakMemoryKB(void)
+{
   char * statfile = malloc(100*sizeof(char));
   sprintf(statfile, "/proc/%d/status", getpid());
   FILE * sf = fopen(statfile, "r");
   if(sf == NULL)
   {
-    fprintf(fout, "Failed to open %s\n", statfile);
+    fprintf(stderr, "Failed to open %s\n", statfile);
     free(statfile);
-    return;
+    return 0;
   }
+
+  char * peakline = NULL;
 
   char * line = NULL;
   size_t len = 0;
@@ -272,14 +277,41 @@ void printVmPeak(FILE * fout)
     {
       if(strncmp(line, "VmPeak", 6) == 0)
       {
-        fprintf(fout, "%s", line);
+        peakline = strdup(line);
       }
     }
   }
   free(line);
   fclose(sf);
   free(statfile);
+
+  // Parse the line starting with "VmPeak"
+  // Seems like it is always in kB
+  // (reference: fs/proc/task_mmu.c)
+  // actually in kiB i.e., 1024 bytes
+  // since the last three characters are ' kb' we can skip them and parse in between
+  size_t peakMemoryKB = 0;
+  //  printf("peakline: '%s'\n", peakline);
+  if(strlen(peakline) > 11)
+  {
+    peakline[strlen(peakline) -4] = '\0';
+
+    //    printf("peakline: '%s'\n", peakline+7);
+    peakMemoryKB = (size_t) atol(peakline+7);
+  }
+
+  free(peakline);
+  return peakMemoryKB;
+}
 #endif
+
+void fprint_peakMemory(FILE * fout)
+{
+  size_t pm = get_peakMemoryKB();
+
+  if(fout == NULL) fout = stdout;
+  fprintf(fout, "peakMemory: %zu kiB\n", pm);
+
   return;
 }
 
@@ -690,8 +722,8 @@ void usage(const int argc, char ** argv, const opts * s)
 {
   printf(" Usage:\n");
   printf("\t$ %s <options> image.tif psf.tif\n", argv[0]);
-//  printf("or\n");
-//  printf("\t$ %s --batch <options> image_dir psf_dir\n", argv[0]);
+  //  printf("or\n");
+  //  printf("\t$ %s --batch <options> image_dir psf_dir\n", argv[0]);
   printf("\n");
   printf(" Options:\n");
   printf(" --version\n\t Show version info\n");
@@ -705,7 +737,7 @@ void usage(const int argc, char ** argv, const opts * s)
   printf(" --tilepad N\n\t Sets the tiles to overlap by N voxels in tile mode (default: %d)\n", s->tiling_padding);
   printf(" --prefix str\n\t Set the prefix of the output files (default: '%s')\n", s->prefix);
   printf(" --overwrite\n\t Allows deconwolf to overwrite already existing output files\n");
-//  printf(" --batch\n\t Generate a batch file to deconvolve all images in the `image_dir`\n");
+  //  printf(" --batch\n\t Generate a batch file to deconvolve all images in the `image_dir`\n");
   printf("\n");
 }
 
@@ -1140,8 +1172,8 @@ void tiffio_ut()
   }
   close(fd);
 
-//  printf("%s\n", fname);
-//  getchar();
+  //  printf("%s\n", fname);
+  //  getchar();
   int M = 1024, N = 2048, P = 2;
   float * im = fArray_zeros(M*N*P);
 
@@ -1188,6 +1220,7 @@ void tiffio_ut()
 
 void unittests()
 {
+  fprint_peakMemory(NULL);
   timings();
   //shift_vector_ut();
   fArray_flipall_ut();
@@ -1283,7 +1316,7 @@ void dcw_init_log(opts * s)
 
 void dcw_close_log(opts * s)
 {
-  printVmPeak(s->log);
+  fprint_peakMemory(s->log);
   show_time(s->log);
   fclose(s->log);
 }
@@ -1376,7 +1409,7 @@ int deconwolf(opts * s)
   free(psf);
   free(out);
   myfftw_stop();
-  if(s->verbosity > 1) printVmPeak(NULL);
+  if(s->verbosity > 1) fprint_peakMemory(NULL);
   clock_gettime(CLOCK_REALTIME, &tend);
   fprintf(s->log, "Took %f s\n", timespec_diff(&tend, &tstart));
   dcw_close_log(s);
