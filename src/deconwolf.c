@@ -249,7 +249,7 @@ void printVmPeak(FILE * fout)
 #ifdef __APPLE__
 	struct rusage r_usage;
 	getrusage(RUSAGE_SELF, &r_usage);
-	fprintf(fout, "VmPeak : %zu\n"), (size_t) r_usage.ru_maxrss);
+	fprintf(fout, "VmPeak : %zu\n", (size_t) r_usage.ru_maxrss);
 #else
   if(fout == NULL) fout = stdout;
 
