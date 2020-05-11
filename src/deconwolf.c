@@ -928,7 +928,8 @@ float * deconvolve(const float * restrict im, const int M, const int N, const in
   fftwf_free(g);
   fftwf_free(gm);
   fftwf_free(cK);
-  fftwf_free(cKr);
+  if(cKr != NULL)
+  { fftwf_free(cKr); }
   fftwf_free(y);
   return out;
 }

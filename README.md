@@ -99,7 +99,9 @@ A&A 437, 369-374 (2005), [doi](https://doi.org/10.1051/0004-6361:20052717)
  - [ ] Break out the image processing functions to separate library.
  - [ ] Proper logger.
  - [ ] Custom TIFF warning handle (not to overflow the console)
- - [c] Support even-sized PSFs (kind of hack, solution by resizing)
+ - [ ] Include also `identity` and `Richardson-Lucy`
+ - [x] Reduce memory by using the identity `f(-x) = ifft(conj(fft(x))`
+ - [x] Support even-sized PSFs (kind of hack, solution by resizing)
  - [x] Check that it works on osx
  - [x] Cross-platform build-tool (meson).
  - [x] Possible to change the prefix with the `--prefix` flag.
