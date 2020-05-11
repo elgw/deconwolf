@@ -1,7 +1,9 @@
 cc=gcc
 
-tiling_ut:
-	$(cc) tiling_ut.c tiling.c tiffio.c -lm -Wall -g -o tiling_ut -ltiff
+all: tiling_ut fft_ut 
 
+tiling_ut:
+	$(cc) tiling_ut.c tiling.c fim_tiff.c fim.c -lm -Wall -g -ltiff -lfftw3f -o tiling_ut 
 fft_ut:
-	$(cc) fft_ut.c  -lm -Wall -g -o fft_ut -lfftw3f -lfftw3f_threads
+	$(cc) fft_ut.c  -lm -Wall -g  -lfftw3f -lfftw3f_threads -o fft_ut
+

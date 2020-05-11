@@ -2,7 +2,8 @@
 #include <stdlib.h>
 #include <assert.h>
 #include "tiling.h"
-#include "tiffio.h"
+#include "fim.h"
+#include "fim_tiff.h"
 
 void test_getWeight1d()
 {
