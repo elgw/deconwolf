@@ -52,7 +52,12 @@ sudo ninja install
 # sudo ninja uninstall
 ```
 
-If meson or some of the libraries are missing, google! On Ubuntu 19.10 this did the job:
+On OSX, if you have [homebrew](https://brew.sh/), then you can install meson with
+```
+brew install meson
+```
+
+On Ubuntu 19.10 I managed to get meson and the other libraries by:
 ```
 sudo apt-get update
 
