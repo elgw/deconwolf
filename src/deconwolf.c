@@ -15,9 +15,7 @@
 #include "fft.h"
 #include "deconwolf.h"
 #include "tiling.h"
-
-// use ldd to check where possibly neede
-#define INLINED inline __attribute__((always_inline))
+#include "fim.h"
 
 opts * opts_new(void)
 {
@@ -106,6 +104,7 @@ void show_info(FILE * f)
 #ifdef CC_VERSION
   fprintf(f, "COMPILER: '%s'\n", CC_VERSION);
 #endif
+  fprintf(f, "BUILD_DATE: '%s'\n'", __DATE__);
   fprintf(f, "FFTW: '%s'\n", fftwf_version);
   fprintf(f, "TIFF: '%s'\n", TIFFGetVersion());
   char * user = getenv("USER");
@@ -328,32 +327,6 @@ void fprint_peakMemory(FILE * fout)
   return;
 }
 
-int psfIsCentered(const float * restrict V, const int M, const int N, const int P)
-{
-  // Check that the PSF looks reasonable
-  if( M % 2 == 0)
-  { return 0; }
-
-  if( N % 2 == 0)
-  { return 0; }
-
-  if (P % 2 == 0)
-  { return 0; }
-
-  int mM = (M-1)/2;
-  int mN = (N-1)/2;
-  int mP = (P-1)/2;
-  float maxV = 0;
-  for(size_t kk = 0; kk< M*N*P; kk++)
-  {
-    V[kk] > maxV ? maxV = V[kk] : 0;
-  }
-
-  if(maxV < V[mM + mN*M + mP*M*N])
-  { return 0; }
-
-  return 1;
-}
 
 float getError(const float * restrict y, const float * restrict g, const int M, const int N, const int P, const int wM, const int wN, const int wP)
 {
@@ -465,283 +438,6 @@ fftwf_complex * initial_guess(const int M, const int N, const int P,
   return Fone;
 }
 
-void fArray_stats(float * A, size_t N)
-{
-  float amax = 0;
-  for(size_t kk = 0; kk<N; kk++)
-  {
-    if(A[kk] > amax)
-      amax = A[kk];
-  }
-  printf("max: %f\n", amax);
-}
-
-void fArray_flipall(float * restrict T, const float * restrict A, const int a1, const int a2, const int a3)
-  /* Equivalent to T = flip(flip(flip(A,1),2),3) in matlab */
-{
-  for(int aa = 0; aa<a1; aa++){
-    for(int bb = 0; bb<a2; bb++){
-      for(int cc = 0; cc<a3; cc++){
-        int idxTo = aa + bb*a1 + cc*a1*a2;
-        int idxFrom = (a1-aa-1) + (a2-bb-1)*a1 + (a3-cc-1)*a1*a2;
-
-        T[idxTo] = A[idxFrom];
-      }
-    }
-  }
-}
-
-void fArray_insert(float * restrict T, const int t1, const int t2, const int t3, 
-    const float * restrict F, const int f1, const int f2, const int f3)
-  /* Insert F [f1xf2xf3] into T [t1xt2xt3] in the "upper left" corner */
-{
-  for(int pp = 0; pp<f3; pp++)
-  {
-    for(int nn = 0; nn<f2; nn++)
-    {
-      for(int mm = 0; mm<f1; mm++)
-      {
-        float x = F[mm + nn*f1 + pp*f1*f2];
-        T[mm + nn*t1 + pp*t1*t2] = x;
-      }
-    }
-  }
-  return;
-}
-
-void fArray_insert_ref(float * T, int t1, int t2, int t3, 
-    float * F, int f1, int f2, int f3)
-  /* Insert F [f1xf2xf3] into T [t1xt2xt3] in the "upper left" corner */
-{
-  for(int mm = 0; mm<f1; mm++)
-  {
-    for(int nn = 0; nn<f2; nn++)
-    {
-      for(int pp = 0; pp<f3; pp++)
-      {
-        float x = F[mm + nn*f1 + pp*f1*f2];
-        T[mm + nn*t1 + pp*t1*t2] = x;
-      }
-    }
-  }
-  return;
-}
-
-float * fArray_get_cuboid(float * restrict A, const int M, const int N, const int P,
-    const int m0, const int m1, const int n0, const int n1, const int p0, const int p1)
-{
-  /* Create a new array from V using [m0, m1]x[n0, n1]x[p0, p1] */
-  int m = m1-m0+1;
-  int n = n1-n0+1;
-  int p = p1-p0+1;
-
-  float * C = fftwf_malloc(m*n*p*sizeof(float));
-  assert(C != NULL);
-
-  for(int aa = m0; aa <= m1; aa++)
-  {
-    for(int bb = n0; bb <= n1; bb++)
-    {
-      for(int cc = p0; cc <= p1; cc++)
-      {
-        // printf("aa:%d, bb:%d, cc:%d\n", aa, bb, cc);
-        size_t Aidx = aa + bb*M + cc*M*N;
-        assert(Aidx < M*N*P);
-        // New coordinates are offset ...
-        size_t Cidx = (aa - m0) + 
-          (bb - n0)*m + 
-          (cc - p0)*m*n;
-        assert(Cidx < m*n*p);
-        C[Cidx] = A[Aidx];
-      }
-    }
-  }
-  return C;
-}
-
-float * fArray_subregion(float * restrict A, const int M, const int N, const int P, const int m, const int n, const int p)
-{
-  /* Extract sub region starting at (0,0,0) */
-  float * S = fftwf_malloc(m*n*p*sizeof(float));
-  assert(S != NULL);
-  for(int pp = 0; pp<p; pp++)
-  {
-    for(int nn = 0; nn<n; nn++)
-    {
-      for(int mm = 0; mm<m; mm++)
-      {
-        size_t Aidx = mm + nn*M + pp*M*N;
-        size_t Sidx = mm + nn*m + pp*m*n;
-        assert(Aidx < M*N*P);
-        assert(Sidx < m*n*p);
-        S[Sidx] = A[Aidx];
-      }
-    }
-  }
-  return S;
-}
-
-float * fArray_subregion_ref(float * A, int M, int N, int P, int m, int n, int p)
-{
-  float * S = fftwf_malloc(m*n*p*sizeof(float));
-  assert(S != NULL);
-  for(int mm = 0; mm<m; mm++)
-  {
-    for(int nn = 0; nn<n; nn++)
-    {
-      for(int pp = 0; pp<p; pp++)
-      {
-        size_t Aidx = mm + nn*M + pp*M*N;
-        size_t Sidx = mm + nn*m + pp*m*n;
-        assert(Aidx < M*N*P);
-        assert(Sidx < m*n*p);
-        S[Sidx] = A[Aidx];
-      }
-    }
-  }
-  return S;
-}
-
-void scale_psf(float * psf, int M, int N, int P)
-{
-  size_t pMNP = M*N*P;;
-  double psf_sum = 0;
-  for(size_t kk = 0; kk<pMNP; kk++)
-  { psf_sum += psf[kk]; }
-//  printf("psf_sum: %f\n", psf_sum);
-  for(size_t kk = 0; kk<pMNP; kk++) 
-  { psf[kk]/=psf_sum; }
-}
-
-INLINED int mod(const int a, const int b)
-{
-  int r = a % b;
-  return r < 0 ? r + b : r;
-}
-
-void shift_vector_buf(float * restrict V, 
-    const int S, 
-    const int N,
-    int k, float * restrict buffer)
-  /* Circular shift of a vector of length N with stride S by step k */
-{
-
-  k = -k;
-  for(size_t pp = 0; pp<N; pp++)
-  {
-    buffer[pp] = V[pp*S];
-  }
-  for(size_t pp = 0; pp<N; pp++)
-  {
-    V[pp*S] = buffer[mod(pp+k, N)];
-  }
-  return;
-}
-
-void shift_vector(float * restrict V, 
-    const int S, 
-    const int N,
-    const int k)
-  /* Circular shift of a vector of length N with stride S by step k */
-{
-
-  float * buffer = malloc(N*sizeof(float));
-  shift_vector_buf(V, S, N, k, buffer);
-  free(buffer);
-  return;
-}
-
-float * fArray_copy(const float * restrict V, const size_t N)
-  // Return a newly allocated copy of V
-{
-  float * C = fftwf_malloc(N*sizeof(float));
-  memcpy(C, V, N*sizeof(float));
-  return C;
-}
-
-float * fArray_constant(const size_t N, const float value)
-  // Allocate and return an array of N floats sets to a constant value
-{
-  float * A = fftwf_malloc(N*sizeof(float));
-  for(size_t kk = 0; kk<N; kk++)
-  {
-    A[kk] = value;
-  }
-  return A;
-}
-
-float * fArray_zeros(const size_t N)
-  // Allocate and return an array of N floats
-{
-  float * A = fftwf_malloc(N*sizeof(float));
-  memset(A, 0, N*sizeof(float));
-  return A;
-}
-
-void fArray_circshift(float * restrict A, 
-    const int M, const int N, const int P, 
-    const int sm, const int sn, const int sp)
-  /* Shift the image A [MxNxP] by sm, sn, sp in each dimension */
-{
-
-  const size_t bsize = fmax(fmax(M, N), P);
-  float * restrict buf = malloc(bsize*sizeof(float));
-
-  // Dimension 1
-  for(int cc = 0; cc<P; cc++)
-  {
-    for(int bb = 0; bb<N; bb++)
-    {    
-      //shift_vector(A + bb*M + cc*M*N, 1, M, sm);
-      shift_vector_buf(A + bb*M + cc*M*N, 1, M, sm, buf);
-    }
-  }
-
-  // Dimension 2
-  for(int cc = 0; cc<P; cc++)
-  {
-    for(int aa = 0; aa<M; aa++)
-    {    
-      //shift_vector(A + aa+cc*M*N, M, N, sn);
-      shift_vector_buf(A + aa+cc*M*N, M, N, sn, buf);
-    }
-  }
-
-  // Dimension 3
-  for(int bb = 0; bb<N; bb++)
-  {
-    for(int aa = 0; aa<M; aa++)
-    {  
-      //shift_vector(A + aa+bb*M, M*N, P, sp);
-      shift_vector_buf(A + aa+bb*M, M*N, P, sp, buf);
-    }
-  }
-
-  free(buf);
-  return;
-}
-
-float * expandIm_a(const float * restrict in, 
-    const int pM, const int pN, const int pP, 
-    const int M, const int N, const int P)
-  /* "expand an image" by making it larger 
-   * pM, ... current size
-   * M, Nm ... new size
-   * */
-{
-  assert(pM<=M);
-  assert(pN<=N);
-  assert(pP<=P);
-
-  float * out = fftwf_malloc(M*N*P*sizeof(float));
-  assert(in != NULL);
-  assert(out != NULL);
-  for(size_t kk = 0; kk<M*N*P; kk++)
-    out[kk] = 0;
-  fArray_insert(out, M, N, P, in, pM, pN, pP);
-  return out;
-}
-
 void usage(const int argc, char ** argv, const opts * s)
 {
   printf(" Usage:\n");
@@ -793,7 +489,7 @@ float * deconvolve_w(const float * restrict im, const int M, const int N, const 
   /*Deconvolve im using psf */
   const int nIter = s->nIter;
 
-  if(psfIsCentered(psf, pM, pN, pP) == 0)
+  if(fim_maxAtOrigo(psf, pM, pN, pP) == 0)
   {
     printf("PSF is not centered!\n");
     return NULL;
@@ -824,8 +520,8 @@ float * deconvolve_w(const float * restrict im, const int M, const int N, const 
   // cK : "full size" fft of the PSF
   float * Z = fftwf_malloc(wMNP*sizeof(float));
   memset(Z, 0, wMNP*sizeof(float));
-  fArray_insert(Z, wM, wN, wP, psf, pM, pN, pP);
-  fArray_circshift(Z, wM, wN, wP, -(pM-1)/2, -(pN-1)/2, -(pP-1)/2);
+  fim_insert(Z, wM, wN, wP, psf, pM, pN, pP);
+  fim_circshift(Z, wM, wN, wP, -(pM-1)/2, -(pN-1)/2, -(pP-1)/2);
   fftwf_complex * cK = fft(Z, wM, wN, wP);
   fftwf_free(Z);
 
@@ -837,10 +533,10 @@ float * deconvolve_w(const float * restrict im, const int M, const int N, const 
   memset(Zr, 0, wMNP*sizeof(float));
   float * psf_flipped = malloc(wMNP*sizeof(float));
   memset(psf_flipped, 0, sizeof(float)*wMNP);
-  fArray_flipall(psf_flipped, psf, pM, pN, pP);
-  fArray_insert(Zr, wM, wN, wP, psf_flipped, pM, pN, pP);
+  fim_flipall(psf_flipped, psf, pM, pN, pP);
+  fim_insert(Zr, wM, wN, wP, psf_flipped, pM, pN, pP);
   free(psf_flipped);
-  fArray_circshift(Zr, wM, wN, wP, -(pM-1)/2, -(pN-1)/2, -(pP-1)/2);
+  fim_circshift(Zr, wM, wN, wP, -(pM-1)/2, -(pN-1)/2, -(pP-1)/2);
   fftwf_complex * cKr = fft(Zr, wM, wN, wP); // Possibly not needed due to f(-x) = ifft(conf(fft(f)))
   fftwf_free(Zr);
   */
@@ -850,7 +546,7 @@ float * deconvolve_w(const float * restrict im, const int M, const int N, const 
   float * P1 = fft_convolve_cc(cK, F_one, wM, wN, wP);
   fftwf_free(F_one);
   //printf("P1\n");
-  //fArray_stats(P1, pM*pN*pP);
+  //fim_stats(P1, pM*pN*pP);
 
   //writetif("P1.tif", P1, wM, wN, wP);
   float sigma = 0.001;
@@ -865,7 +561,7 @@ float * deconvolve_w(const float * restrict im, const int M, const int N, const 
   // Original image -- expanded
   float * G = fftwf_malloc(wMNP*sizeof(float));
   memset(G, 0, wMNP*sizeof(float));
-  fArray_insert(G, wM, wN, wP, im, M, N, P);
+  fim_insert(G, wM, wN, wP, im, M, N, P);
   //writetif("G.tif", G, wM, wN, wP);
   
   if(s->method == DW_METHOD_RL)
@@ -883,17 +579,17 @@ float * deconvolve_w(const float * restrict im, const int M, const int N, const 
   }
 
   float alpha = 0;
-  float * f = fArray_constant(wMNP, sumg/wMNP);
-  float * y = fArray_copy(f, wMNP);
+  float * f = fim_constant(wMNP, sumg/wMNP);
+  float * y = fim_copy(f, wMNP);
 
-  float * x1 = fArray_copy(f, wMNP);
-  float * x2 = fArray_copy(f, wMNP);
+  float * x1 = fim_copy(f, wMNP);
+  float * x2 = fim_copy(f, wMNP);
   float * x = x1;
   float * xp = x2;
-  float * xm = x2; // fArray_copy(f, wMNP);
+  float * xm = x2; // fim_copy(f, wMNP);
 
-  float * gm = fArray_zeros(wMNP);
-  float * g = fArray_zeros(wMNP);
+  float * gm = fim_zeros(wMNP);
+  float * g = fim_zeros(wMNP);
 
   int it = 0;
   while(it<nIter)
@@ -944,7 +640,7 @@ float * deconvolve_w(const float * restrict im, const int M, const int N, const 
 
   fftwf_free(W); // is P1
   fftwf_free(G);
-  float * out = fArray_subregion(x, wM, wN, wP, M, N, P);
+  float * out = fim_subregion(x, wM, wN, wP, M, N, P);
   fftwf_free(f);
   fftwf_free(x1);
   fftwf_free(x2);
@@ -992,7 +688,7 @@ float * deconvolve_tiles(const float * restrict im, int M, int N, int P,
   for(int tt = 0; tt<T->nTiles; tt++)
   {
     // Temporal copy of the PSF that might be cropped to fit the tile
-    float * tpsf = fArray_copy(psf, pM*pN*pP);
+    float * tpsf = fim_copy(psf, pM*pN*pP);
     int tpM = pM, tpN = pN, tpP = pP;
 
     if(s->verbosity > 0)
@@ -1010,7 +706,7 @@ float * deconvolve_tiles(const float * restrict im, int M, int N, int P,
     tpsf = autocrop_psf(tpsf, &tpM, &tpN, &tpP, 
         tileM, tileN, tileP, s);
 
-    scale_psf(tpsf, tpM, tpN, tpP);
+    fim_normalize_max1(tpsf, tpM, tpN, tpP);
     float * dw_im_tile = deconvolve_w(im_tile, tileM, tileN, tileP, // input image and size
         tpsf, tpM, tpN, tpP, // psf and size
         s);
@@ -1025,7 +721,7 @@ float * deconvolve_tiles(const float * restrict im, int M, int N, int P,
   return V;
 }
 
-void fArray_flipall_ut()
+void fim_flipall_ut()
 {
 
   float * a = malloc(3*3*3*sizeof(float));
@@ -1038,7 +734,7 @@ void fArray_flipall_ut()
   }
 
   a[13] = 1;
-  fArray_flipall(b, a, 3, 3, 3);
+  fim_flipall(b, a, 3, 3, 3);
   assert(b[13] == 1);
 
   for(int kk = 0; kk<27; kk++)
@@ -1046,20 +742,20 @@ void fArray_flipall_ut()
     a[kk] = rand();
   }
 
-  fArray_flipall(b, a, 3, 3, 3);
-  fArray_flipall(c, b, 3, 3, 3);
+  fim_flipall(b, a, 3, 3, 3);
+  fim_flipall(c, b, 3, 3, 3);
   for(int kk = 0; kk<27; kk++)
   {
     assert(a[kk] == c[kk]);
   }
 
-  fArray_flipall(b, a, 4, 3, 2);
-  fArray_flipall(c, b, 4, 3, 2);
+  fim_flipall(b, a, 4, 3, 2);
+  fim_flipall(c, b, 4, 3, 2);
   for(int kk = 0; kk<24; kk++)
     assert(a[kk] == c[kk]);
 
-  fArray_flipall(b, a, 2, 3, 4);
-  fArray_flipall(c, b, 2, 3, 4);
+  fim_flipall(b, a, 2, 3, 4);
+  fim_flipall(c, b, 2, 3, 4);
   for(int kk = 0; kk<24; kk++)
     assert(a[kk] == c[kk]);
 
@@ -1067,23 +763,6 @@ void fArray_flipall_ut()
   return;
 }
 
-void shift_vector_ut()
-{
-  int N = 5;
-  int S = 1; // stride
-  float * V = malloc(N*sizeof(float));
-
-  for(int k = -7; k<7; k++)
-  {
-    for(int kk = 0; kk<N; kk++)
-    {V[kk] = kk;}
-    printf("shift: % d -> ", k);
-    shift_vector(V,S,N,k);
-    for(int kk =0; kk<N; kk++)
-    { printf("%.0f ", V[kk]);}
-    printf("\n");
-  }
-}
 
 static double timespec_diff(struct timespec* end, struct timespec * start)
 {
@@ -1133,8 +812,8 @@ void timings()
 
     // ---
     tic
-    fArray_flipall(V, A, M, N, P);
-  toc(fArray_flipall)
+    fim_flipall(V, A, M, N, P);
+  toc(fim_flipall)
 
     // ---
     tic 
@@ -1157,24 +836,24 @@ void timings()
 
   // ---
   tic
-    float * S1 = fArray_subregion(V, M, N, P, M-1, N-1, P-1);
-  toc(fArray_subregion)
+    float * S1 = fim_subregion(V, M, N, P, M-1, N-1, P-1);
+  toc(fim_subregion)
 
     tic
-    float * S2 = fArray_subregion_ref(V, M, N, P, M-1, N-1, P-1);
-  toc(fArray_subregion_ref)
+    float * S2 = fim_subregion_ref(V, M, N, P, M-1, N-1, P-1);
+  toc(fim_subregion_ref)
     printf("S1 - S2 = %f\n", getError(S1, S1, M-1, N-1, P-1, M-1, N-1, P-1));
   free(S1);
   free(S2);
 
   // ---
   tic
-    fArray_insert(V, M, N, P, A, M-1, N-1, P-1);
-  toc(fArray_subregion)      
+    fim_insert(V, M, N, P, A, M-1, N-1, P-1);
+  toc(fim_subregion)      
 
     tic
-    fArray_insert_ref(V, M, N, P, A, M-1, N-1, P-1);
-  toc(fArray_subregion_ref)
+    fim_insert_ref(V, M, N, P, A, M-1, N-1, P-1);
+  toc(fim_subregion_ref)
 
     // ---
 
@@ -1203,7 +882,7 @@ void tiffio_ut()
   //  printf("%s\n", fname);
   //  getchar();
   int M = 1024, N = 2048, P = 2;
-  float * im = fArray_zeros(M*N*P);
+  float * im = fim_zeros(M*N*P);
 
   size_t pos1 = 1111;
   size_t pos2 = 2222;
@@ -1251,7 +930,7 @@ void unittests()
   fprint_peakMemory(NULL);
   timings();
   //shift_vector_ut();
-  fArray_flipall_ut();
+  fim_flipall_ut();
   tiffio_ut();
   //
   printf("done\n");
@@ -1282,8 +961,8 @@ if(p % 2 == 0)
 if(reshape == 0)
 {  return psf; }
 // printf("%d %d %d -> %d %d %d\n", pM[0], pN[0], pP[0], m, n, p);
-float * psf2 = fArray_zeros(m*n*p);
-fArray_insert(psf2, m, n, p, psf, pM[0], pN[0], pP[0]);
+float * psf2 = fim_zeros(m*n*p);
+fim_insert(psf2, m, n, p, psf, pM[0], pN[0], pP[0]);
 free(psf);
 pM[0] = m; 
 pN[0] = n; 
@@ -1341,7 +1020,7 @@ float * autocrop_psf(float * psf, int * pM, int * pN, int * pP,  // psf and size
     {
       printf("! %d %d : %d %d : %d %d\n", m0, m1, n0, n1, p0, p1);
     }
-    float * psf_cropped = fArray_get_cuboid(psf, m, n, p,
+    float * psf_cropped = fim_get_cuboid(psf, m, n, p,
         m0, m1, n0, n1, p0, p1);
     free(psf);
 
@@ -1444,7 +1123,7 @@ int deconwolf(opts * s)
   if(s->tiling_maxSize < 0)
   {
 
-    scale_psf(psf, pM, pN, pP);
+    fim_normalize_max1(psf, pM, pN, pP);
     out = deconvolve_w(im, M, N, P, // input image and size
         psf, pM, pN, pP, // psf and size
         s);// settings

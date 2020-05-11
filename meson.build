@@ -4,7 +4,7 @@ project('deconwolf', 'c',
 
 cc = meson.get_compiler('c')
 
-src = ['src/deconwolf.c', 'src/tiffio.c', 'src/tiling.c', 'src/fft.c']
+src = ['src/deconwolf.c', 'src/tiffio.c', 'src/tiling.c', 'src/fft.c', 'src/fim.c']
 
 fftw3f_dep = dependency('fftw3f')
 fftw3f_threads_dep = cc.find_library('fftw3f_threads')
