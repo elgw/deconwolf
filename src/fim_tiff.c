@@ -1,3 +1,19 @@
+/*    Copyright (C) 2020 Erik L. G. Wernersson
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation, either version 3 of the License, or
+ *    (at your option) any later version.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -5,7 +21,7 @@
 #include <math.h>
 #include <tiffio.h>
 #include <unistd.h>
-#include "tiffio.h"
+#include "fim_tiff.h"
 #include "fim.h"
 
 /* see man 3 tifflib
@@ -16,9 +32,9 @@
  */
 
 
-void tiffio_ut()
+void fim_tiff_ut()
 {
-  printf("-> tiffio_ut (write and read back a tif file)\n");
+  printf("-> fim_tiff_ut (write and read back a tif file)\n");
   /* Create and write a 3D image to disk,
    * read it back and check that it is the same thing*/
 

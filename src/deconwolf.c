@@ -1,3 +1,19 @@
+/*    Copyright (C) 2020 Erik L. G. Wernersson
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation, either version 3 of the License, or
+ *    (at your option) any later version.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -11,11 +27,11 @@
 #include <stdlib.h>
 #include <libgen.h>
 #include <time.h>
-#include "tiffio.h"
 #include "fft.h"
 #include "deconwolf.h"
 #include "tiling.h"
 #include "fim.h"
+#include "fim_tiff.h"
 
 dw_opts * dw_opts_new(void)
 {
@@ -402,7 +418,7 @@ float iter(float * xp, // Output, f_(t+1)
   }
   fftwf_complex * F_sn = fft(sn, wM, wN, wP);
   fftwf_free(y); // = sn as well
-//  float * x = fft_convolve_cc(cKr, F_sn, wM, wN, wP);
+  //  float * x = fft_convolve_cc(cKr, F_sn, wM, wN, wP);
   float * x = fft_convolve_cc_conj(cK, F_sn, wM, wN, wP);
   fftwf_free(F_sn);
   for(size_t kk = 0; kk<wMNP; kk++)
@@ -433,7 +449,7 @@ fftwf_complex * initial_guess(const int M, const int N, const int P,
       }
     }
   }
-//  writetif("one.tif", one, wM, wN, wP);
+  //  writetif("one.tif", one, wM, wN, wP);
 
   fftwf_complex * Fone = fft(one, wM, wN, wP);
 
@@ -532,19 +548,19 @@ float * deconvolve_w(const float * restrict im, const int M, const int N, const 
 
   fftwf_complex * cKr = NULL;
 
-/* <-- This isn't needed ...
-  float * Zr = fftwf_malloc(wMNP*sizeof(float));
-  memset(Zr, 0, wMNP*sizeof(float));
-  float * psf_flipped = malloc(wMNP*sizeof(float));
-  memset(psf_flipped, 0, sizeof(float)*wMNP);
-  fim_flipall(psf_flipped, psf, pM, pN, pP);
-  fim_insert(Zr, wM, wN, wP, psf_flipped, pM, pN, pP);
-  free(psf_flipped);
-  fim_circshift(Zr, wM, wN, wP, -(pM-1)/2, -(pN-1)/2, -(pP-1)/2);
-  cKr = fft(Zr, wM, wN, wP); 
+  /* <-- This isn't needed ...
+     float * Zr = fftwf_malloc(wMNP*sizeof(float));
+     memset(Zr, 0, wMNP*sizeof(float));
+     float * psf_flipped = malloc(wMNP*sizeof(float));
+     memset(psf_flipped, 0, sizeof(float)*wMNP);
+     fim_flipall(psf_flipped, psf, pM, pN, pP);
+     fim_insert(Zr, wM, wN, wP, psf_flipped, pM, pN, pP);
+     free(psf_flipped);
+     fim_circshift(Zr, wM, wN, wP, -(pM-1)/2, -(pN-1)/2, -(pP-1)/2);
+     cKr = fft(Zr, wM, wN, wP); 
   // Possibly not needed due to f(-x) = ifft(conf(fft(f)))
   fftwf_free(Zr);
-   --> */
+  --> */
 
   //printf("initial guess\n"); fflush(stdout);
   fftwf_complex * F_one = initial_guess(M, N, P, wM, wN, wP);
@@ -552,7 +568,7 @@ float * deconvolve_w(const float * restrict im, const int M, const int N, const 
   fftwf_free(F_one);
   //printf("P1\n");
   //fim_stats(P1, pM*pN*pP);
-//  writetif("P1.tif", P1, wM, wN, wP);
+  //  writetif("P1.tif", P1, wM, wN, wP);
 
   float sigma = 0.001;
   for(size_t kk = 0; kk<wMNP; kk++)
@@ -567,15 +583,15 @@ float * deconvolve_w(const float * restrict im, const int M, const int N, const 
   float * G = fftwf_malloc(wMNP*sizeof(float));
   memset(G, 0, wMNP*sizeof(float));
   fim_insert(G, wM, wN, wP, im, M, N, P);
-//  writetif("G.tif", G, wM, wN, wP);
-  
+  //  writetif("G.tif", G, wM, wN, wP);
+
   if(s->method == DW_METHOD_RL)
   {
-//    float * x = deconvolve_rl(G, );
- //   free(G);
- //   return x;
+    //    float * x = deconvolve_rl(G, );
+    //   free(G);
+    //   return x;
   }
-  
+
 
   float sumg = 0;
   for(size_t kk = 0; kk<M*N*P; kk++)
@@ -600,14 +616,14 @@ float * deconvolve_w(const float * restrict im, const int M, const int N, const 
   while(it<nIter)
   {
 
-  if(s->iterdump){
-    float * temp = fim_subregion(x, wM, wN, wP, M, N, P);
-    char * tempname = malloc(100*sizeof(char));
-    sprintf(tempname, "x_%03d.tif", it);
-    printf("Writing current guess to %s\n", tempname);
-    writetif(tempname, temp, M, N, P);
-    free(temp);
-  }
+    if(s->iterdump){
+      float * temp = fim_subregion(x, wM, wN, wP, M, N, P);
+      char * tempname = malloc(100*sizeof(char));
+      sprintf(tempname, "x_%03d.tif", it);
+      printf("Writing current guess to %s\n", tempname);
+      writetif(tempname, temp, M, N, P);
+      free(temp);
+    }
 
     for(size_t kk = 0; kk<wMNP; kk++)
     { 
@@ -912,7 +928,7 @@ void dw_unittests()
   timings();
   //shift_vector_ut();
   fim_flipall_ut();
-  tiffio_ut();
+  fim_tiff_ut();
   //
   printf("done\n");
 }
@@ -927,28 +943,28 @@ void show_time(FILE * f)
 
 float * psf_makeOdd(float * psf, int * pM, int * pN, int *pP)
 {
-// Expand the psf so that it had odd dimensions it if doesn't already have that
-int m = pM[0];
-int n = pN[0];
-int p = pP[0];
-int reshape = 0;
-if(m % 2 == 0)
-{ m++; reshape = 1;}
-if(n % 2 == 0)
-{ n++; reshape = 1;}
-if(p % 2 == 0)
-{ p++; reshape = 1;}
+  // Expand the psf so that it had odd dimensions it if doesn't already have that
+  int m = pM[0];
+  int n = pN[0];
+  int p = pP[0];
+  int reshape = 0;
+  if(m % 2 == 0)
+  { m++; reshape = 1;}
+  if(n % 2 == 0)
+  { n++; reshape = 1;}
+  if(p % 2 == 0)
+  { p++; reshape = 1;}
 
-if(reshape == 0)
-{  return psf; }
-// printf("%d %d %d -> %d %d %d\n", pM[0], pN[0], pP[0], m, n, p);
-float * psf2 = fim_zeros(m*n*p);
-fim_insert(psf2, m, n, p, psf, pM[0], pN[0], pP[0]);
-free(psf);
-pM[0] = m; 
-pN[0] = n; 
-pP[0] = p; 
-return psf2;
+  if(reshape == 0)
+  {  return psf; }
+  // printf("%d %d %d -> %d %d %d\n", pM[0], pN[0], pP[0], m, n, p);
+  float * psf2 = fim_zeros(m*n*p);
+  fim_insert(psf2, m, n, p, psf, pM[0], pN[0], pP[0]);
+  free(psf);
+  pM[0] = m; 
+  pN[0] = n; 
+  pP[0] = p; 
+  return psf2;
 }
 
 
