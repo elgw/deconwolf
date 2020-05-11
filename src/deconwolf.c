@@ -29,12 +29,13 @@ opts * opts_new(void)
   s->outFile = NULL;
   s->logFile = NULL;
   s->prefix = malloc(10*sizeof(char));
-  sprintf(s->prefix, "dcw");
+  sprintf(s->prefix, "dw");
   s->log = NULL;
   s->verbosity = 1;
   s->overwrite = 0;
   s->tiling_maxSize = -1;
   s->tiling_padding = 20;
+  s->method = DW_METHOD_W;
   return s;
 }
 
@@ -68,6 +69,10 @@ void opts_print(opts * s, FILE *f)
   fprintf(f, "nIter:  %d\n", s->nIter);
   fprintf(f, "nThreads: %d\n", s->nThreads);
   fprintf(f, "verbosity: %d\n", s->verbosity);
+  if(s->method == DW_METHOD_RL)
+    {
+      fprintf(f, "method: Richardson-Lucy\n");
+    }
   if(s->overwrite == 1)
   { fprintf(f, "overwrite: YES\n"); } else
   { fprintf(f, "overwrite: NO\n"); }
@@ -145,6 +150,7 @@ void argparsing(int argc, char ** argv, opts * s)
     { "overwrite",   no_argument,        NULL,   'w' },
     { "prefix",       required_argument, NULL,   'f' },
     { "batch",        no_argument, NULL, 'b' },
+    { "method",       required_argument, NULL,   'm' },
     { NULL,           0,                 NULL,   0   }
   };
 
@@ -193,6 +199,13 @@ void argparsing(int argc, char ** argv, opts * s)
         break;
       case 'b':
         generate_batch = 1;
+        break;
+      case 'm':
+        if(strcmp(optarg, "rl"))
+        { 
+          s->method = DW_METHOD_RL; 
+          sprintf(s->prefix, "drl");
+        }
         break;
     }
   }
@@ -768,7 +781,7 @@ float update_alpha(const float * restrict g, const float * restrict gm, const si
   return alpha;
 }
 
-float * deconvolve(const float * restrict im, const int M, const int N, const int P,
+float * deconvolve_w(const float * restrict im, const int M, const int N, const int P,
     const float * restrict psf, const int pM, const int pN, const int pP,
     opts * s)
 {
@@ -817,6 +830,8 @@ float * deconvolve(const float * restrict im, const int M, const int N, const in
   fftwf_free(Z);
 
   fftwf_complex * cKr = NULL;
+
+
 /*
   float * Zr = fftwf_malloc(wMNP*sizeof(float));
   memset(Zr, 0, wMNP*sizeof(float));
@@ -852,6 +867,14 @@ float * deconvolve(const float * restrict im, const int M, const int N, const in
   memset(G, 0, wMNP*sizeof(float));
   fArray_insert(G, wM, wN, wP, im, M, N, P);
   //writetif("G.tif", G, wM, wN, wP);
+  
+  if(s->method == DW_METHOD_RL)
+  {
+//    float * x = deconvolve_rl(G, );
+ //   free(G);
+ //   return x;
+  }
+  
 
   float sumg = 0;
   for(size_t kk = 0; kk<M*N*P; kk++)
@@ -988,7 +1011,7 @@ float * deconvolve_tiles(const float * restrict im, int M, int N, int P,
         tileM, tileN, tileP, s);
 
     scale_psf(tpsf, tpM, tpN, tpP);
-    float * dw_im_tile = deconvolve(im_tile, tileM, tileN, tileP, // input image and size
+    float * dw_im_tile = deconvolve_w(im_tile, tileM, tileN, tileP, // input image and size
         tpsf, tpM, tpN, tpP, // psf and size
         s);
 
@@ -1422,7 +1445,7 @@ int deconwolf(opts * s)
   {
 
     scale_psf(psf, pM, pN, pP);
-    out = deconvolve(im, M, N, P, // input image and size
+    out = deconvolve_w(im, M, N, P, // input image and size
         psf, pM, pN, pP, // psf and size
         s);// settings
   } else {

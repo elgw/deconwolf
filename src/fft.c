@@ -145,6 +145,10 @@ void fft_mul_conj(fftwf_complex * restrict C,
     fftwf_complex * restrict A, 
     fftwf_complex * restrict B, 
     const size_t n1, const size_t n2, const size_t n3)
+  /* Multiply and conjugate the elements in the array A 
+   * i.e. C = conj(A)*B
+   * All inputs should have the same size [n1 x n2 x n3]
+   * */
 {
   const int n3red = (n3+3)/2;
   const size_t N = n1*n2*n3red;

@@ -18,6 +18,9 @@
  *
  */
 
+#define DW_METHOD_W 0
+#define DW_METHOD_RL 1
+
 typedef struct{
   int nThreads;
   int nIter;
@@ -30,7 +33,7 @@ typedef struct{
   int tiling_maxSize;
   int tiling_padding;
   int overwrite; // overwrite output tif file?
-
+  int method;
   int verbosity;
   fftwf_plan fft_plan;
   fftwf_plan ifft_plan;
