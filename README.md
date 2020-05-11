@@ -81,6 +81,9 @@ sudo make install
  * [libtiff repository](https://gitlab.com/libtiff/libtiff)
 
 The algoritm is based on these papers:
+
+ * Richardson, William Hadley (1972). "Bayesian-Based Iterative Method of Image Restoration". JOSA. 62 (1): 55–59. [doi](https://doi.org/10.1364/JOSA.62.000055)
+ * Lucy, L. B. (1974). "An iterative technique for the rectification of observed distributions". Astronomical Journal. 79 (6): 745–754. [doi](https://doi.org/10.1086%2F111605)
  * Biggs, D.S.C. “Acceleration of Iterative Image Restoration Algorithms.” Applied Optics. Vol. 36. Number 8, 1997, pp. 1766–1775. 
  * M. Bertero and P. Boccacci, A simple method for the reduction of boundary effects in the Richardson-Lucy approach to image deconvolution, 
 A&A 437, 369-374 (2005), [doi](https://doi.org/10.1051/0004-6361:20052717)
