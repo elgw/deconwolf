@@ -18,4 +18,7 @@ void fft_mul(fftwf_complex * restrict C,
 
 float * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B, int M, int N, int P);
 
+float * fft_convolve_cc_conj(fftwf_complex * A, fftwf_complex * B, int M, int N, int P);
+
+
 void fft_train(size_t M, size_t N, size_t P , int, int nThreads);

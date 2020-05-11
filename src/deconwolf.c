@@ -405,7 +405,8 @@ float iter(float * xp, const float * restrict g,
   }
   fftwf_complex * F_sn = fft(sn, wM, wN, wP);
   fftwf_free(y); // = sn as well
-  float * x = fft_convolve_cc(cKr, F_sn, wM, wN, wP);
+//  float * x = fft_convolve_cc(cKr, F_sn, wM, wN, wP);
+  float * x = fft_convolve_cc_conj(cK, F_sn, wM, wN, wP);
   fftwf_free(F_sn);
   for(size_t kk = 0; kk<wMNP; kk++)
   {
@@ -588,6 +589,16 @@ float * fArray_subregion_ref(float * A, int M, int N, int P, int m, int n, int p
   return S;
 }
 
+void scale_psf(float * psf, int M, int N, int P)
+{
+  size_t pMNP = M*N*P;;
+  double psf_sum = 0;
+  for(size_t kk = 0; kk<pMNP; kk++)
+  { psf_sum += psf[kk]; }
+//  printf("psf_sum: %f\n", psf_sum);
+  for(size_t kk = 0; kk<pMNP; kk++) 
+  { psf[kk]/=psf_sum; }
+}
 
 INLINED int mod(const int a, const int b)
 {
@@ -797,39 +808,31 @@ float * deconvolve(const float * restrict im, const int M, const int N, const in
   fft_train(wM, wN, wP, 
       s->verbosity, s->nThreads);
 
-  // Prepare the full size cK and cKr
-  // (K and Kr in MATLAB)
+  // cK : "full size" fft of the PSF
   float * Z = fftwf_malloc(wMNP*sizeof(float));
   memset(Z, 0, wMNP*sizeof(float));
-
-  //printf("insert\n"); fflush(stdout);
   fArray_insert(Z, wM, wN, wP, psf, pM, pN, pP);
+  fArray_circshift(Z, wM, wN, wP, -(pM-1)/2, -(pN-1)/2, -(pP-1)/2);
+  fftwf_complex * cK = fft(Z, wM, wN, wP);
+  fftwf_free(Z);
+
+  fftwf_complex * cKr = NULL;
+/*
   float * Zr = fftwf_malloc(wMNP*sizeof(float));
   memset(Zr, 0, wMNP*sizeof(float));
   float * psf_flipped = malloc(wMNP*sizeof(float));
   memset(psf_flipped, 0, sizeof(float)*wMNP);
-  //fArray_stats(psf, pM*pN*pP);
   fArray_flipall(psf_flipped, psf, pM, pN, pP);
-  //fArray_stats(psf_flipped, pM*pN*pP);
-  //writetif("psf_flipped.tif", psf_flipped, pM, pN, pP);
   fArray_insert(Zr, wM, wN, wP, psf_flipped, pM, pN, pP);
-  //writetif("Zr0.tif", Zr, wM, wN, wP);
   free(psf_flipped);
-  fArray_circshift(Z, wM, wN, wP, -(pM-1)/2, -(pN-1)/2, -(pP-1)/2);
   fArray_circshift(Zr, wM, wN, wP, -(pM-1)/2, -(pN-1)/2, -(pP-1)/2);
-  //printf("...\n"); fflush(stdout);
-  //fArray_stats(Z, pM*pN*pP);
-  //fArray_stats(Zr, pM*pN*pP);
-  //writetif("Z.tif", Z, wM, wN, wP);
-  //writetif("Zr.tif", Zr, wM, wN, wP);
-
-  fftwf_complex * cK = fft(Z, wM, wN, wP);
-  fftwf_free(Z);
-  fftwf_complex * cKr = fft(Zr, wM, wN, wP);
+  fftwf_complex * cKr = fft(Zr, wM, wN, wP); // Possibly not needed due to f(-x) = ifft(conf(fft(f)))
   fftwf_free(Zr);
+  */
+
   //printf("initial guess\n"); fflush(stdout);
   fftwf_complex * F_one = initial_guess(M, N, P, wM, wN, wP);
-  float * P1 = fft_convolve_cc(cKr, F_one, wM, wN, wP);
+  float * P1 = fft_convolve_cc(cK, F_one, wM, wN, wP);
   fftwf_free(F_one);
   //printf("P1\n");
   //fArray_stats(P1, pM*pN*pP);
@@ -983,6 +986,7 @@ float * deconvolve_tiles(const float * restrict im, int M, int N, int P,
     tpsf = autocrop_psf(tpsf, &tpM, &tpN, &tpP, 
         tileM, tileN, tileP, s);
 
+    scale_psf(tpsf, tpM, tpN, tpP);
     float * dw_im_tile = deconvolve(im_tile, tileM, tileN, tileP, // input image and size
         tpsf, tpM, tpN, tpP, // psf and size
         s);
@@ -1237,10 +1241,37 @@ void show_time(FILE * f)
   fprintf(f, "%s\n", tstring);
 }
 
+float * psf_makeOdd(float * psf, int * pM, int * pN, int *pP)
+{
+// Expand the psf so that it had odd dimensions it if doesn't already have that
+int m = pM[0];
+int n = pN[0];
+int p = pP[0];
+int reshape = 0;
+if(m % 2 == 0)
+{ m++; reshape = 1;}
+if(n % 2 == 0)
+{ n++; reshape = 1;}
+if(p % 2 == 0)
+{ p++; reshape = 1;}
+
+if(reshape == 0)
+{  return psf; }
+// printf("%d %d %d -> %d %d %d\n", pM[0], pN[0], pP[0], m, n, p);
+float * psf2 = fArray_zeros(m*n*p);
+fArray_insert(psf2, m, n, p, psf, pM[0], pN[0], pP[0]);
+free(psf);
+pM[0] = m; 
+pN[0] = n; 
+pP[0] = p; 
+return psf2;
+}
+
 float * autocrop_psf(float * psf, int * pM, int * pN, int * pP,  // psf and size
     int M, int N, int P, // image size
     opts * s)
 {
+
   int m = pM[0];
   int n = pN[0];
   int p = pP[0];
@@ -1282,8 +1313,10 @@ float * autocrop_psf(float * psf, int * pM, int * pN, int * pP,  // psf and size
       p0 = (p-popt)/2-1;
       p1 = p1-(p-popt)/2-1;
     }
-
-    //    printf("! %d %d : %d %d : %d %d\n", m0, m1, n0, n1, p0, p1);
+    if(s->verbosity > 2)
+    {
+      printf("! %d %d : %d %d : %d %d\n", m0, m1, n0, n1, p0, p1);
+    }
     float * psf_cropped = fArray_get_cuboid(psf, m, n, p,
         m0, m1, n0, n1, p0, p1);
     free(psf);
@@ -1297,8 +1330,8 @@ float * autocrop_psf(float * psf, int * pM, int * pN, int * pP,  // psf and size
       fprintf(stdout, "The PSF was cropped to [%d x %d x %d]\n", pM[0], pN[0], pP[0]);
     }
     fprintf(s->log, "The PSF was cropped to [%d x %d x %d]\n", pM[0], pN[0], pP[0]);
-    return psf_cropped;
 
+    return psf_cropped;
   } else {
     return psf;
   }
@@ -1343,6 +1376,16 @@ int deconwolf(opts * s)
   }
   int M = 0, N = 0, P = 0;
   float * im = readtif_asFloat(s->imFile, &M, &N, &P, s->verbosity);
+  if(s->verbosity > 2)
+  {
+    printf("Image size: [%d x %d x %d]\n", M, N, P);
+  }
+  if(im == NULL)
+  {
+    printf("Failed to open %s\n", s->imFile);
+    exit(1);
+  }
+
   // writetif("im.tif", im, M, N, P);
 
   int pM = 0, pN = 0, pP = 0;
@@ -1365,14 +1408,19 @@ int deconwolf(opts * s)
     psf[13] = 1;
   }
 
+  psf = psf_makeOdd(psf, &pM, &pN, &pP);
+
   // Possibly the PSF will be cropped even more per tile later on
   psf = autocrop_psf(psf, &pM, &pN, &pP, 
       M, N, P, s);
+
 
   myfftw_start(s->nThreads);
   float * out = NULL;
   if(s->tiling_maxSize < 0)
   {
+
+    scale_psf(psf, pM, pN, pP);
     out = deconvolve(im, M, N, P, // input image and size
         psf, pM, pN, pP, // psf and size
         s);// settings

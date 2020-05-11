@@ -98,13 +98,15 @@ A&A 437, 369-374 (2005), [doi](https://doi.org/10.1051/0004-6361:20052717)
  - [ ] Highly parsable log file.
  - [ ] Break out the image processing functions to separate library.
  - [ ] Proper logger.
- - [ ] Check that it works on osx
+ - [ ] Custom TIFF warning handle (not to overflow the console)
+ - [c] Support even-sized PSFs (kind of hack, solution by resizing)
+ - [x] Check that it works on osx
  - [x] Cross-platform build-tool (meson).
  - [x] Possible to change the prefix with the `--prefix` flag.
  - [x] Refuse to run if output file already exist (unless `--overwrite`) with status `0`.
  - [x] Crop PSF also in x and y (individual crop per tile as well).
  - [x] Faster calculation of tiling weights.
- - [x] Report VmPeak to the log, i.e., the peak memory usage.
+ - [x] Report peak memory usage to log file.
  - [x] Automatic cropping of the PSF if it has too many stacks.
  - [x] Block mode for low memory systems, accessible through the options `--tilesize` and `--tilepad`
  - [x] Eliminate one or two arrays in the main loop to save memory.

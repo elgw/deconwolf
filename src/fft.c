@@ -140,12 +140,54 @@ void fft_mul(fftwf_complex * restrict C,
   return;
 }
 
+
+void fft_mul_conj(fftwf_complex * restrict C, 
+    fftwf_complex * restrict A, 
+    fftwf_complex * restrict B, 
+    const size_t n1, const size_t n2, const size_t n3)
+{
+  const int n3red = (n3+3)/2;
+  const size_t N = n1*n2*n3red;
+  // C = A*B
+  for(size_t kk = 0; kk<N; kk++)
+  {
+    float a = A[kk][0]; float ac = -A[kk][1];
+    float b = B[kk][0]; float bc = B[kk][1];
+    C[kk][0] = a*b - ac*bc;
+    C[kk][1] = a*bc + b*ac;
+  }
+  return;
+}
+
 float * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B, 
     const int M, const int N, const int P)
 {
   size_t n3red = (P+3)/2;
   fftwf_complex * C = fftwf_malloc(M*N*n3red*sizeof(fftwf_complex));
   fft_mul(C, A, B, M, N, P); 
+
+  float * out = fftwf_malloc(M*N*P*sizeof(float));
+
+  fftwf_plan p = fftwf_plan_dft_c2r_3d(P, N, M, 
+      C, out, 
+      MYPLAN);
+  fftwf_execute(p);
+  fftwf_destroy_plan(p);
+  fftwf_free(C);
+
+  for(size_t kk = 0; kk<M*N*P; kk++)
+  {
+    out[kk]/=(M*N*P);
+  }
+  return out;
+}
+
+float * fft_convolve_cc_conj(fftwf_complex * A, fftwf_complex * B, 
+    const int M, const int N, const int P)
+{
+  size_t n3red = (P+3)/2;
+  fftwf_complex * C = fftwf_malloc(M*N*n3red*sizeof(fftwf_complex));
+  fft_mul_conj(C, A, B, M, N, P); 
 
   float * out = fftwf_malloc(M*N*P*sizeof(float));
 

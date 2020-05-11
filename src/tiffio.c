@@ -57,7 +57,35 @@ void floatimage_show_stats(float * I, size_t N, size_t M, size_t P)
   printf("min: %f max: %f mean: %f\n", imin, imax, isum/(M*N*P));
 }
 
-void readUint(TIFF * tfile, float * V, 
+void readUint8(TIFF * tfile, float * V, 
+    const uint32_t ssize, 
+    const uint32_t ndirs,
+    const uint32_t nstrips,
+    const uint32_t perDirectory
+    )
+{
+  // Number of elements per strip
+  size_t nes = ssize/sizeof(uint8_t);
+  uint8_t * buf = _TIFFmalloc(ssize);
+  assert(buf != NULL);
+
+  for(int dd=0; dd<ndirs; dd++) {
+    TIFFSetDirectory(tfile, dd);
+    for(int kk=0; kk<nstrips; kk++) {
+      int strip = kk;
+      tsize_t read = TIFFReadEncodedStrip(tfile, strip, buf, (tsize_t) - 1);
+      assert(read>0);
+
+      for(int ii = 0; ii<read/sizeof(uint8_t); ii++) {
+        size_t pos = ii+kk*nes + dd*perDirectory; 
+        V[pos] = (float) buf[ii];
+      }
+    } 
+  }
+  _TIFFfree(buf);
+}
+
+void readUint16(TIFF * tfile, float * V, 
     const uint32_t ssize, 
     const uint32_t ndirs,
     const uint32_t nstrips,
@@ -236,7 +264,8 @@ float * readtif_asFloat(char * fName,
     }
   } 
   else {
-    printf("Warning: TIFFTAG_SAMPLEFORMAT not specified, assuming uint\n");
+    printf("Warning: TIFFTAG_SAMPLEFORMAT not specified, assuming uint but that could be wrong!\n");
+    isUint = 1;
   }
 
   if(!(isUint || isFloat))
@@ -245,9 +274,9 @@ float * readtif_asFloat(char * fName,
     return NULL;
   }
 
-  if(isUint && (BPS != 16))
+  if(isUint && !(BPS == 16 || BPS == 8))
   {
-    printf("For unsigned images, only 16-bit samples are supported %u\n", BPS);
+    printf("Unsigned %d-bit images are not supported, only 8 and 16.\n", BPS);
     return NULL;
   }
 
@@ -305,7 +334,14 @@ float * readtif_asFloat(char * fName,
     {
       printf("ReadUint ...\n");
     }
-    readUint(tfile, V, ssize, ndirs, nstrips, M*N);
+    if(BPS == 16)
+    {
+      readUint16(tfile, V, ssize, ndirs, nstrips, M*N);
+    }
+    if(BPS == 8)
+    {
+      readUint8(tfile, V, ssize, ndirs, nstrips, M*N);
+    }
   }
 
   TIFFClose(tfile);
