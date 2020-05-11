@@ -402,8 +402,8 @@ float iter(float * xp, // Output, f_(t+1)
   }
   fftwf_complex * F_sn = fft(sn, wM, wN, wP);
   fftwf_free(y); // = sn as well
-  float * x = fft_convolve_cc(cKr, F_sn, wM, wN, wP);
-//  float * x = fft_convolve_cc_conj(cK, F_sn, wM, wN, wP);
+//  float * x = fft_convolve_cc(cKr, F_sn, wM, wN, wP);
+  float * x = fft_convolve_cc_conj(cK, F_sn, wM, wN, wP);
   fftwf_free(F_sn);
   for(size_t kk = 0; kk<wMNP; kk++)
   {
@@ -532,7 +532,7 @@ float * deconvolve_w(const float * restrict im, const int M, const int N, const 
 
   fftwf_complex * cKr = NULL;
 
-// <-- This isn't needed ...
+/* <-- This isn't needed ...
   float * Zr = fftwf_malloc(wMNP*sizeof(float));
   memset(Zr, 0, wMNP*sizeof(float));
   float * psf_flipped = malloc(wMNP*sizeof(float));
@@ -544,11 +544,11 @@ float * deconvolve_w(const float * restrict im, const int M, const int N, const 
   cKr = fft(Zr, wM, wN, wP); 
   // Possibly not needed due to f(-x) = ifft(conf(fft(f)))
   fftwf_free(Zr);
-  // -->
+   --> */
 
   //printf("initial guess\n"); fflush(stdout);
   fftwf_complex * F_one = initial_guess(M, N, P, wM, wN, wP);
-  float * P1 = fft_convolve_cc(cKr, F_one, wM, wN, wP); // can't replace this one with cK!
+  float * P1 = fft_convolve_cc_conj(cK, F_one, wM, wN, wP); // can't replace this one with cK!
   fftwf_free(F_one);
   //printf("P1\n");
   //fim_stats(P1, pM*pN*pP);
