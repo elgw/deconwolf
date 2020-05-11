@@ -19,7 +19,7 @@ fim:
 	$(cc) -c src/fim.c $(cflags) -lm -o fim.o
 
 fim_dbg:
-	$(cc) -c src/tiling.c $(clags_dbg) -lm -o fim_dbg.o
+	$(cc) -c src/fim.c $(clags_dbg) -lm -o fim_dbg.o
 
 tiling:
 	$(cc) -c src/tiling.c $(cflags) -lm -o tiling.o

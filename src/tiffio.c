@@ -4,6 +4,9 @@
 #include <stdint.h>
 #include <math.h>
 #include <tiffio.h>
+#include <unistd.h>
+#include "tiffio.h"
+#include "fim.h"
 
 /* see man 3 tifflib
  *
@@ -11,6 +14,69 @@
  * Finally, note that the last strip of data in an image may have fewer rows in it than specified by the 
  * RowsPerStrip tag. A reader should not assume that each decoded strip contains a full set of rows in it. 
  */
+
+
+void tiffio_ut()
+{
+  printf("-> tiffio_ut (write and read back a tif file)\n");
+  /* Create and write a 3D image to disk,
+   * read it back and check that it is the same thing*/
+
+  char fname[] = "_deconwolf_temporary_XXXXXX";
+  int fd = mkstemp(fname);
+  if(fd == -1)
+  {
+    printf("Could not get a good temporary file name, skipping test\n");
+    return;
+  }
+  close(fd);
+
+  //  printf("%s\n", fname);
+  //  getchar();
+  int M = 1024, N = 2048, P = 2;
+  float * im = fim_zeros(M*N*P);
+
+  size_t pos1 = 1111;
+  size_t pos2 = 2222;
+  size_t pos3 = 3333;
+
+  im[pos1] = 1;
+  im[pos2] = 2;
+  im[pos3] = 3;
+
+  writetif(fname, im, M, N, P);
+
+  int M2 = 0, N2 = 0, P2 = 0;
+  float * im2 = readtif_asFloat(fname, &M2, &N2, &P2, 0);
+  if(im2 == NULL)
+  {
+    printf("Could not read back the image\n");
+    free(im);
+    remove(fname);
+    return;
+  }
+
+  if(M != M2 || N != N2 || P != P2)
+  {
+    printf("Dimensions does not match!\n");
+    printf("Wrote: [%d x %d x %d], Read: [%d x %d x %d]\n",
+        M, N, P, M2, N2, P2);
+    free(im);
+    free(im2);
+    remove(fname);
+    return;
+  }
+
+  if( fabs(im[pos1]/im[pos2] - im2[pos1]/im2[pos2])>1e-5)
+  {
+    printf("Error: images values does not match\n");
+  }
+
+  free(im);
+  free(im2);
+  remove(fname);
+}
+
 
 void floatimage_normalize(float * restrict I, const size_t N)
 {

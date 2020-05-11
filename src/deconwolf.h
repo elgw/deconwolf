@@ -1,25 +1,23 @@
+#ifndef deconwolf_h
+#define deconwolf_h
+
 #define deconwolf_version "alpha-0.002"
 
 /* deconwolf
- * Erik Wernersson, 2020
  *
- * Configuration files.
- * If $home/.config/ exists deconwolf will store its settings there
- * specifically the fftw3 wisdom data is stored in
- * ./config/deconwolf/wisdom/
+ * fftw3 wisdom data is stored and loaded from
+ * $home/.config/ 
  *
- * The choice of folder is recommended by "XDG Base Directory Specification", see:
- * https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
- *
- * 
- * All algorithms assumes column major indexing, i.e., the distance 
+ * Internally column major indexing is used, i.e., the distance 
  * between elements is 1 for the first dimension and increases with 
  * each new dimension.
  *
+ * Erik Wernersson, 2020
  */
 
 #define DW_METHOD_W 0
 #define DW_METHOD_RL 1
+#define DW_METHOD_ID 2
 
 typedef struct{
   int nThreads;
@@ -37,12 +35,18 @@ typedef struct{
   int verbosity;
   fftwf_plan fft_plan;
   fftwf_plan ifft_plan;
-} opts;
+  int iterdump; // Dump each iteration to file ... 
+} dw_opts;
 
-int deconwolf(opts *);
+dw_opts * dw_opts_new(void);
+void dw_argparsing(int argc, char ** argv, dw_opts * s);
+void dw_opts_fprint(FILE *f, dw_opts * s);
+void dw_opts_free(dw_opts ** sp);
+void dw_usage(const int argc, char ** argv, const dw_opts * );
 
-void usage(const int argc, char ** argv, const opts * );
-void unittests();
-void shift_vector_ut();
-void fArray_flipall_ut();
-float * autocrop_psf(float *, int *, int *, int *, int, int , int, opts * );
+void dw_fprint_info(FILE * f);
+void dw_unittests();
+
+int  dw_run(dw_opts *);
+
+#endif

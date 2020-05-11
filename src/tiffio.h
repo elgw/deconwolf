@@ -1,9 +1,13 @@
+#ifndef tiffio_h
+#define tiffio_h
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <math.h>
 #include <tiffio.h>
+#include <unistd.h>
+#include "fim.h"
 
 int writetif(char * fName, float * V, 
     int M, int N, int P);
@@ -14,4 +18,5 @@ float * readtif_asFloat(char * fName,
 
 void floatimage_normalize(float * restrict, const size_t);
 void floatimage_show_stats(float * I, size_t N, size_t M, size_t P);
-
+void tiffio_ut();
+#endif

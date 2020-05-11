@@ -105,11 +105,11 @@ A&A 437, 369-374 (2005), [doi](https://doi.org/10.1051/0004-6361:20052717)
  - [ ] Use tif tags to write meta data (also to transfer from input image).
  - [ ] Crash-safe writing of output images, write to temporary file and move when write is complete to avoid bad luck.
  - [ ] Highly parsable log file.
- - [ ] Break out the image processing functions to separate library.
  - [ ] Proper logger.
  - [ ] Custom TIFF warning handle (not to overflow the console)
  - [ ] Include also `identity` and `Richardson-Lucy`
  - [x] Reduce memory by using the identity `f(-x) = ifft(conj(fft(x))`
+ - [x] Break out the image processing functions to separate library.
  - [x] Protect better against misuse.
  - [x] Support even-sized PSFs (kind of hack, solution by resizing)
  - [x] Check that it works on osx
