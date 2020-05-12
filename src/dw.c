@@ -553,7 +553,7 @@ float * deconvolve_w(const float * restrict im, const int M, const int N, const 
   fim_insert(Z, wM, wN, wP, psf, pM, pN, pP);
   fim_circshift(Z, wM, wN, wP, -(pM-1)/2, -(pN-1)/2, -(pP-1)/2);
   fftwf_complex * cK = fft(Z, wM, wN, wP);
-  fim_tiff_write("Z.tif", Z, wM, wN, wP);
+  //fim_tiff_write("Z.tif", Z, wM, wN, wP);
 
   fftwf_free(Z);
 

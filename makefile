@@ -1,7 +1,7 @@
 # Normal build:
 # make -B
 # To build with debug flags:
-# make debug=1 -B
+# make DEBUG=1 -B
 
 CC_VERSION = "$(shell gcc --version | head -n 1)"
 GIT_VERSION = "$(shell git log --pretty=format:'%aD:%H' -n 1)"
@@ -9,9 +9,9 @@ GIT_VERSION = "$(shell git log --pretty=format:'%aD:%H' -n 1)"
 XFLAGS = -DCC_VERSION=\"$(CC_VERSION)\"
 XFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
 
-DEBUG ?= 0
-ifeq (DEBUG, 1)
-    CFLAGS =-Wall -g3 -gdwarf2 -DDEBUG
+DEBUG?=0
+ifeq ($(DEBUG),1)
+    CFLAGS =-Wall -g3 -DDEBUG
 else
     CFLAGS=-Wall -DNDEBUG -O3 -flto -march=native
 endif
