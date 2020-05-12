@@ -14,6 +14,9 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+/* Read and write tiff files to/from single precision floats
+ */
+
 #ifndef fim_tiff_h
 #define fim_tiff_h
 #include <assert.h>
@@ -25,14 +28,13 @@
 #include <unistd.h>
 #include "fim.h"
 
-int writetif(char * fName, float * V, 
+int fim_tiff_write(char * fName, float * V, 
     int M, int N, int P);
 
 // Read a 3D tif stack as a float array
-float * readtif_asFloat(char * fName, 
+float * fim_tiff_read(char * fName, 
     int * M0, int * N0, int * P0, int verbosity);
 
-void floatimage_normalize(float * restrict, const size_t);
-void floatimage_show_stats(float * I, size_t N, size_t M, size_t P);
 void fim_tiff_ut();
+
 #endif

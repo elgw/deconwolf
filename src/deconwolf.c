@@ -542,7 +542,7 @@ float * deconvolve_w(const float * restrict im, const int M, const int N, const 
   fim_insert(Z, wM, wN, wP, psf, pM, pN, pP);
   fim_circshift(Z, wM, wN, wP, -(pM-1)/2, -(pN-1)/2, -(pP-1)/2);
   fftwf_complex * cK = fft(Z, wM, wN, wP);
-  writetif("Z.tif", Z, wM, wN, wP);
+  fim_tiff_write("Z.tif", Z, wM, wN, wP);
 
   fftwf_free(Z);
 
@@ -621,7 +621,7 @@ float * deconvolve_w(const float * restrict im, const int M, const int N, const 
       char * tempname = malloc(100*sizeof(char));
       sprintf(tempname, "x_%03d.tif", it);
       printf("Writing current guess to %s\n", tempname);
-      writetif(tempname, temp, M, N, P);
+      fim_tiff_write(tempname, temp, M, N, P);
       free(temp);
     }
 
@@ -1005,7 +1005,7 @@ int dw_run(dw_opts * s)
     printf("Reading %s\n", s->imFile);
   }
   int M = 0, N = 0, P = 0;
-  float * im = readtif_asFloat(s->imFile, &M, &N, &P, s->verbosity);
+  float * im = fim_tiff_read(s->imFile, &M, &N, &P, s->verbosity);
   if(s->verbosity > 2)
   {
     printf("Image size: [%d x %d x %d]\n", M, N, P);
@@ -1025,7 +1025,7 @@ int dw_run(dw_opts * s)
     {
       printf("Reading %s\n", s->psfFile);
     }
-    psf = readtif_asFloat(s->psfFile, &pM, &pN, &pP, s->verbosity);
+    psf = fim_tiff_read(s->psfFile, &pM, &pN, &pP, s->verbosity);
     if(psf == NULL)
     {
       printf("Failed to open %s\n", s->psfFile);
@@ -1074,7 +1074,7 @@ int dw_run(dw_opts * s)
       printf("Writing to %s\n", s->outFile); fflush(stdout);
     }
     //    floatimage_normalize(out, M*N*P);
-    writetif(s->outFile, out, M, N, P);
+    fim_tiff_write(s->outFile, out, M, N, P);
     exitstatus = 0;
   }
 

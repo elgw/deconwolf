@@ -60,10 +60,10 @@ void fim_tiff_ut()
   im[pos2] = 2;
   im[pos3] = 3;
 
-  writetif(fname, im, M, N, P);
+  fim_tiff_write(fname, im, M, N, P);
 
   int M2 = 0, N2 = 0, P2 = 0;
-  float * im2 = readtif_asFloat(fname, &M2, &N2, &P2, 0);
+  float * im2 = fim_tiff_read(fname, &M2, &N2, &P2, 0);
   if(im2 == NULL)
   {
     printf("Could not read back the image\n");
@@ -224,7 +224,7 @@ void readFloat(TIFF * tfile, float * V,
 }
 
 
-int writetif(char * fName, float * V, 
+int fim_tiff_write(char * fName, float * V, 
     int N, int M, int P)
 {
   float imax = -INFINITY;
@@ -299,7 +299,7 @@ int writetif(char * fName, float * V,
   return 0;
 }
 
-float * readtif_asFloat(char * fName, 
+float * fim_tiff_read(char * fName, 
     int * N0, int * M0, int * P0, int verbosity)
 {
   /* Reads the content of the tif file with fName
@@ -456,7 +456,7 @@ int main(int argc, char ** argv)
 
   size_t M = 0, N = 0, P = 0;
 
-  float * I = (float *) readtif_asFloat(inname, &M, &N, &P);
+  float * I = (float *) fim_tiff_read(inname, &M, &N, &P);
 
   if(I == NULL)
   {
@@ -465,9 +465,9 @@ int main(int argc, char ** argv)
   }
 
   floatimage_show_stats(I, M, N, P);
-
   floatimage_normalize(I, M*N*P);
-  writetif(outname, I, M, N, P);
+
+  fim_tiff_write(outname, I, M, N, P);
 
   free(I);
 

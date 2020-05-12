@@ -38,7 +38,7 @@ void test_weights(int M, int N, int P, int maxSize, int overlap)
  
   char outFile[] = "tiling_ut_weights.tif";
   printf("Writing weights to %s\n", outFile); fflush(stdout);
-  writetif(outFile, W, M, N, 1);
+  fim_tiff_write(outFile, W, M, N, 1);
 
   // Assuming that is it same behaviour for all P
  for(size_t kk = 0; kk<M*N; kk++)
@@ -74,14 +74,14 @@ void test_copy_paste(int M, int N, int P, int maxSize, int overlap)
     float * Ttile = tiling_get_tile(T, tt, source);
     tile * tl = T->tiles[tt];
     sprintf(fname, "tile%d.tif", tt);
-    writetif(fname, Ttile, tl->xsize[0], tl->xsize[1], tl->xsize[2]);
+    fim_tiff_write(fname, Ttile, tl->xsize[0], tl->xsize[1], tl->xsize[2]);
 
     // P has size T->tiles[kk]->xsize;
     tiling_put_tile(T, tt, target, Ttile);
     free(Ttile);
   }
 free(fname);
-  writetif("joined.tif", target, M, N, P);
+  fim_tiff_write("joined.tif", target, M, N, P);
 
   for(size_t kk = 0; kk<M*N*P; kk++)
   { 
