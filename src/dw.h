@@ -17,6 +17,24 @@
 #ifndef deconwolf_h
 #define deconwolf_h
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <assert.h>
+#include <stdint.h>
+#include <string.h>
+#include <fftw3.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <getopt.h>
+#include <stdlib.h>
+#include <libgen.h>
+#include <time.h>
+#include "fft.h"
+#include "tiling.h"
+#include "fim.h"
+#include "fim_tiff.h"
+
 #define deconwolf_version "alpha-0.002"
 
 /* fftw3 wisdom data is stored and loaded from

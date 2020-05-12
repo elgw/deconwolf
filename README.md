@@ -28,7 +28,6 @@ the output can be run directly with `| bash` or piped to a file and executed lat
 
 ### Test data
 
-
 ### Memory considerations
 Memory consumption is somewhere between 60 and 70 B per voxel, and drops when tiling is enabled. (Some data: 26169630 voxels, VmPeak 1700132 kB gives 65 B per voxel. 339982580 voxels and VmPeak 19498732 gives 58 B per voxel.
 
@@ -37,6 +36,9 @@ PSFs can be generate from ImageJ with a [plugin](http://bigwww.epfl.ch/algorithm
 
 ### Supported image formats
 Currently deconwolf does only support tif images, specifically: multipage, 16-bit unsigned or 32-bit floats, written in strip mode. The output is 16-bit unsigned and can be read by Matlab, ImageJ, etc.
+
+### Log files and output
+The reported error is the mean square error between the input image and the current guess convolved with the PSF.
 
 ## Building and installing
 deconwolf requires `fftw3f`, `fftw3f_threads` and `tiff-5` and can be built with [meson](https://mesonbuild.com/). 
