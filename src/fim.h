@@ -88,6 +88,10 @@ float * fim_expand(const float * restrict in,
    * M, Nm ... new size
    * */
 
+float fim_mse(float * A, float * B, size_t N);
+  /* mean( (A(:)-B(:)).^(1/2) )
+   */
+
 void shift_vector(float * restrict V, 
     const int S, 
     const int N,
@@ -98,6 +102,8 @@ void shift_vector_buf(float * restrict V,
     const int S, 
     const int N,
     int k, float * restrict buffer);
+
+
 
 void fim_flipall_ut();
 

@@ -14,6 +14,9 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#ifndef fft_h
+#define fft_h
+
 #include <fftw3.h>
 
 void myfftw_start(int nThreads);
@@ -38,3 +41,7 @@ float * fft_convolve_cc_conj(fftwf_complex * A, fftwf_complex * B, int M, int N,
 
 
 void fft_train(size_t M, size_t N, size_t P , int, int nThreads);
+
+void fft_ut(void);
+
+#endif

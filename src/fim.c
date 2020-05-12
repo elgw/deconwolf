@@ -83,6 +83,17 @@ void fim_stats(float * A, size_t N)
   printf("max: %f\n", amax);
 }
 
+float fim_mse(float * A, float * B, size_t N)
+  /* mean( (A(:)-B(:)).^(1/2) )
+   */
+{
+  double mse = 0;
+  for(size_t kk = 0; kk<N; kk++)
+  {
+    mse += pow(A[kk]-B[kk], 2);
+  }
+  return mse/N;
+}
 
 void fim_flipall(float * restrict T, const float * restrict A, const int a1, const int a2, const int a3)
   /* Equivalent to T = flip(flip(flip(A,1),2),3) in matlab */
