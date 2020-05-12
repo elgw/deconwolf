@@ -180,6 +180,56 @@ void fft_mul_conj(fftwf_complex * restrict C,
   return;
 }
 
+float * fft_convolve_cc_f2(fftwf_complex * A, fftwf_complex * B, 
+    const int M, const int N, const int P)
+{
+  size_t n3red = (P+3)/2;
+  fftwf_complex * C = fftwf_malloc(M*N*n3red*sizeof(fftwf_complex));
+  fft_mul(C, A, B, M, N, P); 
+  fftwf_free(B);
+
+  float * out = fftwf_malloc(M*N*P*sizeof(float));
+
+  fftwf_plan p = fftwf_plan_dft_c2r_3d(P, N, M, 
+      C, out, 
+      MYPLAN);
+  fftwf_execute(p);
+  fftwf_destroy_plan(p);
+  fftwf_free(C);
+
+  for(size_t kk = 0; kk<M*N*P; kk++)
+  {
+    out[kk]/=(M*N*P);
+  }
+  return out;
+}
+
+float * fft_convolve_cc_conj_f2(fftwf_complex * A, fftwf_complex * B, 
+    const int M, const int N, const int P)
+{
+  size_t n3red = (P+3)/2;
+  fftwf_complex * C = fftwf_malloc(M*N*n3red*sizeof(fftwf_complex));
+  fft_mul_conj(C, A, B, M, N, P); 
+  fftwf_free(B);
+
+  float * out = fftwf_malloc(M*N*P*sizeof(float));
+
+  fftwf_plan p = fftwf_plan_dft_c2r_3d(P, N, M, 
+      C, out, 
+      MYPLAN);
+  fftwf_execute(p);
+  fftwf_destroy_plan(p);
+  fftwf_free(C);
+
+  for(size_t kk = 0; kk<M*N*P; kk++)
+  {
+    out[kk]/=(M*N*P);
+  }
+  return out;
+}
+
+
+
 float * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B, 
     const int M, const int N, const int P)
 {
