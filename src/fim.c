@@ -53,7 +53,7 @@ int fim_maxAtOrigo(const float * restrict V, const int M, const int N, const int
   return 1;
 }
 
-float fim_sum(float * A, size_t N)
+float fim_sum(const float * restrict A, size_t N)
 {
   double sum = 0;
   for(size_t kk = 0; kk<N; kk++)
@@ -75,6 +75,19 @@ float fim_min(float * A, size_t N)
       amin = A[kk];
   }
   return amin;
+}
+
+void fim_minus(float * restrict  A, 
+    const float * restrict B, 
+    const float * restrict C, 
+    const size_t N)
+  // A = B - C
+{
+  for(size_t kk = 0; kk<N; kk++)
+  {
+    A[kk] = B[kk] - C[kk];
+  }
+  return;
 }
 
 float fim_max(float * A, size_t N)
@@ -260,7 +273,6 @@ float * fim_copy(const float * restrict V, const size_t N)
   memcpy(C, V, N*sizeof(float));
   return C;
 }
-
 
 float * fim_zeros(const size_t N)
   // Allocate and return an array of N floats

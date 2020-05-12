@@ -51,6 +51,7 @@ dw_opts * dw_opts_new(void)
   s->tiling_padding = 20;
   s->method = DW_METHOD_W;
   s->iterdump = 0;
+  s->relax = 0;
   return s;
 }
 
@@ -102,6 +103,10 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
     fprintf(f, "tiling, padding: %d\n", s->tiling_padding);
   } else {
     fprintf(f, "tiling: OFF\n");
+  }
+  if(s->relax > 0)
+  {
+    fprintf(f, "PSF relaxation: %f\n", s->relax);
   }
   fprintf(f, "\n");
 }
@@ -171,6 +176,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     { "prefix",       required_argument, NULL,   'f' },
     { "batch",        no_argument, NULL, 'b' },
     { "method",       required_argument, NULL,   'm' },
+    { "relax",        required_argument, NULL,   'r' },
     { NULL,           0,                 NULL,   0   }
   };
 
@@ -231,6 +237,9 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
           s->method = DW_METHOD_ID; 
           sprintf(s->prefix, "id");
         }
+        break;
+      case 'r':
+        s->relax = atof(optarg);
         break;
     }
   }
@@ -476,6 +485,7 @@ void dw_usage(const int argc, char ** argv, const dw_opts * s)
   printf(" --tilepad N\n\t Sets the tiles to overlap by N voxels in tile mode (default: %d)\n", s->tiling_padding);
   printf(" --prefix str\n\t Set the prefix of the output files (default: '%s')\n", s->prefix);
   printf(" --overwrite\n\t Allows deconwolf to overwrite already existing output files\n");
+  printf(" --relax F\n\t Multiply the central pixel of the PSF by F. (F>1 relaxation)\n");
   //  printf(" --batch\n\t Generate a batch file to deconvolve all images in the `image_dir`\n");
   printf("\n");
 }
@@ -513,6 +523,7 @@ float * deconvolve_w(const float * restrict im, const int M, const int N, const 
     printf("PSF is not centered!\n");
     return NULL;
   }
+
 
   // This is the dimensions that we will work with
   // called M1 M2 M3 in the MATLAB code
@@ -592,12 +603,7 @@ float * deconvolve_w(const float * restrict im, const int M, const int N, const 
     //   return x;
   }
 
-
-  float sumg = 0;
-  for(size_t kk = 0; kk<M*N*P; kk++)
-  {
-    sumg+=im[kk];
-  }
+  float sumg = fim_sum(im, M*N*P);
 
   float alpha = 0;
   float * f = fim_constant(wMNP, sumg/wMNP);
@@ -652,10 +658,7 @@ float * deconvolve_w(const float * restrict im, const int M, const int N, const 
     float * swap = g;
     g = gm; gm = swap;
 
-    for(size_t kk = 0; kk<wMNP; kk++)
-    { 
-      g[kk] = xp[kk]-y[kk]; 
-    }
+    fim_minus(g, xp, y, wMNP); // g = xp - y
 
     if(it > 0) {
       alpha = update_alpha(g, gm, wMNP);
@@ -1044,6 +1047,18 @@ int dw_run(dw_opts * s)
   psf = psf_autocrop(psf, &pM, &pN, &pP, 
       M, N, P, s);
 
+  if(s->relax > 0)
+  {
+    // Note: only works with odd sized PSF
+    fprintf(s->log, "Relaxing the PSF by %f\n", s->relax);
+    if(s->verbosity > 0)
+    {    
+    printf("Relaxing the PSF\n");
+    }
+    size_t mid = (pM-1)/2 + (pN-1)/2*pM + (pP-1)/2*pM*pN;
+    psf[mid] *= s->relax;
+    fim_normalize_max1(psf, pM, pN, pP);
+  }
 
   myfftw_start(s->nThreads);
   float * out = NULL;

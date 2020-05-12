@@ -48,6 +48,7 @@ typedef struct{
   fftwf_plan fft_plan;
   fftwf_plan ifft_plan;
   int iterdump; // Dump each iteration to file ... 
+  float relax;
 } dw_opts;
 
 dw_opts * dw_opts_new(void);

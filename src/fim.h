@@ -30,6 +30,13 @@
 float fim_min(float * A, size_t N);
 float fim_mean(float * A, size_t N);
 float fim_max(float * A, size_t N);
+float fim_sum(const float * restrict A, size_t N);
+void fim_minus(float * restrict  A, 
+    const float * restrict B, 
+    const float * restrict C, 
+    const size_t N);
+  // A = B - C
+
 
 int fim_maxAtOrigo(const float * restrict V, const int M, const int N, const int P);
   /* Check that the MAX of the fim is in the middle
