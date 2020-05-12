@@ -22,9 +22,14 @@
 /* fim : operations on 3D floating point images 
  * all allocations are done with fftw3f_malloc (for alignment)
  *
- * functions ending with `_ref` are reference implementation,
- * and are only used for testing.
+ * functions ending with `_ref` are reference implementations to be compared 
+ * tweaked or alternative versions.
  * */
+
+
+float fim_min(float * A, size_t N);
+float fim_mean(float * A, size_t N);
+float fim_max(float * A, size_t N);
 
 int fim_maxAtOrigo(const float * restrict V, const int M, const int N, const int P);
   /* Check that the MAX of the fim is in the middle
@@ -104,7 +109,6 @@ void shift_vector_buf(float * restrict V,
     int k, float * restrict buffer);
 
 
-
-void fim_flipall_ut();
+void fim_ut(void);
 
 #endif

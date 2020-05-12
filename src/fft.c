@@ -292,7 +292,7 @@ void fft_train(const size_t M, const size_t N, const size_t P, const int verbosi
 void fft_ut_wisdom_name(void){
   /* Wisdom file names
    * Try this when $HOME/.config/deconwolf/ does not exist
-   * and when it does ... 
+   * and when it does ... jonas.paulsen1 
    * could also test it when that dir isn't writeable.
    * */
 

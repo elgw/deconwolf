@@ -926,10 +926,10 @@ void dw_unittests()
 {
   fprint_peakMemory(NULL);
   timings();
-  //shift_vector_ut();
-  fim_flipall_ut();
+
+  fim_ut();
   fim_tiff_ut();
-  //
+  fft_ut();
   printf("done\n");
 }
 

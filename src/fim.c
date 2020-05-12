@@ -23,25 +23,6 @@
 #include "fim.h"
 
 
-void shift_vector_ut()
-{
-  int N = 5;
-  int S = 1; // stride
-  float * V = malloc(N*sizeof(float));
-
-  for(int k = -7; k<7; k++)
-  {
-    for(int kk = 0; kk<N; kk++)
-    {V[kk] = kk;}
-    printf("shift: % d -> ", k);
-    shift_vector(V,S,N,k);
-    for(int kk =0; kk<N; kk++)
-    { printf("%.0f ", V[kk]);}
-    printf("\n");
-  }
-}
-
-
 int fim_maxAtOrigo(const float * restrict V, const int M, const int N, const int P)
   /* Check that the MAX of the fim is in the middle
    * returns 1 on success.
@@ -72,15 +53,49 @@ int fim_maxAtOrigo(const float * restrict V, const int M, const int N, const int
   return 1;
 }
 
-void fim_stats(float * A, size_t N)
+float fim_sum(float * A, size_t N)
 {
-  float amax = 0;
+  double sum = 0;
+  for(size_t kk = 0; kk<N; kk++)
+    sum+=(double) A[kk];
+  return (float) sum;
+}
+
+float fim_mean(float * A, size_t N)
+{
+  return fim_sum(A, N)/(float) N;
+}
+
+float fim_min(float * A, size_t N)
+{
+  float amin = INFINITY;
+  for(size_t kk = 0; kk<N; kk++)
+  {
+    if(A[kk] < amin)
+      amin = A[kk];
+  }
+  return amin;
+}
+
+float fim_max(float * A, size_t N)
+{
+  float amax = -INFINITY;
   for(size_t kk = 0; kk<N; kk++)
   {
     if(A[kk] > amax)
       amax = A[kk];
   }
-  printf("max: %f\n", amax);
+  return amax;
+}
+
+
+void fim_stats(float * A, size_t N)
+{
+  printf("min: %f mean: %f, max: %f\n",
+      fim_min(A, N),
+      fim_mean(A, N),
+      fim_max(A, N));
+  return;
 }
 
 float fim_mse(float * A, float * B, size_t N)
@@ -412,4 +427,29 @@ void fim_flipall_ut()
   return;
 }
 
+void shift_vector_ut()
+{
+  int N = 5;
+  int S = 1; // stride
+  float * V = malloc(N*sizeof(float));
 
+  for(int k = -7; k<7; k++)
+  {
+    for(int kk = 0; kk<N; kk++)
+    {V[kk] = kk;}
+    printf("shift: % d -> ", k);
+    shift_vector(V,S,N,k);
+    for(int kk =0; kk<N; kk++)
+    { printf("%.0f ", V[kk]);}
+    printf("\n");
+  }
+}
+
+
+
+void fim_ut()
+{
+fim_flipall_ut();
+shift_vector_ut();
+
+}
