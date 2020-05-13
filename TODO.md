@@ -1,0 +1,32 @@
+# Todo
+
+ - [ ] Documentation, examples and test data.
+ - [ ] A higher level interface with facilities for handling and generation of PSFs.
+ - [ ] Flag to save one image after each iteration (to facilitate setting the number of iterations).
+ - [ ] Demos, for example on the effect of the tiling.
+ - [ ] Use tif tags to write meta data (also to transfer from input image).
+ - [ ] Crash-safe writing of output images, write to temporary file and move when write is complete to avoid bad luck.
+ - [ ] Highly parsable log file.
+ - [ ] Proper logger.
+ - [ ] Custom TIFF warning handle (not to overflow the console)
+ - [ ] Include also `identity` and `Richardson-Lucy`
+ - [x] Reduce memory by using the identity `f(-x) = ifft(conj(fft(x))`
+ - [x] Break out the image processing functions to separate library.
+ - [x] Protect better against misuse.
+ - [x] Support even-sized PSFs (kind of hack, solution by resizing)
+ - [x] Check that it works on osx
+ - [x] Cross-platform build-tool (meson).
+ - [x] Possible to change the prefix with the `--prefix` flag.
+ - [x] Refuse to run if output file already exist (unless `--overwrite`) with status `0`.
+ - [x] Crop PSF also in x and y (individual crop per tile as well).
+ - [x] Faster calculation of tiling weights.
+ - [x] Report peak memory usage to log file.
+ - [x] Automatic cropping of the PSF if it has too many stacks.
+ - [x] Block mode for low memory systems, accessible through the options `--tilesize` and `--tilepad`
+ - [x] Eliminate one or two arrays in the main loop to save memory.
+ - [x] Use some kind of logging
+ - [x] Argument parsing 
+ - [x] Proper automatic name on output file.
+ - [x] Make use of symmetries to save memory?
+ - [x] Save FFTW wisdom (saved to `./config/deconwolf/`)
+ - [x] Identical results to matlab code.

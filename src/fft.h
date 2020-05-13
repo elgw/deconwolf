@@ -14,6 +14,9 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#ifndef fft_h
+#define fft_h
+
 #include <fftw3.h>
 
 void myfftw_start(int nThreads);
@@ -32,9 +35,18 @@ void fft_mul(fftwf_complex * restrict C,
     fftwf_complex * restrict B, 
     const size_t n1, const size_t n2, const size_t n3);
 
+// Y = ifft(A*B)
 float * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B, int M, int N, int P);
-
+// Y = ifff(conj(A)*B))
 float * fft_convolve_cc_conj(fftwf_complex * A, fftwf_complex * B, int M, int N, int P);
+
+// Highly specialised versions where the second argument is freed
+float * fft_convolve_cc_f2(fftwf_complex * A, fftwf_complex * B, int M, int N, int P);
+float * fft_convolve_cc_conj_f2(fftwf_complex * A, fftwf_complex * B, int M, int N, int P);
 
 
 void fft_train(size_t M, size_t N, size_t P , int, int nThreads);
+
+void fft_ut(void);
+
+#endif

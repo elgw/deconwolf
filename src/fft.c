@@ -24,6 +24,7 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include "fim.h"
 
 // FFTW_MEASURE, FFTW_PATIENT or FFTW_EXHAUSTIVE
 const unsigned int MYPLAN = FFTW_MEASURE;
@@ -76,7 +77,7 @@ static char * get_swf_file_name(int nThreads)
   sprintf(swf, "fftw_wisdom_float_threads_%d.dat", nThreads);    
 
   sprintf(dir_config, "%s/.config/", dir_home);
- // printf("dir_config = %s\n", dir_config);
+  // printf("dir_config = %s\n", dir_config);
   if( !isdir(dir_config) )
   {     
     free(dir_config);
@@ -84,7 +85,7 @@ static char * get_swf_file_name(int nThreads)
   }
 
   sprintf(dir_config, "%s/.config/deconwolf/", dir_home);
-//  printf("dir_config = %s\n", dir_config);
+  //  printf("dir_config = %s\n", dir_config);
   if( ensuredir(dir_config) == 0 )
   {
     char * prefered = malloc(1024*sizeof(char));
@@ -178,6 +179,56 @@ void fft_mul_conj(fftwf_complex * restrict C,
   }
   return;
 }
+
+float * fft_convolve_cc_f2(fftwf_complex * A, fftwf_complex * B, 
+    const int M, const int N, const int P)
+{
+  size_t n3red = (P+3)/2;
+  fftwf_complex * C = fftwf_malloc(M*N*n3red*sizeof(fftwf_complex));
+  fft_mul(C, A, B, M, N, P); 
+  fftwf_free(B);
+
+  float * out = fftwf_malloc(M*N*P*sizeof(float));
+
+  fftwf_plan p = fftwf_plan_dft_c2r_3d(P, N, M, 
+      C, out, 
+      MYPLAN);
+  fftwf_execute(p);
+  fftwf_destroy_plan(p);
+  fftwf_free(C);
+
+  for(size_t kk = 0; kk<M*N*P; kk++)
+  {
+    out[kk]/=(M*N*P);
+  }
+  return out;
+}
+
+float * fft_convolve_cc_conj_f2(fftwf_complex * A, fftwf_complex * B, 
+    const int M, const int N, const int P)
+{
+  size_t n3red = (P+3)/2;
+  fftwf_complex * C = fftwf_malloc(M*N*n3red*sizeof(fftwf_complex));
+  fft_mul_conj(C, A, B, M, N, P); 
+  fftwf_free(B);
+
+  float * out = fftwf_malloc(M*N*P*sizeof(float));
+
+  fftwf_plan p = fftwf_plan_dft_c2r_3d(P, N, M, 
+      C, out, 
+      MYPLAN);
+  fftwf_execute(p);
+  fftwf_destroy_plan(p);
+  fftwf_free(C);
+
+  for(size_t kk = 0; kk<M*N*P; kk++)
+  {
+    out[kk]/=(M*N*P);
+  }
+  return out;
+}
+
+
 
 float * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B, 
     const int M, const int N, const int P)
@@ -283,7 +334,68 @@ void fft_train(const size_t M, const size_t N, const size_t P, const int verbosi
   { assert(0); } 
   else {
     fftwf_export_wisdom_to_filename(swf);
+    free(swf);
   }
 
+  return;
+}
+
+void fft_ut_wisdom_name(void){
+  /* Wisdom file names
+   * Try this when $HOME/.config/deconwolf/ does not exist
+   * and when it does ... jonas.paulsen1 
+   * could also test it when that dir isn't writeable.
+   * */
+
+  int nThreads = 4;
+  char * swf = get_swf_file_name(nThreads);
+  printf("swf = '%s'\n", swf);
+  free(swf);
+}
+
+void fft_ut_flipall_conj()
+{
+  myfftw_start(2);
+  /* Test the identity 
+   * flip(X) = ifft(conj(fft(X)))
+   */
+  int M = 12, N = 13, P = 15;
+  float * A = fftwf_malloc(M*N*P*sizeof(float));
+  for(int kk = 0; kk<M*N*P; kk++)
+  { A[kk] = (float) rand() / (float) RAND_MAX; }
+  fim_stats(A, M*N*P);
+  float * B = fftwf_malloc(M*N*P*sizeof(float));
+  memcpy(B, A, M*N*P*sizeof(float));
+  float * B_flipall = fftwf_malloc(M*N*P*sizeof(float));
+  fim_flipall(B_flipall, B, M, N, P);
+
+
+  fftwf_complex * FA = fft(A, M, N, P);
+  fftwf_complex * FB = fft(B, M, N, P);
+  fftwf_complex * FB_flipall = fft(B_flipall, M, N, P);
+
+  float * Y1 = fft_convolve_cc(FA, FB_flipall, M, N, P);
+  float * Y2 = fft_convolve_cc_conj(FA, FB, M, N, P);
+
+  float mse = fim_mse(Y1, Y2, M*N*P);
+  printf("mse=%f ", mse);
+  if(mse < 1e-5)
+  { printf("ok!\n"); } else 
+  { printf("BAD :(\n"); }
+
+  fftwf_free(A); fftwf_free(FA);
+  fftwf_free(B); fftwf_free(FB);
+  fftwf_free(B_flipall); fftwf_free(FB_flipall);
+
+  fftwf_free(Y1);
+  fftwf_free(Y2);
+
+  myfftw_stop();
+}
+
+void fft_ut(void)
+{
+  fft_ut_wisdom_name();
+  fft_ut_flipall_conj();
   return;
 }

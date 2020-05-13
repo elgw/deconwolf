@@ -22,9 +22,21 @@
 /* fim : operations on 3D floating point images 
  * all allocations are done with fftw3f_malloc (for alignment)
  *
- * functions ending with `_ref` are reference implementation,
- * and are only used for testing.
+ * functions ending with `_ref` are reference implementations to be compared 
+ * tweaked or alternative versions.
  * */
+
+
+float fim_min(const float * A, size_t N);
+float fim_mean(const float * A, size_t N);
+float fim_max(const float * A, size_t N);
+float fim_sum(const float * restrict A, size_t N);
+void fim_minus(float * restrict  A, 
+    const float * restrict B, 
+    const float * restrict C, 
+    const size_t N);
+  // A = B - C
+
 
 int fim_maxAtOrigo(const float * restrict V, const int M, const int N, const int P);
   /* Check that the MAX of the fim is in the middle
@@ -32,7 +44,7 @@ int fim_maxAtOrigo(const float * restrict V, const int M, const int N, const int
    * Returns 0 if any of the image dimensions are even
    */
 
-void fim_stats(float * A, size_t N);
+void fim_stats(const float * A, size_t N);
 // Print some info about A to stdout
 
 void fim_flipall(float * restrict T, const float * restrict A, const int a1, const int a2, const int a3);
@@ -88,6 +100,10 @@ float * fim_expand(const float * restrict in,
    * M, Nm ... new size
    * */
 
+float fim_mse(float * A, float * B, size_t N);
+  /* mean( (A(:)-B(:)).^(1/2) )
+   */
+
 void shift_vector(float * restrict V, 
     const int S, 
     const int N,
@@ -99,6 +115,7 @@ void shift_vector_buf(float * restrict V,
     const int N,
     int k, float * restrict buffer);
 
-void fim_flipall_ut();
+
+void fim_ut(void);
 
 #endif

@@ -1,9 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include "fft.h"
+#include "fim.h"
 
 int main(int argc, char ** argv)
 {
-  fft_ut();
+  fim_ut();
   return 0;
 }

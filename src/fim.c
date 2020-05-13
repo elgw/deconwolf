@@ -23,25 +23,6 @@
 #include "fim.h"
 
 
-void shift_vector_ut()
-{
-  int N = 5;
-  int S = 1; // stride
-  float * V = malloc(N*sizeof(float));
-
-  for(int k = -7; k<7; k++)
-  {
-    for(int kk = 0; kk<N; kk++)
-    {V[kk] = kk;}
-    printf("shift: % d -> ", k);
-    shift_vector(V,S,N,k);
-    for(int kk =0; kk<N; kk++)
-    { printf("%.0f ", V[kk]);}
-    printf("\n");
-  }
-}
-
-
 int fim_maxAtOrigo(const float * restrict V, const int M, const int N, const int P)
   /* Check that the MAX of the fim is in the middle
    * returns 1 on success.
@@ -72,17 +53,75 @@ int fim_maxAtOrigo(const float * restrict V, const int M, const int N, const int
   return 1;
 }
 
-void fim_stats(float * A, size_t N)
+float fim_sum(const float * restrict A, size_t N)
 {
-  float amax = 0;
+  double sum = 0;
+  for(size_t kk = 0; kk<N; kk++)
+    sum+=(double) A[kk];
+  return (float) sum;
+}
+
+float fim_mean(const float * A, size_t N)
+{
+  return fim_sum(A, N)/(float) N;
+}
+
+float fim_min(const float * A, size_t N)
+{
+  float amin = INFINITY;
+  for(size_t kk = 0; kk<N; kk++)
+  {
+    if(A[kk] < amin)
+      amin = A[kk];
+  }
+  return amin;
+}
+
+void fim_minus(float * restrict  A, 
+    const float * restrict B, 
+    const float * restrict C, 
+    const size_t N)
+  // A = B - C
+{
+  for(size_t kk = 0; kk<N; kk++)
+  {
+    A[kk] = B[kk] - C[kk];
+  }
+  return;
+}
+
+float fim_max(const float * A, size_t N)
+{
+  float amax = -INFINITY;
   for(size_t kk = 0; kk<N; kk++)
   {
     if(A[kk] > amax)
       amax = A[kk];
   }
-  printf("max: %f\n", amax);
+  return amax;
 }
 
+
+void fim_stats(const float * A, const size_t N)
+{
+  printf("min: %f mean: %f, max: %f\n",
+      fim_min(A, N),
+      fim_mean(A, N),
+      fim_max(A, N));
+  return;
+}
+
+float fim_mse(float * A, float * B, size_t N)
+  /* mean( (A(:)-B(:)).^(1/2) )
+   */
+{
+  double mse = 0;
+  for(size_t kk = 0; kk<N; kk++)
+  {
+    mse += pow(A[kk]-B[kk], 2);
+  }
+  return mse/N;
+}
 
 void fim_flipall(float * restrict T, const float * restrict A, const int a1, const int a2, const int a3)
   /* Equivalent to T = flip(flip(flip(A,1),2),3) in matlab */
@@ -234,7 +273,6 @@ float * fim_copy(const float * restrict V, const size_t N)
   memcpy(C, V, N*sizeof(float));
   return C;
 }
-
 
 float * fim_zeros(const size_t N)
   // Allocate and return an array of N floats
@@ -401,4 +439,29 @@ void fim_flipall_ut()
   return;
 }
 
+void shift_vector_ut()
+{
+  int N = 5;
+  int S = 1; // stride
+  float * V = malloc(N*sizeof(float));
 
+  for(int k = -7; k<7; k++)
+  {
+    for(int kk = 0; kk<N; kk++)
+    {V[kk] = kk;}
+    printf("shift: % d -> ", k);
+    shift_vector(V,S,N,k);
+    for(int kk =0; kk<N; kk++)
+    { printf("%.0f ", V[kk]);}
+    printf("\n");
+  }
+}
+
+
+
+void fim_ut()
+{
+fim_flipall_ut();
+shift_vector_ut();
+
+}

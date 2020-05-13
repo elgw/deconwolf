@@ -17,7 +17,25 @@
 #ifndef deconwolf_h
 #define deconwolf_h
 
-#define deconwolf_version "alpha-0.002"
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <assert.h>
+#include <stdint.h>
+#include <string.h>
+#include <fftw3.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <getopt.h>
+#include <stdlib.h>
+#include <libgen.h>
+#include <time.h>
+#include "fft.h"
+#include "tiling.h"
+#include "fim.h"
+#include "fim_tiff.h"
+
+#define deconwolf_version "0.0.2"
 
 /* fftw3 wisdom data is stored and loaded from
  * $home/.config/ 
@@ -48,6 +66,7 @@ typedef struct{
   fftwf_plan fft_plan;
   fftwf_plan ifft_plan;
   int iterdump; // Dump each iteration to file ... 
+  float relax;
 } dw_opts;
 
 dw_opts * dw_opts_new(void);
