@@ -426,7 +426,7 @@ float getError_ref(float * y, float * g, int M, int N, int P, int wM, int wN, in
 
 
 float iter(
-    float * xp, // Output, f_(t+1)
+    float ** xp, // Output, f_(t+1)
     const float * restrict im, // Input image
     fftwf_complex * restrict cK, // fft(psf)
     fftwf_complex * restrict cKr, // = NULL
@@ -467,10 +467,10 @@ float iter(
 
   for(size_t kk = 0; kk<wMNP; kk++)
   {
-    xp[kk] = f[kk]*x[kk]*W[kk];
+    x[kk] *= f[kk]*W[kk];
   }
-  fftwf_free(x);
-//  xp[0] = x;
+
+  xp[0] = x;
   return error;
 }
 
@@ -672,8 +672,9 @@ float * deconvolve_w(float * restrict im, const int M, const int N, const int P,
     }
 
     xp = xm;
+    free(xp);
     double err = iter(
-        xp, // xp is updated to the next guess
+        &xp, // xp is updated to the next guess
         im,
         cK, NULL, // FFT of PSF
         y, // Current guess
@@ -711,8 +712,15 @@ float * deconvolve_w(float * restrict im, const int M, const int N, const int P,
   fftwf_free(W); // is P1
   float * out = fim_subregion(x, wM, wN, wP, M, N, P);
   fftwf_free(f);
-  fftwf_free(x1);
-  fftwf_free(x2);
+  if(x != NULL)
+  {
+    fftwf_free(x); x = NULL;
+  }
+  if(xm != NULL)
+  {
+    fftwf_free(xm);
+    xm = NULL;
+  }
   fftwf_free(g);
   fftwf_free(gm);
   fftwf_free(cK);

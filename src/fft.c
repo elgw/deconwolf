@@ -334,6 +334,7 @@ void fft_train(const size_t M, const size_t N, const size_t P, const int verbosi
   { assert(0); } 
   else {
     fftwf_export_wisdom_to_filename(swf);
+    free(swf);
   }
 
   return;
