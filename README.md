@@ -6,6 +6,9 @@
  - highly parallelised so that it can use all the juice in your fancy multi-core computer.
  - extremely tiny: with an installation size of less than 0.1 MB it would fit most floppy drives (if you are fortunate enough to own one of those antiquities).
 
+
+Except for this readme there is also a [change log](CHANGELOG.MD) and a [to do list](TODO.MD).
+
 ## Usage:
 deconwolf has a simple command line interface and only need to know which image that you want to deconvolve and what PSF that should be used. For example, to deconvolve the image `dapi_001.tif` by the PSF in `PSF_dapi.tif`, just type:
 ```
@@ -81,12 +84,11 @@ make
 sudo make install
 ```
 
-
 ## Notes
  * FFTW is self tuning and will perform some tuning every time it presented for a new problem size. The result of this tuning is called wisdom and is stored in files like `fftw_wisdom_float_threads_16.dat` by deconwolf (in `~/config/deonwolf/`). Do not transfer that file to other machines and expect the tuning to take some time.
 
 
-## Resources
+## Resources and references
  * [fftw3 documentation](http://www.fftw.org/fftw3_doc/).
  * [libtiff repository](https://gitlab.com/libtiff/libtiff)
 
@@ -99,34 +101,3 @@ The algoritm is based on these papers:
 A&A 437, 369-374 (2005), [doi](https://doi.org/10.1051/0004-6361:20052717)
  * Lee, Ji-Yeon & Lee, Nam-Yong. (2014). Cause Analysis and Removal of Boundary Artifacts in Image Deconvolution. Journal of Korea Multimedia Society. 17. 838-848. [doi](https://doi.org/10.9717/kmms.2014.17.7.838).
 
-## Todo
- - [ ] Documentation, examples and test data.
- - [ ] A higher level interface with facilities for handling and generation of PSFs.
- - [ ] Flag to save one image after each iteration (to facilitate setting the number of iterations).
- - [ ] Demos, for example on the effect of the tiling.
- - [ ] Use tif tags to write meta data (also to transfer from input image).
- - [ ] Crash-safe writing of output images, write to temporary file and move when write is complete to avoid bad luck.
- - [ ] Highly parsable log file.
- - [ ] Proper logger.
- - [ ] Custom TIFF warning handle (not to overflow the console)
- - [ ] Include also `identity` and `Richardson-Lucy`
- - [x] Reduce memory by using the identity `f(-x) = ifft(conj(fft(x))`
- - [x] Break out the image processing functions to separate library.
- - [x] Protect better against misuse.
- - [x] Support even-sized PSFs (kind of hack, solution by resizing)
- - [x] Check that it works on osx
- - [x] Cross-platform build-tool (meson).
- - [x] Possible to change the prefix with the `--prefix` flag.
- - [x] Refuse to run if output file already exist (unless `--overwrite`) with status `0`.
- - [x] Crop PSF also in x and y (individual crop per tile as well).
- - [x] Faster calculation of tiling weights.
- - [x] Report peak memory usage to log file.
- - [x] Automatic cropping of the PSF if it has too many stacks.
- - [x] Block mode for low memory systems, accessible through the options `--tilesize` and `--tilepad`
- - [x] Eliminate one or two arrays in the main loop to save memory.
- - [x] Use some kind of logging
- - [x] Argument parsing 
- - [x] Proper automatic name on output file.
- - [x] Make use of symmetries to save memory?
- - [x] Save FFTW wisdom (saved to `./config/deconwolf/`)
- - [x] Identical results to matlab code.
