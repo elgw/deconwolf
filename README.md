@@ -7,7 +7,7 @@
  - extremely tiny: with an installation size of less than 0.1 MB it would fit most floppy drives (if you are fortunate enough to own one of those antiquities).
 
 
-Except for this readme there is also a [change log](CHANGELOG.MD) and a [to do list](TODO.MD).
+Except for this readme there is also a [change log](CHANGELOG.md) and a [to do list](TODO.md).
 
 ## Usage:
 deconwolf has a simple command line interface and only need to know which image that you want to deconvolve and what PSF that should be used. For example, to deconvolve the image `dapi_001.tif` by the PSF in `PSF_dapi.tif`, just type:
@@ -32,7 +32,7 @@ the output can be run directly with `| bash` or piped to a file and executed lat
 ### Test data
 
 ### Memory considerations
-Memory consumption is somewhere between 60 and 70 B per voxel, and drops when tiling is enabled. (Some data: 26169630 voxels, VmPeak 1700132 kB gives 65 B per voxel. 339982580 voxels and VmPeak 19498732 gives 58 B per voxel.
+The peak memory usage is written at the end of the log file.
 
 ### PSF
 PSFs can be generate from ImageJ with a [plugin](http://bigwww.epfl.ch/algorithms/psfgenerator/). If the image has N slices, it is recommended that the PSF has 2xN-1 slices. Unfortunately that will require a lot of memory and processing out of your machine. If the PSF is larger than needed it will be cropped automagically.
