@@ -384,7 +384,9 @@ float getErrorX(const float * restrict y, const float * restrict g, const int M,
   return (float) e;
 }
 
-float getError(const float * restrict y, const float * restrict g, const int M, const int N, const int P, const int wM, const int wN, const int wP)
+float getError(const float * restrict y, const float * restrict g, 
+    const int M, const int N, const int P, 
+    const int wM, const int wN, const int wP)
 {
   double e = 0;
   for(int c = 0; c<P; c++)
@@ -423,41 +425,52 @@ float getError_ref(float * y, float * g, int M, int N, int P, int wM, int wN, in
 }
 
 
-float iter(float * xp, // Output, f_(t+1)
+float iter(
+    float * xp, // Output, f_(t+1)
+    const float * restrict im, // Input image
     fftwf_complex * restrict cK, // fft(psf)
     fftwf_complex * restrict cKr, // = NULL
     float * restrict f, // Current guess
     float * restrict W, // Weights
-    float * restrict G, // expanded input image
     const int wM, const int wN, const int wP, // expanded size
     const int M, const int N, const int P, // input image size
     const dw_opts * s)
 {
+  // We could reduce memory even further by using 
+  // the allocation for xp
   const size_t wMNP = wM*wN*wP;
 
   fftwf_complex * F = fft(f, wM, wN, wP);
+  float * y = fft_convolve_cc_f2(cK, F, wM, wN, wP); // F is freed
+  float error = getError(y, im, M, N, P, wM, wN, wP);
 
-  float * y = fft_convolve_cc_f2(cK, F, wM, wN, wP);
-
-  float error = getErrorX(y, G, M, N, P, wM, wN, wP);
-
-  for(size_t kk = 0; kk<wMNP; kk++)
-  {
-    y[kk] < 1e-6 ? y[kk] = 1e-6 : 0;
-    y[kk] = G[kk]/y[kk];
+  for(int cc =0; cc<wP; cc++){
+    for(int bb = 0; bb<wN; bb++){
+      for(int aa = 0; aa<wM; aa++){
+        size_t yidx = aa + bb*wM + cc*wM*wN;
+        size_t imidx = aa + bb*M + cc*M*N;
+        if(aa<M && bb<N && cc<P)
+        {
+          y[yidx] < 1e-6 ? y[yidx] = 1e-6 : 0;
+          y[yidx]=im[imidx]/y[yidx];
+        } else {
+          y[yidx]=0;
+        }
+      }
+    }
   }
-  
+
   fftwf_complex * F_sn = fft(y, wM, wN, wP); 
   fftwf_free(y);
 
-  //  float * x = fft_convolve_cc(cKr, F_sn, wM, wN, wP); // xp could be used for x
-float * x = fft_convolve_cc_conj_f2(cK, F_sn, wM, wN, wP); 
+  float * x = fft_convolve_cc_conj_f2(cK, F_sn, wM, wN, wP); 
 
   for(size_t kk = 0; kk<wMNP; kk++)
   {
     xp[kk] = f[kk]*x[kk]*W[kk];
   }
   fftwf_free(x);
+//  xp[0] = x;
   return error;
 }
 
@@ -612,9 +625,9 @@ float * deconvolve_w(float * restrict im, const int M, const int N, const int P,
   //writetif("W.tif", W, wM, wN, wP);
 
   // Original image -- expanded
-  float * G = fftwf_malloc(wMNP*sizeof(float));
-  memset(G, 0, wMNP*sizeof(float));
-  fim_insert(G, wM, wN, wP, im, M, N, P);
+  //  float * G = fftwf_malloc(wMNP*sizeof(float));
+  // memset(G, 0, wMNP*sizeof(float));
+  // fim_insert(G, wM, wN, wP, im, M, N, P);
   //  writetif("G.tif", G, wM, wN, wP);
 
   if(s->method == DW_METHOD_RL)
@@ -625,7 +638,6 @@ float * deconvolve_w(float * restrict im, const int M, const int N, const int P,
   }
 
   float sumg = fim_sum(im, M*N*P);
-  fftwf_free(im);
 
   float alpha = 0;
   float * f = fim_constant(wMNP, sumg/wMNP);
@@ -660,14 +672,16 @@ float * deconvolve_w(float * restrict im, const int M, const int N, const int P,
     }
 
     xp = xm;
-    double err = iter(xp, // xp is updated to the next Guess
-        cK, cKr, // FFT of PSF
+    double err = iter(
+        xp, // xp is updated to the next guess
+        im,
+        cK, NULL, // FFT of PSF
         y, // Current guess
         W, // Weights (to handle boundaries)
-        G, // expanded original image
         wM, wN, wP, // Expanded size
         M, N, P, // Original size
         s);
+
     if(s->verbosity > 0){
       if(s->verbosity> 1 || it+1 == nIter) {
         {printf("Iteration %d/%d, error=%e\n", it+1, nIter, err);}
@@ -695,7 +709,6 @@ float * deconvolve_w(float * restrict im, const int M, const int N, const int P,
   }
 
   fftwf_free(W); // is P1
-  fftwf_free(G);
   float * out = fim_subregion(x, wM, wN, wP, M, N, P);
   fftwf_free(f);
   fftwf_free(x1);
@@ -834,11 +847,10 @@ float * deconvolve_tiles(float * restrict im, int M, int N, int P,
         tileM, tileN, tileP, s);
 
     fim_normalize_max1(tpsf, tpM, tpN, tpP);
-    // Note: deconvolve_w will free it's first argument
     float * dw_im_tile = deconvolve_w(im_tile, tileM, tileN, tileP, // input image and size
         tpsf, tpM, tpN, tpP, // psf and size
         s);
-
+    free(im_tile);
     tiling_put_tile(T, tt, V, dw_im_tile);
     free(dw_im_tile);
     free(tpsf);
@@ -1077,7 +1089,7 @@ int dw_run(dw_opts * s)
     fprintf(s->log, "Relaxing the PSF by %f\n", s->relax);
     if(s->verbosity > 0)
     {    
-    printf("Relaxing the PSF\n");
+      printf("Relaxing the PSF\n");
     }
     size_t mid = (pM-1)/2 + (pN-1)/2*pM + (pP-1)/2*pM*pN;
     psf[mid] *= s->relax;
@@ -1090,16 +1102,15 @@ int dw_run(dw_opts * s)
   {
 
     fim_normalize_max1(psf, pM, pN, pP);
-    // Will free im
     out = deconvolve_w(im, M, N, P, // input image and size
         psf, pM, pN, pP, // psf and size
         s);// settings
   } else {
-    // Will free im
     out = deconvolve_tiles(im, M, N, P, // input image and size
         psf, pM, pN, pP, // psf and size
         s);// settings
   }
+  fftwf_free(im);
   // floatimage_show_stats(out, M, N, P);
   int exitstatus = 1;
   if(out == NULL)

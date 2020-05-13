@@ -61,12 +61,12 @@ float fim_sum(const float * restrict A, size_t N)
   return (float) sum;
 }
 
-float fim_mean(float * A, size_t N)
+float fim_mean(const float * A, size_t N)
 {
   return fim_sum(A, N)/(float) N;
 }
 
-float fim_min(float * A, size_t N)
+float fim_min(const float * A, size_t N)
 {
   float amin = INFINITY;
   for(size_t kk = 0; kk<N; kk++)
@@ -90,7 +90,7 @@ void fim_minus(float * restrict  A,
   return;
 }
 
-float fim_max(float * A, size_t N)
+float fim_max(const float * A, size_t N)
 {
   float amax = -INFINITY;
   for(size_t kk = 0; kk<N; kk++)
@@ -102,7 +102,7 @@ float fim_max(float * A, size_t N)
 }
 
 
-void fim_stats(float * A, size_t N)
+void fim_stats(const float * A, const size_t N)
 {
   printf("min: %f mean: %f, max: %f\n",
       fim_min(A, N),

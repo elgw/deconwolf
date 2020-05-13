@@ -27,9 +27,9 @@
  * */
 
 
-float fim_min(float * A, size_t N);
-float fim_mean(float * A, size_t N);
-float fim_max(float * A, size_t N);
+float fim_min(const float * A, size_t N);
+float fim_mean(const float * A, size_t N);
+float fim_max(const float * A, size_t N);
 float fim_sum(const float * restrict A, size_t N);
 void fim_minus(float * restrict  A, 
     const float * restrict B, 
@@ -44,7 +44,7 @@ int fim_maxAtOrigo(const float * restrict V, const int M, const int N, const int
    * Returns 0 if any of the image dimensions are even
    */
 
-void fim_stats(float * A, size_t N);
+void fim_stats(const float * A, size_t N);
 // Print some info about A to stdout
 
 void fim_flipall(float * restrict T, const float * restrict A, const int a1, const int a2, const int a3);
