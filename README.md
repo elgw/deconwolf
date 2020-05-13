@@ -1,20 +1,19 @@
 # deconwolf
 
-`deconwolf` is a program for deconvolution of fluorescent wide-field image stacks, the highlights are:
- - almost no most boundary effects compared to ordinary linear deconvolution due to clever algorithm.
- - optional low RAM usage at the cost of slightly longer computation times which makes it possible to use low-cost hardware.
- - highly parallelised so that it can use all the juice in your fancy multi-core computer.
- - extremely tiny: with an installation size of less than 0.1 MB it would fit most floppy drives (if you are fortunate enough to own one of those antiquities).
+`deconwolf` is a program for deconvolution of fluorescent wide-field image stacks:
+ - The deconvolved images shows very mild boundary effects which means that you can crop and deconvolve small regions of interest.
+ - RAM usage can be reduced at the cost of slightly longer computation times by tiling. That makes it possible to deconvolve large images on small machines.
+ - It can make use of all precious cores of your "big" machine since the critical parts run on separate threads (as many as you would like).
+ - Deconwolf is tiny! The installation size of less than 0.1 MB it would fit most floppy drives (if you are fortunate enough to own one of those antiquities).
 
-
-Except for this readme there is also a [change log](CHANGELOG.md) and a [to do list](TODO.md).
+Except for this README there is also a [CHANGELOG](CHANGELOG.md) and a [TODO](TODO.md) list.
 
 ## Usage:
 deconwolf has a simple command line interface and only need to know which image that you want to deconvolve and what PSF that should be used. For example, to deconvolve the image `dapi_001.tif` by the PSF in `PSF_dapi.tif`, just type:
 ```
 deconwolf dapi_001.tif PSF_dapi.tif
 ```
-which will produce a new image called `dcw_dapi_001.tif` along with a log file called `dcw_dapi_001.tif.log.txt`. For the other options, see
+which will produce a new image called `dw_dapi_001.tif` along with a log file called `dw_dapi_001.tif.log.txt`. For the other options, see
 ```
 deonwolf --help
 ```
@@ -30,6 +29,7 @@ deconwolf --iter 50 --tilesize 512 iMERULA91_20200125_001/dapi_013.tif ../PSF/PS
 the output can be run directly with `| bash` or piped to a file and executed later (possibly using `parallel`). Since deconwolf does not overwrite output files such list of jobs to be run can be aborted and restarted.
 
 ### Test data
+No special test data has been prepared, but you can get some images from the [DeconvolutionLab2](http://bigwww.epfl.ch/deconvolution/deconvolutionlab2/) web page.
 
 ### Memory considerations
 The peak memory usage is written at the end of the log file.
@@ -44,7 +44,7 @@ Currently deconwolf does only support tif images, specifically: multipage, 16-bi
 The reported error is the mean square error between the input image and the current guess convolved with the PSF.
 
 ## Building and installing
-deconwolf requires `fftw3f`, `fftw3f_threads` and `tiff-5` and can be built with [meson](https://mesonbuild.com/). 
+deconwolf requires `fftw3f`, `fftw3f_threads` and `tiff-5` it can be built with [meson](https://mesonbuild.com/) or GNU make on Linux and macOS.
 
 Typical installation procedure:
 ```
@@ -55,6 +55,12 @@ ninja
 sudo ninja install
 # if you for some reason don't want it anymore, use
 # sudo ninja uninstall
+```
+
+Alternatively:
+```
+make -B
+# the binary ends up in bin/
 ```
 
 On OSX, if you have [homebrew](https://brew.sh/), then you can install meson with
@@ -75,7 +81,7 @@ sudo apt-get install libfftw3-dev
 sudo apt-get install meson
 ```
 
-If you need to build fftw3 from source, that was not too tricky:
+If you need/want to build fftw3 from source, that was not too tricky:
 ```
 # download source first ...
 ./configure --help
