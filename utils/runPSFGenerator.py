@@ -97,12 +97,12 @@ ss = {'run' : 1, # set to 0 for dry run
            'method': "BW"}
 
 # Per channel we only change the wavelength
-channels = {'ir800': 810,
+channels = {'a594': 590,
+            'ir800': 810,
             'a700':700,
             'a488': 488,
             'Cy5': 695,
             'tmr': 542,
-            'a594': 490,
             'dapi': 432}
 
 ss['outfolder'] = 'PSF/'
@@ -122,6 +122,15 @@ except FileExistsError:
     print(f"{ss['outfolder']} did already exist")
     # ok, if folded did exist
 
+with open(f"{ss['outfolder']}PSF_README.txt", "w") as ofile:
+    ofile.write("> PSFs generated from runPSFGenerator.py\n")
+    ofile.write("> Generating PSFs using the following settings:\n")
+    for s, v in ss.items():
+        ofile.write(f"{s}={v}\n")
+
+    print("> Channels and wavelengths\n")
+    for cc, lam in channels.items():
+        ofile.write(f"channel: {cc} lambda: {lam}\n")
 
 
 for cc, lam in channels.items():

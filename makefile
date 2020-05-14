@@ -2,6 +2,8 @@
 # make -B
 # To build with debug flags:
 # make DEBUG=1 -B
+# To use openMP:
+# make OMP=1 -B
 
 CC_VERSION = "$(shell gcc --version | head -n 1)"
 GIT_VERSION = "$(shell git log --pretty=format:'%aD:%H' -n 1)"
@@ -11,9 +13,14 @@ XFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
 
 DEBUG?=0
 ifeq ($(DEBUG),1)
-    CFLAGS =-Wall -g3 -DDEBUG
+    CFLAGS =-Wall -g3 -DDEBUG 
 else
-    CFLAGS=-Wall -DNDEBUG -O3 -flto -march=native
+    CFLAGS=-Wall -DNDEBUG -O3 -flto -march=native -ftree-vectorize
+endif
+
+OMP?=0
+ifeq ($(OMP), 1)
+  CFLAGS += -fopenmp
 endif
 
 CFLAGS += $(XFLAGS)

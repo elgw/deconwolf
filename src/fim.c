@@ -22,8 +22,10 @@
 #include <string.h>
 #include "fim.h"
 
+typedef float afloat __attribute__ ((__aligned__(16)));
 
-int fim_maxAtOrigo(const float * restrict V, const int M, const int N, const int P)
+
+int fim_maxAtOrigo(const afloat * restrict V, const int M, const int N, const int P)
   /* Check that the MAX of the fim is in the middle
    * returns 1 on success.
    * Returns 0 if any of the image dimensions are even
@@ -53,20 +55,21 @@ int fim_maxAtOrigo(const float * restrict V, const int M, const int N, const int
   return 1;
 }
 
-float fim_sum(const float * restrict A, size_t N)
+float fim_sum(const afloat * restrict A, size_t N)
 {
   double sum = 0;
+#pragma omp parallel for reduction(+:sum)
   for(size_t kk = 0; kk<N; kk++)
     sum+=(double) A[kk];
   return (float) sum;
 }
 
-float fim_mean(const float * A, size_t N)
+float fim_mean(const afloat * A, size_t N)
 {
   return fim_sum(A, N)/(float) N;
 }
 
-float fim_min(const float * A, size_t N)
+float fim_min(const afloat * A, size_t N)
 {
   float amin = INFINITY;
   for(size_t kk = 0; kk<N; kk++)
@@ -77,20 +80,23 @@ float fim_min(const float * A, size_t N)
   return amin;
 }
 
-void fim_minus(float * restrict  A, 
-    const float * restrict B, 
-    const float * restrict C, 
+void fim_minus(afloat * restrict  A, 
+    const afloat * restrict B, 
+    const afloat * restrict C, 
     const size_t N)
   // A = B - C
 {
-  for(size_t kk = 0; kk<N; kk++)
+  size_t kk = 0;
+
+#pragma omp parallel for
+  for(kk = 0; kk<N; kk++)
   {
     A[kk] = B[kk] - C[kk];
   }
   return;
 }
 
-float fim_max(const float * A, size_t N)
+float fim_max(const afloat * A, size_t N)
 {
   float amax = -INFINITY;
   for(size_t kk = 0; kk<N; kk++)
@@ -102,7 +108,7 @@ float fim_max(const float * A, size_t N)
 }
 
 
-void fim_stats(const float * A, const size_t N)
+void fim_stats(const afloat * A, const size_t N)
 {
   printf("min: %f mean: %f, max: %f\n",
       fim_min(A, N),
@@ -111,9 +117,9 @@ void fim_stats(const float * A, const size_t N)
   return;
 }
 
-float fim_mse(float * A, float * B, size_t N)
+float fim_mse(afloat * A, afloat * B, size_t N)
   /* mean( (A(:)-B(:)).^(1/2) )
-   */
+  */
 {
   double mse = 0;
   for(size_t kk = 0; kk<N; kk++)
@@ -123,7 +129,7 @@ float fim_mse(float * A, float * B, size_t N)
   return mse/N;
 }
 
-void fim_flipall(float * restrict T, const float * restrict A, const int a1, const int a2, const int a3)
+void fim_flipall(afloat * restrict T, const afloat * restrict A, const int a1, const int a2, const int a3)
   /* Equivalent to T = flip(flip(flip(A,1),2),3) in matlab */
 {
   for(int aa = 0; aa<a1; aa++){
@@ -139,8 +145,8 @@ void fim_flipall(float * restrict T, const float * restrict A, const int a1, con
 }
 
 
-void fim_insert(float * restrict T, const int t1, const int t2, const int t3, 
-    const float * restrict F, const int f1, const int f2, const int f3)
+void fim_insert(afloat * restrict T, const int t1, const int t2, const int t3, 
+    const afloat * restrict F, const int f1, const int f2, const int f3)
   /* Insert F [f1xf2xf3] into T [t1xt2xt3] in the "upper left" corner */
 {
   for(int pp = 0; pp<f3; pp++)
@@ -149,16 +155,15 @@ void fim_insert(float * restrict T, const int t1, const int t2, const int t3,
     {
       for(int mm = 0; mm<f1; mm++)
       {
-        float x = F[mm + nn*f1 + pp*f1*f2];
-        T[mm + nn*t1 + pp*t1*t2] = x;
+        T[mm + nn*t1 + pp*t1*t2] = F[mm + nn*f1 + pp*f1*f2];
       }
     }
   }
   return;
 }
 
-void fim_insert_ref(float * T, int t1, int t2, int t3, 
-    float * F, int f1, int f2, int f3)
+void fim_insert_ref(afloat * T, int t1, int t2, int t3, 
+    afloat * F, int f1, int f2, int f3)
   /* Insert F [f1xf2xf3] into T [t1xt2xt3] in the "upper left" corner */
 {
   for(int mm = 0; mm<f1; mm++)
@@ -167,7 +172,7 @@ void fim_insert_ref(float * T, int t1, int t2, int t3,
     {
       for(int pp = 0; pp<f3; pp++)
       {
-        float x = F[mm + nn*f1 + pp*f1*f2];
+        afloat x = F[mm + nn*f1 + pp*f1*f2];
         T[mm + nn*t1 + pp*t1*t2] = x;
       }
     }
@@ -176,7 +181,7 @@ void fim_insert_ref(float * T, int t1, int t2, int t3,
 }
 
 
-float * fim_get_cuboid(float * restrict A, const int M, const int N, const int P,
+afloat * fim_get_cuboid(afloat * restrict A, const int M, const int N, const int P,
     const int m0, const int m1, const int n0, const int n1, const int p0, const int p1)
 {
   /* Create a new array from V using [m0, m1]x[n0, n1]x[p0, p1] */
@@ -184,7 +189,7 @@ float * fim_get_cuboid(float * restrict A, const int M, const int N, const int P
   int n = n1-n0+1;
   int p = p1-p0+1;
 
-  float * C = fftwf_malloc(m*n*p*sizeof(float));
+  afloat * C = fftwf_malloc(m*n*p*sizeof(float));
   assert(C != NULL);
 
   for(int aa = m0; aa <= m1; aa++)
@@ -208,10 +213,10 @@ float * fim_get_cuboid(float * restrict A, const int M, const int N, const int P
   return C;
 }
 
-float * fim_subregion(float * restrict A, const int M, const int N, const int P, const int m, const int n, const int p)
+afloat * fim_subregion(afloat * restrict A, const int M, const int N, const int P, const int m, const int n, const int p)
 {
   /* Extract sub region starting at (0,0,0) */
-  float * S = fftwf_malloc(m*n*p*sizeof(float));
+  afloat * S = fftwf_malloc(m*n*p*sizeof(float));
   assert(S != NULL);
   for(int pp = 0; pp<p; pp++)
   {
@@ -230,9 +235,9 @@ float * fim_subregion(float * restrict A, const int M, const int N, const int P,
   return S;
 }
 
-float * fim_subregion_ref(float * A, int M, int N, int P, int m, int n, int p)
+afloat * fim_subregion_ref(afloat * A, int M, int N, int P, int m, int n, int p)
 {
-  float * S = fftwf_malloc(m*n*p*sizeof(float));
+  afloat * S = fftwf_malloc(m*n*p*sizeof(float));
   assert(S != NULL);
   for(int mm = 0; mm<m; mm++)
   {
@@ -251,7 +256,7 @@ float * fim_subregion_ref(float * A, int M, int N, int P, int m, int n, int p)
   return S;
 }
 
-void fim_normalize_max1(float * psf, int M, int N, int P)
+void fim_normalize_max1(afloat * psf, int M, int N, int P)
   /* 
    * MATLAB:
    * Y = X/max(X(:))
@@ -261,31 +266,31 @@ void fim_normalize_max1(float * psf, int M, int N, int P)
   double psf_sum = 0;
   for(size_t kk = 0; kk<pMNP; kk++)
   { psf_sum += psf[kk]; }
-//  printf("psf_sum: %f\n", psf_sum);
+  //  printf("psf_sum: %f\n", psf_sum);
   for(size_t kk = 0; kk<pMNP; kk++) 
   { psf[kk]/=psf_sum; }
 }
 
-float * fim_copy(const float * restrict V, const size_t N)
+afloat * fim_copy(const afloat * restrict V, const size_t N)
   // Return a newly allocated copy of V
 {
-  float * C = fftwf_malloc(N*sizeof(float));
+  afloat * C = fftwf_malloc(N*sizeof(float));
   memcpy(C, V, N*sizeof(float));
   return C;
 }
 
-float * fim_zeros(const size_t N)
+afloat * fim_zeros(const size_t N)
   // Allocate and return an array of N floats
 {
-  float * A = fftwf_malloc(N*sizeof(float));
+  afloat * A = fftwf_malloc(N*sizeof(float));
   memset(A, 0, N*sizeof(float));
   return A;
 }
 
-float * fim_constant(const size_t N, const float value)
+afloat * fim_constant(const size_t N, const float value)
   // Allocate and return an array of N floats sets to a constant value
 {
-  float * A = fftwf_malloc(N*sizeof(float));
+  afloat * A = fftwf_malloc(N*sizeof(float));
   for(size_t kk = 0; kk<N; kk++)
   {
     A[kk] = value;
@@ -293,46 +298,52 @@ float * fim_constant(const size_t N, const float value)
   return A;
 }
 
-void fim_circshift(float * restrict A, 
+void fim_circshift(afloat * restrict A, 
     const int M, const int N, const int P, 
     const int sm, const int sn, const int sp)
   /* Shift the image A [MxNxP] by sm, sn, sp in each dimension */
 {
 
   const size_t bsize = fmax(fmax(M, N), P);
-  float * restrict buf = malloc(bsize*sizeof(float));
-
-  // Dimension 1
-  for(int cc = 0; cc<P; cc++)
+#pragma omp parallel
   {
+    afloat * restrict buf = malloc(bsize*sizeof(float));
+
+    // Dimension 1
+#pragma omp for
+    for(int cc = 0; cc<P; cc++)
+    {
+      for(int bb = 0; bb<N; bb++)
+      {    
+        //shift_vector(A + bb*M + cc*M*N, 1, M, sm);
+        shift_vector_buf(A + bb*M + cc*M*N, 1, M, sm, buf);
+      }
+    }
+
+    // Dimension 2
+#pragma omp for
+    for(int cc = 0; cc<P; cc++)
+    {
+      for(int aa = 0; aa<M; aa++)
+      {    
+        //shift_vector(A + aa+cc*M*N, M, N, sn);
+        shift_vector_buf(A + aa+cc*M*N, M, N, sn, buf);
+      }
+    }
+
+    // Dimension 3
+#pragma omp for
     for(int bb = 0; bb<N; bb++)
-    {    
-      //shift_vector(A + bb*M + cc*M*N, 1, M, sm);
-      shift_vector_buf(A + bb*M + cc*M*N, 1, M, sm, buf);
+    {
+      for(int aa = 0; aa<M; aa++)
+      {  
+        //shift_vector(A + aa+bb*M, M*N, P, sp);
+        shift_vector_buf(A + aa+bb*M, M*N, P, sp, buf);
+      }
     }
-  }
 
-  // Dimension 2
-  for(int cc = 0; cc<P; cc++)
-  {
-    for(int aa = 0; aa<M; aa++)
-    {    
-      //shift_vector(A + aa+cc*M*N, M, N, sn);
-      shift_vector_buf(A + aa+cc*M*N, M, N, sn, buf);
-    }
+    free(buf);
   }
-
-  // Dimension 3
-  for(int bb = 0; bb<N; bb++)
-  {
-    for(int aa = 0; aa<M; aa++)
-    {  
-      //shift_vector(A + aa+bb*M, M*N, P, sp);
-      shift_vector_buf(A + aa+bb*M, M*N, P, sp, buf);
-    }
-  }
-
-  free(buf);
   return;
 }
 
@@ -343,10 +354,10 @@ INLINED static int mod_int(const int a, const int b)
   return r < 0 ? r + b : r;
 }
 
-void shift_vector_buf(float * restrict V, 
+void shift_vector_buf(afloat * restrict V, 
     const int S, 
     const int N,
-    int k, float * restrict buffer)
+    int k, afloat * restrict buffer)
   /* Circular shift of a vector of length N with stride S by step k */
 {
 
@@ -362,21 +373,21 @@ void shift_vector_buf(float * restrict V,
   return;
 }
 
-void shift_vector(float * restrict V, 
+void shift_vector(afloat * restrict V, 
     const int S, 
     const int N,
     const int k)
   /* Circular shift of a vector of length N with stride S by step k */
 {
 
-  float * buffer = malloc(N*sizeof(float));
+  afloat * buffer = malloc(N*sizeof(float));
   shift_vector_buf(V, S, N, k, buffer);
   free(buffer);
   return;
 }
 
 
-float * fim_expand(const float * restrict in, 
+afloat * fim_expand(const afloat * restrict in, 
     const int pM, const int pN, const int pP, 
     const int M, const int N, const int P)
   /* "expand an image" by making it larger 
@@ -388,7 +399,7 @@ float * fim_expand(const float * restrict in,
   assert(pN<=N);
   assert(pP<=P);
 
-  float * out = fftwf_malloc(M*N*P*sizeof(float));
+  afloat * out = fftwf_malloc(M*N*P*sizeof(float));
   assert(in != NULL);
   assert(out != NULL);
   for(size_t kk = 0; kk<M*N*P; kk++)
@@ -400,9 +411,9 @@ float * fim_expand(const float * restrict in,
 void fim_flipall_ut()
 {
 
-  float * a = malloc(3*3*3*sizeof(float));
-  float * b = malloc(3*3*3*sizeof(float));
-  float * c = malloc(3*3*3*sizeof(float));
+  float * a = fftwf_malloc(3*3*3*sizeof(float));
+  float * b = fftwf_malloc(3*3*3*sizeof(float));
+  float * c = fftwf_malloc(3*3*3*sizeof(float));
 
   for(int kk = 0; kk<27; kk++)
   {
@@ -443,7 +454,7 @@ void shift_vector_ut()
 {
   int N = 5;
   int S = 1; // stride
-  float * V = malloc(N*sizeof(float));
+  float * V = fftwf_malloc(N*sizeof(float));
 
   for(int k = -7; k<7; k++)
   {
@@ -461,7 +472,7 @@ void shift_vector_ut()
 
 void fim_ut()
 {
-fim_flipall_ut();
-shift_vector_ut();
+  fim_flipall_ut();
+  shift_vector_ut();
 
 }

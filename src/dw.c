@@ -27,11 +27,24 @@
 #include <stdlib.h>
 #include <libgen.h>
 #include <time.h>
+#ifdef _OPENMP // turned on with -fopenmp
+#include <omp.h>
+#endif 
 #include "fft.h"
 #include "dw.h"
 #include "tiling.h"
 #include "fim.h"
 #include "fim_tiff.h"
+
+
+#define tictoc struct timespec tictoc_start, tictoc_end;
+#define tic clock_gettime(CLOCK_REALTIME, &tictoc_start);
+#define toc(X) clock_gettime(CLOCK_REALTIME, &tictoc_end); printf(#X); printf(" %f s\n", timespec_diff(&tictoc_end, &tictoc_start));
+
+/* This is what fftw_malloc returns
+ * http://www.fftw.org/fftw3_doc/SIMD-alignment-and-fftw_005fmalloc.html#SIMD-alignment-and-fftw_005fmalloc
+*/
+typedef float afloat __attribute__ ((__aligned__(16)));
 
 dw_opts * dw_opts_new(void)
 {
@@ -111,6 +124,13 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
   fprintf(f, "\n");
 }
 
+static double timespec_diff(struct timespec* end, struct timespec * start)
+{
+  double elapsed = (end->tv_sec - start->tv_sec);
+  elapsed += (end->tv_nsec - start->tv_nsec) / 1000000000.0;
+  return elapsed;
+}
+
 int file_exist(char * fname)
 {
   if( access( fname, F_OK ) != -1 ) {
@@ -143,6 +163,9 @@ void dw_fprint_info(FILE * f)
     fprintf(f, "HOSTNAME: '%s'\n", hname); 
     free(hname);
   }
+#ifdef _OPENMP
+  fprintf(f, "OpenMP: YES\n");
+#endif
 
   fprintf(f, "\n");
   fflush(f);
@@ -368,11 +391,11 @@ float getErrorX(const float * restrict y, const float * restrict g, const int M,
   /* Same as getError with the difference that G is expanded to MxNxP */
   assert(wM>=M);
   double e = 0;
-  for(int c = 0; c<P; c++)
+  for(size_t c = 0; c<P; c++)
   {
-    for(int b = 0; b<N; b++)
+    for(size_t b = 0; b<N; b++)
     {
-      for(int a = 0; a<M; a++)
+      for(size_t a = 0; a<M; a++)
       {
         double yval = y[a + b*wM + c*wM*wN];
         double gval = g[a + b*wM + c*wM*wN];
@@ -384,11 +407,13 @@ float getErrorX(const float * restrict y, const float * restrict g, const int M,
   return (float) e;
 }
 
-float getError(const float * restrict y, const float * restrict g, 
+
+float getError(const afloat * restrict y, const afloat * restrict g, 
     const int M, const int N, const int P, 
     const int wM, const int wN, const int wP)
 {
   double e = 0;
+#pragma omp parallel for reduction(+: e)
   for(int c = 0; c<P; c++)
   {
     for(int b = 0; b<N; b++)
@@ -401,6 +426,7 @@ float getError(const float * restrict y, const float * restrict g,
       }
     }
   }
+
   e/=(M*N*P);
   return (float) e;
 }
@@ -426,12 +452,12 @@ float getError_ref(float * y, float * g, int M, int N, int P, int wM, int wN, in
 
 
 float iter(
-    float ** xp, // Output, f_(t+1)
+    afloat ** xp, // Output, f_(t+1)
     const float * restrict im, // Input image
     fftwf_complex * restrict cK, // fft(psf)
     fftwf_complex * restrict cKr, // = NULL
-    float * restrict f, // Current guess
-    float * restrict W, // Weights
+    afloat * restrict f, // Current guess
+    afloat * restrict W, // Weights
     const int wM, const int wN, const int wP, // expanded size
     const int M, const int N, const int P, // input image size
     const dw_opts * s)
@@ -441,12 +467,14 @@ float iter(
   const size_t wMNP = wM*wN*wP;
 
   fftwf_complex * F = fft(f, wM, wN, wP);
-  float * y = fft_convolve_cc_f2(cK, F, wM, wN, wP); // F is freed
+  afloat * y = fft_convolve_cc_f2(cK, F, wM, wN, wP); // F is freed
   float error = getError(y, im, M, N, P, wM, wN, wP);
 
-  for(int cc =0; cc<wP; cc++){
-    for(int bb = 0; bb<wN; bb++){
-      for(int aa = 0; aa<wM; aa++){
+
+#pragma omp parallel for
+  for(size_t cc =0; cc<wP; cc++){
+    for(size_t bb = 0; bb<wN; bb++){
+      for(size_t aa = 0; aa<wM; aa++){
         size_t yidx = aa + bb*wM + cc*wM*wN;
         size_t imidx = aa + bb*M + cc*M*N;
         if(aa<M && bb<N && cc<P)
@@ -463,12 +491,11 @@ float iter(
   fftwf_complex * F_sn = fft(y, wM, wN, wP); 
   fftwf_free(y);
 
-  float * x = fft_convolve_cc_conj_f2(cK, F_sn, wM, wN, wP); 
+  afloat * x = fft_convolve_cc_conj_f2(cK, F_sn, wM, wN, wP); 
 
-  for(size_t kk = 0; kk<wMNP; kk++)
-  {
-    x[kk] *= f[kk]*W[kk];
-  }
+#pragma omp parallel for
+  for(size_t cc = 0; cc<wMNP; cc++)
+  { x[cc] *= f[cc]*W[cc]; }
 
   xp[0] = x;
   return error;
@@ -485,8 +512,8 @@ fftwf_complex * initial_guess(const int M, const int N, const int P,
 
   assert(wM > M); assert(wN > N); assert(wP > P);
 
-  float * one = fim_zeros(wM*wN*wP);
-
+  afloat * one = fim_zeros(wM*wN*wP);
+#pragma omp parallel for
   for(int cc = 0; cc < P; cc++) {
     for(int bb = 0; bb < N; bb++) {
       for(int aa = 0; aa < M; aa++) {
@@ -527,23 +554,27 @@ void dw_usage(const int argc, char ** argv, const dw_opts * s)
 }
 
 
-float update_alpha(const float * restrict g, const float * restrict gm, const size_t wMNP)
+float update_alpha(const afloat * restrict g, const afloat * restrict gm, const size_t wMNP)
 {
   double ggm = 0;
   double gmgm = 0;
+
+#pragma omp parallel for reduction(+: ggm, gmgm)
   for(size_t kk = 0; kk<wMNP; kk++)
   {
     ggm += g[kk]*gm[kk];
     gmgm += pow(gm[kk], 2);
   }
+
   float alpha = ggm/(gmgm+1e-7);
   alpha < 0 ? alpha = 0 : 0;
   alpha > 1 ? alpha = 1 : 0;
+
   return alpha;
 }
 
-float * deconvolve_w(float * restrict im, const int M, const int N, const int P,
-    const float * restrict psf, const int pM, const int pN, const int pP,
+float * deconvolve_w(afloat * restrict im, const int M, const int N, const int P,
+    const afloat * restrict psf, const int pM, const int pN, const int pP,
     dw_opts * s)
 {
   if(s->verbosity > 0)
@@ -583,7 +614,7 @@ float * deconvolve_w(float * restrict im, const int M, const int N, const int P,
       s->verbosity, s->nThreads);
 
   // cK : "full size" fft of the PSF
-  float * Z = fftwf_malloc(wMNP*sizeof(float));
+  afloat * Z = fftwf_malloc(wMNP*sizeof(float));
   memset(Z, 0, wMNP*sizeof(float));
   fim_insert(Z, wM, wN, wP, psf, pM, pN, pP);
   fim_circshift(Z, wM, wN, wP, -(pM-1)/2, -(pN-1)/2, -(pP-1)/2);
@@ -610,18 +641,19 @@ float * deconvolve_w(float * restrict im, const int M, const int N, const int P,
 
   //printf("initial guess\n"); fflush(stdout);
   fftwf_complex * F_one = initial_guess(M, N, P, wM, wN, wP);
-  float * P1 = fft_convolve_cc_conj_f2(cK, F_one, wM, wN, wP); // can't replace this one with cK!
+  afloat * P1 = fft_convolve_cc_conj_f2(cK, F_one, wM, wN, wP); // can't replace this one with cK!
   //printf("P1\n");
   //fim_stats(P1, pM*pN*pP);
   //  writetif("P1.tif", P1, wM, wN, wP);
 
   float sigma = 0.001;
+#pragma omp parallel for 
   for(size_t kk = 0; kk<wMNP; kk++)
   {
     if(P1[kk] < sigma)
     { P1[kk] = 0; } else { P1[kk] = 1/P1[kk]; }
   }
-  float * W = P1;
+  afloat * W = P1;
   //writetif("W.tif", W, wM, wN, wP);
 
   // Original image -- expanded
@@ -636,28 +668,27 @@ float * deconvolve_w(float * restrict im, const int M, const int N, const int P,
     //   free(G);
     //   return x;
   }
-
   float sumg = fim_sum(im, M*N*P);
 
   float alpha = 0;
-  float * f = fim_constant(wMNP, sumg/wMNP);
-  float * y = fim_copy(f, wMNP);
+  afloat * f = fim_constant(wMNP, sumg/wMNP);
+  afloat * y = fim_copy(f, wMNP);
 
-  float * x1 = fim_copy(f, wMNP);
-  float * x2 = fim_copy(f, wMNP);
-  float * x = x1;
-  float * xp = x2;
-  float * xm = x2; // fim_copy(f, wMNP);
+  afloat * x1 = fim_copy(f, wMNP);
+  afloat * x2 = fim_copy(f, wMNP);
+  afloat * x = x1;
+  afloat * xp = x2;
+  afloat * xm = x2; // fim_copy(f, wMNP);
 
-  float * gm = fim_zeros(wMNP);
-  float * g = fim_zeros(wMNP);
+  afloat * gm = fim_zeros(wMNP);
+  afloat * g = fim_zeros(wMNP);
 
   int it = 0;
   while(it<nIter)
   {
 
     if(s->iterdump){
-      float * temp = fim_subregion(x, wM, wN, wP, M, N, P);
+      afloat * temp = fim_subregion(x, wM, wN, wP, M, N, P);
       char * tempname = malloc(100*sizeof(char));
       sprintf(tempname, "x_%03d.tif", it);
       printf("Writing current guess to %s\n", tempname);
@@ -665,6 +696,7 @@ float * deconvolve_w(float * restrict im, const int M, const int N, const int P,
       free(temp);
     }
 
+#pragma omp parallel for
     for(size_t kk = 0; kk<wMNP; kk++)
     { 
       y[kk] = x[kk] + alpha*(x[kk]-xm[kk]);
@@ -693,7 +725,7 @@ float * deconvolve_w(float * restrict im, const int M, const int N, const int P,
     if(s->log != NULL)
     { fprintf(s->log, "Iteration %d/%d, error=%e\n", it+1, nIter, err);}
 
-    float * swap = g;
+    afloat * swap = g;
     g = gm; gm = swap;
 
     fim_minus(g, xp, y, wMNP); // g = xp - y
@@ -710,7 +742,7 @@ float * deconvolve_w(float * restrict im, const int M, const int N, const int P,
   }
 
   fftwf_free(W); // is P1
-  float * out = fim_subregion(x, wM, wN, wP, M, N, P);
+  afloat * out = fim_subregion(x, wM, wN, wP, M, N, P);
   fftwf_free(f);
   if(x != NULL)
   {
@@ -869,16 +901,7 @@ float * deconvolve_tiles(float * restrict im, int M, int N, int P,
   return V;
 }
 
-static double timespec_diff(struct timespec* end, struct timespec * start)
-{
-  double elapsed = (end->tv_sec - start->tv_sec);
-  elapsed += (end->tv_nsec - start->tv_nsec) / 1000000000.0;
-  return elapsed;
-}
 
-#define tictoc struct timespec tictoc_start, tictoc_end;
-#define tic clock_gettime(CLOCK_REALTIME, &tictoc_start);
-#define toc(X) clock_gettime(CLOCK_REALTIME, &tictoc_end); printf(#X); printf(" %f s\n", timespec_diff(&tictoc_end, &tictoc_start));
 
 void timings()
 {
@@ -901,10 +924,14 @@ void timings()
     memset(V, 0, M*N*P*sizeof(float));
   toc(memset)
     memset(A, 0, M*N*P*sizeof(float));
-  for(int kk = 0; kk<M*N*P; kk++)
-  {
-    A[kk] = (float) rand()/(float) RAND_MAX;
-  }
+
+
+      tic
+      for(size_t kk = 0; kk<M*N*P; kk++)
+      {
+        A[kk] = (float) rand()/(float) RAND_MAX;
+      }
+    toc(rand)
 
   // ---
   tic
@@ -1105,6 +1132,10 @@ int dw_run(dw_opts * s)
   }
 
   myfftw_start(s->nThreads);
+#if OMP_H
+  omp_set_num_threads(s->nThreads);
+#endif
+
   float * out = NULL;
   if(s->tiling_maxSize < 0)
   {
