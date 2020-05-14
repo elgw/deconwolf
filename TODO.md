@@ -1,5 +1,5 @@
 # Todo
-
+ - [ ] Does gomp use more threads than it should?
  - [ ] Documentation, examples and test data.
  - [ ] A higher level interface with facilities for handling and generation of PSFs.
  - [ ] Flag to save one image after each iteration (to facilitate setting the number of iterations).

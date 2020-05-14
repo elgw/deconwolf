@@ -723,7 +723,7 @@ float * deconvolve_w(afloat * restrict im, const int M, const int N, const int P
     }
 
     if(s->log != NULL)
-    { fprintf(s->log, "Iteration %d/%d, error=%e\n", it+1, nIter, err);}
+    { fprintf(s->log, "Iteration %d/%d, error=%e\n", it+1, nIter, err); fflush(s->log); }
 
     afloat * swap = g;
     g = gm; gm = swap;
