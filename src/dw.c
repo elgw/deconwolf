@@ -1134,6 +1134,7 @@ int dw_run(dw_opts * s)
   myfftw_start(s->nThreads);
 #if OMP_H
   omp_set_num_threads(s->nThreads);
+  omp_set_dynamic(1);
 #endif
 
   float * out = NULL;

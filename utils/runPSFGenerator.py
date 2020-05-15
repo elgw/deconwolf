@@ -96,6 +96,7 @@ ss = {'run' : 1, # set to 0 for dry run
            'NXY' : 181,
            'method': "BW"}
 
+# hoechst has emission maxima at 461
 # Per channel we only change the wavelength
 channels = {'a594': 590,
             'ir800': 810,
