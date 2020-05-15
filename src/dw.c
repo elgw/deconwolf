@@ -280,13 +280,16 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     exit(0);
   }
 
-  s->imFile = realpath(argv[optind++], 0);
-  s->psfFile = realpath(argv[optind++], 0);
-
-  if(s->psfFile == NULL || s->imFile == NULL)
+  s->imFile = realpath(argv[optind], 0);
+  if(s->imFile == NULL)
   {
-    printf("realpath can't interpret the file names.\n");
-    assert(0);
+    printf("ERROR: Can't read %s\n", argv[optind]);
+    exit(1);
+  }
+  s->psfFile = realpath(argv[++optind], 0);
+  if(s->psfFile == NULL)
+  {
+    printf("ERROR: Can't read %s\n", argv[optind]);
     exit(1);
   }
 
@@ -1181,7 +1184,7 @@ int dw_run(dw_opts * s)
   }
 
 
-  if(s->verbosity > 0)
+  if(s->verbosity > 1)
   {
     printf("Finalizing\n"); fflush(stdout);
   }
@@ -1190,7 +1193,7 @@ int dw_run(dw_opts * s)
   myfftw_stop();
   if(s->verbosity > 1) fprint_peakMemory(NULL);
   clock_gettime(CLOCK_REALTIME, &tend);
-  fprintf(s->log, "Took %f s\n", timespec_diff(&tend, &tstart));
+  fprintf(s->log, "Took: %f s\n", timespec_diff(&tend, &tstart));
   dcw_close_log(s);
   dw_opts_free(&s);
 

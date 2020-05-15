@@ -115,7 +115,8 @@ channels = {'a594': 617,
             'tmr': 562,
             'dapi': 461}
 
-ss['outfolder'] = 'PSF_dyes/'
+ss['method'] = "RW"
+ss['outfolder'] = 'PSF_RW_dyes/'
 
 print("Generating PSFs using the following settings:")
 for s, v in ss.items():
@@ -147,7 +148,8 @@ for cc, lam in channels.items():
     print(f"channel: {cc} lambda: {lam}")
     cfname = f"{ss['outfolder']}config_{cc}.txt"
     config = getConfig(NA=ss['NA'], resxy=ss['resxy'], resz=ss['resz'],
-                       nIM=ss['nIM'], NZ=ss['NZ'], NXY=ss['NXY'], lam=lam);
+                       nIM=ss['nIM'], NZ=ss['NZ'], NXY=ss['NXY'],
+                       lam=lam, method=ss['method']);
     print(f"Writing config to {cfname}")
     with open(cfname, "w") as cf:
         cf.write(config)
