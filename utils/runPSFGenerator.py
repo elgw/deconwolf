@@ -96,8 +96,7 @@ ss = {'run' : 1, # set to 0 for dry run
            'NXY' : 181,
            'method': "BW"}
 
-# hoechst has emission maxima at 461
-# Per channel we only change the wavelength
+# Based on emission filters?
 channels = {'a594': 590,
             'ir800': 810,
             'a700':700,
@@ -105,8 +104,18 @@ channels = {'a594': 590,
             'Cy5': 695,
             'tmr': 542,
             'dapi': 432}
-
 ss['outfolder'] = 'PSF/'
+
+# Based on the dyes
+channels = {'a594': 617,
+            'ir800': 794, # or 814 if it is alexa790
+            'a700':723,
+            'a488': 519,
+            'Cy5': 664,
+            'tmr': 562,
+            'dapi': 461}
+
+ss['outfolder'] = 'PSF_dyes/'
 
 print("Generating PSFs using the following settings:")
 for s, v in ss.items():

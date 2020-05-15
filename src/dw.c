@@ -577,7 +577,7 @@ float * deconvolve_w(afloat * restrict im, const int M, const int N, const int P
     const afloat * restrict psf, const int pM, const int pN, const int pP,
     dw_opts * s)
 {
-  if(s->verbosity > 0)
+  if(s->verbosity > 1)
   {
     printf("Deconvolving\n");
   }
@@ -606,7 +606,7 @@ float * deconvolve_w(afloat * restrict im, const int M, const int N, const int P
   {
     printf("Estimated peak memory usage: %.1f GB\n", wMNP*65.0/1e9);
   }
-  fprintf(s->log, "\timage: [%dx%dx%d]\npsf: [%dx%dx%d]\njob: [%dx%dx%d] (%zu voxels)\n",
+  fprintf(s->log, "image: [%dx%dx%d]\npsf: [%dx%dx%d]\njob: [%dx%dx%d] (%zu voxels)\n",
       M, N, P, pM, pN, pP, wM, wN, wP, wMNP);
   fflush(s->log);
 
@@ -767,9 +767,9 @@ float * psf_autocrop(float * psf, int * pM, int * pN, int * pP,  // psf and size
     dw_opts * s)
 {
 
-  int m = pM[0];
-  int n = pN[0];
-  int p = pP[0];
+  const int m = pM[0];
+  const int n = pN[0];
+  const int p = pP[0];
 
   if((p % 2) == 0)
   {
@@ -822,9 +822,11 @@ float * psf_autocrop(float * psf, int * pM, int * pN, int * pP,  // psf and size
 
     if(s->verbosity > 0)
     {
-      fprintf(stdout, "The PSF was cropped to [%d x %d x %d]\n", pM[0], pN[0], pP[0]);
+      fprintf(stdout, "PSF crop [%d x %d x %d] -> [%d x %d x %d]\n", 
+          m, n, p, pM[0], pN[0], pP[0]);
     }
-    fprintf(s->log, "The PSF was cropped to [%d x %d x %d]\n", pM[0], pN[0], pP[0]);
+    fprintf(s->log, "PSF crop [%d x %d x %d] -> [%d x %d x %d]\n", 
+        m, n, p, pM[0], pN[0], pP[0]);
 
     return psf_cropped;
   } else {
@@ -1066,7 +1068,14 @@ int dw_run(dw_opts * s)
 
   dcw_init_log(s);
 
-  if(s->verbosity > 0) 
+
+#if _OPENMP
+  omp_set_num_threads(s->nThreads);
+  omp_set_dynamic(1);
+//  printf("omp_get_max_threads: %d\n", omp_get_max_threads());
+#endif
+
+  if(s->verbosity > 1) 
   {
     dw_opts_fprint(NULL, s); 
     printf("\n");
@@ -1132,10 +1141,6 @@ int dw_run(dw_opts * s)
   }
 
   myfftw_start(s->nThreads);
-#if OMP_H
-  omp_set_num_threads(s->nThreads);
-  omp_set_dynamic(1);
-#endif
 
   float * out = NULL;
   if(s->tiling_maxSize < 0)
