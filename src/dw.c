@@ -43,7 +43,7 @@
 
 /* This is what fftw_malloc returns
  * http://www.fftw.org/fftw3_doc/SIMD-alignment-and-fftw_005fmalloc.html#SIMD-alignment-and-fftw_005fmalloc
-*/
+ */
 typedef float afloat __attribute__ ((__aligned__(16)));
 
 dw_opts * dw_opts_new(void)
@@ -686,6 +686,11 @@ float * deconvolve_w(afloat * restrict im, const int M, const int N, const int P
   afloat * gm = fim_zeros(wMNP);
   afloat * g = fim_zeros(wMNP);
 
+  if(s->verbosity > 0)
+  {
+    printf("Iterating ..."); fflush(stdout);
+  }
+
   int it = 0;
   while(it<nIter)
   {
@@ -719,10 +724,8 @@ float * deconvolve_w(afloat * restrict im, const int M, const int N, const int P
         s);
 
     if(s->verbosity > 0){
-      if(s->verbosity> 1 || it+1 == nIter) {
-        {printf("Iteration %d/%d, error=%e\n", it+1, nIter, err);}
-      } else 
-        if(it % 5 == 0)  {printf("Iteration %d/%d, error=%e\n", it+1, nIter, err);}
+      printf("\rIteration %3d/%3d, error=%e", it+1, nIter, err);
+      fflush(stdout);
     }
 
     if(s->log != NULL)
@@ -742,6 +745,9 @@ float * deconvolve_w(afloat * restrict im, const int M, const int N, const int P
     xp = NULL;
 
     it++;
+  }
+  if(s->verbosity > 0) {
+    printf("\n");
   }
 
   fftwf_free(W); // is P1
@@ -931,15 +937,15 @@ void timings()
     memset(A, 0, M*N*P*sizeof(float));
 
 
-      tic
-      for(size_t kk = 0; kk<M*N*P; kk++)
-      {
-        A[kk] = (float) rand()/(float) RAND_MAX;
-      }
-    toc(rand)
-
-  // ---
   tic
+    for(size_t kk = 0; kk<M*N*P; kk++)
+    {
+      A[kk] = (float) rand()/(float) RAND_MAX;
+    }
+  toc(rand)
+
+    // ---
+    tic
     fftwf_plan p = fftwf_plan_dft_r2c_3d(P, N, M, 
         V, NULL, 
         FFTW_WISDOM_ONLY | FFTW_MEASURE);
@@ -1075,7 +1081,7 @@ int dw_run(dw_opts * s)
 #if _OPENMP
   omp_set_num_threads(s->nThreads);
   omp_set_dynamic(1);
-//  printf("omp_get_max_threads: %d\n", omp_get_max_threads());
+  //  printf("omp_get_max_threads: %d\n", omp_get_max_threads());
 #endif
 
   if(s->verbosity > 1) 

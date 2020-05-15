@@ -96,16 +96,6 @@ ss = {'run' : 1, # set to 0 for dry run
            'NXY' : 181,
            'method': "BW"}
 
-# Based on emission filters?
-channels = {'a594': 590,
-            'ir800': 810,
-            'a700':700,
-            'a488': 488,
-            'Cy5': 695,
-            'tmr': 542,
-            'dapi': 432}
-ss['outfolder'] = 'PSF/'
-
 # Based on the dyes
 channels = {'a594': 617,
             'ir800': 794, # or 814 if it is alexa790
@@ -115,8 +105,10 @@ channels = {'a594': 617,
             'tmr': 562,
             'dapi': 461}
 
-ss['method'] = "RW"
-ss['outfolder'] = 'PSF_RW_dyes/'
+ss['outfolder'] = 'PSF/'
+
+ss['NA'] = 1.44;
+ss['outfolder'] = 'PSF144/'
 
 print("Generating PSFs using the following settings:")
 for s, v in ss.items():
