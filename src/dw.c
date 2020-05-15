@@ -1140,6 +1140,11 @@ int dw_run(dw_opts * s)
     fim_normalize_max1(psf, pM, pN, pP);
   }
 
+  if(s->verbosity > 0)
+  {
+    printf("Output: %s(.log.txt)\n", s->outFile);
+  }
+
   myfftw_start(s->nThreads);
 
   float * out = NULL;
