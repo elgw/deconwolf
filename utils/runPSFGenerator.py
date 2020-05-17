@@ -107,8 +107,8 @@ channels = {'a594': 617,
 
 ss['outfolder'] = 'PSF/'
 
-ss['NA'] = 1.44;
-ss['outfolder'] = 'PSF144/'
+ss['NA'] = 1.40;
+ss['outfolder'] = 'PSF140/'
 
 print("Generating PSFs using the following settings:")
 for s, v in ss.items():

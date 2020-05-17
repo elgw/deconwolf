@@ -46,7 +46,7 @@ Currently deconwolf does only support tif images, specifically: multipage, 16-bi
 The reported error is the mean square error between the input image and the current guess convolved with the PSF.
 
 ## Building and installing
-deconwolf requires `fftw3f`, `fftw3f_threads` and `tiff-5` it can be built with [meson](https://mesonbuild.com/) or GNU make on Linux and macOS.
+deconwolf requires `fftw3f`, `fftw3f_threads` and `tiff-5` it can be built with [meson](https://mesonbuild.com/) or GNU make on Linux and macOS. Optionally OpenMP can be used to parallelise some parts of the program.
 
 Typical installation procedure:
 ```
@@ -61,8 +61,11 @@ sudo ninja install
 
 Alternatively:
 ```
-make -B
+# Normal optimized build
+make OMP=1 -B
 # the binary ends up in bin/
+# or debug build
+# make DEBUG=1 -B
 ```
 
 On OSX, if you have [homebrew](https://brew.sh/), then you can install meson with

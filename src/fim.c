@@ -256,7 +256,7 @@ afloat * fim_subregion_ref(afloat * A, int M, int N, int P, int m, int n, int p)
   return S;
 }
 
-void fim_normalize_max1(afloat * psf, int M, int N, int P)
+void fim_normalize_sum1(afloat * psf, int M, int N, int P)
   /* 
    * MATLAB:
    * Y = X/max(X(:))

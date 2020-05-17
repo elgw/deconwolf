@@ -65,6 +65,7 @@ dw_opts * dw_opts_new(void)
   s->method = DW_METHOD_W;
   s->iterdump = 0;
   s->relax = 0;
+  s->xycropfactor = 0.001;
   return s;
 }
 
@@ -117,6 +118,7 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
   } else {
     fprintf(f, "tiling: OFF\n");
   }
+  fprintf(f, "XY crop factor: %f\n", s->xycropfactor);
   if(s->relax > 0)
   {
     fprintf(f, "PSF relaxation: %f\n", s->relax);
@@ -200,6 +202,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     { "batch",        no_argument, NULL, 'b' },
     { "method",       required_argument, NULL,   'm' },
     { "relax",        required_argument, NULL,   'r' },
+    { "xyfactor",     required_argument, NULL,   'x' },
     { NULL,           0,                 NULL,   0   }
   };
 
@@ -263,6 +266,14 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         break;
       case 'r':
         s->relax = atof(optarg);
+        break;
+      case 'x':
+        s->xycropfactor = atof(optarg);
+        if(s->xycropfactor > 1 || s->xycropfactor < 0)
+        {
+          printf("The crop factor in x and y has to be => 0 and < 1\n");
+          exit(1);
+        }
         break;
     }
   }
@@ -492,7 +503,7 @@ float iter(
   }
 
   fftwf_complex * F_sn = fft(y, wM, wN, wP); 
-  fftwf_free(y);
+  fftwf_free(y); 
 
   afloat * x = fft_convolve_cc_conj_f2(cK, F_sn, wM, wN, wP); 
 
@@ -552,6 +563,7 @@ void dw_usage(const int argc, char ** argv, const dw_opts * s)
   printf(" --prefix str\n\t Set the prefix of the output files (default: '%s')\n", s->prefix);
   printf(" --overwrite\n\t Allows deconwolf to overwrite already existing output files\n");
   printf(" --relax F\n\t Multiply the central pixel of the PSF by F. (F>1 relaxation)\n");
+  printf(" --xyfactor F\n\t Discard outer planes of the PSF with sum < F of the central\n");
   //  printf(" --batch\n\t Generate a batch file to deconvolve all images in the `image_dir`\n");
   printf("\n");
 }
@@ -745,7 +757,8 @@ float * deconvolve_w(afloat * restrict im, const int M, const int N, const int P
     xp = NULL;
 
     it++;
-  }
+  } // End of main loop
+
   if(s->verbosity > 0) {
     printf("\n");
   }
@@ -771,7 +784,7 @@ float * deconvolve_w(afloat * restrict im, const int M, const int N, const int P
   return out;
 }
 
-float * psf_autocrop(float * psf, int * pM, int * pN, int * pP,  // psf and size
+float * psf_autocrop_byImage(float * psf, int * pM, int * pN, int * pP,  // psf and size
     int M, int N, int P, // image size
     dw_opts * s)
 {
@@ -843,6 +856,80 @@ float * psf_autocrop(float * psf, int * pM, int * pN, int * pP,  // psf and size
   }
 }
 
+float * psf_autocrop_XY(float * psf, int * pM, int * pN, int * pP,  // psf and size
+    int M, int N, int P, // image size
+    dw_opts * s)
+{
+
+  float maxsum = 0;
+  for(int xx = 0; xx<pM[0]; xx++)
+  {
+    float sum = 0;
+    for(int yy = 0; yy<pN[0]; yy++)
+    {
+      for(int zz = 0; zz<P; zz++)
+      {
+        sum += psf[xx + yy*pM[0] + zz*pM[0]*pN[0]];
+      }
+    }
+    sum > maxsum ? maxsum = sum : 0;
+  }
+
+  int first=0;
+  float sum = 0;
+
+while(sum < s->xycropfactor * maxsum)
+  {
+    sum = 0;
+    int xx = first;
+    for(int yy = 0; yy<pN[0]; yy++)
+    {
+      for(int zz = 0; zz<P; zz++)
+      {
+        sum += psf[xx + yy*pM[0] + zz*pM[0]*pN[0]];
+      }
+    }
+    first++;
+  }
+
+if(first == 0)
+{
+  if(s->verbosity > 1)
+  {
+    printf("PSF X-crop: Not cropping\n");
+  }
+  return psf;
+}
+
+float * p = fim_get_cuboid(psf, pM[0], pN[0], pP[0],
+    first, pM[0] - first -1, 
+    first, pN[0] - first -1, 
+    0, pP[0]-1);
+pM[0] -= 2*first;
+pN[0] -= 2*first;
+
+if(s->verbosity > 0)
+{
+printf("PSF X-crop: Removing %d planes in XY\n", first);
+}
+
+free(psf);
+return p;
+}
+
+float * psf_autocrop(float * psf, int * pM, int * pN, int * pP,  // psf and size
+    int M, int N, int P, // image size
+    dw_opts * s)
+{
+  float * p = psf;
+  // Crop the PSF if it is larger than necessary
+  p = psf_autocrop_byImage(p, pM, pN, pP, M, N, P, s);
+  // Crop the PSF by removing outer planes that has very little information
+  p = psf_autocrop_XY(p, pM, pN, pP, M, N, P, s);
+  assert(p != NULL);
+  return p;
+}
+
 
 float * deconvolve_tiles(float * restrict im, int M, int N, int P,
     const float * restrict psf, const int pM, const int pN, const int pP,
@@ -894,10 +981,13 @@ float * deconvolve_tiles(float * restrict im, int M, int N, int P,
     int tileN = T->tiles[tt]->xsize[1];
     int tileP = T->tiles[tt]->xsize[2];
 
+    fim_normalize_sum1(tpsf, tpM, tpN, tpP);
+
     tpsf = psf_autocrop(tpsf, &tpM, &tpN, &tpP, 
         tileM, tileN, tileP, s);
 
-    fim_normalize_max1(tpsf, tpM, tpN, tpP);
+    fim_normalize_sum1(tpsf, tpM, tpN, tpP);
+
     float * dw_im_tile = deconvolve_w(im_tile, tileM, tileN, tileP, // input image and size
         tpsf, tpM, tpN, tpP, // psf and size
         s);
@@ -1133,6 +1223,8 @@ int dw_run(dw_opts * s)
   psf = psf_makeOdd(psf, &pM, &pN, &pP);
 
   // Possibly the PSF will be cropped even more per tile later on
+  
+  fim_normalize_sum1(psf, pM, pN, pP);
   psf = psf_autocrop(psf, &pM, &pN, &pP, 
       M, N, P, s);
 
@@ -1146,7 +1238,7 @@ int dw_run(dw_opts * s)
     }
     size_t mid = (pM-1)/2 + (pN-1)/2*pM + (pP-1)/2*pM*pN;
     psf[mid] *= s->relax;
-    fim_normalize_max1(psf, pM, pN, pP);
+    fim_normalize_sum1(psf, pM, pN, pP);
   }
 
   if(s->verbosity > 0)
@@ -1160,7 +1252,7 @@ int dw_run(dw_opts * s)
   if(s->tiling_maxSize < 0)
   {
 
-    fim_normalize_max1(psf, pM, pN, pP);
+    fim_normalize_sum1(psf, pM, pN, pP);
     out = deconvolve_w(im, M, N, P, // input image and size
         psf, pM, pN, pP, // psf and size
         s);// settings
