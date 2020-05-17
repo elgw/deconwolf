@@ -75,7 +75,7 @@ float * fim_subregion(float * restrict A, const int M, const int N, const int P,
 
 float * fim_subregion_ref(float * A, int M, int N, int P, int m, int n, int p);
 
-void fim_normalize_max1(float * psf, int M, int N, int P);
+void fim_normalize_sum1(float * psf, int M, int N, int P);
 
 
 float * fim_copy(const float * restrict V, const size_t N);

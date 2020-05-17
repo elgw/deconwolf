@@ -30,9 +30,10 @@ if __name__ == '__main__':
         usage()
         sys.exit(1)
 
-    imd = sys.argv[1]
-    psd = sys.argv[2]
-    dcw = sys.argv[3]
+    imd = sys.argv[1] # image folder
+    psd = sys.argv[2] # psf folder
+    dcw = sys.argv[3] # common options to deconwolf
+
     images = glob.glob(imd + '*.tif')
 
     for im in images:

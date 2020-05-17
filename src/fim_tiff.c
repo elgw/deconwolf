@@ -21,6 +21,7 @@
 #include <math.h>
 #include <tiffio.h>
 #include <unistd.h>
+#include <fftw3.h>
 #include "fim_tiff.h"
 #include "fim.h"
 
@@ -31,6 +32,7 @@
  * RowsPerStrip tag. A reader should not assume that each decoded strip contains a full set of rows in it. 
  */
 
+typedef float afloat __attribute__ ((__aligned__(16)));
 
 void fim_tiff_ut()
 {
@@ -50,7 +52,7 @@ void fim_tiff_ut()
   //  printf("%s\n", fname);
   //  getchar();
   int M = 1024, N = 2048, P = 2;
-  float * im = fim_zeros(M*N*P);
+  afloat * im = fim_zeros(M*N*P);
 
   size_t pos1 = 1111;
   size_t pos2 = 2222;
@@ -63,7 +65,7 @@ void fim_tiff_ut()
   fim_tiff_write(fname, im, M, N, P);
 
   int M2 = 0, N2 = 0, P2 = 0;
-  float * im2 = fim_tiff_read(fname, &M2, &N2, &P2, 0);
+  afloat * im2 = fim_tiff_read(fname, &M2, &N2, &P2, 0);
   if(im2 == NULL)
   {
     printf("Could not read back the image\n");
@@ -94,7 +96,7 @@ void fim_tiff_ut()
 }
 
 
-void floatimage_normalize(float * restrict I, const size_t N)
+void floatimage_normalize(afloat * restrict I, const size_t N)
 {
   // Scale image to span the whole 16 bit range.
   float imax = 1e7; float imin = 1e7;
@@ -125,7 +127,7 @@ void floatimage_normalize(float * restrict I, const size_t N)
 
 }
 
-void floatimage_show_stats(float * I, size_t N, size_t M, size_t P)
+void floatimage_show_stats(afloat * I, size_t N, size_t M, size_t P)
 {
   float isum = 0;
   float imin = INFINITY;
@@ -139,7 +141,7 @@ void floatimage_show_stats(float * I, size_t N, size_t M, size_t P)
   printf("min: %f max: %f mean: %f\n", imin, imax, isum/(M*N*P));
 }
 
-void readUint8(TIFF * tfile, float * V, 
+void readUint8(TIFF * tfile, afloat * V, 
     const uint32_t ssize, 
     const uint32_t ndirs,
     const uint32_t nstrips,
@@ -167,7 +169,7 @@ void readUint8(TIFF * tfile, float * V,
   _TIFFfree(buf);
 }
 
-void readUint16(TIFF * tfile, float * V, 
+void readUint16(TIFF * tfile, afloat * V, 
     const uint32_t ssize, 
     const uint32_t ndirs,
     const uint32_t nstrips,
@@ -195,7 +197,7 @@ void readUint16(TIFF * tfile, float * V,
   _TIFFfree(buf);
 }
 
-void readFloat(TIFF * tfile, float * V,
+void readFloat(TIFF * tfile, afloat * V,
     uint32_t ssize, 
     uint32_t ndirs,
     uint32_t nstrips,
@@ -224,7 +226,7 @@ void readFloat(TIFF * tfile, float * V,
 }
 
 
-int fim_tiff_write(char * fName, float * V, 
+int fim_tiff_write(char * fName, afloat * V, 
     int N, int M, int P)
 {
   float imax = -INFINITY;
@@ -299,7 +301,7 @@ int fim_tiff_write(char * fName, float * V,
   return 0;
 }
 
-float * fim_tiff_read(char * fName, 
+afloat * fim_tiff_read(char * fName, 
     int * N0, int * M0, int * P0, int verbosity)
 {
   /* Reads the content of the tif file with fName
@@ -400,7 +402,7 @@ float * fim_tiff_read(char * fName,
 
   //  size_t nel = nstrips * ssize * ndirs; 
   size_t nel = M*N*ndirs;
-  float * V = malloc(nel*sizeof(float));
+  afloat * V = fftwf_malloc(nel*sizeof(float));
 
   if(isFloat)
   {
@@ -456,7 +458,7 @@ int main(int argc, char ** argv)
 
   size_t M = 0, N = 0, P = 0;
 
-  float * I = (float *) fim_tiff_read(inname, &M, &N, &P);
+  afloat * I = (afloat *) fim_tiff_read(inname, &M, &N, &P);
 
   if(I == NULL)
   {

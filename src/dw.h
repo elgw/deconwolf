@@ -35,7 +35,7 @@
 #include "fim.h"
 #include "fim_tiff.h"
 
-#define deconwolf_version "0.0.2"
+#define deconwolf_version "0.0.3"
 
 /* fftw3 wisdom data is stored and loaded from
  * $home/.config/ 
@@ -67,6 +67,7 @@ typedef struct{
   fftwf_plan ifft_plan;
   int iterdump; // Dump each iteration to file ... 
   float relax;
+  float xycropfactor; // discard outer slices that are less than this of the central one
 } dw_opts;
 
 dw_opts * dw_opts_new(void);
@@ -79,5 +80,14 @@ void dw_fprint_info(FILE * f);
 void dw_unittests();
 
 int  dw_run(dw_opts *);
+
+/* Autocrop the PSF by:
+ * 1/ Cropping if the size is larger than needed by the image.
+ * 2/ Optionally, trim the sides in x and y where the PSF vanishes.
+ */
+float * psf_autocrop(float * psf, int * pM, int * pN, int * pP,  // psf and size
+    int M, int N, int P, // image size
+    dw_opts * s);
+
 
 #endif

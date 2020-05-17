@@ -1,5 +1,11 @@
 # CHANGELOG
 
+### 2020-05-17 v0.0.3
+ * Further memory savings
+ * Everything in the main loop is parallelized with OpenMP
+ * Automatic cropping of redundant layers of the PSF, controlled by the `--xyfactor` setting.
+ * Less clutter in the output to the terminal.
+
 ### 2020-05-13 v0.0.2
  * Memory savings of about 20%
  * Refactorization
