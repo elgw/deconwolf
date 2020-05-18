@@ -784,6 +784,67 @@ float * deconvolve_w(afloat * restrict im, const int M, const int N, const int P
   return out;
 }
 
+float * psf_autocrop_centerZ(float * psf, int * pM, int * pN, int * pP,  // psf and size
+    dw_opts * s)
+{
+
+  const int m = pM[0];
+  const int n = pN[0];
+  const int p = pP[0];
+
+  const int midm = (m-1)/2;
+  const int midn = (n-1)/2;
+  const int midp = (p-1)/2;
+
+  float maxvalue = -INFINITY;
+  int maxp = -1;
+
+  for(int pp = 0; pp<p; pp++)
+  {
+    size_t idx = midm + midn*m + pp*m*n;
+    if(psf[idx] > maxvalue)
+    {
+      maxp = pp;
+      maxvalue = psf[idx];
+    }
+  }
+
+  if(maxp == midp)
+  {
+    if(s->verbosity > 2)
+    {
+      printf("PSF is Z-centered :)\n");
+    }
+    return psf;
+  }
+
+  int ndz = 0;
+
+  int m0 = 0, m1 = m-1;
+  int n0 = 0, n1 = n-1;
+  int p0 = maxp, p1 = maxp;
+
+  while(p0 > 1 && p1+2 < p)
+  {
+    p0--; p1++;
+  }
+  if(s->verbosity > 2)
+  {
+    printf("PSF has %d slices\n", p);
+    printf("brighest at plane %d\n", maxp);
+    printf("Selecting Z-planes: %d -- %d\n", p0, p1);
+  }
+
+  fprintf(s->log, "Selecting Z-planes %d -- %d\n", p0, p1);
+
+  float * psf_cropped = fim_get_cuboid(psf, m, n, p,
+      m0, m1, n0, n1, p0, p1);
+  free(psf);
+  pP[0] = p1-p0+1;
+  return psf_cropped;
+
+}
+
 float * psf_autocrop_byImage(float * psf, int * pM, int * pN, int * pP,  // psf and size
     int M, int N, int P, // image size
     dw_opts * s)
@@ -817,18 +878,18 @@ float * psf_autocrop_byImage(float * psf, int * pM, int * pN, int * pP,  // psf 
     int p0 = 0, p1 = p-1;
     if(m > mopt)
     {
-      m0 = (m-mopt)/2-1;
-      m1 = m1-(m-mopt)/2-1;
+      m0 = (m-mopt)/2;
+      m1 = m1-(m-mopt)/2;
     }
     if(n > nopt)
     {
-      n0 = (n-nopt)/2-1;
-      n1 = n1-(n-nopt)/2-1;
+      n0 = (n-nopt)/2;
+      n1 = n1-(n-nopt)/2;
     }
     if(p > popt)
     {
-      p0 = (p-popt)/2-1;
-      p1 = p1-(p-popt)/2-1;
+      p0 = (p-popt)/2;
+      p1 = p1-(p-popt)/2;
     }
     if(s->verbosity > 2)
     {
@@ -878,7 +939,7 @@ float * psf_autocrop_XY(float * psf, int * pM, int * pN, int * pP,  // psf and s
   int first=0;
   float sum = 0;
 
-while(sum < s->xycropfactor * maxsum)
+  while(sum < s->xycropfactor * maxsum)
   {
     sum = 0;
     int xx = first;
@@ -892,29 +953,29 @@ while(sum < s->xycropfactor * maxsum)
     first++;
   }
 
-if(first == 0)
-{
-  if(s->verbosity > 1)
+  if(first == 0)
   {
-    printf("PSF X-crop: Not cropping\n");
+    if(s->verbosity > 1)
+    {
+      printf("PSF X-crop: Not cropping\n");
+    }
+    return psf;
   }
-  return psf;
-}
 
-float * p = fim_get_cuboid(psf, pM[0], pN[0], pP[0],
-    first, pM[0] - first -1, 
-    first, pN[0] - first -1, 
-    0, pP[0]-1);
-pM[0] -= 2*first;
-pN[0] -= 2*first;
+  float * p = fim_get_cuboid(psf, pM[0], pN[0], pP[0],
+      first, pM[0] - first -1, 
+      first, pN[0] - first -1, 
+      0, pP[0]-1);
+  pM[0] -= 2*first;
+  pN[0] -= 2*first;
 
-if(s->verbosity > 0)
-{
-printf("PSF X-crop: Removing %d planes in XY\n", first);
-}
+  if(s->verbosity > 0)
+  {
+    printf("PSF X-crop: Removing %d planes in XY\n", first);
+  }
 
-free(psf);
-return p;
+  free(psf);
+  return p;
 }
 
 float * psf_autocrop(float * psf, int * pM, int * pN, int * pP,  // psf and size
@@ -922,6 +983,7 @@ float * psf_autocrop(float * psf, int * pM, int * pN, int * pP,  // psf and size
     dw_opts * s)
 {
   float * p = psf;
+  p = psf_autocrop_centerZ(p, pM, pN, pP, s);
   // Crop the PSF if it is larger than necessary
   p = psf_autocrop_byImage(p, pM, pN, pP, M, N, P, s);
   // Crop the PSF by removing outer planes that has very little information
@@ -1221,9 +1283,16 @@ int dw_run(dw_opts * s)
   }
 
   psf = psf_makeOdd(psf, &pM, &pN, &pP);
+  psf = psf_autocrop_centerZ(psf, &pM, &pN, &pP, s);
+
+  if(fim_maxAtOrigo(psf, pM, pN, pP) == 0)
+  {
+    printf("PSF is not centered!\n");
+    return NULL;
+  }
 
   // Possibly the PSF will be cropped even more per tile later on
-  
+
   fim_normalize_sum1(psf, pM, pN, pP);
   psf = psf_autocrop(psf, &pM, &pN, &pP, 
       M, N, P, s);
