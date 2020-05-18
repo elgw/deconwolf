@@ -3,15 +3,21 @@ import sys
 import glob
 
 def getConfig(NA=1.45, lam=780, method="BW", resz=200,
-              resxy=130.0, NZ = 181, NXY = 181, nIM=1.51):
+              resxy=130.0, NZ = 181, NXY = 181, nIM=1.51,
+              nSample=1.33,
+              wDist=150, # um
+              ppos=2000): # nm
     # NA: numerical aperture
     # lam: lambda (nm)
-    # method: RW or BW
+    # method: RW or BW (or GL)
     # resxy: lateral pixel size (nm)
     # resz: axial pixel size (nm)
     # NXY: Number of pixels in x and y
     # NZ: number of pixels in z
     # nIM: n for the immersion oil
+    # nSample only used for GL
+    # wDist only for GL -- working distance of the objective
+    # ppos only for GL -- particle position
 
     config = f"""
     #PSFGenerator
@@ -30,7 +36,7 @@ def getConfig(NA=1.45, lam=780, method="BW", resz=200,
     psf-Gaussian-defocus=100.0
     psf-BW-accuracy=Best
     psf-Cardinale-Sine-focus=0.0
-    psf-GL-ZPos=2000.0
+    psf-GL-ZPos={ppos}
     psf-Astigmatism-focus=0.0
     psf-Lorentz-focus=0.0
     psf-Koehler-dMid=3.0
@@ -50,13 +56,13 @@ def getConfig(NA=1.45, lam=780, method="BW", resz=200,
     psf-Cosine-defocus=100.0
     Scale=Linear
     psf-BW-NI={nIM}
-    psf-GL-NS=1.33
+    psf-GL-NS={nSample}
     Lambda={lam}
     PSF-shortname={method}
-    psf-GL-NI=1.5
+    psf-GL-NI={nIM}
     psf-Astigmatism-defocus=100.0
     ResAxial={resz}
-    psf-GL-TI=150.0
+    psf-GL-TI={wDist}
     psf-Double-Helix-axial=Linear
     LUT=Grays
     psf-VRIGL-RIvary=Linear
@@ -64,7 +70,7 @@ def getConfig(NA=1.45, lam=780, method="BW", resz=200,
     NZ={NZ}
     NY={NXY}
     NX={NXY}
-    psf-VRIGL-accuracy=Good
+    psf-VRIGL-accuracy=Best
     psf-Gaussian-axial=Linear
     psf-VRIGL-ZPos=2000.0
     psf-Gaussian-focus=0.0
@@ -81,20 +87,24 @@ def getConfig(NA=1.45, lam=780, method="BW", resz=200,
     psf-Cosine-axial=Linear
     psf-Cosine-focus=0.0
     psf-TV-NS=1.0
-    psf-GL-accuracy=Good
+    psf-GL-accuracy=Best
     psf-Defocus-DTop=30.0"""
     return config
 
 # Common settings
 ss = {'run' : 1, # set to 0 for dry run
-     'NA' : 1.45,
-           'resxy' : 130.0,
-           'resz' : 200,
-           'NA' : 1.45,
-           'nIM' : 1.51,
-           'NZ': 181,
-           'NXY' : 181,
-           'method': "BW"}
+      'NA' : 1.45,
+      'resxy' : 130.0,
+      'resz' : 200,
+      'NA' : 1.45,
+      'nIM' : 1.51,
+      'NZ': 181,
+      'NXY' : 181,
+      'method': "GL",
+      'oversample': 0,
+      'nSample' : 1.33,
+      'wDist': 130, # um
+      'ppos' : 2000}
 
 # Based on the dyes
 channels = {'a594': 617,
@@ -105,10 +115,16 @@ channels = {'a594': 617,
             'tmr': 562,
             'dapi': 461}
 
-ss['outfolder'] = 'PSF/'
+ss['outfolder'] = 'PSFGL/'
 
-ss['NA'] = 1.40;
-ss['outfolder'] = 'PSF140/'
+if ss['oversample'] > 1:
+    print("Warning: You have to bin the PSF afterwards!")
+    x = ss['oversample']
+    ss['NZ']=x*ss['NZ']
+    ss['NXY']=x*ss['NXY']
+    ss['resxy'] = ss['resxy']/x
+    ss['resz'] = ss['resz']/x
+    ss['outfolder'] = 'PSF3X/'
 
 print("Generating PSFs using the following settings:")
 for s, v in ss.items():
@@ -141,7 +157,9 @@ for cc, lam in channels.items():
     cfname = f"{ss['outfolder']}config_{cc}.txt"
     config = getConfig(NA=ss['NA'], resxy=ss['resxy'], resz=ss['resz'],
                        nIM=ss['nIM'], NZ=ss['NZ'], NXY=ss['NXY'],
-                       lam=lam, method=ss['method']);
+                       lam=lam, method=ss['method'],
+                       nSample=ss['nSample'], wDist=ss['wDist'],
+                       ppos=ss['ppos']);
     print(f"Writing config to {cfname}")
     with open(cfname, "w") as cf:
         cf.write(config)

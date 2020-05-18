@@ -43,14 +43,32 @@ int fim_maxAtOrigo(const afloat * restrict V, const int M, const int N, const in
   int mM = (M-1)/2;
   int mN = (N-1)/2;
   int mP = (P-1)/2;
+
   float maxV = 0;
-  for(size_t kk = 0; kk< M*N*P; kk++)
-  {
-    V[kk] > maxV ? maxV = V[kk] : 0;
+  int m = 0, n = 0, p = 0;
+
+  for(int pp = 0; pp < P; pp++) {
+    for(int nn = 0; nn < N; nn++) {
+      for(int mm = 0; mm < M; mm++) {
+        size_t idx = mm + nn*M + pp*M*N;
+        if(V[idx] > maxV)
+        {
+          maxV = V[idx];
+          m = mm; n = nn; p = pp;
+        }
+      }
+    }
   }
 
-  if(maxV < V[mM + mN*M + mP*M*N])
-  { return 0; }
+  float midValue = V[mM + mN*M + mP*M*N];
+
+
+  if(maxV > midValue)
+  { 
+    printf("max I(%d, %d, %d)=%f > mid I(%d, %d, %d)=%f\n", 
+        m, n, p, maxV, mM, mN, mP, midValue);
+    return 0; 
+  }
 
   return 1;
 }
