@@ -375,10 +375,26 @@ afloat * fim_tiff_read(char * fName,
   uint32_t B = 0;
   int gotB = TIFFGetField(tfile, TIFFTAG_IMAGEDEPTH, &B);
 
+  uint32_t PTAG;
+  int gotptag = TIFFGetField(tfile, TIFFTAG_PHOTOMETRIC, &PTAG);
+  int inverted = 0;
+  //printf("PTAG = %u\n", PTAG);
+  if(PTAG == 0)
+  {
+    inverted = 1;
+  }
+  if(PTAG > 1)
+  {
+    printf("Only WhiteIsZero or BlackIsZero are supported Photometric Interpretations\n");
+    return NULL;
+  }
+
+
   tmsize_t ssize = TIFFStripSize(tfile); // Seems to be in bytes
   uint32_t nstrips = TIFFNumberOfStrips(tfile);
   uint32_t ndirs = TIFFNumberOfDirectories(tfile);
   P0[0] = (size_t) ndirs;
+  size_t P = P0[0];
 
   if(verbosity > 1)
   {
@@ -429,6 +445,11 @@ afloat * fim_tiff_read(char * fName,
   }
 
   TIFFClose(tfile);
+
+  if(inverted == 1)
+  {
+    fim_invert(V, M*N*P);
+  }
 
   return V;
 }

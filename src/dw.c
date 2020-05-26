@@ -632,6 +632,11 @@ float * deconvolve_w(afloat * restrict im, const int M, const int N, const int P
     printf("Deconvolving\n");
   }
 
+if(s->nIter == 0)
+{  
+  return fim_copy(im, M*N*P);
+}
+
   /*Deconvolve im using psf */
   const int nIter = s->nIter;
 
@@ -1291,6 +1296,16 @@ int dw_run(dw_opts * s)
   }
   int M = 0, N = 0, P = 0;
   float * im = fim_tiff_read(s->imFile, &M, &N, &P, s->verbosity);
+  if(fim_min(im, M*N*P) < 0)
+  {
+    printf("min value of the image is %f, shifting to 0\n", fim_min(im, M*N*P));
+    fim_set_min_to_zero(im, M*N*P);
+    if(fim_max(im, M*N*P) < 1000)
+    {
+      fim_mult_scalar(im, M*N*P, 1000/fim_max(im, M*N*P));
+    }
+  }
+
   if(s->verbosity > 2)
   {
     printf("Image size: [%d x %d x %d]\n", M, N, P);
@@ -1359,7 +1374,7 @@ int dw_run(dw_opts * s)
   myfftw_start(s->nThreads);
 
   float * out = NULL;
-  if(s->tiling_maxSize < 0)
+  if(s->tiling_maxSize <= 0)
   {
 
     fim_normalize_sum1(psf, pM, pN, pP);

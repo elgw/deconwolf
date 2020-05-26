@@ -274,6 +274,23 @@ afloat * fim_subregion_ref(afloat * A, int M, int N, int P, int m, int n, int p)
   return S;
 }
 
+void fim_set_min_to_zero(afloat * I, size_t N)
+{
+  float min = fim_min(I, N);
+  for(size_t kk = 0; kk<N; kk++)
+  {
+    I[kk] -= min;
+  }
+}
+
+void fim_mult_scalar(afloat * I, size_t N, float x)
+{
+  for(size_t kk = 0; kk < N ; kk++)
+  {
+    I[kk]*=x;
+  }
+}
+
 void fim_normalize_sum1(afloat * psf, int M, int N, int P)
   /* 
    * MATLAB:
@@ -486,7 +503,14 @@ void shift_vector_ut()
   }
 }
 
-
+void fim_invert(float * restrict A, size_t N)
+{
+  for(size_t kk = 0; kk < N; kk++)
+  {
+    A[kk] = 1-A[kk];
+  }
+return;
+}
 
 void fim_ut()
 {
