@@ -141,9 +141,9 @@ void myfftw_stop(void)
 
 fftwf_complex * fft(afloat * restrict in, const int n1, const int n2, const int n3)
 {
-  int n3red = (n3+3)/2;
-  fftwf_complex * out = fftwf_malloc(n1*n2*n3red*sizeof(fftwf_complex));
-  memset(out, 0, n1*n2*n3red*sizeof(fftwf_complex));
+  size_t N = (n1+3)/2*n2*n3;
+  fftwf_complex * out = fftwf_malloc(N*sizeof(fftwf_complex));
+  memset(out, 0, N*sizeof(fftwf_complex));
 
   fftwf_plan p = fftwf_plan_dft_r2c_3d(n3, n2, n1, 
       in, // Float
@@ -159,8 +159,7 @@ void fft_mul(fftwf_complex * restrict C,
     fftwf_complex * restrict B, 
     const size_t n1, const size_t n2, const size_t n3)
 {
-  const int n3red = (n3+3)/2;
-  const size_t N = n1*n2*n3red;
+  size_t N = (n1+3)/2*n2*n3;
   // C = A*B
   for(size_t kk = 0; kk<N; kk++)
   {
@@ -182,8 +181,7 @@ void fft_mul_conj(fftwf_complex * restrict C,
    * All inputs should have the same size [n1 x n2 x n3]
    * */
 {
-  const int n3red = (n3+3)/2;
-  const size_t N = n1*n2*n3red;
+  size_t N = (n1+3)/2*n2*n3;
   // C = A*B
   size_t kk = 0;
 #pragma omp parallel for
@@ -200,8 +198,8 @@ void fft_mul_conj(fftwf_complex * restrict C,
 afloat * fft_convolve_cc_f2(fftwf_complex * A, fftwf_complex * B, 
     const int M, const int N, const int P)
 {
-  size_t n3red = (P+3)/2;
-  fftwf_complex * C = fftwf_malloc(M*N*n3red*sizeof(fftwf_complex));
+  size_t n = (M+3)/2*N*P;
+  fftwf_complex * C = fftwf_malloc(n*sizeof(fftwf_complex));
   fft_mul(C, A, B, M, N, P); 
   fftwf_free(B);
 
@@ -226,8 +224,9 @@ afloat * fft_convolve_cc_f2(fftwf_complex * A, fftwf_complex * B,
 afloat * fft_convolve_cc_conj_f2(fftwf_complex * A, fftwf_complex * B, 
     const int M, const int N, const int P)
 {
-  size_t n3red = (P+3)/2;
-  fftwf_complex * C = fftwf_malloc(M*N*n3red*sizeof(fftwf_complex));
+
+  size_t n = (M+3)/2*N*P;
+  fftwf_complex * C = fftwf_malloc(n*sizeof(fftwf_complex));
   fft_mul_conj(C, A, B, M, N, P); 
   fftwf_free(B);
 
@@ -252,8 +251,8 @@ afloat * fft_convolve_cc_conj_f2(fftwf_complex * A, fftwf_complex * B,
 afloat * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B, 
     const int M, const int N, const int P)
 {
-  size_t n3red = (P+3)/2;
-  fftwf_complex * C = fftwf_malloc(M*N*n3red*sizeof(fftwf_complex));
+  size_t n = (M+3)/2*N*P;
+  fftwf_complex * C = fftwf_malloc(n*sizeof(fftwf_complex));
   fft_mul(C, A, B, M, N, P); 
 
   afloat * out = fftwf_malloc(M*N*P*sizeof(float));
@@ -275,8 +274,8 @@ afloat * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B,
 afloat * fft_convolve_cc_conj(fftwf_complex * A, fftwf_complex * B, 
     const int M, const int N, const int P)
 {
-  size_t n3red = (P+3)/2;
-  fftwf_complex * C = fftwf_malloc(M*N*n3red*sizeof(fftwf_complex));
+   size_t n = (M+3)/2*N*P;
+  fftwf_complex * C = fftwf_malloc(n*sizeof(fftwf_complex));
   fft_mul_conj(C, A, B, M, N, P); 
 
   afloat * out = fftwf_malloc(M*N*P*sizeof(float));

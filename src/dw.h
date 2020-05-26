@@ -68,6 +68,7 @@ typedef struct{
   int iterdump; // Dump each iteration to file ... 
   float relax;
   float xycropfactor; // discard outer slices that are less than this of the central one
+  char * commandline;
 } dw_opts;
 
 dw_opts * dw_opts_new(void);
@@ -76,7 +77,7 @@ void dw_opts_fprint(FILE *f, dw_opts * s);
 void dw_opts_free(dw_opts ** sp);
 void dw_usage(const int argc, char ** argv, const dw_opts * );
 
-void dw_fprint_info(FILE * f);
+void dw_fprint_info(FILE * f, dw_opts * s);
 void dw_unittests();
 
 int  dw_run(dw_opts *);

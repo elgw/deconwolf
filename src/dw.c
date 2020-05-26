@@ -66,6 +66,7 @@ dw_opts * dw_opts_new(void)
   s->iterdump = 0;
   s->relax = 0;
   s->xycropfactor = 0.001;
+  s->commandline = NULL;
   return s;
 }
 
@@ -85,12 +86,14 @@ void dw_opts_free(dw_opts ** sp)
   nullfree(s->outFile);
   nullfree(s->logFile);
   nullfree(s->prefix);
+  nullfree(s->commandline);
   free(s);
 }
 
 void dw_opts_fprint(FILE *f, dw_opts * s)
 {
   f == NULL ? f = stdout : 0;
+
   fprintf(f, "> Settings:\n");
   fprintf(f, "image:  %s\n", s->imFile);
   fprintf(f, "psf:    %s\n", s->psfFile);
@@ -142,10 +145,20 @@ int file_exist(char * fname)
   }
 }
 
-void dw_fprint_info(FILE * f)
+void dw_fprint_info(FILE * f, dw_opts * s)
 {
   f == NULL ? f = stdout : 0;
   fprintf(f, "deconwolf: '%s' PID: %d\n", deconwolf_version, (int) getpid());
+   char cwd[1024];
+   if (getcwd(cwd, sizeof(cwd)) != NULL) {
+       fprintf(f, "PWD: %s\n", cwd);
+   } 
+
+  if(s->commandline != NULL)
+  {
+    fprintf(f, "CMD: %s\n", s->commandline);
+  }
+
 #ifdef GIT_VERSION
   fprintf(f, "GIT_VERSION: '%s'\n", GIT_VERSION);
 #endif
@@ -180,8 +193,30 @@ void deconwolf_batch(dw_opts * s)
   printf("Not implemented !\n");
 }
 
+static void getCmdLine(int argc, char ** argv, dw_opts * s)
+{
+  // Copy the command line to s->commandline
+ int lcmd=0;
+  for(int kk = 0; kk<argc; kk++)
+  {
+    lcmd += strlen(argv[kk]);
+  }
+  lcmd += argc+2;
+  s->commandline = malloc(lcmd);
+  int pos = 0;
+  for(int kk = 0; kk<argc; kk++)
+  {
+    sprintf(s->commandline+pos, "%s ", argv[kk]);
+    pos += strlen(argv[kk])+1;
+  }
+  s->commandline[pos-1] = '\0';
+//  printf("argc: %d cmd: '%s'\n", argc, s->commandline);
+}
+
 void dw_argparsing(int argc, char ** argv, dw_opts * s)
 {
+
+  getCmdLine(argc, argv, s);
 
   int generate_batch = 0;
 
@@ -211,7 +246,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
   {
     switch(ch) {
       case 'v':
-        dw_fprint_info(NULL);
+        dw_fprint_info(NULL, s);
         exit(0);
         break;
       case 'h':
@@ -524,7 +559,7 @@ fftwf_complex * initial_guess(const int M, const int N, const int P,
    * Possibly more stable to use the mean of the input image rather than 1
    */
 
-  assert(wM > M); assert(wN > N); assert(wP > P);
+  assert(wM >= M); assert(wN >= N); assert(wP >= P);
 
   afloat * one = fim_zeros(wM*wN*wP);
 #pragma omp parallel for
@@ -796,6 +831,9 @@ float * psf_autocrop_centerZ(float * psf, int * pM, int * pN, int * pP,  // psf 
   const int midn = (n-1)/2;
   const int midp = (p-1)/2;
 
+//  printf("m: %d, n:%d, p:%d\n", m, n, p);
+//  printf("midm: %d, midn: %d, midp: %d\n", midm, midn, midp);
+
   float maxvalue = -INFINITY;
   int maxp = -1;
 
@@ -818,7 +856,6 @@ float * psf_autocrop_centerZ(float * psf, int * pM, int * pN, int * pP,  // psf 
     return psf;
   }
 
-  int ndz = 0;
 
   int m0 = 0, m1 = m-1;
   int n0 = 0, n1 = n-1;
@@ -921,14 +958,14 @@ float * psf_autocrop_XY(float * psf, int * pM, int * pN, int * pP,  // psf and s
     int M, int N, int P, // image size
     dw_opts * s)
 {
-
+// Find the y-z plane with the largest sum
   float maxsum = 0;
   for(int xx = 0; xx<pM[0]; xx++)
   {
     float sum = 0;
     for(int yy = 0; yy<pN[0]; yy++)
     {
-      for(int zz = 0; zz<P; zz++)
+      for(int zz = 0; zz<pP[0]; zz++)
       {
         sum += psf[xx + yy*pM[0] + zz*pM[0]*pN[0]];
       }
@@ -936,21 +973,23 @@ float * psf_autocrop_XY(float * psf, int * pM, int * pN, int * pP,  // psf and s
     sum > maxsum ? maxsum = sum : 0;
   }
 
-  int first=0;
+//  printf("X maxsum %f\n", maxsum);
+
+  int first=-1;
   float sum = 0;
 
   while(sum < s->xycropfactor * maxsum)
   {
+    first++;
     sum = 0;
     int xx = first;
     for(int yy = 0; yy<pN[0]; yy++)
     {
-      for(int zz = 0; zz<P; zz++)
+      for(int zz = 0; zz<pP[0]; zz++)
       {
         sum += psf[xx + yy*pM[0] + zz*pM[0]*pN[0]];
       }
     }
-    first++;
   }
 
   if(first == 0)
@@ -984,10 +1023,13 @@ float * psf_autocrop(float * psf, int * pM, int * pN, int * pP,  // psf and size
 {
   float * p = psf;
   p = psf_autocrop_centerZ(p, pM, pN, pP, s);
+  assert(pM[0] > 0);
   // Crop the PSF if it is larger than necessary
   p = psf_autocrop_byImage(p, pM, pN, pP, M, N, P, s);
+  assert(pM[0] > 0);
   // Crop the PSF by removing outer planes that has very little information
   p = psf_autocrop_XY(p, pM, pN, pP, M, N, P, s);
+  assert(pM[0] > 0);
   assert(p != NULL);
   return p;
 }
@@ -1058,7 +1100,6 @@ float * deconvolve_tiles(float * restrict im, int M, int N, int P,
     free(dw_im_tile);
     free(tpsf);
   }
-  fftwf_free(im);
   tiling_free(T);
   free(T);
   return V;
@@ -1211,7 +1252,7 @@ void dcw_init_log(dw_opts * s)
   assert(s->log != NULL);
   show_time(s->log);
   dw_opts_fprint(s->log, s); 
-  dw_fprint_info(s->log);
+  dw_fprint_info(s->log, s);
 }
 
 void dcw_close_log(dw_opts * s)
@@ -1242,7 +1283,7 @@ int dw_run(dw_opts * s)
     printf("\n");
   }
 
-  s->verbosity > 1 ? dw_fprint_info(NULL) : 0;
+  s->verbosity > 1 ? dw_fprint_info(NULL, s) : 0;
 
   if(s->verbosity > 0)
   {
@@ -1260,7 +1301,7 @@ int dw_run(dw_opts * s)
     exit(1);
   }
 
-  // writetif("im.tif", im, M, N, P);
+ // fim_tiff_write("identity.tif", im, M, N, P);
 
   int pM = 0, pN = 0, pP = 0;
   float * psf = NULL;
@@ -1288,7 +1329,7 @@ int dw_run(dw_opts * s)
   if(fim_maxAtOrigo(psf, pM, pN, pP) == 0)
   {
     printf("PSF is not centered!\n");
-    return NULL;
+    return -1;
   }
 
   // Possibly the PSF will be cropped even more per tile later on

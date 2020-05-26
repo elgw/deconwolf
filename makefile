@@ -25,7 +25,7 @@ endif
 
 CFLAGS += $(XFLAGS)
 
-CC = gcc $(CFLAGS)
+CC = cc $(CFLAGS)
 
 EXECUTABLE = bin/deconwolf
 OBJECTS = fim.o tiling.o fft.o fim_tiff.o dw.o deconwolf.o
