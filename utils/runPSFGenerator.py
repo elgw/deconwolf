@@ -95,12 +95,12 @@ def getConfig(NA=1.45, lam=780, method="BW", resz=200,
 ss = {'run' : 1, # set to 0 for dry run
       'NA' : 1.45,
       'resxy' : 130.0,
-      'resz' : 200,
+      'resz' : 300,
       'NA' : 1.45,
       'nIM' : 1.51,
       'NZ': 181,
       'NXY' : 181,
-      'method': "GL",
+      'method': "BW",
       'oversample': 0,
       'nSample' : 1.33,
       'wDist': 130, # um
@@ -115,7 +115,7 @@ channels = {'a594': 617,
             'tmr': 562,
             'dapi': 461}
 
-ss['outfolder'] = 'PSFGL/'
+ss['outfolder'] = 'PSFBW03/'
 
 if ss['oversample'] > 1:
     print("Warning: You have to bin the PSF afterwards!")

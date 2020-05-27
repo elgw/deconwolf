@@ -1,0 +1,31 @@
+.\" Convert with groff:
+.\" groff -m man -T xhtml deconwolf.man1 > deconwolf_man.html
+
+.Dd May 27, 2020
+.Dt DECONWOLF 1
+.Sh NAME
+.Nm deconwolf
+.Nd Deconvolve wide-field microscopy images
+.Sh SYNOPSIS
+.Sy deconwolf
+.Op Fl Fl threads Ar nThreads
+.Op Fl Fl iter Ar nIterations
+.Op Fl Fl help
+.Op Fl Fl overwrite
+.Op Fl Fl test
+.Op Fl Fl version
+.Op Fl Fl out Ar outFile
+.Op Fl Fl verbose Ar verbosity
+.Op Fl Fl tilesize Ar tilesize
+.Op Fl Fl tilepad Ar tilepad
+.Op Fl Fl prefix Ar prefixStr
+.Op Fl Fl relax Ar relax_float
+.Op Fl Fl xyfactor Ar F
+.Ar image.tif
+.Ar psf.tif
+.Ys
+.Sh DESCRIPTION
+.Nm DECONWOLF 
+is used to deconvolve 3D stacks using a user-provided point spread function.
+.Sh EXAMPLES
+
