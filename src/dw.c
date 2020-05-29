@@ -805,6 +805,8 @@ if(s->nIter == 0)
 
   fftwf_free(W); // is P1
   afloat * out = fim_subregion(x, wM, wN, wP, M, N, P);
+//  printf("DEBUG: writing final_full_tif\n");  
+//  fim_tiff_write("final_full.tif", x, wM, wN, wP);
   fftwf_free(f);
   if(x != NULL)
   {
@@ -1272,7 +1274,6 @@ int dw_run(dw_opts * s)
 {
   struct timespec tstart, tend;
   clock_gettime(CLOCK_REALTIME, &tstart);
-
   dcw_init_log(s);
 
 
@@ -1292,6 +1293,20 @@ int dw_run(dw_opts * s)
 
   if(s->verbosity > 0)
   {
+
+    uint32_t a = 0, b =0, c = 0;
+    if(fim_tiff_get_size(s->imFile, &a, &b, &c))
+    {
+      printf("Failed to open %s\n", s->imFile);
+      return -1;
+    }
+
+    if(fim_tiff_get_size(s->psfFile, &a, &b, &c))
+    {
+      printf("Failed to open %s\n", s->imFile);
+      return -1;
+    }
+
     printf("Reading %s\n", s->imFile);
   }
   int M = 0, N = 0, P = 0;

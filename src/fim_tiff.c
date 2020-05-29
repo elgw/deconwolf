@@ -301,6 +301,29 @@ int fim_tiff_write(char * fName, afloat * V,
   return 0;
 }
 
+int fim_tiff_get_size(char * fname, uint32_t * M, uint32_t * N, uint32_t * P)
+{
+ TIFF * tiff = TIFFOpen(fname, "r");
+
+  if(tiff == NULL) {
+    return -1;
+  }
+  
+  int ok = 1;
+  ok *= TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &M);
+  ok *= TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &N);
+  if(ok != 1)
+  {
+    return -1;
+    TIFFClose(tiff);
+  }
+
+  P[0] = TIFFNumberOfDirectories(tiff);
+  TIFFClose(tiff);
+
+  return 0;
+}
+
 afloat * fim_tiff_read(char * fName, 
     int * N0, int * M0, int * P0, int verbosity)
 {

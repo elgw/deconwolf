@@ -37,4 +37,9 @@ float * fim_tiff_read(char * fName,
 
 void fim_tiff_ut();
 
+// Get the size of a tiff file (by name)
+// Returns 0 upon success.
+int fim_tiff_get_size(char * fname, 
+    uint32_t * M, uint32_t * N, uint32_t * P);
+
 #endif
