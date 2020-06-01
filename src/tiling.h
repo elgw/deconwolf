@@ -36,14 +36,25 @@ tiling * tiling_create(int M, int N, int P, int maxSize, int overlap);
 void tiling_show(tiling * T);
 void tiling_free(tiling * T);
 float tiling_getWeights(tiling * T, int m, int n, int p);
+
 /* Extract tile #t from V */
 float * tiling_get_tile(tiling * T, int t, const float * restrict V);
+
+/* Extract tile #t from tiff file */
+float * tiling_get_tile_tiff(tiling * T, int t, const char * fName);
+
+
 /* Put back data extracted by tiling_get_tile
  * S extracted data from tile t
  * V target image, dimensions given by T->M, N, P
  * */
 void tiling_put_tile(tiling * T, int t, float * V, float * S);
 
+/* Put back data extracted by tiling_get_tile
+ * S extracted data from tile t
+ * V target image, dimensions given by T->M, N, P
+ * */
+void tiling_put_tile_tiff(tiling * T, int t, const char * fName, float * S);
 
 tile * tile_create();
 void tile_free(tile *);
