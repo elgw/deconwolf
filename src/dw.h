@@ -35,7 +35,7 @@
 #include "fim.h"
 #include "fim_tiff.h"
 
-#define deconwolf_version "0.0.3"
+#define deconwolf_version "0.0.4"
 
 /* fftw3 wisdom data is stored and loaded from
  * $home/.config/ 
