@@ -25,7 +25,7 @@ endif
 
 CFLAGS += $(XFLAGS)
 
-CC = gcc $(CFLAGS)
+CC = cc $(CFLAGS)
 
 EXECUTABLE = bin/deconwolf
 OBJECTS = fim.o tiling.o fft.o fim_tiff.o dw.o deconwolf.o
@@ -42,3 +42,13 @@ $(EXECUTABLE): $(OBJECTS)
 
 clean:
 	rm -f $(EXECUTABLE) $(OBJECTS)
+
+install:
+	cp bin/deconwolf /usr/bin/
+	cp doc/deconwolf.1 .
+	gzip deconwolf.1
+	mv deconwolf.1.gz /usr/share/man/man1/
+
+uninstall:
+	rm /usr/bin/deconwolf
+	rm /usr/share/man/man1/deconwolf.1.gz

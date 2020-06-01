@@ -92,30 +92,46 @@ def getConfig(NA=1.45, lam=780, method="BW", resz=200,
     return config
 
 # Common settings
-ss = {'run' : 1, # set to 0 for dry run
+ss100x = {'run' : 1, # set to 0 for dry run
       'NA' : 1.45,
       'resxy' : 130.0,
-      'resz' : 200,
-      'NA' : 1.45,
+      'resz' : 300,
       'nIM' : 1.51,
       'NZ': 181,
       'NXY' : 181,
-      'method': "GL",
+      'method': "BW",
       'oversample': 0,
       'nSample' : 1.33,
       'wDist': 130, # um
-      'ppos' : 2000}
+      'ppos' : 2000,
+      'mag' : '100x'}
+
+ss60x = {'run' : 1, # set to 0 for dry run
+      'NA' : 1.4,
+      'resxy' : 216.6,
+      'resz' : 300,
+      'nIM' : 1.515,
+      'NZ': 181,
+      'NXY' : 181,
+      'method': "BW",
+      'oversample': 0,
+      'nSample' : 1.33,
+      'wDist': 130, # um (Su said 140 ...)
+      'ppos' : 2000,
+      'mag' : '60x'}
+
+ss = ss60x;
 
 # Based on the dyes
 channels = {'a594': 617,
             'ir800': 794, # or 814 if it is alexa790
             'a700':723,
             'a488': 519,
-            'Cy5': 664,
+            'Cy5': 664, # alexa 647
             'tmr': 562,
             'dapi': 461}
 
-ss['outfolder'] = 'PSFGL/'
+ss['outfolder'] = f"PSF{ss['method']}_{ss['mag']}_{ss['resz']}/"
 
 if ss['oversample'] > 1:
     print("Warning: You have to bin the PSF afterwards!")
