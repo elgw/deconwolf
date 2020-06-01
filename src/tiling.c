@@ -233,22 +233,22 @@ void tile_free(tile * t)
 
 float * tiling_get_tile_tiff(tiling * T, const int tid, const char * fName)
 {
-   tile * t = T->tiles[tid];
-int verbosity = 1;
- int M = 0; int N = 0; int P = 0; // Will be set to the image size
- float * R = fim_tiff_read_sub(fName, &M, &N, &P, verbosity, 
-     1, 
-     t->xpos[0], t->xpos[2], t->xpos[4], // Start pos
-     t->xsize[0], t->xsize[1], t->xsize[2]); // size
- 
- printf("%d %d %d\n", t->xsize[0], t->xsize[1], t->xsize[2]);
+  tile * t = T->tiles[tid];
+  int verbosity = 1;
+  int M = 0; int N = 0; int P = 0; // Will be set to the image size
+  float * R = fim_tiff_read_sub(fName, &M, &N, &P, verbosity, 
+      1, 
+      t->xpos[0], t->xpos[2], t->xpos[4], // Start pos
+      t->xsize[0], t->xsize[1], t->xsize[2]); // size
 
-if(0)
-{
-  printf("Writing to tile.tif\n");
- fim_tiff_write("tile.tif", R, t->xsize[0], t->xsize[1], t->xsize[2]);
-printf("ok\n"); getchar();
-}
+  printf("%d %d %d\n", t->xsize[0], t->xsize[1], t->xsize[2]);
+
+  if(0)
+  {
+    printf("Writing to tile.tif\n");
+    fim_tiff_write("tile.tif", R, t->xsize[0], t->xsize[1], t->xsize[2]);
+    printf("ok\n"); getchar();
+  }
   return R;
 }
 
@@ -286,9 +286,61 @@ float * tiling_get_tile(tiling * T, const int tid, const float * restrict V)
   return R;
 }
 
-// Write tile directly to tiff file
-void tiling_put_tile_tiff(tiling * T, int tid, const char * fname, float * restrict S)  
+// Write tile directly to raw float file
+void tiling_put_tile_raw(tiling * T, int tid, const char * fname, float * restrict S)  
 {
+  /* 
+   * Assumes that the raw file is already created and big enough 
+   * To reduce the number of fseeks and writes, one column at a time is read/written
+   *
+   * TIFF files does not support altering of the contents,
+   * that is why I settled for this solution.
+   * */
+
+  tile * t = T->tiles[tid];
+  int M = T->M; int N = T->N; 
+  int m = t->xsize[0];
+  int n = t->xsize[1];
+
+  printf("Opening %s for r/w\n", fname); fflush(stdout);
+  FILE * fid = fopen(fname, "r+");
+  if(fid == NULL)
+  {
+    printf("ERROR: Failed to open %s\n", fname);
+    exit(1);
+  }
+
+  size_t buf_size = M*sizeof(float);
+  float * buf = malloc(buf_size);
+
+  for(int cc = t->xpos[4]; cc <= t->xpos[5]; cc++)
+  {
+    for(int bb = t->xpos[2]; bb <= t->xpos[3]; bb++)
+    {
+      size_t colpos = (bb*M + cc*M*N)*sizeof(float);
+      //      printf("colpos: %zu\n", colpos);
+      //fsetpos(fid, &colpos);
+      fseek(fid, colpos, SEEK_SET);
+      fread(buf, buf_size, 1, fid);
+      size_t buf_pos = t->xpos[0];
+      for(int aa = t->xpos[0]; aa <= t->xpos[1]; aa++)
+      {
+        // Index in the tile ...
+        size_t Sidx = (aa - t->xpos[0]) + 
+          (bb - t->xpos[2])*m + 
+          (cc - t->xpos[4])*m*n;
+        float w = tile_getWeight(t, aa, bb, cc, T->overlap);
+        w/= tiling_getWeights(T, aa, bb, cc);
+        buf[buf_pos++] += w*(float) S[Sidx];
+      }
+
+      fseek(fid, colpos, SEEK_SET);
+      //fsetpos(fid, &colpos);
+      fwrite(buf, buf_size, 1, fid);
+    }
+  }
+  fclose(fid);
+  free(buf);
 
 }
 

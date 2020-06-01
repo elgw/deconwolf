@@ -54,7 +54,7 @@ void tiling_put_tile(tiling * T, int t, float * V, float * S);
  * S extracted data from tile t
  * V target image, dimensions given by T->M, N, P
  * */
-void tiling_put_tile_tiff(tiling * T, int t, const char * fName, float * S);
+void tiling_put_tile_raw(tiling * T, int t, const char * fName, float * S);
 
 tile * tile_create();
 void tile_free(tile *);

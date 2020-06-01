@@ -39,7 +39,7 @@
 
 #define tictoc struct timespec tictoc_start, tictoc_end;
 #define tic clock_gettime(CLOCK_REALTIME, &tictoc_start);
-#define toc(X) clock_gettime(CLOCK_REALTIME, &tictoc_end); printf(#X); printf(" %f s\n", timespec_diff(&tictoc_end, &tictoc_start));
+#define toc(X) clock_gettime(CLOCK_REALTIME, &tictoc_end); printf(#X); printf(" %f s\n", timespec_diff(&tictoc_end, &tictoc_start)); fflush(stdout);
 
 /* This is what fftw_malloc returns
  * http://www.fftw.org/fftw3_doc/SIMD-alignment-and-fftw_005fmalloc.html#SIMD-alignment-and-fftw_005fmalloc
@@ -363,6 +363,28 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
   //  printf("Options received\n"); fflush(stdout);
 }
 
+
+void fsetzeros(const char * fname, size_t N)
+  /* Create a new file and fill it with N bytes of zeros
+  */
+{
+  size_t bsize = 1024*1024;
+  char * buffer = malloc(bsize);
+  memset(buffer, 0, bsize);
+  FILE * fid = fopen(fname, "wb");
+  size_t written = 0;
+  while(written + bsize < N)
+  {
+    fwrite(buffer, bsize, 1, fid);
+    written += bsize;
+  }
+    printf("\r %zu / %zu \n", written, N); fflush(stdout);
+  
+  fwrite(buffer, N-written, 1, fid);
+  fclose(fid);
+  free(buffer);
+}
+
 #ifdef __APPLE__
 size_t get_peakMemoryKB(void)
 {
@@ -660,7 +682,7 @@ float * deconvolve_w(afloat * restrict im, const int M, const int N, const int P
   }
   if(s->verbosity > 1)
   {
-    printf("Estimated peak memory usage: %.1f GB\n", wMNP*65.0/1e9);
+    printf("Estimated peak memory usage: %.1f GB\n", wMNP*35.0/1e9);
   }
   fprintf(s->log, "image: [%dx%dx%d]\npsf: [%dx%dx%d]\njob: [%dx%dx%d] (%zu voxels)\n",
       M, N, P, pM, pN, pP, wM, wN, wP, wMNP);
@@ -1043,7 +1065,7 @@ float * psf_autocrop(float * psf, int * pM, int * pN, int * pP,  // psf and size
 }
 
 
-int deconvolve_tiles(int M, int N, int P,
+int deconvolve_tiles(const int M, const int N, const int P,
     const float * restrict psf, const int pM, const int pN, const int pP,
     dw_opts * s)
 {
@@ -1073,15 +1095,23 @@ int deconvolve_tiles(int M, int N, int P,
   /* Output image initialize as zeros
    * will be updated block by block
    */
+  char * tfile = malloc(strlen(s->outFile)+10);
+  sprintf(tfile, "%s.raw", s->outFile);
+
   if(s->verbosity > 0)
   {
-    printf("Initializing %s to 0", s->outFile); fflush(stdout);
+    printf("Initializing %s to 0\n", tfile); fflush(stdout);
   }
-  fim_tiff_write_zeros(s->outFile, M, N, P);
-  if(s->verbosity > 0)
-  {
-    printf("\n"); fflush(stdout);
-  }
+  tictoc
+    tic
+    fsetzeros(tfile, (size_t) M* (size_t) N* (size_t) P*sizeof(float));
+    toc(fsetzeros)
+
+    //fim_tiff_write_zeros(s->outFile, M, N, P);
+    if(s->verbosity > 0)
+    {
+      printf("\n"); fflush(stdout);
+    }
 
   for(int tt = 0; tt<T->nTiles; tt++)
   {
@@ -1095,7 +1125,9 @@ int deconvolve_tiles(int M, int N, int P,
       fprintf(s->log, "-> Processing tile %d / %d\n", tt+1, T->nTiles);
     }
 
+    tic
     float * im_tile = tiling_get_tile_tiff(T, tt, s->imFile);
+    toc(tiling_get_tile_tiff)
 
     int tileM = T->tiles[tt]->xsize[0];
     int tileN = T->tiles[tt]->xsize[1];
@@ -1112,12 +1144,23 @@ int deconvolve_tiles(int M, int N, int P,
         tpsf, tpM, tpN, tpP, // psf and size
         s);
     free(im_tile);
-    tiling_put_tile_tiff(T, tt, s->outFile, dw_im_tile);
+    tiling_put_tile_raw(T, tt, tfile, dw_im_tile);
     free(dw_im_tile);
     free(tpsf);
   }
   tiling_free(T);
   free(T);
+
+  fim_tiff_from_raw(s->outFile, M, N, P, tfile);
+
+  if(s->verbosity < 5)
+  {
+    remove(tfile);
+  } else {
+    printf("Keeping %s for inspection, remove manually\n", tfile);
+  }
+  free(tfile);
+
   return 0;
 }
 
@@ -1319,35 +1362,32 @@ int dw_run(dw_opts * s)
     printf("Image dimensions: %d x %d x %d\n", M, N, P);
   }
 
-  if(s->verbosity > 0)
-  {
-    printf("Reading %s\n", s->imFile);
-  }
 
   float * im = NULL;
 
   if(tiling == 0)
   {
-  float * im = fim_tiff_read(s->imFile, &M, &N, &P, s->verbosity);
-  if(fim_min(im, M*N*P) < 0)
-  {
-    printf("min value of the image is %f, shifting to 0\n", fim_min(im, M*N*P));
-    fim_set_min_to_zero(im, M*N*P);
-    if(fim_max(im, M*N*P) < 1000)
+    if(s->verbosity > 0 )
     {
-      fim_mult_scalar(im, M*N*P, 1000/fim_max(im, M*N*P));
+      printf("Reading %s\n", s->imFile);
     }
-  }
-  }
 
-  if(s->verbosity > 2)
-  {
-    printf("Image size: [%d x %d x %d]\n", M, N, P);
-  }
-  if(im == NULL && tiling == 0)
-  {
-    printf("Failed to open %s\n", s->imFile);
-    exit(1);
+    im = fim_tiff_read(s->imFile, &M, &N, &P, s->verbosity);
+    if(fim_min(im, M*N*P) < 0)
+    {
+      printf("min value of the image is %f, shifting to 0\n", fim_min(im, M*N*P));
+      fim_set_min_to_zero(im, M*N*P);
+      if(fim_max(im, M*N*P) < 1000)
+      {
+        fim_mult_scalar(im, M*N*P, 1000/fim_max(im, M*N*P));
+      }
+    }
+    if(im == NULL)
+    {
+      printf("Failed to open %s\n", s->imFile);
+      exit(1);
+    }
+
   }
 
   // fim_tiff_write("identity.tif", im, M, N, P);
@@ -1423,23 +1463,23 @@ int dw_run(dw_opts * s)
   if(tiling == 0)
   {
     fftwf_free(im);
-  
 
-  if(out == NULL)
-  {
-    if(s->verbosity > 0)
+
+    if(out == NULL)
     {
-      printf("Nothing to write to disk :(\n");
-    }
-  } else 
-  {
-    if(s->verbosity > 0)
+      if(s->verbosity > 0)
+      {
+        printf("Nothing to write to disk :(\n");
+      }
+    } else 
     {
-      printf("Writing to %s\n", s->outFile); fflush(stdout);
+      if(s->verbosity > 0)
+      {
+        printf("Writing to %s\n", s->outFile); fflush(stdout);
+      }
+      //    floatimage_normalize(out, M*N*P);
+      fim_tiff_write(s->outFile, out, M, N, P);
     }
-    //    floatimage_normalize(out, M*N*P);
-    fim_tiff_write(s->outFile, out, M, N, P);
-  }
   }
 
   if(s->verbosity > 1)

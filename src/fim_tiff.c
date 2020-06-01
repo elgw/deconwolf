@@ -320,6 +320,117 @@ void readFloat(TIFF * tfile, afloat * V,
   _TIFFfree(buf);
 }
 
+float raw_file_single_max(const char * rName, const size_t N)
+{
+  // Get max value from raw data file with N floats
+
+  size_t buf_size = 1024*1024*sizeof(float);
+  float  max = -INFINITY;
+  float * buf = malloc(buf_size);
+  FILE * fid = fopen(rName, "r");
+  size_t nread = 0;
+  while(nread + buf_size < N*sizeof(float))
+  {
+    fread(buf, buf_size, 1, fid);
+    for(size_t kk = 0; kk<buf_size/sizeof(float); kk++)
+    {
+      if(buf[kk] > max)
+      {
+        max = buf[kk];
+      }
+    }
+    nread += buf_size;
+  }
+  size_t rem = N*sizeof(float)-nread;
+  fread(buf, rem, 1, fid);
+  for(size_t kk = 0; kk<rem/sizeof(float); kk++)
+  {
+    if(buf[kk] > max)
+    {
+      max = buf[kk];
+    }
+  }
+
+  fclose(fid);
+  free(buf);
+  return max;
+}
+
+
+int fim_tiff_from_raw(const char * fName, int M, int N, int P,
+    const char * rName)
+  // Convert a raw float file to uint16 tif
+{
+
+  size_t bytesPerSample = sizeof(uint16_t);
+  char formatString[4] = "w";
+  size_t MNP = (size_t) M * (size_t) N * (size_t ) P;
+  if(MNP*sizeof(uint16) >= pow(2, 32))
+  {
+    sprintf(formatString, "w8\n");
+    printf("WARNING: File is > 2 GB, using BigTIFF format\n");
+  }
+
+  TIFF* out = TIFFOpen(fName, formatString);
+  assert(out != NULL);
+
+  size_t linbytes = M*bytesPerSample;
+  uint16_t * buf = _TIFFmalloc(linbytes);
+  float * rbuf = malloc(M*sizeof(float));
+  memset(buf, 0, linbytes);
+
+  // Determine max value
+  float scaling = 1/raw_file_single_max(rName, MNP);
+
+  FILE * rf = fopen(rName, "r");
+
+  for(size_t dd = 0; dd<P; dd++)
+  {
+
+    TIFFSetField(out, TIFFTAG_IMAGEWIDTH, M);  // set the width of the image
+    TIFFSetField(out, TIFFTAG_IMAGELENGTH, N);    // set the height of the image
+    TIFFSetField(out, TIFFTAG_SAMPLESPERPIXEL, 1);   // set number of channels per pixel
+    TIFFSetField(out, TIFFTAG_BITSPERSAMPLE, 8*bytesPerSample);    // set the size of the channels
+    TIFFSetField(out, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);    // set the origin of the image.
+    //   Some other essential fields to set that you do not have to understand for now.
+    TIFFSetField(out, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
+    TIFFSetField(out, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
+    TIFFSetField(out, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_UINT);
+
+    /* We are writing single page of the multipage file */
+    TIFFSetField(out, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
+    /* Set the page number */
+    TIFFSetField(out, TIFFTAG_PAGENUMBER, dd, P); 
+
+
+    for(size_t nn = 0; nn<N; nn++)
+    {
+      fread(rbuf, M*sizeof(float), 1, rf);
+      for(size_t mm = 0; mm<M; mm++)
+      {
+        buf[mm] = (uint16_t) (rbuf[mm]*scaling*65535.0);
+      }
+
+      int ok = TIFFWriteScanline(out, // TIFF
+          buf, 
+          nn, // row
+          0); //sample
+      if(ok != 1)
+      {
+        printf("TIFFWriteScanline failed\n");
+      }
+    }
+
+    TIFFWriteDirectory(out);
+  }
+
+  _TIFFfree(buf);
+
+  TIFFClose(out);
+  fclose(rf);
+  free(rbuf);
+  return 0;
+}
 
 int fim_tiff_write_zeros(const char * fName, int N, int M, int P)
 {
@@ -433,8 +544,8 @@ int fim_tiff_get_size(char * fname, int * M, int * N, int * P)
   }
 
   int ok = 1;
-  ok *= TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &m);
-  ok *= TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &n);
+  ok *= TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &m);
+  ok *= TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &n);
   if(ok != 1)
   {
     return -1;
@@ -459,7 +570,7 @@ afloat * fim_tiff_read(const char * fName,
 }
 
 afloat * fim_tiff_read_sub(const char * fName, 
-    int * N0, int * M0, int * P0, int verbosity,
+    int * M0, int * N0, int * P0, int verbosity,
     int subregion,
     int sM, int sN, int sP, // start
     int wM, int wN, int wP) // width
@@ -478,8 +589,8 @@ afloat * fim_tiff_read_sub(const char * fName,
 
   // Tags: ImageWidth and ImageLength
   uint32_t M = 0, N = 0, BPS = 0, SF = 0, CMP=0;
-  TIFFGetField(tfile, TIFFTAG_IMAGELENGTH, &M);
-  TIFFGetField(tfile, TIFFTAG_IMAGEWIDTH, &N);
+  TIFFGetField(tfile, TIFFTAG_IMAGELENGTH, &N);
+  TIFFGetField(tfile, TIFFTAG_IMAGEWIDTH, &M);
   TIFFGetField(tfile, TIFFTAG_BITSPERSAMPLE, &BPS);
   int gotSF = TIFFGetField(tfile, TIFFTAG_SAMPLEFORMAT, &SF);
   int gotCMP = TIFFGetField(tfile, TIFFTAG_COMPRESSION, &CMP);

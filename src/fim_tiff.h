@@ -35,6 +35,11 @@ int fim_tiff_write(const char * fName, const float * V,
 
 int fim_tiff_write_zeros(const char * fName, int M, int N, int P);
 
+// Write to the tif file fName as uint16, using the raw data
+// in rName
+int fim_tiff_from_raw(const char * fName, int M, int N, int P,
+    const char * rName);
+
 // Read a 3D tif stack as a float array
 float * fim_tiff_read(const char * fName, 
     int * M0, int * N0, int * P0, int verbosity);
