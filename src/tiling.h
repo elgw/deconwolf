@@ -43,6 +43,9 @@ float * tiling_get_tile(tiling * T, int t, const float * restrict V);
 /* Extract tile #t from tiff file */
 float * tiling_get_tile_tiff(tiling * T, int t, const char * fName);
 
+/* Extract tile #t from raw float file */
+float * tiling_get_tile_raw(tiling * T, int t, const char * fName);
+
 
 /* Put back data extracted by tiling_get_tile
  * S extracted data from tile t

@@ -66,8 +66,8 @@ int main(int argc, char ** argv)
   fclose(fin);
   fclose(fout);
 
-  printf("%% In MATLAB\n:");
-  printf("f = fopen('%s', 'rb')\n", ofilename);
+  printf("%% In MATLAB:\n");
+  printf("f = fopen('%s', 'rb');\n", ofilename);
   printf("I = fread(f, inf, 'float32'); fclose(f);\n");
   printf("I = reshape(I, [%zu, %zu]);\n", M, N);
   printf("imagesc(I), colormap gray, axis image\n");

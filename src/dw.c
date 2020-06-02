@@ -378,7 +378,7 @@ void fsetzeros(const char * fname, size_t N)
     fwrite(buffer, bsize, 1, fid);
     written += bsize;
   }
-    printf("\r %zu / %zu \n", written, N); fflush(stdout);
+  //  printf("\r %zu / %zu \n", written, N); fflush(stdout);
   
   fwrite(buffer, N-written, 1, fid);
   fclose(fid);
@@ -1102,10 +1102,19 @@ int deconvolve_tiles(const int M, const int N, const int P,
   {
     printf("Initializing %s to 0\n", tfile); fflush(stdout);
   }
-  tictoc
-    tic
     fsetzeros(tfile, (size_t) M* (size_t) N* (size_t) P*sizeof(float));
-    toc(fsetzeros)
+
+      char * imFileRaw = malloc(strlen(s->imFile) + 10);
+    sprintf(imFileRaw, "%s.raw", s->imFile);
+
+      if(s->verbosity > 0)
+      {
+        printf("Dumping %s to %s (for quicker io)\n", s->imFile, imFileRaw);
+      }
+    
+    fim_tiff_to_raw(s->imFile, imFileRaw);
+    printf("Writing to imdump.tif\n");
+    fim_tiff_from_raw("imdump.tif", M, N, P, imFileRaw);
 
     //fim_tiff_write_zeros(s->outFile, M, N, P);
     if(s->verbosity > 0)
@@ -1125,13 +1134,19 @@ int deconvolve_tiles(const int M, const int N, const int P,
       fprintf(s->log, "-> Processing tile %d / %d\n", tt+1, T->nTiles);
     }
 
+    tictoc
     tic
-    float * im_tile = tiling_get_tile_tiff(T, tt, s->imFile);
+    //float * im_tile = tiling_get_tile_tiff(T, tt, s->imFile);
+    float * im_tile = tiling_get_tile_raw(T, tt, imFileRaw);
     toc(tiling_get_tile_tiff)
 
     int tileM = T->tiles[tt]->xsize[0];
     int tileN = T->tiles[tt]->xsize[1];
     int tileP = T->tiles[tt]->xsize[2];
+    
+    printf("writing to tiledump.tif\n");
+    fim_tiff_write("tiledump.tif", im_tile, tileM, tileN, tileP);
+    getchar();
 
     fim_normalize_sum1(tpsf, tpM, tpN, tpP);
 
@@ -1161,6 +1176,8 @@ int deconvolve_tiles(const int M, const int N, const int P,
   }
   free(tfile);
 
+  remove(imFileRaw);
+  free(imFileRaw);
   return 0;
 }
 

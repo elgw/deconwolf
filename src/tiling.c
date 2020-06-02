@@ -18,9 +18,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <string.h>
 #include <fftw3.h>
 #include "tiling.h"
 #include "fim_tiff.h"
+
 
 int * tiling_getDivision(const int M, const int m, int * nDiv)
 {
@@ -229,6 +231,52 @@ void tile_free(tile * t)
   free(t->xsize);
   free(t->pos);
   free(t->xpos);
+}
+
+float * tiling_get_tile_raw(tiling * T, const int tid, const char * fName)
+{
+  printf("Reading tile from %s\n", fName);
+  tile * t = T->tiles[tid];
+  FILE * fid = fopen(fName, "r");
+  if(fid == NULL)
+  {
+    printf("ERROR: Can't read %s\n", fName);
+    exit(1);
+  }
+
+  size_t m = t->xsize[0];
+  size_t n = t->xsize[1];
+  size_t p = t->xsize[2];
+
+  size_t npixels = m*n*p;
+  printf("To populate %zu pixels (%zu x %zu x %zu)\n", npixels, m, n, p);
+  float * R = fftwf_malloc(npixels*sizeof(float));
+  if(R == NULL)
+  {
+    printf("ERROR: memory allocation failed\n");
+    exit(-1);
+  }
+  memset(R, 0, npixels*sizeof(float));
+
+  for(size_t pp = t->xpos[4]; pp <= t->xpos[5]; pp++)
+  {
+    for(size_t nn = t->xpos[2]; nn <= t->xpos[3]; nn++)
+    {
+      // seek position in big raw file
+      size_t spos = t->xpos[0] + nn*T->M + pp*T->M*T->N;
+      // write position in tile
+      size_t wpos = (nn - t->xpos[2])*t->xsize[0] + 
+                    (pp - t->xpos[4])*t->xsize[0]*t->xsize[1]; // in tile
+//      printf("spos: %zu, wpos: %zu\n", spos, wpos);
+      assert(wpos+m <= npixels);
+      assert(wpos <= spos);
+      fseek(fid, spos*sizeof(float), SEEK_SET);
+      fread(R+wpos, m*sizeof(float), 1, fid);
+    }
+  }
+
+  fclose(fid);
+  return R;
 }
 
 float * tiling_get_tile_tiff(tiling * T, const int tid, const char * fName)

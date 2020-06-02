@@ -40,6 +40,9 @@ int fim_tiff_write_zeros(const char * fName, int M, int N, int P);
 int fim_tiff_from_raw(const char * fName, int M, int N, int P,
     const char * rName);
 
+// Convert tiff image to raw float image
+int fim_tiff_to_raw(const char *fName, const char * oName);
+
 // Read a 3D tif stack as a float array
 float * fim_tiff_read(const char * fName, 
     int * M0, int * N0, int * P0, int verbosity);
