@@ -296,6 +296,14 @@ afloat * fft_convolve_cc_conj(fftwf_complex * A, fftwf_complex * B,
 
 void fft_train(const size_t M, const size_t N, const size_t P, const int verbosity, const int nThreads)
 {
+  if(MYPLAN == FFTW_ESTIMATE)
+  {
+    if(verbosity > 0)
+    {
+      printf("No training needed for FFTW_ESTIMATE\n");
+    }
+    return;
+  }
   if(verbosity > 1){
     printf("fftw3 training ... \n"); fflush(stdout);
   }

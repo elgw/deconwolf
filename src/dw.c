@@ -1113,8 +1113,10 @@ int deconvolve_tiles(const int M, const int N, const int P,
       }
     
     fim_tiff_to_raw(s->imFile, imFileRaw);
+    if(0){
     printf("Writing to imdump.tif\n");
     fim_tiff_from_raw("imdump.tif", M, N, P, imFileRaw);
+    }
 
     //fim_tiff_write_zeros(s->outFile, M, N, P);
     if(s->verbosity > 0)
@@ -1144,9 +1146,12 @@ int deconvolve_tiles(const int M, const int N, const int P,
     int tileN = T->tiles[tt]->xsize[1];
     int tileP = T->tiles[tt]->xsize[2];
     
-    printf("writing to tiledump.tif\n");
+if(0)
+{
+  printf("writing to tiledump.tif\n");
     fim_tiff_write("tiledump.tif", im_tile, tileM, tileN, tileP);
     getchar();
+}
 
     fim_normalize_sum1(tpsf, tpM, tpN, tpP);
 
