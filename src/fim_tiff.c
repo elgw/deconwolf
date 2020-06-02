@@ -367,7 +367,6 @@ void uint16toraw(TIFF * tfile, const char * ofile,
     const uint32_t perDirectory
     )
 {
-  printf("uint16toraw\n"); fflush(stdout);
   uint16_t * buf = _TIFFmalloc(ssize);
   float * wbuf = malloc(ssize/sizeof(uint16_t)*sizeof(float));
   FILE * fout = fopen(ofile, "w");
@@ -376,7 +375,7 @@ void uint16toraw(TIFF * tfile, const char * ofile,
 
   for(int dd=0; dd<ndirs; dd++) {
     TIFFSetDirectory(tfile, dd);
-    printf("\r Directory %d / %u", dd+1, ndirs); fflush(stdout);
+ //   printf("\r Directory %d / %u", dd+1, ndirs); fflush(stdout);
     for(int kk=0; kk<nstrips; kk++) {
       tsize_t read = TIFFReadEncodedStrip(tfile, kk, buf, (tsize_t) - 1);
       assert(read>0);
@@ -387,7 +386,7 @@ void uint16toraw(TIFF * tfile, const char * ofile,
       fwrite(wbuf, read/sizeof(uint16_t)*sizeof(float), 1, fout);
     } 
   }
-  printf("\n");
+//  printf("\n");
   fclose(fout);
   free(wbuf);
   _TIFFfree(buf);

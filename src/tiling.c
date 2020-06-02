@@ -235,7 +235,7 @@ void tile_free(tile * t)
 
 float * tiling_get_tile_raw(tiling * T, const int tid, const char * fName)
 {
-  printf("Reading tile from %s\n", fName);
+//  printf("Reading tile from %s\n", fName);
   tile * t = T->tiles[tid];
   FILE * fid = fopen(fName, "r");
   if(fid == NULL)
@@ -249,7 +249,7 @@ float * tiling_get_tile_raw(tiling * T, const int tid, const char * fName)
   size_t p = t->xsize[2];
 
   size_t npixels = m*n*p;
-  printf("To populate %zu pixels (%zu x %zu x %zu)\n", npixels, m, n, p);
+//  printf("To populate %zu pixels (%zu x %zu x %zu)\n", npixels, m, n, p);
   float * R = fftwf_malloc(npixels*sizeof(float));
   if(R == NULL)
   {
@@ -350,7 +350,7 @@ void tiling_put_tile_raw(tiling * T, int tid, const char * fname, float * restri
   int m = t->xsize[0];
   int n = t->xsize[1];
 
-  printf("Opening %s for r/w\n", fname); fflush(stdout);
+//  printf("Opening %s for r/w\n", fname); fflush(stdout);
   FILE * fid = fopen(fname, "r+");
   if(fid == NULL)
   {

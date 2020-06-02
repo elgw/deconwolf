@@ -1136,11 +1136,11 @@ int deconvolve_tiles(const int M, const int N, const int P,
       fprintf(s->log, "-> Processing tile %d / %d\n", tt+1, T->nTiles);
     }
 
-    tictoc
-    tic
+//    tictoc
+ //   tic
     //float * im_tile = tiling_get_tile_tiff(T, tt, s->imFile);
     float * im_tile = tiling_get_tile_raw(T, tt, imFileRaw);
-    toc(tiling_get_tile_tiff)
+//    toc(tiling_get_tile_tiff)
 
     int tileM = T->tiles[tt]->xsize[0];
     int tileN = T->tiles[tt]->xsize[1];
