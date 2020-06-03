@@ -1,5 +1,6 @@
 cc=gcc
 CFLAGS=-lm -Wno-unknown-pragmas -Wall -g
+CFLAGS2=-lm -Wno-unknown-pragmas -Wall -O3 -flto -march=native
 
 all: tiling_ut fft_ut fim_ut
 
@@ -12,4 +13,4 @@ fim_ut:
 	$(cc) fim_ut.c fim.c $(CFLAGS) -lm -o fim_ut -lfftw3f
 
 dw_tiff_max:
-	$(cc) fim.c fim_tiff.c deconwolf_tif_max.c $(CFLAGS) -lm -ltiff -lfftw3f -lfftw3f_threads -o dw_tiff_max
+	$(cc) fim.c fim_tiff.c deconwolf_tif_max.c $(CFLAGS2) -lm -ltiff -lfftw3f -lfftw3f_threads -o dw_tiff_max
