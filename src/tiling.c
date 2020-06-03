@@ -24,7 +24,7 @@
 #include "fim_tiff.h"
 
 
-int * tiling_getDivision(const int M, const int m, int * nDiv)
+int64_t * tiling_getDivision(const int64_t M, const int64_t m, int64_t * nDiv)
 {
 
   // How many sections in M?
@@ -36,43 +36,59 @@ int * tiling_getDivision(const int M, const int m, int * nDiv)
 #ifndef NDEBUG
   printf("nb: %.0f, w: %.0f\n", ns, width);
 #endif
-  int * divs = malloc(2*ns*sizeof(int));
+  int64_t * divs = malloc(2*ns*sizeof(int64_t));
+  // Start point for the first tile
   divs[0] = 0;
+  // End point for the last tile
   divs[(int)( 2*ns-1)] = M-1;
 
   // Settle the end and start of all regions between the end points
-  for(int dd = 1 ; dd < ns; dd++)
+  for(int64_t dd = 1 ; dd < ns; dd++)
   {
-    divs[dd*2-1] = (int) ceil(width*dd);
+    divs[dd*2-1] = (int) ceil(width*dd)-1;
     divs[dd*2] = divs[dd*2-1]+1;  
   }
   nDiv[0] = (int) ns;
+
+#ifndef NDEBUG
+  if(0){
+  for(int64_t dd = 0; dd < ns; dd++)
+  {
+    printf("[%ld, %ld]\n", divs[dd*2], divs[dd*2+1]);
+  }
+  }
+  for(int64_t dd = 1; dd < ns; dd++)
+  {
+    assert( divs[dd*2 - 1] + 1 == divs[dd*2] );
+  }
+#endif
+
   return divs;
 }
 
-int imin(int a, int b)
+int64_t imin(int64_t a, int64_t b)
 {
   if(a < b){ return(a); } else { return(b); } ;
 }
 
-int imax(int a, int b)
+int64_t imax(int64_t a, int64_t b)
 {
   if(a > b){ return(a); } else { return(b); } ;
 }
 
-tiling * tiling_create(const int M, const int N, const int P, const int maxSize, const int overlap)
+tiling * tiling_create(const int64_t M, const int64_t N, const int64_t P, const int64_t maxSize, const int64_t overlap)
 {
 
-  int nM = 0;
-  int * divM = tiling_getDivision(M, maxSize, &nM);
-  int nN = 0;
-  int * divN = tiling_getDivision(N, maxSize, &nN);
+  int64_t nM = 0;
+  int64_t * divM = tiling_getDivision(M, maxSize, &nM);
+  int64_t nN = 0;
+  int64_t * divN = tiling_getDivision(N, maxSize, &nN);
 
 #ifndef NDEBUG
-  printf("Dividing %d into:\n", M);
-  for(int kk = 0; kk<nM; kk++)
+  printf("Dividing %ld into:\n", M);
+  for(int64_t kk = 0; kk<nM; kk++)
   {
-    printf("[%d, %d]\n", divM[2*kk], divM[2*kk+1]);
+    printf("[%ld, %ld]\n", divM[2*kk], divM[2*kk+1]);
   }
 #endif
 
@@ -88,10 +104,10 @@ tiling * tiling_create(const int M, const int N, const int P, const int maxSize,
   T->maxSize = maxSize;
   T->overlap = overlap;
 
-  int bb = 0;
-  for(int mm = 0; mm<nM; mm++)
+  int64_t bb = 0;
+  for(int64_t mm = 0; mm<nM; mm++)
   {
-    for(int nn = 0; nn<nN; nn++)
+    for(int64_t nn = 0; nn<nN; nn++)
     {
       T->tiles[bb] = tile_create();
       tile * t = T->tiles[bb]; 
@@ -124,7 +140,7 @@ tiling * tiling_create(const int M, const int N, const int P, const int maxSize,
 void tiling_show(tiling * T)
 {
   printf("Tiling with %d tiles\n", T->nTiles);
-  printf("Generated for [%d x %d x %d], maxSize: %d, overlap: %d\n",
+  printf("Generated for [%ld x %ld x %ld], maxSize: %d, overlap: %d\n",
       T->M, T->N, T->P, T->maxSize, T->overlap);
   for(int kk = 0; kk<T->nTiles; kk++)
   {
@@ -145,20 +161,20 @@ void tiling_free(tiling * T)
 void tile_show(tile * T)
 {
   printf("-> tile_show\n");
-  printf("size: [%d x %d x %d]\n", 
+  printf("size: [%ld x %ld x %ld]\n", 
       T->size[0], T->size[1], T->size[2]);
-  printf("xsize: [%d x %d x %d]\n", 
+  printf("xsize: [%ld x %ld x %ld]\n", 
       T->xsize[0], T->xsize[1], T->xsize[2]);
-  printf("pos: %d--%d, %d--%d, %d--%d\n", 
+  printf("pos: %ld--%ld, %ld--%ld, %ld--%ld\n", 
       T->pos[0], T->pos[1], T->pos[2],
       T->pos[3], T->pos[4], T->pos[5]);
-  printf("xpos: %d--%d, %d--%d, %d--%d\n", 
+  printf("xpos: %ld--%ld, %ld--%ld, %ld--%ld\n", 
       T->xpos[0], T->xpos[1], T->xpos[2],
       T->xpos[3], T->xpos[4], T->xpos[5]);
 }
 
 
-float getWeight1d(const float a, const float b, const float c, const float d, const int x)
+float getWeight1d(const float a, const float b, const float c, const float d, const int64_t x)
 {
   assert(a<=b);
   assert(b<c); // a tile has to have a size
@@ -187,7 +203,7 @@ float getWeight1d(const float a, const float b, const float c, const float d, co
 }
 
 float tile_getWeight(tile * t, 
-    const int m, const int n, const int p, 
+    const int64_t m, const int64_t n, const int64_t p, 
     const float pad)
   /* Calculate the weight for tile t at position (m,n,p) */
 {
@@ -204,11 +220,11 @@ float tile_getWeight(tile * t,
   return w;
 }
 
-float tiling_getWeights(tiling * T, const int M, const int N, const int P)
+float tiling_getWeights(tiling * T, const int64_t M, const int64_t N, const int64_t P)
 {
   float w = 0;
   const float pad = (float) T->overlap;
-  for(int tt = 0; tt<T->nTiles; tt++)
+  for(int tt = 0; tt < T->nTiles; tt++)
   {
     w+=tile_getWeight(T->tiles[tt], M, N, P, pad);
   }
@@ -218,10 +234,10 @@ float tiling_getWeights(tiling * T, const int M, const int N, const int P)
 tile * tile_create()
 {
   tile * t = malloc(sizeof(tile));
-  t->size = malloc(3*sizeof(int));
-  t->xsize = malloc(3*sizeof(int));
-  t->pos = malloc(6*sizeof(int));
-  t->xpos = malloc(6*sizeof(int));
+  t->size = malloc(3*sizeof(int64_t));
+  t->xsize = malloc(3*sizeof(int64_t));
+  t->pos = malloc(6*sizeof(int64_t));
+  t->xpos = malloc(6*sizeof(int64_t));
   return t;
 }
 
@@ -271,7 +287,8 @@ float * tiling_get_tile_raw(tiling * T, const int tid, const char * fName)
       assert(wpos+m <= npixels);
       assert(wpos <= spos);
       fseek(fid, spos*sizeof(float), SEEK_SET);
-      fread(R+wpos, m*sizeof(float), 1, fid);
+      size_t nread = fread(R+wpos, m*sizeof(float), 1, fid);
+      (void) nread;
     }
   }
 
@@ -283,13 +300,13 @@ float * tiling_get_tile_tiff(tiling * T, const int tid, const char * fName)
 {
   tile * t = T->tiles[tid];
   int verbosity = 1;
-  int M = 0; int N = 0; int P = 0; // Will be set to the image size
+  int64_t M = 0; int64_t N = 0; int64_t P = 0; // Will be set to the image size
   float * R = fim_tiff_read_sub(fName, &M, &N, &P, verbosity, 
       1, 
       t->xpos[0], t->xpos[2], t->xpos[4], // Start pos
       t->xsize[0], t->xsize[1], t->xsize[2]); // size
 
-  printf("%d %d %d\n", t->xsize[0], t->xsize[1], t->xsize[2]);
+  printf("%ld %ld %ld\n", t->xsize[0], t->xsize[1], t->xsize[2]);
 
   if(0)
   {
@@ -304,20 +321,20 @@ float * tiling_get_tile(tiling * T, const int tid, const float * restrict V)
   /* Extract tile number tid from the image V */
 {
   tile * t = T->tiles[tid];
-  int M = T->M; int N = T->N; 
+  int64_t M = T->M; int64_t N = T->N; 
 #ifndef NDEBUG
-  int P = T->P;
+  int64_t P = T->P;
   tile_show(t);
 #endif
-  int m = t->xsize[0];
-  int n = t->xsize[1];
-  int p = t->xsize[2];
+  int64_t m = t->xsize[0];
+  int64_t n = t->xsize[1];
+  int64_t p = t->xsize[2];
   float * R = fftwf_malloc(m*n*p*sizeof(float));
-  for(int cc = t->xpos[4]; cc <= t->xpos[5]; cc++)
+  for(int64_t cc = t->xpos[4]; cc <= t->xpos[5]; cc++)
   {
-    for(int bb = t->xpos[2]; bb <= t->xpos[3]; bb++)
+    for(int64_t bb = t->xpos[2]; bb <= t->xpos[3]; bb++)
     {
-      for(int aa = t->xpos[0]; aa <= t->xpos[1]; aa++)
+      for(int64_t aa = t->xpos[0]; aa <= t->xpos[1]; aa++)
       {
         // printf("aa:%d, bb:%d, cc:%d\n", aa, bb, cc);
         size_t Vidx = aa + bb*M + cc*M*N;
@@ -346,9 +363,9 @@ void tiling_put_tile_raw(tiling * T, int tid, const char * fname, float * restri
    * */
 
   tile * t = T->tiles[tid];
-  int M = T->M; int N = T->N; 
-  int m = t->xsize[0];
-  int n = t->xsize[1];
+  int64_t M = T->M; int64_t N = T->N; 
+  int64_t m = t->xsize[0];
+  int64_t n = t->xsize[1];
 
 //  printf("Opening %s for r/w\n", fname); fflush(stdout);
   FILE * fid = fopen(fname, "r+");
@@ -361,17 +378,18 @@ void tiling_put_tile_raw(tiling * T, int tid, const char * fname, float * restri
   size_t buf_size = M*sizeof(float);
   float * buf = malloc(buf_size);
 
-  for(int cc = t->xpos[4]; cc <= t->xpos[5]; cc++)
+  for(int64_t cc = t->xpos[4]; cc <= t->xpos[5]; cc++)
   {
-    for(int bb = t->xpos[2]; bb <= t->xpos[3]; bb++)
+    for(int64_t bb = t->xpos[2]; bb <= t->xpos[3]; bb++)
     {
       size_t colpos = (bb*M + cc*M*N)*sizeof(float);
       //      printf("colpos: %zu\n", colpos);
       //fsetpos(fid, &colpos);
       fseek(fid, colpos, SEEK_SET);
-      fread(buf, buf_size, 1, fid);
+      size_t nread = fread(buf, buf_size, 1, fid);
+      (void) nread;
       size_t buf_pos = t->xpos[0];
-      for(int aa = t->xpos[0]; aa <= t->xpos[1]; aa++)
+      for(int64_t aa = t->xpos[0]; aa <= t->xpos[1]; aa++)
       {
         // Index in the tile ...
         size_t Sidx = (aa - t->xpos[0]) + 
@@ -395,14 +413,14 @@ void tiling_put_tile_raw(tiling * T, int tid, const char * fname, float * restri
 void tiling_put_tile(tiling * T, int tid, float * restrict V, float * restrict S)
 {
   tile * t = T->tiles[tid];
-  int M = T->M; int N = T->N; 
-  int m = t->xsize[0];
-  int n = t->xsize[1];
-  for(int cc = t->xpos[4]; cc <= t->xpos[5]; cc++)
+  int64_t M = T->M; int64_t N = T->N; 
+  int64_t m = t->xsize[0];
+  int64_t n = t->xsize[1];
+  for(int64_t cc = t->xpos[4]; cc <= t->xpos[5]; cc++)
   {
-    for(int bb = t->xpos[2]; bb <= t->xpos[3]; bb++)
+    for(int64_t bb = t->xpos[2]; bb <= t->xpos[3]; bb++)
     {
-      for(int aa = t->xpos[0]; aa <= t->xpos[1]; aa++)
+      for(int64_t aa = t->xpos[0]; aa <= t->xpos[1]; aa++)
       {
         size_t Vidx = aa + bb*M + cc*M*N;
         size_t Sidx = (aa-t->xpos[0]) + 

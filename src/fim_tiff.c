@@ -23,6 +23,7 @@
 #include <unistd.h>
 #include <fftw3.h>
 #include <string.h>
+#include <stdint.h>
 #include "fim_tiff.h"
 #include "fim.h"
 
@@ -52,7 +53,7 @@ void fim_tiff_ut()
 
   //  printf("%s\n", fname);
   //  getchar();
-  int M = 1024, N = 2048, P = 2;
+  int64_t M = 1024, N = 2048, P = 2;
   afloat * im = fim_zeros(M*N*P);
 
   size_t pos1 = 1111;
@@ -65,7 +66,7 @@ void fim_tiff_ut()
 
   fim_tiff_write(fname, im, M, N, P);
 
-  int M2 = 0, N2 = 0, P2 = 0;
+  int64_t M2 = 0, N2 = 0, P2 = 0;
   afloat * im2 = fim_tiff_read(fname, &M2, &N2, &P2, 0);
   if(im2 == NULL)
   {
@@ -78,7 +79,7 @@ void fim_tiff_ut()
   if(M != M2 || N != N2 || P != P2)
   {
     printf("Dimensions does not match!\n");
-    printf("Wrote: [%d x %d x %d], Read: [%d x %d x %d]\n",
+    printf("Wrote: [%ld x %ld x %ld], Read: [%ld x %ld x %ld]\n",
         M, N, P, M2, N2, P2);
     free(im);
     free(im2);
@@ -148,7 +149,7 @@ void readUint8_sub(TIFF * tfile, afloat * V,
     const uint32_t ndirs,
     const uint32_t nstrips,
     const uint32_t perDirectory,
-    int sM, int sN, int sP, int wM, int wN, int wP)
+    int64_t sM, int64_t sN, int64_t sP, int64_t wM, int64_t wN, int64_t wP)
 {
   perror("Not implemented\n");
   exit(1);
@@ -167,14 +168,14 @@ void readUint8(TIFF * tfile, afloat * V,
   uint8_t * buf = _TIFFmalloc(ssize);
   assert(buf != NULL);
 
-  for(int dd=0; dd<ndirs; dd++) {
+  for(int64_t dd=0; dd<ndirs; dd++) {
     TIFFSetDirectory(tfile, dd);
-    for(int kk=0; kk<nstrips; kk++) {
-      int strip = kk;
+    for(int64_t kk=0; kk<nstrips; kk++) {
+      int64_t strip = kk;
       tsize_t read = TIFFReadEncodedStrip(tfile, strip, buf, (tsize_t) - 1);
       assert(read>0);
 
-      for(int ii = 0; ii<read/sizeof(uint8_t); ii++) {
+      for(int64_t ii = 0; ii<read/sizeof(uint8_t); ii++) {
         size_t pos = ii+kk*nes + dd*perDirectory; 
         V[pos] = (float) buf[ii];
       }
@@ -183,18 +184,19 @@ void readUint8(TIFF * tfile, afloat * V,
   _TIFFfree(buf);
 }
 
-INLINED extern void sub2ind(size_t ind, int M, int N, int P, int * m, int * n, int * p)
+INLINED extern void sub2ind(size_t ind, 
+    int64_t M, int64_t N, int64_t P, 
+    int64_t * m, int64_t * n, int64_t * p)
 {
   /* If ind is the linear index from a [M,N,P] image, figure out the coordinates of ind
   */
 
-  div_t d = div(ind, M*N);
+  ldiv_t d = ldiv(ind, M*N);
   p[0] = d.quot;
-  int t = d.rem;
-  d = div(t, M);
+  int64_t t = d.rem;
+  d = ldiv(t, M);
   n[0] = d.quot;
   m[0] = d.rem;
-
 }
 
 void readUint16_sub(TIFF * tfile, afloat * V, 
@@ -202,9 +204,9 @@ void readUint16_sub(TIFF * tfile, afloat * V,
     const uint32_t ndirs,
     const uint32_t nstrips,
     const uint32_t perDirectory,
-    int M, int N, int P,
-    int sM, int sN, int sP, 
-    int wM, int wN, int wP)
+    int64_t M, int64_t N, int64_t P,
+    int64_t sM, int64_t sN, int64_t sP, 
+    int64_t wM, int64_t wN, int64_t wP)
 {
 
   // V should hold wM*wN*wP uint16
@@ -214,29 +216,29 @@ void readUint16_sub(TIFF * tfile, afloat * V,
   uint16_t * buf = _TIFFmalloc(ssize);
   assert(buf != NULL);
 
-  for(int dd=0; dd<ndirs; dd++) {
+  for(int64_t dd=0; dd<ndirs; dd++) {
     TIFFSetDirectory(tfile, dd);
-    for(int kk=0; kk<nstrips; kk++) {
-      int strip = kk;
+    for(int64_t kk=0; kk<nstrips; kk++) {
+      int64_t strip = kk;
       tsize_t read = TIFFReadEncodedStrip(tfile, strip, buf, (tsize_t) - 1);
       assert(read>0);
 
-      for(int ii = 0; ii<read/sizeof(uint16_t); ii++) {
+      for(int64_t ii = 0; ii<read/sizeof(uint16_t); ii++) {
         size_t ipos = ii+kk*nes + dd*perDirectory; // Input position
 
-        int iM = 0; int iN = 0; int iP = 0;
+        int64_t iM = 0; int64_t iN = 0; int64_t iP = 0;
 
         sub2ind(ipos, M, N, P, &iM, &iN, &iP);
 
         if(0){
           if(ipos % 100000 == 0){
-            printf("%d %d %d, %zu -> (%d, %d, %d)\n", M, N, P, ipos, iM, iN, iP);
+            printf("%ld %ld %ld, %zu -> (%ld, %ld, %ld)\n", M, N, P, ipos, iM, iN, iP);
             getchar();
           }}
 
-        int oM = (iM-sM);
-        int oN = (iN-sN);
-        int oP = (iP-sP);
+        int64_t oM = (iM-sM);
+        int64_t oN = (iN-sN);
+        int64_t oP = (iP-sP);
 
         if(oM >= 0 && oM < wM){
           if(oN >= 0 && oN < wN){
@@ -265,14 +267,14 @@ void readUint16(TIFF * tfile, afloat * V,
   uint16_t * buf = _TIFFmalloc(ssize);
   assert(buf != NULL);
 
-  for(int dd=0; dd<ndirs; dd++) {
+  for(int64_t dd=0; dd<ndirs; dd++) {
     TIFFSetDirectory(tfile, dd);
-    for(int kk=0; kk<nstrips; kk++) {
-      int strip = kk;
+    for(int64_t kk=0; kk<nstrips; kk++) {
+      int64_t strip = kk;
       tsize_t read = TIFFReadEncodedStrip(tfile, strip, buf, (tsize_t) - 1);
       assert(read>0);
 
-      for(int ii = 0; ii<read/sizeof(uint16_t); ii++) {
+      for(int64_t ii = 0; ii<read/sizeof(uint16_t); ii++) {
         size_t pos = ii+kk*nes + dd*perDirectory; 
         V[pos] = (float) buf[ii];
       }
@@ -286,7 +288,7 @@ void readFloat_sub(TIFF * tfile, afloat * V,
     uint32_t ndirs,
     uint32_t nstrips,
     uint32_t perDirectory, 
-    int sM, int sN, int sP, int wM, int wN, int wP)    
+    int64_t sM, int64_t sN, int64_t sP, int64_t wM, int64_t wN, int64_t wP)    
 {
   perror("Not implemented!\n");
   exit(1);
@@ -304,14 +306,14 @@ void readFloat(TIFF * tfile, afloat * V,
   float * buf = _TIFFmalloc(ssize);
   assert(buf != NULL);
 
-  for(int dd=0; dd<ndirs; dd++) {
+  for(int64_t dd=0; dd<ndirs; dd++) {
     TIFFSetDirectory(tfile, dd);
-    for(int kk=0; kk<nstrips; kk++) {
-      int strip = kk;
+    for(int64_t kk=0; kk<nstrips; kk++) {
+      int64_t strip = kk;
       tsize_t read = TIFFReadEncodedStrip(tfile, strip, buf, (tsize_t)-1);
       assert(read > 0);
 
-      for(int ii = 0; ii<read/sizeof(float); ii++) {
+      for(int64_t ii = 0; ii<read/sizeof(float); ii++) {
         size_t pos = ii+kk*nes + dd*perDirectory; 
         V[pos] = buf[ii];
       }
@@ -335,7 +337,8 @@ float raw_file_single_max(const char * rName, const size_t N)
   size_t nread = 0;
   while(nread + buf_size < N*sizeof(float))
   {
-    fread(buf, buf_size, 1, fid);
+    nread = fread(buf, buf_size, 1, fid);
+    (void) nread;
     for(size_t kk = 0; kk<buf_size/sizeof(float); kk++)
     {
       if(buf[kk] > max)
@@ -346,7 +349,8 @@ float raw_file_single_max(const char * rName, const size_t N)
     nread += buf_size;
   }
   size_t rem = N*sizeof(float)-nread;
-  fread(buf, rem, 1, fid);
+  nread =  fread(buf, rem, 1, fid);
+  (void) nread;
   for(size_t kk = 0; kk<rem/sizeof(float); kk++)
   {
     if(buf[kk] > max)
@@ -373,14 +377,14 @@ void uint16toraw(TIFF * tfile, const char * ofile,
 
   assert(buf != NULL);
 
-  for(int dd=0; dd<ndirs; dd++) {
+  for(int64_t dd=0; dd<ndirs; dd++) {
     TIFFSetDirectory(tfile, dd);
  //   printf("\r Directory %d / %u", dd+1, ndirs); fflush(stdout);
-    for(int kk=0; kk<nstrips; kk++) {
+    for(int64_t kk=0; kk<nstrips; kk++) {
       tsize_t read = TIFFReadEncodedStrip(tfile, kk, buf, (tsize_t) - 1);
       assert(read>0);
 
-      for(int ii = 0; ii<read/sizeof(uint16_t); ii++) {
+      for(int64_t ii = 0; ii<read/sizeof(uint16_t); ii++) {
         wbuf[ii] = (float) buf[ii];
       }
       fwrite(wbuf, read/sizeof(uint16_t)*sizeof(float), 1, fout);
@@ -405,14 +409,14 @@ void floattoraw(TIFF * tfile, const char * ofile,
 
   assert(buf != NULL);
 
-  for(int dd=0; dd<ndirs; dd++) {
+  for(int64_t dd=0; dd<ndirs; dd++) {
     TIFFSetDirectory(tfile, dd);
-    for(int kk=0; kk<nstrips; kk++) {
-      int strip = kk;
+    for(int64_t kk=0; kk<nstrips; kk++) {
+      int64_t strip = kk;
       tsize_t read = TIFFReadEncodedStrip(tfile, strip, buf, (tsize_t) - 1);
       assert(read>0);
 
-      for(int ii = 0; ii<read/sizeof(float); ii++) {
+      for(int64_t ii = 0; ii<read/sizeof(float); ii++) {
         wbuf[ii] = (float) buf[ii];
       }
       fwrite(wbuf, read, 1, fout);
@@ -551,7 +555,7 @@ TIFFClose(tfile);
 return 0;
 }
 
-int fim_tiff_from_raw(const char * fName, int M, int N, int P,
+int fim_tiff_from_raw(const char * fName, int64_t M, int64_t N, int64_t P,
     const char * rName)
   // Convert a raw float file to uint16 tif
 {
@@ -599,7 +603,9 @@ int fim_tiff_from_raw(const char * fName, int M, int N, int P,
 
     for(size_t nn = 0; nn<N; nn++)
     {
-      fread(rbuf, M*sizeof(float), 1, rf);
+      size_t nread = fread(rbuf, M*sizeof(float), 1, rf);
+      (void)(nread);
+
       for(size_t mm = 0; mm<M; mm++)
       {
         buf[mm] = (uint16_t) (rbuf[mm]*scaling*65535.0);
@@ -626,13 +632,13 @@ int fim_tiff_from_raw(const char * fName, int M, int N, int P,
   return 0;
 }
 
-int fim_tiff_write_zeros(const char * fName, int N, int M, int P)
+int fim_tiff_write_zeros(const char * fName, int64_t N, int64_t M, int64_t P)
 {
   return fim_tiff_write(fName, NULL, N, M, P);
 }
 
 int fim_tiff_write(const char * fName, const afloat * V, 
-    int N, int M, int P)
+    int64_t N, int64_t M, int64_t P)
 {
   // if V == NULL and empty file will be written
 
@@ -728,7 +734,7 @@ int fim_tiff_write(const char * fName, const afloat * V,
   return 0;
 }
 
-int fim_tiff_get_size(char * fname, int * M, int * N, int * P)
+int fim_tiff_get_size(char * fname, int64_t * M, int64_t * N, int64_t * P)
 {
   TIFF * tiff = TIFFOpen(fname, "r");
   uint32_t m, n, p;
@@ -755,7 +761,7 @@ int fim_tiff_get_size(char * fname, int * M, int * N, int * P)
 
 
 afloat * fim_tiff_read(const char * fName, 
-    int * N0, int * M0, int * P0, int verbosity)
+    int64_t * N0, int64_t * M0, int64_t * P0, int verbosity)
 {
   return fim_tiff_read_sub(fName, N0, M0, P0, verbosity,
       0, // sub disabled
@@ -764,10 +770,10 @@ afloat * fim_tiff_read(const char * fName,
 }
 
 afloat * fim_tiff_read_sub(const char * fName, 
-    int * M0, int * N0, int * P0, int verbosity,
+    int64_t * M0, int64_t * N0, int64_t * P0, int verbosity,
     int subregion,
-    int sM, int sN, int sP, // start
-    int wM, int wN, int wP) // width
+    int64_t sM, int64_t sN, int64_t sP, // start
+    int64_t wM, int64_t wN, int64_t wP) // width
 {
   /* Reads the content of the tif file with fName
    * Puts the images size in M0, N0, P0
@@ -782,12 +788,13 @@ afloat * fim_tiff_read_sub(const char * fName,
   }
 
   // Tags: ImageWidth and ImageLength
-  uint32_t M = 0, N = 0, BPS = 0, SF = 0, CMP=0;
-  TIFFGetField(tfile, TIFFTAG_IMAGELENGTH, &N);
-  TIFFGetField(tfile, TIFFTAG_IMAGEWIDTH, &M);
+  uint32_t _M = 0, _N = 0, BPS = 0, SF = 0, CMP=0;
+  TIFFGetField(tfile, TIFFTAG_IMAGELENGTH, &_N);
+  TIFFGetField(tfile, TIFFTAG_IMAGEWIDTH, &_M);
   TIFFGetField(tfile, TIFFTAG_BITSPERSAMPLE, &BPS);
   int gotSF = TIFFGetField(tfile, TIFFTAG_SAMPLEFORMAT, &SF);
   int gotCMP = TIFFGetField(tfile, TIFFTAG_COMPRESSION, &CMP);
+  int64_t M = _M, N = _N; 
 
   if(gotCMP)
   {
@@ -868,7 +875,7 @@ afloat * fim_tiff_read_sub(const char * fName,
   uint32_t nstrips = TIFFNumberOfStrips(tfile);
   uint32_t ndirs = TIFFNumberOfDirectories(tfile);
   P0[0] = (size_t) ndirs;
-  size_t P = P0[0];
+  int64_t P = P0[0];
 
   if(verbosity > 1)
   {
@@ -925,7 +932,7 @@ afloat * fim_tiff_read_sub(const char * fName,
     {
       if(subregion)
       {
-        printf("%d %d %d, %d %d %d, %d %d %d\n", M, N, (int) P, sM, sN, sP, wM, wN, wP);
+        printf("%ld %ld %ld, %ld %ld %ld, %ld %ld %ld\n", M, N, P, sM, sN, sP, wM, wN, wP);
         readUint16_sub(tfile, V, ssize, ndirs, nstrips, M*N,
             M, N, (int) P, sM, sN, sP, wM, wN, wP);
       } else {

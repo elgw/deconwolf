@@ -15,12 +15,14 @@ DEBUG?=0
 ifeq ($(DEBUG),1)
     CFLAGS =-Wall -g3 -DDEBUG 
 else
-    CFLAGS=-Wall -DNDEBUG -O3 -flto -march=native -ftree-vectorize
+    CFLAGS=-Wall -Wno-unknown-pragmas -DNDEBUG -O3 -flto -march=native -ftree-vectorize
 endif
 
 OMP?=0
 ifeq ($(OMP), 1)
   CFLAGS += -fopenmp
+else
+  CFLAGS += -fno-openmp
 endif
 
 CFLAGS += $(XFLAGS)

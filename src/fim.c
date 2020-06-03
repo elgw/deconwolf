@@ -20,12 +20,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include "fim.h"
 
 typedef float afloat __attribute__ ((__aligned__(16)));
 
 
-int fim_maxAtOrigo(const afloat * restrict V, const int M, const int N, const int P)
+int fim_maxAtOrigo(const afloat * restrict V, const int64_t M, const int64_t N, const int64_t P)
   /* Check that the MAX of the fim is in the middle
    * returns 1 on success.
    * Returns 0 if any of the image dimensions are even
@@ -40,16 +41,16 @@ int fim_maxAtOrigo(const afloat * restrict V, const int M, const int N, const in
   if (P % 2 == 0)
   { return 0; }
 
-  int mM = (M-1)/2;
-  int mN = (N-1)/2;
-  int mP = (P-1)/2;
+  int64_t mM = (M-1)/2;
+  int64_t mN = (N-1)/2;
+  int64_t mP = (P-1)/2;
 
   float maxV = 0;
-  int m = 0, n = 0, p = 0;
+  int64_t m = 0, n = 0, p = 0;
 
-  for(int pp = 0; pp < P; pp++) {
-    for(int nn = 0; nn < N; nn++) {
-      for(int mm = 0; mm < M; mm++) {
+  for(int64_t pp = 0; pp < P; pp++) {
+    for(int64_t nn = 0; nn < N; nn++) {
+      for(int64_t mm = 0; mm < M; mm++) {
         size_t idx = mm + nn*M + pp*M*N;
         if(V[idx] > maxV)
         {
@@ -65,7 +66,7 @@ int fim_maxAtOrigo(const afloat * restrict V, const int M, const int N, const in
 
   if(maxV > midValue)
   { 
-    printf("max I(%d, %d, %d)=%f > mid I(%d, %d, %d)=%f\n", 
+    printf("max I(%ld, %ld, %ld)=%f > mid I(%ld, %ld, %ld)=%f\n", 
         m, n, p, maxV, mM, mN, mP, midValue);
     return 0; 
   }
@@ -147,14 +148,14 @@ float fim_mse(afloat * A, afloat * B, size_t N)
   return mse/N;
 }
 
-void fim_flipall(afloat * restrict T, const afloat * restrict A, const int a1, const int a2, const int a3)
+void fim_flipall(afloat * restrict T, const afloat * restrict A, const int64_t a1, const int64_t a2, const int64_t a3)
   /* Equivalent to T = flip(flip(flip(A,1),2),3) in matlab */
 {
-  for(int aa = 0; aa<a1; aa++){
-    for(int bb = 0; bb<a2; bb++){
-      for(int cc = 0; cc<a3; cc++){
-        int idxTo = aa + bb*a1 + cc*a1*a2;
-        int idxFrom = (a1-aa-1) + (a2-bb-1)*a1 + (a3-cc-1)*a1*a2;
+  for(int64_t aa = 0; aa<a1; aa++){
+    for(int64_t bb = 0; bb<a2; bb++){
+      for(int64_t cc = 0; cc<a3; cc++){
+        int64_t idxTo = aa + bb*a1 + cc*a1*a2;
+        int64_t idxFrom = (a1-aa-1) + (a2-bb-1)*a1 + (a3-cc-1)*a1*a2;
 
         T[idxTo] = A[idxFrom];
       }
@@ -163,15 +164,15 @@ void fim_flipall(afloat * restrict T, const afloat * restrict A, const int a1, c
 }
 
 
-void fim_insert(afloat * restrict T, const int t1, const int t2, const int t3, 
-    const afloat * restrict F, const int f1, const int f2, const int f3)
+void fim_insert(afloat * restrict T, const int64_t t1, const int64_t t2, const int64_t t3, 
+    const afloat * restrict F, const int64_t f1, const int64_t f2, const int64_t f3)
   /* Insert F [f1xf2xf3] into T [t1xt2xt3] in the "upper left" corner */
 {
-  for(int pp = 0; pp<f3; pp++)
+  for(int64_t pp = 0; pp<f3; pp++)
   {
-    for(int nn = 0; nn<f2; nn++)
+    for(int64_t nn = 0; nn<f2; nn++)
     {
-      for(int mm = 0; mm<f1; mm++)
+      for(int64_t mm = 0; mm<f1; mm++)
       {
         T[mm + nn*t1 + pp*t1*t2] = F[mm + nn*f1 + pp*f1*f2];
       }
@@ -180,15 +181,15 @@ void fim_insert(afloat * restrict T, const int t1, const int t2, const int t3,
   return;
 }
 
-void fim_insert_ref(afloat * T, int t1, int t2, int t3, 
-    afloat * F, int f1, int f2, int f3)
+void fim_insert_ref(afloat * T, int64_t t1, int64_t t2, int64_t t3, 
+    afloat * F, int64_t f1, int64_t f2, int64_t f3)
   /* Insert F [f1xf2xf3] into T [t1xt2xt3] in the "upper left" corner */
 {
-  for(int mm = 0; mm<f1; mm++)
+  for(int64_t mm = 0; mm<f1; mm++)
   {
-    for(int nn = 0; nn<f2; nn++)
+    for(int64_t nn = 0; nn<f2; nn++)
     {
-      for(int pp = 0; pp<f3; pp++)
+      for(int64_t pp = 0; pp<f3; pp++)
       {
         afloat x = F[mm + nn*f1 + pp*f1*f2];
         T[mm + nn*t1 + pp*t1*t2] = x;
@@ -199,22 +200,22 @@ void fim_insert_ref(afloat * T, int t1, int t2, int t3,
 }
 
 
-afloat * fim_get_cuboid(afloat * restrict A, const int M, const int N, const int P,
-    const int m0, const int m1, const int n0, const int n1, const int p0, const int p1)
+afloat * fim_get_cuboid(afloat * restrict A, const int64_t M, const int64_t N, const int64_t P,
+    const int64_t m0, const int64_t m1, const int64_t n0, const int64_t n1, const int64_t p0, const int64_t p1)
 {
   /* Create a new array from V using [m0, m1]x[n0, n1]x[p0, p1] */
-  int m = m1-m0+1;
-  int n = n1-n0+1;
-  int p = p1-p0+1;
+  int64_t m = m1-m0+1;
+  int64_t n = n1-n0+1;
+  int64_t p = p1-p0+1;
 
   afloat * C = fftwf_malloc(m*n*p*sizeof(float));
   assert(C != NULL);
 
-  for(int aa = m0; aa <= m1; aa++)
+  for(int64_t aa = m0; aa <= m1; aa++)
   {
-    for(int bb = n0; bb <= n1; bb++)
+    for(int64_t bb = n0; bb <= n1; bb++)
     {
-      for(int cc = p0; cc <= p1; cc++)
+      for(int64_t cc = p0; cc <= p1; cc++)
       {
         // printf("aa:%d, bb:%d, cc:%d\n", aa, bb, cc);
         size_t Aidx = aa + bb*M + cc*M*N;
@@ -231,16 +232,16 @@ afloat * fim_get_cuboid(afloat * restrict A, const int M, const int N, const int
   return C;
 }
 
-afloat * fim_subregion(afloat * restrict A, const int M, const int N, const int P, const int m, const int n, const int p)
+afloat * fim_subregion(afloat * restrict A, const int64_t M, const int64_t N, const int64_t P, const int64_t m, const int64_t n, const int64_t p)
 {
   /* Extract sub region starting at (0,0,0) */
   afloat * S = fftwf_malloc(m*n*p*sizeof(float));
   assert(S != NULL);
-  for(int pp = 0; pp<p; pp++)
+  for(int64_t pp = 0; pp<p; pp++)
   {
-    for(int nn = 0; nn<n; nn++)
+    for(int64_t nn = 0; nn<n; nn++)
     {
-      for(int mm = 0; mm<m; mm++)
+      for(int64_t mm = 0; mm<m; mm++)
       {
         size_t Aidx = mm + nn*M + pp*M*N;
         size_t Sidx = mm + nn*m + pp*m*n;
@@ -253,15 +254,15 @@ afloat * fim_subregion(afloat * restrict A, const int M, const int N, const int 
   return S;
 }
 
-afloat * fim_subregion_ref(afloat * A, int M, int N, int P, int m, int n, int p)
+afloat * fim_subregion_ref(afloat * A, int64_t M, int64_t N, int64_t P, int64_t m, int64_t n, int64_t p)
 {
   afloat * S = fftwf_malloc(m*n*p*sizeof(float));
   assert(S != NULL);
-  for(int mm = 0; mm<m; mm++)
+  for(int64_t mm = 0; mm<m; mm++)
   {
-    for(int nn = 0; nn<n; nn++)
+    for(int64_t nn = 0; nn<n; nn++)
     {
-      for(int pp = 0; pp<p; pp++)
+      for(int64_t pp = 0; pp<p; pp++)
       {
         size_t Aidx = mm + nn*M + pp*M*N;
         size_t Sidx = mm + nn*m + pp*m*n;
@@ -291,7 +292,7 @@ void fim_mult_scalar(afloat * I, size_t N, float x)
   }
 }
 
-void fim_normalize_sum1(afloat * psf, int M, int N, int P)
+void fim_normalize_sum1(afloat * psf, int64_t M, int64_t N, int64_t P)
   /* 
    * MATLAB:
    * Y = X/max(X(:))
@@ -334,8 +335,8 @@ afloat * fim_constant(const size_t N, const float value)
 }
 
 void fim_circshift(afloat * restrict A, 
-    const int M, const int N, const int P, 
-    const int sm, const int sn, const int sp)
+    const int64_t M, const int64_t N, const int64_t P, 
+    const int64_t sm, const int64_t sn, const int64_t sp)
   /* Shift the image A [MxNxP] by sm, sn, sp in each dimension */
 {
 
@@ -346,9 +347,9 @@ void fim_circshift(afloat * restrict A,
 
     // Dimension 1
 #pragma omp for
-    for(int cc = 0; cc<P; cc++)
+    for(int64_t cc = 0; cc<P; cc++)
     {
-      for(int bb = 0; bb<N; bb++)
+      for(int64_t bb = 0; bb<N; bb++)
       {    
         //shift_vector(A + bb*M + cc*M*N, 1, M, sm);
         shift_vector_buf(A + bb*M + cc*M*N, 1, M, sm, buf);
@@ -357,9 +358,9 @@ void fim_circshift(afloat * restrict A,
 
     // Dimension 2
 #pragma omp for
-    for(int cc = 0; cc<P; cc++)
+    for(int64_t cc = 0; cc<P; cc++)
     {
-      for(int aa = 0; aa<M; aa++)
+      for(int64_t aa = 0; aa<M; aa++)
       {    
         //shift_vector(A + aa+cc*M*N, M, N, sn);
         shift_vector_buf(A + aa+cc*M*N, M, N, sn, buf);
@@ -368,9 +369,9 @@ void fim_circshift(afloat * restrict A,
 
     // Dimension 3
 #pragma omp for
-    for(int bb = 0; bb<N; bb++)
+    for(int64_t bb = 0; bb<N; bb++)
     {
-      for(int aa = 0; aa<M; aa++)
+      for(int64_t aa = 0; aa<M; aa++)
       {  
         //shift_vector(A + aa+bb*M, M*N, P, sp);
         shift_vector_buf(A + aa+bb*M, M*N, P, sp, buf);
@@ -383,16 +384,16 @@ void fim_circshift(afloat * restrict A,
 }
 
 
-INLINED static int mod_int(const int a, const int b)
+INLINED static int64_t mod_int(const int64_t a, const int64_t b)
 {
-  int r = a % b;
+  int64_t r = a % b;
   return r < 0 ? r + b : r;
 }
 
 void shift_vector_buf(afloat * restrict V, 
-    const int S, 
-    const int N,
-    int k, afloat * restrict buffer)
+    const int64_t S, 
+    const int64_t N,
+    int64_t k, afloat * restrict buffer)
   /* Circular shift of a vector of length N with stride S by step k */
 {
 
@@ -409,9 +410,9 @@ void shift_vector_buf(afloat * restrict V,
 }
 
 void shift_vector(afloat * restrict V, 
-    const int S, 
-    const int N,
-    const int k)
+    const int64_t S, 
+    const int64_t N,
+    const int64_t k)
   /* Circular shift of a vector of length N with stride S by step k */
 {
 
@@ -423,8 +424,8 @@ void shift_vector(afloat * restrict V,
 
 
 afloat * fim_expand(const afloat * restrict in, 
-    const int pM, const int pN, const int pP, 
-    const int M, const int N, const int P)
+    const int64_t pM, const int64_t pN, const int64_t pP, 
+    const int64_t M, const int64_t N, const int64_t P)
   /* "expand an image" by making it larger 
    * pM, ... current size
    * M, Nm ... new size
@@ -450,7 +451,7 @@ void fim_flipall_ut()
   float * b = fftwf_malloc(3*3*3*sizeof(float));
   float * c = fftwf_malloc(3*3*3*sizeof(float));
 
-  for(int kk = 0; kk<27; kk++)
+  for(int64_t kk = 0; kk<27; kk++)
   {
     a[kk] = 0;
   }
@@ -459,26 +460,26 @@ void fim_flipall_ut()
   fim_flipall(b, a, 3, 3, 3);
   assert(b[13] == 1);
 
-  for(int kk = 0; kk<27; kk++)
+  for(int64_t kk = 0; kk<27; kk++)
   {
     a[kk] = rand();
   }
 
   fim_flipall(b, a, 3, 3, 3);
   fim_flipall(c, b, 3, 3, 3);
-  for(int kk = 0; kk<27; kk++)
+  for(int64_t kk = 0; kk<27; kk++)
   {
     assert(a[kk] == c[kk]);
   }
 
   fim_flipall(b, a, 4, 3, 2);
   fim_flipall(c, b, 4, 3, 2);
-  for(int kk = 0; kk<24; kk++)
+  for(int64_t kk = 0; kk<24; kk++)
     assert(a[kk] == c[kk]);
 
   fim_flipall(b, a, 2, 3, 4);
   fim_flipall(c, b, 2, 3, 4);
-  for(int kk = 0; kk<24; kk++)
+  for(int64_t kk = 0; kk<24; kk++)
     assert(a[kk] == c[kk]);
 
   free(a); free(b); free(c);
@@ -487,17 +488,17 @@ void fim_flipall_ut()
 
 void shift_vector_ut()
 {
-  int N = 5;
-  int S = 1; // stride
+  int64_t N = 5;
+  int64_t S = 1; // stride
   float * V = fftwf_malloc(N*sizeof(float));
 
-  for(int k = -7; k<7; k++)
+  for(int64_t k = -7; k<7; k++)
   {
-    for(int kk = 0; kk<N; kk++)
+    for(int64_t kk = 0; kk<N; kk++)
     {V[kk] = kk;}
-    printf("shift: % d -> ", k);
+    printf("shift: %ld -> ", k);
     shift_vector(V,S,N,k);
-    for(int kk =0; kk<N; kk++)
+    for(int64_t kk =0; kk<N; kk++)
     { printf("%.0f ", V[kk]);}
     printf("\n");
   }
