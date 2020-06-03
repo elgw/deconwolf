@@ -19,6 +19,7 @@
 
 #ifndef fim_tiff_h
 #define fim_tiff_h
+
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -26,6 +27,9 @@
 #include <math.h>
 #include <tiffio.h>
 #include <unistd.h>
+#include <fftw3.h>
+#include <string.h>
+#include <stdint.h>
 #include "fim.h"
 
 #define INLINED inline __attribute__((always_inline))
@@ -62,5 +66,8 @@ void fim_tiff_ut();
 // Returns 0 upon success.
 int fim_tiff_get_size(char * fname, 
     int64_t * M, int64_t * N, int64_t * P);
+
+/* Max projection from input to output file */
+int fim_tiff_maxproj(char * in, char * out);
 
 #endif

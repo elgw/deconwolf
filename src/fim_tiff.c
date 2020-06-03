@@ -14,18 +14,7 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <assert.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <math.h>
-#include <tiffio.h>
-#include <unistd.h>
-#include <fftw3.h>
-#include <string.h>
-#include <stdint.h>
 #include "fim_tiff.h"
-#include "fim.h"
 
 /* see man 3 tifflib
  *
@@ -379,7 +368,7 @@ void uint16toraw(TIFF * tfile, const char * ofile,
 
   for(int64_t dd=0; dd<ndirs; dd++) {
     TIFFSetDirectory(tfile, dd);
- //   printf("\r Directory %d / %u", dd+1, ndirs); fflush(stdout);
+    //   printf("\r Directory %d / %u", dd+1, ndirs); fflush(stdout);
     for(int64_t kk=0; kk<nstrips; kk++) {
       tsize_t read = TIFFReadEncodedStrip(tfile, kk, buf, (tsize_t) - 1);
       assert(read>0);
@@ -390,7 +379,7 @@ void uint16toraw(TIFF * tfile, const char * ofile,
       fwrite(wbuf, read/sizeof(uint16_t)*sizeof(float), 1, fout);
     } 
   }
-//  printf("\n");
+  //  printf("\n");
   fclose(fout);
   free(wbuf);
   _TIFFfree(buf);
@@ -420,7 +409,7 @@ void floattoraw(TIFF * tfile, const char * ofile,
         wbuf[ii] = (float) buf[ii];
       }
       fwrite(wbuf, read, 1, fout);
-      
+
     } 
   }
   fclose(fout);
@@ -431,7 +420,7 @@ void floattoraw(TIFF * tfile, const char * ofile,
 
 int fim_tiff_to_raw(const char * fName, const char * oName)
 {
-// Convert a tif image, fName, to a raw float image, oName
+  // Convert a tif image, fName, to a raw float image, oName
 
   TIFF * tfile = TIFFOpen(fName, "r");
 
@@ -492,9 +481,6 @@ int fim_tiff_to_raw(const char * fName, const char * oName)
     printf("For floating point images, only 32-bit samples are supported %u\n", BPS);
   }
 
-  uint32_t B = 0;
-  int gotB = TIFFGetField(tfile, TIFFTAG_IMAGEDEPTH, &B);
-
   // tiffio.h:typedef uint32 ttag_t;
   uint32_t PTAG = 0;
   int gotptag = TIFFGetField(tfile, TIFFTAG_PHOTOMETRIC, &PTAG);
@@ -523,16 +509,6 @@ int fim_tiff_to_raw(const char * fName, const char * oName)
   uint32_t nstrips = TIFFNumberOfStrips(tfile);
   uint32_t ndirs = TIFFNumberOfDirectories(tfile);
 
-  if(0)
-  {
-    if(gotB){
-      printf(" TIFFTAG_IMAGEDEPTH: %u\n", B);}
-    printf(" TIFFTAG_BITSPERSAMPLE: %u\n", BPS);
-    printf(" size: %zu x %zu, %zu bits\n", (size_t) M, (size_t) N, (size_t) BPS);
-    printf(" # strips: %zu \n", (size_t) nstrips);
-    printf(" strip size (ssize): %zu bytes \n", (size_t) ssize);
-    printf(" # dirs (slices): %zu\n", (size_t) ndirs);
-  }
 
   if(TIFFIsTiled(tfile))
   {
@@ -541,18 +517,18 @@ int fim_tiff_to_raw(const char * fName, const char * oName)
     return -1;
   }
 
-if(isFloat)
-{
-  floattoraw(tfile, oName, ssize, ndirs, nstrips, M*N);
-}
-if(isUint)
-{
-  uint16toraw(tfile, oName, ssize, ndirs, nstrips, M*N);
-}
+  if(isFloat)
+  {
+    floattoraw(tfile, oName, ssize, ndirs, nstrips, M*N);
+  }
+  if(isUint)
+  {
+    uint16toraw(tfile, oName, ssize, ndirs, nstrips, M*N);
+  }
 
-TIFFClose(tfile);
+  TIFFClose(tfile);
 
-return 0;
+  return 0;
 }
 
 int fim_tiff_from_raw(const char * fName, int64_t M, int64_t N, int64_t P,
@@ -1004,3 +980,143 @@ int main(int argc, char ** argv)
   return 0;
 }
 #endif
+
+
+char * tiff_is_supported(TIFF * tiff)
+{
+  char * errStr = malloc(1024);
+  if(tiff == NULL) {
+    sprintf(errStr, "Can't be opened!");
+    return errStr;
+  }
+
+  // Tags: ImageWidth and ImageLength
+  uint32_t _M = 0, _N = 0, BPS = 0, SF = 0, CMP=0;
+  TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &_N);
+  TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &_M);
+  TIFFGetField(tiff, TIFFTAG_BITSPERSAMPLE, &BPS);
+  int gotSF = TIFFGetField(tiff, TIFFTAG_SAMPLEFORMAT, &SF);
+  int gotCMP = TIFFGetField(tiff, TIFFTAG_COMPRESSION, &CMP);
+
+  if(gotCMP)
+  {
+    if(CMP != 1)
+    {
+      sprintf(errStr, "TIFFTAG_COMPRESSION=%u is not supported\n", CMP);
+      return errStr;
+    }
+  }
+
+  int isUint = 0;
+
+  if(gotSF)
+  {
+    if( SF == SAMPLEFORMAT_UINT)
+    {
+      isUint = 1;
+    }
+  } 
+  else {
+    printf("Warning: TIFFTAG_SAMPLEFORMAT not specified, assuming uint but that could be wrong!\n");
+    isUint = 1;
+  }
+
+  if(!(isUint))
+  {
+    sprintf(errStr, "Only unsigned integer and float images are supported\n");
+    return errStr;
+  }
+
+  if(isUint && !(BPS == 16))
+  {
+    sprintf(errStr, "Unsigned %d-bit images are not supported, 16.\n", BPS);
+    return errStr;
+  }
+
+  // tiffio.h:typedef uint32 ttag_t;
+  uint32_t PTAG = 0;
+  int gotptag = TIFFGetField(tiff, TIFFTAG_PHOTOMETRIC, &PTAG);
+
+  if(gotptag != 1)
+  {
+    printf("WARNING: Could not read TIFFTAG_PHOTOMETRIC, assuming minIsBlack\n");
+    PTAG=1;
+  }
+
+  if(PTAG != 1)
+  {
+    sprintf(errStr, "Only BlackIsZero are supported Photometric Interpretations, tag found: %u\n", PTAG);
+    return errStr;
+  }
+
+  free(errStr);  
+  return NULL;
+}
+
+int fim_tiff_maxproj(char * in, char * out)
+{
+  int64_t M, N, P;
+
+  if(fim_tiff_get_size(in, &M, &N, &P))
+  {
+    printf("Can't open %s to get image dimension\n", in);
+    return -1;
+  }
+
+  TIFF * input = TIFFOpen(in, "r");
+  char * errStr = tiff_is_supported(input);
+  if(errStr != NULL)
+  {
+    printf("Can't process %s\n", in);
+    printf("Error: %s\n", errStr);
+    return -1;
+  }
+
+  TIFF * output = TIFFOpen(out, "w");
+  TIFFSetField(output, TIFFTAG_IMAGEWIDTH, M);  
+  TIFFSetField(output, TIFFTAG_IMAGELENGTH, N); 
+  TIFFSetField(output, TIFFTAG_SAMPLESPERPIXEL, 1); 
+  TIFFSetField(output, TIFFTAG_BITSPERSAMPLE, 16); 
+  TIFFSetField(output, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);
+  TIFFSetField(output, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
+  TIFFSetField(output, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
+  TIFFSetField(output, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_UINT);
+  TIFFSetField(output, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
+  TIFFSetField(output, TIFFTAG_PAGENUMBER, 1, 1);
+
+  tmsize_t ssize = TIFFStripSize(input); // Seems to be in bytes
+  printf("Strip size: %zu b\n", (size_t) ssize);
+  uint32_t nstrips = TIFFNumberOfStrips(input);
+
+  uint16_t * mstrip = _TIFFmalloc(ssize); // For max over all directories
+  uint16_t * strip    = _TIFFmalloc(ssize);
+
+  // Input is 16 bit unsigned int.
+  for(int64_t nn = 0; nn<nstrips; nn++) // Each strip
+  {
+    memset(mstrip, 0, ssize);
+    tsize_t read = 0;
+    for(int64_t pp = 0; pp<P; pp++) // For each directory
+    {
+      TIFFSetDirectory(input, pp); // Does it keep the location for each directory?
+      read = TIFFReadEncodedStrip(input, nn, strip, (tsize_t)-1);
+      for(int64_t kk = 0; kk<read/2; kk++)
+      {
+        if(strip[kk] > mstrip[kk])
+        {
+          mstrip[kk] = strip[kk];
+        }
+      }
+    }
+    TIFFWriteRawStrip(output, 0, mstrip, read);
+  }
+
+  _TIFFfree(strip);
+  _TIFFfree(mstrip);
+
+  TIFFClose(input);
+  TIFFClose(output);
+
+  return 0;
+}
+
