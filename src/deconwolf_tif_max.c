@@ -6,6 +6,7 @@
 
 void usage(int argc, char ** argv)
 {
+  printf("Make a maximum intensity projection of uint16_t multi-page tiff file\n");
   printf("Usage: %s input.tif [output.tif]\n", argv[0]);
 }
 
@@ -14,6 +15,7 @@ int main(int argc, char ** argv)
   if(argc < 2)
   {
     usage(argc, argv);
+    exit(1);
   }
 
   char * inFile = argv[1];
