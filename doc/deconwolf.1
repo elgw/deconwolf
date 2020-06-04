@@ -27,5 +27,7 @@
 .Sh DESCRIPTION
 .Nm DECONWOLF 
 is used to deconvolve 3D stacks using a user-provided point spread function.
+.Sh NOTES
+.Nm DECONWOLF does not care about the pixel sizes that are specified in the tiff files. I.e. it does not rescale the images and leaves the responsibility to the user of using a matching pair of image and PSF with the same pixel size.
 .Sh EXAMPLES
 
