@@ -1,6 +1,5 @@
 # Todo
  - [ ] Documentation, examples and test data.
- - [ ] A higher level interface with facilities for handling and generation of PSFs.
  - [ ] Flag to save one image after each iteration (to facilitate setting the number of iterations).
  - [ ] Demos, for example on the effect of the tiling.
  - [ ] Use tif tags to write meta data (also to transfer from input image).
@@ -11,8 +10,10 @@
  - [ ] Include normal `Richardson-Lucy`
  - [ ] Make `FFTW_ESTIMATE` an option.
  - [ ] Double check the tiling weights using gradients and other patterns.
- - [ ] *Reuse* more tile sizes in order to keep the number of training sessions low.
- - [ ] faster BigTIFF writes, examples exist in [matlab](https://github.com/rharkes/Fast_Tiff_Write/blob/master/Fast_BigTiff_Write.m), (In C++)[https://github.com/jkriege2/TinyTIFF], ...
+ - [ ] Give some love to deconwolf_batch.py (tiff vs tif, help mapping channels, install systemwide, etc)
+ - [x] A higher level interface with facilities for handling and generation of PSFs. -- runPSFGenerator.py
+ - [x] *Reuse* more tile sizes in order to keep the number of training sessions low.
+ - [x] faster BigTIFF writes, examples exist in [matlab](https://github.com/rharkes/Fast_Tiff_Write/blob/master/Fast_BigTiff_Write.m), (In C++)[https://github.com/jkriege2/TinyTIFF], ... -- decided that it was not necessary
  - [x] Write as BigTIFF if the images don't fit into regular TIFF files.
  - [x] Does gomp use more threads than it should? -- It looks like gomp creates more threads than needed, however only the specified number of threads are active at the same time.
  - [x] Never load the full image in tile mode.
