@@ -1188,6 +1188,10 @@ if(0)
   tiling_free(T);
   free(T);
 
+  if(s->verbosity > 2)
+{
+  printf("converting %s to %s\n", tfile, s->outFile);
+}
   fim_tiff_from_raw(s->outFile, M, N, P, tfile);
 
   if(s->verbosity < 5)

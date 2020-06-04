@@ -14,3 +14,6 @@ fim_ut:
 
 dw_tiff_max:
 	$(cc) fim.c fim_tiff.c deconwolf_tif_max.c $(CFLAGS2) -lm -ltiff -lfftw3f -lfftw3f_threads -o dw_tiff_max
+
+tiff_from_raw:
+	$(cc) tiff_from_raw.c fim_tiff.c $(CFLAGS2) -lm -ltiff -o ../bin/tiff_from_raw

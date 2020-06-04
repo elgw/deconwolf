@@ -314,21 +314,23 @@ void readFloat(TIFF * tfile, afloat * V,
 float raw_file_single_max(const char * rName, const size_t N)
 {
   // Get max value from raw data file with N floats
-
-  size_t buf_size = 1024*1024*sizeof(float);
+//  printf("Getting max value from %s\n", rName);
+  size_t buf_size = 1024*1024;
   float  max = -INFINITY;
-  float * buf = malloc(buf_size);
+  float * buf = malloc(buf_size*sizeof(float));
   FILE * fid = fopen(rName, "r");
   if(fid == NULL)
   {
     printf("ERROR: unable to open %s\n", rName);
   }
   size_t nread = 0;
-  while(nread + buf_size < N*sizeof(float))
+//  printf("N = %zu\n", N);
+  while(nread + buf_size < N)
   {
-    nread = fread(buf, buf_size, 1, fid);
-    (void) nread;
-    for(size_t kk = 0; kk<buf_size/sizeof(float); kk++)
+    size_t nr = fread(buf, buf_size*sizeof(float), 1, fid);
+    assert(nr > 0);
+    (void) nr;
+    for(size_t kk = 0; kk<buf_size; kk++)
     {
       if(buf[kk] > max)
       {
@@ -336,11 +338,12 @@ float raw_file_single_max(const char * rName, const size_t N)
       }
     }
     nread += buf_size;
+  //  printf("%zu\n", nread);
   }
-  size_t rem = N*sizeof(float)-nread;
-  nread =  fread(buf, rem, 1, fid);
+  size_t rem = N-nread;
+  nread =  fread(buf, rem*sizeof(float), 1, fid);
   (void) nread;
-  for(size_t kk = 0; kk<rem/sizeof(float); kk++)
+  for(size_t kk = 0; kk<rem; kk++)
   {
     if(buf[kk] > max)
     {
@@ -531,9 +534,10 @@ int fim_tiff_to_raw(const char * fName, const char * oName)
   return 0;
 }
 
-int fim_tiff_from_raw(const char * fName, int64_t M, int64_t N, int64_t P,
-    const char * rName)
-  // Convert a raw float file to uint16 tif
+int fim_tiff_from_raw(const char * fName, // Name of tiff file to be written
+    int64_t M, int64_t N, int64_t P, // Image dimensions
+    const char * rName) // name of raw file
+  /* Convert a raw float file to uint16 tif */
 {
 
   size_t bytesPerSample = sizeof(uint16_t);
@@ -545,8 +549,14 @@ int fim_tiff_from_raw(const char * fName, int64_t M, int64_t N, int64_t P,
     printf("WARNING: File is > 2 GB, using BigTIFF format\n");
   }
 
-  TIFF* out = TIFFOpen(fName, formatString);
-  assert(out != NULL);
+  TIFF * out = TIFFOpen(fName, formatString);
+ // printf("Opened %s for writing using formatString: %s\n", fName, formatString);
+
+  if(out == NULL)
+  {
+    printf("ERROR: Failed to open %s for writing using formatString: %s\n", fName, formatString);
+    exit(1);
+  }
 
   size_t linbytes = M*bytesPerSample;
   uint16_t * buf = _TIFFmalloc(linbytes);
@@ -554,9 +564,25 @@ int fim_tiff_from_raw(const char * fName, int64_t M, int64_t N, int64_t P,
   memset(buf, 0, linbytes);
 
   // Determine max value
-  float scaling = 1/raw_file_single_max(rName, MNP);
+
+  float scaling = 1;
+  float rawmax = raw_file_single_max(rName, MNP);
+  if(rawmax > 0)
+  {
+    scaling = 65535/rawmax;
+  }
+//  printf("Max value of file: %f\n", rawmax);
 
   FILE * rf = fopen(rName, "r");
+  if(rf == NULL)
+  {
+    printf("Failed to open %s for writing\n", rName);
+  }
+
+// Can TIFFCheckpointDirectory be used to speed up this?
+// http://maptools-org.996276.n3.nabble.com/help-writing-thumbnails-to-TIFF-file-td3824.html
+// No, that isn't the trick to use.
+// The "fast" writers puts the metadata last, that should be the way to go...
 
   for(size_t dd = 0; dd<P; dd++)
   {
@@ -584,7 +610,7 @@ int fim_tiff_from_raw(const char * fName, int64_t M, int64_t N, int64_t P,
 
       for(size_t mm = 0; mm<M; mm++)
       {
-        buf[mm] = (uint16_t) (rbuf[mm]*scaling*65535.0);
+        buf[mm] = (uint16_t) (rbuf[mm]*scaling);
       }
 
       int ok = TIFFWriteScanline(out, // TIFF

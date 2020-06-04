@@ -29,7 +29,7 @@ CFLAGS += $(XFLAGS)
 
 CC = cc $(CFLAGS)
 
-EXECUTABLE = bin/deconwolf
+EXECUTABLE = bin/deconwolf 
 OBJECTS = fim.o tiling.o fft.o fim_tiff.o dw.o deconwolf.o
 LIBRARIES = -lm -lfftw3f -lfftw3f_threads -ltiff
 SRCDIR = src/
