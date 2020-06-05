@@ -1111,7 +1111,7 @@ int fim_tiff_maxproj(char * in, char * out)
   TIFFSetField(output, TIFFTAG_PAGENUMBER, 1, 1);
 
   tmsize_t ssize = TIFFStripSize(input); // Seems to be in bytes
-  printf("Strip size: %zu b\n", (size_t) ssize);
+//  printf("Strip size: %zu b\n", (size_t) ssize);
   uint32_t nstrips = TIFFNumberOfStrips(input);
 
   uint16_t * mstrip = _TIFFmalloc(ssize); // For max over all directories
