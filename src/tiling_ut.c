@@ -8,11 +8,20 @@
 void test_getWeight1d()
 {
   float a = 1, b = 6, c = 8, d = 12;
-  printf("test_getWeight1d\n");
-  printf("[%.0f %.0f %.0f %.0f]\n", a, b, c, d);
+  printf(" -> test_getWeight1d\n");
+  printf("Assuming that the tile goes from %.0f to %.0f\n", b, c);
+  printf("See the values over the range from %.0f to %.0f\n", a, d);
+
   for(int kk = 0; kk<14; kk++)
   {
-    printf("%d %.2f\n", kk, getWeight1d(a, b, c, d, kk));
+    float w = getWeight1d(a, b, c, d, kk);
+    printf("%d %.2f\n", kk, w);
+    if(kk >= b && kk <= c)
+    {
+      assert(w == 1);
+    } else {
+      assert(w < 1);
+    }
   }
   printf("\n");
 }
@@ -20,10 +29,11 @@ void test_getWeight1d()
 
 void test_weights(int M, int N, int P, int maxSize, int overlap)
   {
+printf(" -> test_weights\n");
   tiling * T = tiling_create(M,N,P, maxSize, overlap);
   tiling_show(T);
 
-  printf("Generating weight map\n"); fflush(stdout);
+  printf("Generating weight map ... \n"); fflush(stdout);
   float * W = malloc(M*N*sizeof(float));
   for(int aa = 0; aa<M; aa++)
   {
@@ -34,16 +44,37 @@ void test_weights(int M, int N, int P, int maxSize, int overlap)
       W[aa + bb*M] = w;
     }
   }
-
  
   char outFile[] = "tiling_ut_weights.tif";
-  printf("Writing weights to %s\n", outFile); fflush(stdout);
-  fim_tiff_write(outFile, W, M, N, 1);
+  printf("Writing weights from all tiles to %s\n", outFile); fflush(stdout);
 
   // Assuming that is it same behaviour for all P
  for(size_t kk = 0; kk<M*N; kk++)
   {
     assert(W[kk] > 0);
+  }
+
+
+  fim_tiff_write(outFile, W, M, N, 1);
+  for(int aa = 0; aa<M; aa++)
+  {
+    for(int bb = 0; bb<N; bb++)
+    {
+      float w = tile_getWeight(T->tiles[1], aa, bb, 0, 0);
+      assert(w>=0);
+      W[aa + bb*M] = w;
+    }
+  }
+
+  char outFileTile[] = "tiling_ut_weights_tile1.tif";
+  printf("Writing weights from the first tile to %s\n", outFileTile); fflush(stdout);
+  fim_tiff_write(outFileTile, W, M, N, 1);
+
+
+  // Assuming that is it same behaviour for all P
+ for(size_t kk = 0; kk<M*N; kk++)
+  {
+    assert(W[kk] >= 0);
   }
 
   free(W);

@@ -92,7 +92,7 @@ def getConfig(NA=1.45, lam=780, method="BW", resz=200,
     return config
 
 # Common settings
-ss100x = {'run' : 1, # set to 0 for dry run
+ss_BS1_100x = {'run' : 1, # set to 0 for dry run
       'NA' : 1.45,
       'resxy' : 130.0,
       'resz' : 300,
@@ -106,7 +106,7 @@ ss100x = {'run' : 1, # set to 0 for dry run
       'ppos' : 2000,
       'mag' : '100x'}
 
-ss60x = {'run' : 1, # set to 0 for dry run
+ss_BS1_60x = {'run' : 1, # set to 0 for dry run
       'NA' : 1.4,
       'resxy' : 216.6,
       'resz' : 300,
@@ -120,16 +120,30 @@ ss60x = {'run' : 1, # set to 0 for dry run
       'ppos' : 2000,
       'mag' : '60x'}
 
-ss = ss60x;
+ss_BS2 = {'run' : 1, # set to 0 for dry run
+      'NA' : 1.4,
+      'resxy' : 108.3,
+      'resz' : 600,
+      'nIM' : 1.515,
+      'NZ': 181,
+      'NXY' : 181,
+      'method': "BW",
+      'oversample': 0,
+      'nSample' : 1.33,
+      'wDist': 130, # um (Su said 140 ...)
+      'ppos' : 2000,
+      'mag' : 'xx'}
+
+ss = ss_BS2;
 
 # Based on the dyes
-channels = {'a594': 617,
+channels = {'dapi': 461,
+            'Cy5': 664, # alexa 647
+            'a594': 617,
             'ir800': 794, # or 814 if it is alexa790
             'a700':723,
             'a488': 519,
-            'Cy5': 664, # alexa 647
-            'tmr': 562,
-            'dapi': 461}
+            'tmr': 562}
 
 ss['outfolder'] = f"PSF{ss['method']}_{ss['mag']}_{ss['resz']}/"
 

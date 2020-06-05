@@ -39,7 +39,7 @@
 
 #define tictoc struct timespec tictoc_start, tictoc_end;
 #define tic clock_gettime(CLOCK_REALTIME, &tictoc_start);
-#define toc(X) clock_gettime(CLOCK_REALTIME, &tictoc_end); printf(#X); printf(" %f s\n", timespec_diff(&tictoc_end, &tictoc_start));
+#define toc(X) clock_gettime(CLOCK_REALTIME, &tictoc_end); printf(#X); printf(" %f s\n", timespec_diff(&tictoc_end, &tictoc_start)); fflush(stdout);
 
 /* This is what fftw_malloc returns
  * http://www.fftw.org/fftw3_doc/SIMD-alignment-and-fftw_005fmalloc.html#SIMD-alignment-and-fftw_005fmalloc
@@ -67,6 +67,7 @@ dw_opts * dw_opts_new(void)
   s->relax = 0;
   s->xycropfactor = 0.001;
   s->commandline = NULL;
+  s->onetile = 0;
   return s;
 }
 
@@ -126,6 +127,10 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
   {
     fprintf(f, "PSF relaxation: %f\n", s->relax);
   }
+  if(s->onetile == 1)
+  {
+    fprintf(f, "DEBUG OPTION: ONETILE = TRUE (only first tile will be deconvolved)\n");
+  }
   fprintf(f, "\n");
 }
 
@@ -149,10 +154,10 @@ void dw_fprint_info(FILE * f, dw_opts * s)
 {
   f == NULL ? f = stdout : 0;
   fprintf(f, "deconwolf: '%s' PID: %d\n", deconwolf_version, (int) getpid());
-   char cwd[1024];
-   if (getcwd(cwd, sizeof(cwd)) != NULL) {
-       fprintf(f, "PWD: %s\n", cwd);
-   } 
+  char cwd[1024];
+  if (getcwd(cwd, sizeof(cwd)) != NULL) {
+    fprintf(f, "PWD: %s\n", cwd);
+  } 
 
   if(s->commandline != NULL)
   {
@@ -196,7 +201,7 @@ void deconwolf_batch(dw_opts * s)
 static void getCmdLine(int argc, char ** argv, dw_opts * s)
 {
   // Copy the command line to s->commandline
- int lcmd=0;
+  int lcmd=0;
   for(int kk = 0; kk<argc; kk++)
   {
     lcmd += strlen(argv[kk]);
@@ -210,7 +215,7 @@ static void getCmdLine(int argc, char ** argv, dw_opts * s)
     pos += strlen(argv[kk])+1;
   }
   s->commandline[pos-1] = '\0';
-//  printf("argc: %d cmd: '%s'\n", argc, s->commandline);
+  //  printf("argc: %d cmd: '%s'\n", argc, s->commandline);
 }
 
 void dw_argparsing(int argc, char ** argv, dw_opts * s)
@@ -238,11 +243,12 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     { "method",       required_argument, NULL,   'm' },
     { "relax",        required_argument, NULL,   'r' },
     { "xyfactor",     required_argument, NULL,   'x' },
+    { "onetile",      no_argument,       NULL,   'T' },
     { NULL,           0,                 NULL,   0   }
   };
 
   int ch;
-  while((ch = getopt_long(argc, argv, "vho:n:c:p:s:p:", longopts, NULL)) != -1)
+  while((ch = getopt_long(argc, argv, "vho:n:c:p:s:p:T", longopts, NULL)) != -1)
   {
     switch(ch) {
       case 'v':
@@ -310,6 +316,9 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
           exit(1);
         }
         break;
+      case 'T':
+        s->onetile = 1;
+        break;
     }
   }
 
@@ -361,6 +370,28 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
   sprintf(s->logFile, "%s.log.txt", s->outFile);
 
   //  printf("Options received\n"); fflush(stdout);
+}
+
+
+void fsetzeros(const char * fname, size_t N)
+  /* Create a new file and fill it with N bytes of zeros
+  */
+{
+  size_t bsize = 1024*1024;
+  char * buffer = malloc(bsize);
+  memset(buffer, 0, bsize);
+  FILE * fid = fopen(fname, "wb");
+  size_t written = 0;
+  while(written + bsize < N)
+  {
+    fwrite(buffer, bsize, 1, fid);
+    written += bsize;
+  }
+  //  printf("\r %zu / %zu \n", written, N); fflush(stdout);
+  
+  fwrite(buffer, N-written, 1, fid);
+  fclose(fid);
+  free(buffer);
 }
 
 #ifdef __APPLE__
@@ -435,7 +466,7 @@ void fprint_peakMemory(FILE * fout)
 }
 
 
-float getErrorX(const float * restrict y, const float * restrict g, const int M, const int N, const int P, const int wM, const int wN, const int wP)
+float getErrorX(const float * restrict y, const float * restrict g, const int64_t M, const int64_t N, const int64_t P, const int64_t wM, const int64_t wN, const int64_t wP)
 {
   /* Same as getError with the difference that G is expanded to MxNxP */
   assert(wM>=M);
@@ -458,16 +489,16 @@ float getErrorX(const float * restrict y, const float * restrict g, const int M,
 
 
 float getError(const afloat * restrict y, const afloat * restrict g, 
-    const int M, const int N, const int P, 
-    const int wM, const int wN, const int wP)
+    const int64_t M, const int64_t N, const int64_t P, 
+    const int64_t wM, const int64_t wN, const int64_t wP)
 {
   double e = 0;
 #pragma omp parallel for reduction(+: e)
-  for(int c = 0; c<P; c++)
+  for(int64_t c = 0; c<P; c++)
   {
-    for(int b = 0; b<N; b++)
+    for(int64_t b = 0; b<N; b++)
     {
-      for(int a = 0; a<M; a++)
+      for(int64_t a = 0; a<M; a++)
       {
         double yval = y[a + b*wM + c*wM*wN];
         double gval = g[a + b*M + c * M*N];
@@ -480,14 +511,14 @@ float getError(const afloat * restrict y, const afloat * restrict g,
   return (float) e;
 }
 
-float getError_ref(float * y, float * g, int M, int N, int P, int wM, int wN, int wP)
+float getError_ref(float * y, float * g, int64_t M, int64_t N, int64_t P, int64_t wM, int64_t wN, int64_t wP)
 {
   double e = 0;
-  for(int a = 0; a<M; a++)
+  for(int64_t a = 0; a<M; a++)
   {
-    for(int b = 0; b<N; b++)
+    for(int64_t b = 0; b<N; b++)
     {
-      for(int c = 0; c<P; c++)
+      for(int64_t c = 0; c<P; c++)
       {
         double yval = y[a + b*wM + c*wM*wN];
         double gval = g[a + b*M + c * M*N];
@@ -507,8 +538,8 @@ float iter(
     fftwf_complex * restrict cKr, // = NULL
     afloat * restrict f, // Current guess
     afloat * restrict W, // Weights
-    const int wM, const int wN, const int wP, // expanded size
-    const int M, const int N, const int P, // input image size
+    const int64_t wM, const int64_t wN, const int64_t wP, // expanded size
+    const int64_t M, const int64_t N, const int64_t P, // input image size
     const dw_opts * s)
 {
   // We could reduce memory even further by using 
@@ -550,8 +581,8 @@ float iter(
   return error;
 }
 
-fftwf_complex * initial_guess(const int M, const int N, const int P, 
-    const int wM, const int wN, const int wP)
+fftwf_complex * initial_guess(const int64_t M, const int64_t N, const int64_t P, 
+    const int64_t wM, const int64_t wN, const int64_t wP)
 {
   /* Create initial guess: the fft of an image that is 1 in MNP and 0 outside
    * M, N, P is the dimension of the microscopic image
@@ -562,10 +593,11 @@ fftwf_complex * initial_guess(const int M, const int N, const int P,
   assert(wM >= M); assert(wN >= N); assert(wP >= P);
 
   afloat * one = fim_zeros(wM*wN*wP);
+
 #pragma omp parallel for
-  for(int cc = 0; cc < P; cc++) {
-    for(int bb = 0; bb < N; bb++) {
-      for(int aa = 0; aa < M; aa++) {
+  for(int64_t cc = 0; cc < P; cc++) {
+    for(int64_t bb = 0; bb < N; bb++) {
+      for(int64_t aa = 0; aa < M; aa++) {
         one[aa + wM*bb + wM*wN*cc] = 1;
       }
     }
@@ -623,8 +655,8 @@ float update_alpha(const afloat * restrict g, const afloat * restrict gm, const 
   return alpha;
 }
 
-float * deconvolve_w(afloat * restrict im, const int M, const int N, const int P,
-    const afloat * restrict psf, const int pM, const int pN, const int pP,
+float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, const int64_t P,
+    const afloat * restrict psf, const int64_t pM, const int64_t pN, const int64_t pP,
     dw_opts * s)
 {
   if(s->verbosity > 1)
@@ -632,10 +664,10 @@ float * deconvolve_w(afloat * restrict im, const int M, const int N, const int P
     printf("Deconvolving\n");
   }
 
-if(s->nIter == 0)
-{  
-  return fim_copy(im, M*N*P);
-}
+  if(s->nIter == 0)
+  {  
+    return fim_copy(im, M*N*P);
+  }
 
   /*Deconvolve im using psf */
   const int nIter = s->nIter;
@@ -648,20 +680,20 @@ if(s->nIter == 0)
 
   // This is the dimensions that we will work with
   // called M1 M2 M3 in the MATLAB code
-  int wM = M + pM -1;
-  int wN = N + pN -1;
-  int wP = P + pP -1;
+  int64_t wM = M + pM -1;
+  int64_t wN = N + pN -1;
+  int64_t wP = P + pP -1;
   size_t wMNP = wM*wN*wP;
 
   if(s->verbosity > 0)
-  { printf("image: [%dx%dx%d], psf: [%dx%dx%d], job: [%dx%dx%d] (%zu voxels)\n",
+  { printf("image: [%ldx%ldx%ld], psf: [%ldx%ldx%ld], job: [%ldx%ldx%ld] (%zu voxels)\n",
       M, N, P, pM, pN, pP, wM, wN, wP, wMNP);
   }
   if(s->verbosity > 1)
   {
-    printf("Estimated peak memory usage: %.1f GB\n", wMNP*65.0/1e9);
+    printf("Estimated peak memory usage: %.1f GB\n", wMNP*35.0/1e9);
   }
-  fprintf(s->log, "image: [%dx%dx%d]\npsf: [%dx%dx%d]\njob: [%dx%dx%d] (%zu voxels)\n",
+  fprintf(s->log, "image: [%ldx%ldx%ld]\npsf: [%ldx%ldx%ld]\njob: [%ldx%ldx%ld] (%zu voxels)\n",
       M, N, P, pM, pN, pP, wM, wN, wP, wMNP);
   fflush(s->log);
 
@@ -805,8 +837,8 @@ if(s->nIter == 0)
 
   fftwf_free(W); // is P1
   afloat * out = fim_subregion(x, wM, wN, wP, M, N, P);
-//  printf("DEBUG: writing final_full_tif\n");  
-//  fim_tiff_write("final_full.tif", x, wM, wN, wP);
+  //  printf("DEBUG: writing final_full_tif\n");  
+  //  fim_tiff_write("final_full.tif", x, wM, wN, wP);
   fftwf_free(f);
   if(x != NULL)
   {
@@ -826,25 +858,25 @@ if(s->nIter == 0)
   return out;
 }
 
-float * psf_autocrop_centerZ(float * psf, int * pM, int * pN, int * pP,  // psf and size
+float * psf_autocrop_centerZ(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  // psf and size
     dw_opts * s)
 {
 
-  const int m = pM[0];
-  const int n = pN[0];
-  const int p = pP[0];
+  const int64_t m = pM[0];
+  const int64_t n = pN[0];
+  const int64_t p = pP[0];
 
-  const int midm = (m-1)/2;
-  const int midn = (n-1)/2;
-  const int midp = (p-1)/2;
+  const int64_t midm = (m-1)/2;
+  const int64_t midn = (n-1)/2;
+  const int64_t midp = (p-1)/2;
 
-//  printf("m: %d, n:%d, p:%d\n", m, n, p);
-//  printf("midm: %d, midn: %d, midp: %d\n", midm, midn, midp);
+  //  printf("m: %d, n:%d, p:%d\n", m, n, p);
+  //  printf("midm: %d, midn: %d, midp: %d\n", midm, midn, midp);
 
   float maxvalue = -INFINITY;
-  int maxp = -1;
+  int64_t maxp = -1;
 
-  for(int pp = 0; pp<p; pp++)
+  for(int64_t pp = 0; pp<p; pp++)
   {
     size_t idx = midm + midn*m + pp*m*n;
     if(psf[idx] > maxvalue)
@@ -864,9 +896,9 @@ float * psf_autocrop_centerZ(float * psf, int * pM, int * pN, int * pP,  // psf 
   }
 
 
-  int m0 = 0, m1 = m-1;
-  int n0 = 0, n1 = n-1;
-  int p0 = maxp, p1 = maxp;
+  int64_t m0 = 0, m1 = m-1;
+  int64_t n0 = 0, n1 = n-1;
+  int64_t p0 = maxp, p1 = maxp;
 
   while(p0 > 1 && p1+2 < p)
   {
@@ -874,12 +906,12 @@ float * psf_autocrop_centerZ(float * psf, int * pM, int * pN, int * pP,  // psf 
   }
   if(s->verbosity > 2)
   {
-    printf("PSF has %d slices\n", p);
-    printf("brighest at plane %d\n", maxp);
-    printf("Selecting Z-planes: %d -- %d\n", p0, p1);
+    printf("PSF has %ld slices\n", p);
+    printf("brighest at plane %ld\n", maxp);
+    printf("Selecting Z-planes: %ld -- %ld\n", p0, p1);
   }
 
-  fprintf(s->log, "Selecting Z-planes %d -- %d\n", p0, p1);
+  fprintf(s->log, "Selecting Z-planes %ld -- %ld\n", p0, p1);
 
   float * psf_cropped = fim_get_cuboid(psf, m, n, p,
       m0, m1, n0, n1, p0, p1);
@@ -889,14 +921,14 @@ float * psf_autocrop_centerZ(float * psf, int * pM, int * pN, int * pP,  // psf 
 
 }
 
-float * psf_autocrop_byImage(float * psf, int * pM, int * pN, int * pP,  // psf and size
-    int M, int N, int P, // image size
+float * psf_autocrop_byImage(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  // psf and size
+    int64_t M, int64_t N, int64_t P, // image size
     dw_opts * s)
 {
 
-  const int m = pM[0];
-  const int n = pN[0];
-  const int p = pP[0];
+  const int64_t m = pM[0];
+  const int64_t n = pN[0];
+  const int64_t p = pP[0];
 
   if((p % 2) == 0)
   {
@@ -905,21 +937,21 @@ float * psf_autocrop_byImage(float * psf, int * pM, int * pN, int * pP,  // psf 
   }
 
   // Optimal size
-  int mopt = (M-1)*2 + 1;
-  int nopt = (N-1)*2 + 1;
-  int popt = (P-1)*2 + 1;
+  int64_t mopt = (M-1)*2 + 1;
+  int64_t nopt = (N-1)*2 + 1;
+  int64_t popt = (P-1)*2 + 1;
 
   if(p < popt)
   {
-    fprintf(s->log, "WARNING: The PSF has only %d slices, %d would be better.\n", p, popt);
+    fprintf(s->log, "WARNING: The PSF has only %ld slices, %ld would be better.\n", p, popt);
     return psf;
   }
 
   if(m > mopt || n > nopt || p > popt)
   { 
-    int m0 = 0, m1 = m-1;
-    int n0 = 0, n1 = n-1;
-    int p0 = 0, p1 = p-1;
+    int64_t m0 = 0, m1 = m-1;
+    int64_t n0 = 0, n1 = n-1;
+    int64_t p0 = 0, p1 = p-1;
     if(m > mopt)
     {
       m0 = (m-mopt)/2;
@@ -937,7 +969,7 @@ float * psf_autocrop_byImage(float * psf, int * pM, int * pN, int * pP,  // psf 
     }
     if(s->verbosity > 2)
     {
-      printf("! %d %d : %d %d : %d %d\n", m0, m1, n0, n1, p0, p1);
+      printf("! %ld %ld : %ld %ld : %ld %ld\n", m0, m1, n0, n1, p0, p1);
     }
     float * psf_cropped = fim_get_cuboid(psf, m, n, p,
         m0, m1, n0, n1, p0, p1);
@@ -949,10 +981,10 @@ float * psf_autocrop_byImage(float * psf, int * pM, int * pN, int * pP,  // psf 
 
     if(s->verbosity > 0)
     {
-      fprintf(stdout, "PSF crop [%d x %d x %d] -> [%d x %d x %d]\n", 
+      fprintf(stdout, "PSF crop [%ld x %ld x %ld] -> [%ld x %ld x %ld]\n", 
           m, n, p, pM[0], pN[0], pP[0]);
     }
-    fprintf(s->log, "PSF crop [%d x %d x %d] -> [%d x %d x %d]\n", 
+    fprintf(s->log, "PSF crop [%ld x %ld x %ld] -> [%ld x %ld x %ld]\n", 
         m, n, p, pM[0], pN[0], pP[0]);
 
     return psf_cropped;
@@ -961,18 +993,18 @@ float * psf_autocrop_byImage(float * psf, int * pM, int * pN, int * pP,  // psf 
   }
 }
 
-float * psf_autocrop_XY(float * psf, int * pM, int * pN, int * pP,  // psf and size
-    int M, int N, int P, // image size
+float * psf_autocrop_XY(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  // psf and size
+    int64_t M, int64_t N, int64_t P, // image size
     dw_opts * s)
 {
-// Find the y-z plane with the largest sum
+  // Find the y-z plane with the largest sum
   float maxsum = 0;
-  for(int xx = 0; xx<pM[0]; xx++)
+  for(int64_t xx = 0; xx<pM[0]; xx++)
   {
     float sum = 0;
-    for(int yy = 0; yy<pN[0]; yy++)
+    for(int64_t yy = 0; yy<pN[0]; yy++)
     {
-      for(int zz = 0; zz<pP[0]; zz++)
+      for(int64_t zz = 0; zz<pP[0]; zz++)
       {
         sum += psf[xx + yy*pM[0] + zz*pM[0]*pN[0]];
       }
@@ -980,19 +1012,19 @@ float * psf_autocrop_XY(float * psf, int * pM, int * pN, int * pP,  // psf and s
     sum > maxsum ? maxsum = sum : 0;
   }
 
-//  printf("X maxsum %f\n", maxsum);
+  //  printf("X maxsum %f\n", maxsum);
 
-  int first=-1;
+  int64_t first=-1;
   float sum = 0;
 
   while(sum < s->xycropfactor * maxsum)
   {
     first++;
     sum = 0;
-    int xx = first;
-    for(int yy = 0; yy<pN[0]; yy++)
+    int64_t xx = first;
+    for(int64_t yy = 0; yy<pN[0]; yy++)
     {
-      for(int zz = 0; zz<pP[0]; zz++)
+      for(int64_t zz = 0; zz<pP[0]; zz++)
       {
         sum += psf[xx + yy*pM[0] + zz*pM[0]*pN[0]];
       }
@@ -1017,15 +1049,15 @@ float * psf_autocrop_XY(float * psf, int * pM, int * pN, int * pP,  // psf and s
 
   if(s->verbosity > 0)
   {
-    printf("PSF X-crop: Removing %d planes in XY\n", first);
+    printf("PSF X-crop: Removing %ld planes in XY\n", first);
   }
 
   free(psf);
   return p;
 }
 
-float * psf_autocrop(float * psf, int * pM, int * pN, int * pP,  // psf and size
-    int M, int N, int P, // image size
+float * psf_autocrop(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  // psf and size
+    int64_t M, int64_t N, int64_t P, // image size
     dw_opts * s)
 {
   float * p = psf;
@@ -1042,8 +1074,8 @@ float * psf_autocrop(float * psf, int * pM, int * pN, int * pP,  // psf and size
 }
 
 
-float * deconvolve_tiles(float * restrict im, int M, int N, int P,
-    const float * restrict psf, const int pM, const int pN, const int pP,
+int deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
+    const float * restrict psf, const int64_t pM, const int64_t pN, const int64_t pP,
     dw_opts * s)
 {
 
@@ -1066,19 +1098,54 @@ float * deconvolve_tiles(float * restrict im, int M, int N, int P,
 
   if(s->verbosity > 0)
   {
-    printf("-> Divided the [%d x %d x %d] image into %d tiles\n", M, N, P, T->nTiles);
+    printf("-> Divided the [%ld x %ld x %ld] image into %d tiles\n", M, N, P, T->nTiles);
   }
 
-  // Output image
-  float * V = malloc(M*N*P*sizeof(float));
-  memset(V, 0, M*N*P*sizeof(float));
+  /* Output image initialize as zeros
+   * will be updated block by block
+   */
+  char * tfile = malloc(strlen(s->outFile)+10);
+  sprintf(tfile, "%s.raw", s->outFile);
 
+  if(s->verbosity > 0)
+  {
+    printf("Initializing %s to 0\n", tfile); fflush(stdout);
+  }
+    fsetzeros(tfile, (size_t) M* (size_t) N* (size_t) P*sizeof(float));
 
-  for(int tt = 0; tt<T->nTiles; tt++)
+      char * imFileRaw = malloc(strlen(s->imFile) + 10);
+    sprintf(imFileRaw, "%s.raw", s->imFile);
+
+      if(s->verbosity > 0)
+      {
+        printf("Dumping %s to %s (for quicker io)\n", s->imFile, imFileRaw);
+      }
+    
+    fim_tiff_to_raw(s->imFile, imFileRaw);
+    if(0){
+    printf("Writing to imdump.tif\n");
+    fim_tiff_from_raw("imdump.tif", M, N, P, imFileRaw);
+    }
+
+    //fim_tiff_write_zeros(s->outFile, M, N, P);
+    if(s->verbosity > 0)
+    {
+      printf("\n"); fflush(stdout);
+    }
+
+  int nTiles = T->nTiles;
+  if(s->onetile == 1)
+  {
+    nTiles = 1;
+    fprintf(s->log, "DEBUG: only the first tile to be deconvolved\n");
+    fprintf(stdout, "DEBUG: only the first tile to be deconvolved\n");
+  }
+
+  for(int tt = 0; tt < nTiles; tt++)
   {
     // Temporal copy of the PSF that might be cropped to fit the tile
     float * tpsf = fim_copy(psf, pM*pN*pP);
-    int tpM = pM, tpN = pN, tpP = pP;
+    int64_t tpM = pM, tpN = pN, tpP = pP;
 
     if(s->verbosity > 0)
     {
@@ -1086,11 +1153,22 @@ float * deconvolve_tiles(float * restrict im, int M, int N, int P,
       fprintf(s->log, "-> Processing tile %d / %d\n", tt+1, T->nTiles);
     }
 
-    float * im_tile = tiling_get_tile(T, tt, im);
+//    tictoc
+ //   tic
+    //float * im_tile = tiling_get_tile_tiff(T, tt, s->imFile);
+    float * im_tile = tiling_get_tile_raw(T, tt, imFileRaw);
+//    toc(tiling_get_tile_tiff)
 
-    int tileM = T->tiles[tt]->xsize[0];
-    int tileN = T->tiles[tt]->xsize[1];
-    int tileP = T->tiles[tt]->xsize[2];
+    int64_t tileM = T->tiles[tt]->xsize[0];
+    int64_t tileN = T->tiles[tt]->xsize[1];
+    int64_t tileP = T->tiles[tt]->xsize[2];
+    
+if(0)
+{
+  printf("writing to tiledump.tif\n");
+    fim_tiff_write("tiledump.tif", im_tile, tileM, tileN, tileP);
+    getchar();
+}
 
     fim_normalize_sum1(tpsf, tpM, tpN, tpP);
 
@@ -1103,13 +1181,30 @@ float * deconvolve_tiles(float * restrict im, int M, int N, int P,
         tpsf, tpM, tpN, tpP, // psf and size
         s);
     free(im_tile);
-    tiling_put_tile(T, tt, V, dw_im_tile);
+    tiling_put_tile_raw(T, tt, tfile, dw_im_tile);
     free(dw_im_tile);
     free(tpsf);
   }
   tiling_free(T);
   free(T);
-  return V;
+
+  if(s->verbosity > 2)
+{
+  printf("converting %s to %s\n", tfile, s->outFile);
+}
+  fim_tiff_from_raw(s->outFile, M, N, P, tfile);
+
+  if(s->verbosity < 5)
+  {
+    remove(tfile);
+  } else {
+    printf("Keeping %s for inspection, remove manually\n", tfile);
+  }
+  free(tfile);
+
+  remove(imFileRaw);
+  free(imFileRaw);
+  return 0;
 }
 
 
@@ -1118,7 +1213,7 @@ void timings()
 {
   printf("-> Timings\n");
   tictoc
-    int M = 1024, N = 1024, P = 50;
+    int64_t M = 1024, N = 1024, P = 50;
   float temp = 0;
 
   tic
@@ -1226,12 +1321,12 @@ void show_time(FILE * f)
   fprintf(f, "%s\n", tstring);
 }
 
-float * psf_makeOdd(float * psf, int * pM, int * pN, int *pP)
+float * psf_makeOdd(float * psf, int64_t * pM, int64_t * pN, int64_t *pP)
 {
   // Expand the psf so that it had odd dimensions it if doesn't already have that
-  int m = pM[0];
-  int n = pN[0];
-  int p = pP[0];
+  int64_t m = pM[0];
+  int64_t n = pN[0];
+  int64_t p = pP[0];
   int reshape = 0;
   if(m % 2 == 0)
   { m++; reshape = 1;}
@@ -1277,7 +1372,7 @@ int dw_run(dw_opts * s)
   dcw_init_log(s);
 
 
-#if _OPENMP
+#ifdef _OPENMP
   omp_set_num_threads(s->nThreads);
   omp_set_dynamic(1);
   //  printf("omp_get_max_threads: %d\n", omp_get_max_threads());
@@ -1291,49 +1386,56 @@ int dw_run(dw_opts * s)
 
   s->verbosity > 1 ? dw_fprint_info(NULL, s) : 0;
 
-  if(s->verbosity > 0)
+  int tiling = 0;
+  if(s->tiling_maxSize > 0)
   {
-
-    uint32_t a = 0, b =0, c = 0;
-    if(fim_tiff_get_size(s->imFile, &a, &b, &c))
-    {
-      printf("Failed to open %s\n", s->imFile);
-      return -1;
-    }
-
-    if(fim_tiff_get_size(s->psfFile, &a, &b, &c))
-    {
-      printf("Failed to open %s\n", s->imFile);
-      return -1;
-    }
-
-    printf("Reading %s\n", s->imFile);
-  }
-  int M = 0, N = 0, P = 0;
-  float * im = fim_tiff_read(s->imFile, &M, &N, &P, s->verbosity);
-  if(fim_min(im, M*N*P) < 0)
-  {
-    printf("min value of the image is %f, shifting to 0\n", fim_min(im, M*N*P));
-    fim_set_min_to_zero(im, M*N*P);
-    if(fim_max(im, M*N*P) < 1000)
-    {
-      fim_mult_scalar(im, M*N*P, 1000/fim_max(im, M*N*P));
-    }
+    tiling = 1;
   }
 
-  if(s->verbosity > 2)
-  {
-    printf("Image size: [%d x %d x %d]\n", M, N, P);
-  }
-  if(im == NULL)
+
+  int64_t M = 0, N = 0, P = 0;
+  if(fim_tiff_get_size(s->imFile, &M, &N, &P))
   {
     printf("Failed to open %s\n", s->imFile);
-    exit(1);
+    return -1;
   }
 
- // fim_tiff_write("identity.tif", im, M, N, P);
+  if(s->verbosity > 0)
+  {
+    printf("Image dimensions: %ld x %ld x %ld\n", M, N, P);
+  }
 
-  int pM = 0, pN = 0, pP = 0;
+
+  float * im = NULL;
+
+  if(tiling == 0)
+  {
+    if(s->verbosity > 0 )
+    {
+      printf("Reading %s\n", s->imFile);
+    }
+
+    im = fim_tiff_read(s->imFile, &M, &N, &P, s->verbosity);
+    if(fim_min(im, M*N*P) < 0)
+    {
+      printf("min value of the image is %f, shifting to 0\n", fim_min(im, M*N*P));
+      fim_set_min_to_zero(im, M*N*P);
+      if(fim_max(im, M*N*P) < 1000)
+      {
+        fim_mult_scalar(im, M*N*P, 1000/fim_max(im, M*N*P));
+      }
+    }
+    if(im == NULL)
+    {
+      printf("Failed to open %s\n", s->imFile);
+      exit(1);
+    }
+
+  }
+
+  // fim_tiff_write("identity.tif", im, M, N, P);
+
+  int64_t pM = 0, pN = 0, pP = 0;
   float * psf = NULL;
   if(1){
     if(s->verbosity > 0)
@@ -1389,45 +1491,46 @@ int dw_run(dw_opts * s)
   myfftw_start(s->nThreads);
 
   float * out = NULL;
-  if(s->tiling_maxSize <= 0)
-  {
 
+  if(tiling)
+  {
+    deconvolve_tiles(M, N, P, psf, pM, pN, pP, // psf and size
+        s);// settings
+  } else {
     fim_normalize_sum1(psf, pM, pN, pP);
     out = deconvolve_w(im, M, N, P, // input image and size
         psf, pM, pN, pP, // psf and size
         s);// settings
-  } else {
-    out = deconvolve_tiles(im, M, N, P, // input image and size
-        psf, pM, pN, pP, // psf and size
-        s);// settings
-  }
-  fftwf_free(im);
-  // floatimage_show_stats(out, M, N, P);
-  int exitstatus = 1;
-  if(out == NULL)
-  {
-    if(s->verbosity > 0)
-    {
-      printf("Nothing to write to disk :(\n");
-    }
-  } else 
-  {
-    if(s->verbosity > 0)
-    {
-      printf("Writing to %s\n", s->outFile); fflush(stdout);
-    }
-    //    floatimage_normalize(out, M*N*P);
-    fim_tiff_write(s->outFile, out, M, N, P);
-    exitstatus = 0;
   }
 
+  if(tiling == 0)
+  {
+    fftwf_free(im);
+
+
+    if(out == NULL)
+    {
+      if(s->verbosity > 0)
+      {
+        printf("Nothing to write to disk :(\n");
+      }
+    } else 
+    {
+      if(s->verbosity > 0)
+      {
+        printf("Writing to %s\n", s->outFile); fflush(stdout);
+      }
+      //    floatimage_normalize(out, M*N*P);
+      fim_tiff_write(s->outFile, out, M, N, P);
+    }
+  }
 
   if(s->verbosity > 1)
   {
     printf("Finalizing\n"); fflush(stdout);
   }
   free(psf);
-  free(out);
+  if(out != NULL) free(out);
   myfftw_stop();
   if(s->verbosity > 1) fprint_peakMemory(NULL);
   clock_gettime(CLOCK_REALTIME, &tend);
@@ -1435,7 +1538,7 @@ int dw_run(dw_opts * s)
   dcw_close_log(s);
   dw_opts_free(&s);
 
-  return(exitstatus);
+  return 0;
 }
 
 

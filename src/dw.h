@@ -34,8 +34,8 @@
 #include "tiling.h"
 #include "fim.h"
 #include "fim_tiff.h"
+#include "dw_version.h"
 
-#define deconwolf_version "0.0.4"
 
 /* fftw3 wisdom data is stored and loaded from
  * $home/.config/ 
@@ -69,6 +69,8 @@ typedef struct{
   float relax;
   float xycropfactor; // discard outer slices that are less than this of the central one
   char * commandline;
+
+  int onetile; // For debugging -- only process the first tile if set
 } dw_opts;
 
 dw_opts * dw_opts_new(void);
@@ -86,8 +88,8 @@ int  dw_run(dw_opts *);
  * 1/ Cropping if the size is larger than needed by the image.
  * 2/ Optionally, trim the sides in x and y where the PSF vanishes.
  */
-float * psf_autocrop(float * psf, int * pM, int * pN, int * pP,  // psf and size
-    int M, int N, int P, // image size
+float * psf_autocrop(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  // psf and size
+    int64_t M, int64_t N, int64_t P, // image size
     dw_opts * s);
 
 

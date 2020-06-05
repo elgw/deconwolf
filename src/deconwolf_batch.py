@@ -1,4 +1,4 @@
-#!/bin/python3
+#!/usr/bin/env python3
 import sys
 import glob
 import os
@@ -26,20 +26,32 @@ def usage():
 
 
 if __name__ == '__main__':
-    if(len(sys.argv) != 4):
+    if(len(sys.argv) <= 3):
         usage()
         sys.exit(1)
 
-    imd = sys.argv[1] # image folder
-    psd = sys.argv[2] # psf folder
-    dcw = sys.argv[3] # common options to deconwolf
+    imd = sys.argv[1]  # image folder
+    psd = sys.argv[2]  # psf folder
+    dcw = ""  # default options to deconwolf
+    if len(sys.argv) > 3:
+        dcw = sys.argv[3]  # common options to deconwolf
 
-    images = glob.glob(imd + '*.tif')
+    images_tif = glob.glob(imd + '*.tif')
+    images_tiff = glob.glob(imd + '*.tiff')
+    images = images_tif + images_tiff
+    if len(images) == 0:
+        print(f"No files ending with .tif, or .tiff in {imd}")
+        sys.exit(1)
+
+    psf_images = glob.glob(psd + '*.tif') + glob.glob(psd + '*.tiff')
+    if len(psf_images) == 0:
+        print(f"No files ending with .tif or .tiff in {psd}")
+        sys.exit(1)
 
     for im in images:
         psf_file = im_to_psf(im)
-        if(len(psf_file)>0):
+        if(len(psf_file) > 0):
             psf_file = os.path.join(psd, psf_file)
-            print(f"deconwolf {dcw} {im} {psf_file}")
+            print(f"dw {dcw} {im} {psf_file}")
 
     sys.exit(0)
