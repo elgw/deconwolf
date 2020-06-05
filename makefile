@@ -55,14 +55,19 @@ clean:
 	rm -f $(dwtm) $(dwtm_OBJECTS)
 
 install:
-	cp bin/deconwolf /usr/bin/
-	cp bin/dw_tiffmax /usr/bin
+	# Binaries
+	cp bin/deconwolf /usr/bin/dw
+	cp bin/dw_tiffmax /usr/bin/
+	cp src/deconwolf_batch.py /usr/bin/dw_batch
+	chmod +x /usr/bin/dw_batch
+	# Man pages
 	cp doc/deconwolf.1 .
 	gzip deconwolf.1
-	mv deconwolf.1.gz /usr/share/man/man1/
+	mv deconwolf.1.gz /usr/share/man/man1/dw.1.gz
 
 uninstall:
-	rm /usr/bin/deconwolf
+	rm /usr/bin/dw
 	rm /usr/bin/dw_tiffmax
-	rm /usr/share/man/man1/deconwolf.1.gz
+	rm /usr/share/man/man1/dw.1.gz
+	rm /usr/bin/dw_batch
 

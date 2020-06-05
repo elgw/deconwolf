@@ -1,4 +1,4 @@
-#!/bin/python3
+#!/usr/bin/env python3
 import sys
 import glob
 import os
@@ -52,6 +52,6 @@ if __name__ == '__main__':
         psf_file = im_to_psf(im)
         if(len(psf_file) > 0):
             psf_file = os.path.join(psd, psf_file)
-            print(f"deconwolf {dcw} {im} {psf_file}")
+            print(f"dw {dcw} {im} {psf_file}")
 
     sys.exit(0)
