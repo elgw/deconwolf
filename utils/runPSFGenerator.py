@@ -95,7 +95,7 @@ def getConfig(NA=1.45, lam=780, method="BW", resz=200,
 ss_BS1_100x = {'run' : 1, # set to 0 for dry run
       'NA' : 1.45,
       'resxy' : 130.0,
-      'resz' : 300,
+      'resz' : 200,
       'nIM' : 1.51,
       'NZ': 181,
       'NXY' : 181,
@@ -134,7 +134,7 @@ ss_BS2 = {'run' : 1, # set to 0 for dry run
       'ppos' : 2000,
       'mag' : 'xx'}
 
-ss = ss_BS2;
+ss = ss_BS1_100x
 
 # Based on the dyes
 channels = {'dapi': 461,
