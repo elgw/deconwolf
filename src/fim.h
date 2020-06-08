@@ -17,6 +17,15 @@
 #ifndef fim_h
 #define fim_h
 
+#include <math.h>
+#include <fftw3.h>
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+#include <inttypes.h>
+
 #define INLINED inline __attribute__((always_inline))
 
 /* fim : operations on 3D floating point images 

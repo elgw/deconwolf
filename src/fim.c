@@ -14,13 +14,6 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <math.h>
-#include <fftw3.h>
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdint.h>
 #include "fim.h"
 
 typedef float afloat __attribute__ ((__aligned__(16)));
@@ -66,7 +59,7 @@ int fim_maxAtOrigo(const afloat * restrict V, const int64_t M, const int64_t N, 
 
   if(maxV > midValue)
   { 
-    printf("max I(%ld, %ld, %ld)=%f > mid I(%ld, %ld, %ld)=%f\n", 
+    printf("max I(%" PRId64 ", %" PRId64 ", %" PRId64 ")=%f > mid I(%" PRId64 ", %" PRId64 ", %" PRId64 ")=%f\n", 
         m, n, p, maxV, mM, mN, mP, midValue);
     return 0; 
   }
@@ -496,7 +489,7 @@ void shift_vector_ut()
   {
     for(int64_t kk = 0; kk<N; kk++)
     {V[kk] = kk;}
-    printf("shift: %ld -> ", k);
+    printf("shift: %" PRId64 " -> ", k);
     shift_vector(V,S,N,k);
     for(int64_t kk =0; kk<N; kk++)
     { printf("%.0f ", V[kk]);}
