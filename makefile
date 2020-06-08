@@ -20,6 +20,9 @@ else
     CFLAGS= -Wno-unknown-pragmas -DNDEBUG -O3 -flto -ftree-vectorize
 endif
 
+dw_LIBRARIES = -lm -lfftw3f -lfftw3f_threads -ltiff
+dwtm_LIBRARIES = -lm -ltiff
+
 # on MacOS add -Xpreprocessor
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
@@ -27,6 +30,7 @@ ifeq ($(UNAME_S),Linux)
 endif
 ifeq ($(UNAME_S),Darwin)
     CFLAGS += -Xpreprocessor
+    dw_LIBRARIES += -lomp
 endif
 
 OMP?=1
@@ -43,11 +47,10 @@ SRCDIR = src/
 
 dw = bin/dw
 dw_OBJECTS = fim.o tiling.o fft.o fim_tiff.o dw.o deconwolf.o
-dw_LIBRARIES = -lm -lfftw3f -lfftw3f_threads -ltiff
+
 
 dwtm = bin/dw_tiffmax
 dwtm_OBJECTS = fim_tiff.o deconwolf_tif_max.o
-dwtm_LIBRARIES = -lm -ltiff
 
 
 all: $(dw) $(dwtm)
