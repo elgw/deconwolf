@@ -22,6 +22,7 @@
 #include <math.h>
 #include <assert.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <string.h>
 #include <fftw3.h>
 #include <sys/types.h>
