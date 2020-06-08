@@ -11,11 +11,13 @@ GIT_VERSION = "$(shell git log --pretty=format:'%aD:%H' -n 1)"
 XFLAGS = -DCC_VERSION=\"$(CC_VERSION)\"
 XFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
 
+CFLAGS = -Wall -std=gnu99 -march=native
+
 DEBUG?=0
 ifeq ($(DEBUG),1)
-    CFLAGS =-Wall -g3 -DDEBUG 
+    CFLAGS = -g3 -DDEBUG 
 else
-    CFLAGS=-Wall -Wno-unknown-pragmas -DNDEBUG -O3 -flto -march=native -ftree-vectorize
+    CFLAGS= -Wno-unknown-pragmas -DNDEBUG -O3 -flto -ftree-vectorize
 endif
 
 OMP?=1
@@ -25,14 +27,21 @@ else
   CFLAGS += -fno-openmp
 endif
 
-# if on MacOS we also need -Xpreprocessor
+# on MacOS add -Xpreprocessor
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Linux)
+    CFLAGS += 
+endif
+ifeq ($(UNAME_S),Darwin)
+    CFLAGS += -Xpreprocessor
+endif
 
 CFLAGS += $(XFLAGS)
 
 CC = cc $(CFLAGS)
 SRCDIR = src/
 
-dw = bin/deconwolf 
+dw = bin/dw
 dw_OBJECTS = fim.o tiling.o fft.o fim_tiff.o dw.o deconwolf.o
 dw_LIBRARIES = -lm -lfftw3f -lfftw3f_threads -ltiff
 
@@ -58,7 +67,7 @@ clean:
 
 install:
 	# Binaries
-	cp bin/deconwolf /usr/bin/dw
+	cp bin/dw /usr/bin/dw
 	cp bin/dw_tiffmax /usr/bin/
 	cp src/deconwolf_batch.py /usr/bin/dw_batch
 	chmod +x /usr/bin/dw_batch
