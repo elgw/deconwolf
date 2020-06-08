@@ -25,6 +25,8 @@ else
   CFLAGS += -fno-openmp
 endif
 
+# if on MacOS we also need -Xpreprocessor
+
 CFLAGS += $(XFLAGS)
 
 CC = cc $(CFLAGS)

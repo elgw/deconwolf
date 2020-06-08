@@ -70,6 +70,7 @@ make OMP=1 -B
 
 On OSX, if you have [homebrew](https://brew.sh/), then you can install meson with
 ```
+brew install libopenmpt
 brew install meson
 ```
 
