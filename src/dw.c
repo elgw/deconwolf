@@ -687,14 +687,14 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
 
 
   if(s->verbosity > 0)
-  { printf("image: [%" PRIu64 "x%" PRIu64 "x%" PRIu64 "], psf: [%" PRIu64 "x%" PRIu64 "x%" PRIu64 "], job: [%" PRIu64 "x%" PRIu64 "x%" PRIu64 "] (%zu voxels)\n",
+  { printf("image: [%" PRId64 "x%" PRId64 "x%" PRId64 "], psf: [%" PRId64 "x%" PRId64 "x%" PRId64 "], job: [%" PRId64 "x%" PRId64 "x%" PRId64 "] (%zu voxels)\n",
       M, N, P, pM, pN, pP, wM, wN, wP, wMNP);
   }
   if(s->verbosity > 1)
   {
     printf("Estimated peak memory usage: %.1f GB\n", wMNP*35.0/1e9);
   }
-  fprintf(s->log, "image: [%" PRIu64 "x%" PRIu64 "x%" PRIu64 "]\npsf: [%" PRIu64 "x%" PRIu64 "x%" PRIu64 "]\njob: [%" PRIu64 "x%" PRIu64 "x%" PRIu64 "] (%zu voxels)\n",
+  fprintf(s->log, "image: [%" PRId64 "x%" PRId64 "x%" PRId64 "]\npsf: [%" PRId64 "x%" PRId64 "x%" PRId64 "]\njob: [%" PRId64 "x%" PRId64 "x%" PRId64 "] (%zu voxels)\n",
       M, N, P, pM, pN, pP, wM, wN, wP, wMNP);
   fflush(s->log);
 
@@ -907,12 +907,12 @@ float * psf_autocrop_centerZ(float * psf, int64_t * pM, int64_t * pN, int64_t * 
   }
   if(s->verbosity > 2)
   {
-    printf("PSF has %" PRIu64 " slices\n", p);
-    printf("brighest at plane %" PRIu64 "\n", maxp);
-    printf("Selecting Z-planes: %" PRIu64 " -- %" PRIu64 "\n", p0, p1);
+    printf("PSF has %" PRId64 " slices\n", p);
+    printf("brighest at plane %" PRId64 "\n", maxp);
+    printf("Selecting Z-planes: %" PRId64 " -- %" PRId64 "\n", p0, p1);
   }
 
-  fprintf(s->log, "Selecting Z-planes %" PRIu64 " -- %" PRIu64 "\n", p0, p1);
+  fprintf(s->log, "Selecting Z-planes %" PRId64 " -- %" PRId64 "\n", p0, p1);
 
   float * psf_cropped = fim_get_cuboid(psf, m, n, p,
       m0, m1, n0, n1, p0, p1);
@@ -944,7 +944,7 @@ float * psf_autocrop_byImage(float * psf, int64_t * pM, int64_t * pN, int64_t * 
 
   if(p < popt)
   {
-    fprintf(s->log, "WARNING: The PSF has only %" PRIu64 " slices, %" PRIu64 " would be better.\n", p, popt);
+    fprintf(s->log, "WARNING: The PSF has only %" PRId64 " slices, %" PRId64 " would be better.\n", p, popt);
     return psf;
   }
 
@@ -970,7 +970,7 @@ float * psf_autocrop_byImage(float * psf, int64_t * pM, int64_t * pN, int64_t * 
     }
     if(s->verbosity > 2)
     {
-      printf("! %" PRIu64 " %" PRIu64 " : %" PRIu64 " %" PRIu64 " : %" PRIu64 " %" PRIu64 "\n", m0, m1, n0, n1, p0, p1);
+      printf("! %" PRId64 " %" PRId64 " : %" PRId64 " %" PRId64 " : %" PRId64 " %" PRId64 "\n", m0, m1, n0, n1, p0, p1);
     }
     float * psf_cropped = fim_get_cuboid(psf, m, n, p,
         m0, m1, n0, n1, p0, p1);
@@ -982,10 +982,10 @@ float * psf_autocrop_byImage(float * psf, int64_t * pM, int64_t * pN, int64_t * 
 
     if(s->verbosity > 0)
     {
-      fprintf(stdout, "PSF crop [%" PRIu64 " x %" PRIu64 " x %" PRIu64 "] -> [%" PRIu64 " x %" PRIu64 " x %" PRIu64 "]\n", 
+      fprintf(stdout, "PSF crop [%" PRId64 " x %" PRId64 " x %" PRId64 "] -> [%" PRId64 " x %" PRId64 " x %" PRId64 "]\n", 
           m, n, p, pM[0], pN[0], pP[0]);
     }
-    fprintf(s->log, "PSF crop [%" PRIu64 " x %" PRIu64 " x %" PRIu64 "] -> [%" PRIu64 " x %" PRIu64 " x %" PRIu64 "]\n", 
+    fprintf(s->log, "PSF crop [%" PRId64 " x %" PRId64 " x %" PRId64 "] -> [%" PRId64 " x %" PRId64 " x %" PRId64 "]\n", 
         m, n, p, pM[0], pN[0], pP[0]);
 
     return psf_cropped;
@@ -1050,7 +1050,7 @@ float * psf_autocrop_XY(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  
 
   if(s->verbosity > 0)
   {
-    printf("PSF X-crop: Removing %" PRIu64 " planes in XY\n", first);
+    printf("PSF X-crop: Removing %" PRId64 " planes in XY\n", first);
   }
 
   free(psf);
@@ -1099,7 +1099,7 @@ int deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
 
   if(s->verbosity > 0)
   {
-    printf("-> Divided the [%" PRIu64 " x %" PRIu64 " x %" PRIu64 "] image into %d tiles\n", M, N, P, T->nTiles);
+    printf("-> Divided the [%" PRId64 " x %" PRId64 " x %" PRId64 "] image into %d tiles\n", M, N, P, T->nTiles);
   }
 
   /* Output image initialize as zeros
@@ -1403,7 +1403,7 @@ int dw_run(dw_opts * s)
 
   if(s->verbosity > 0)
   {
-    printf("Image dimensions: %" PRIu64 " x %" PRIu64 " x %" PRIu64 "\n", M, N, P);
+    printf("Image dimensions: %" PRId64 " x %" PRId64 " x %" PRId64 "\n", M, N, P);
   }
 
 
