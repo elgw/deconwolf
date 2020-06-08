@@ -2,6 +2,85 @@ import os
 import sys
 import glob
 
+
+def gen_psfs(ss):
+    # Based on the dyes
+    channels = {'dapi': 461,
+                'Cy5': 664, # alexa 647
+                'a594': 617,
+                'ir800': 794, # or 814 if it is alexa790
+                'a700':723,
+                'a488': 519,
+                'tmr': 562}
+
+    ss['outfolder'] = f"PSF{ss['method']}_{ss['scope']}_{ss['mag']}_Z{ss['resz']}/"
+
+    if ss['oversample'] > 1:
+        print("Warning: You have to bin the PSF afterwards!")
+        x = ss['oversample']
+        ss['NZ']=x*ss['NZ']
+        ss['NXY']=x*ss['NXY']
+        ss['resxy'] = ss['resxy']/x
+        ss['resz'] = ss['resz']/x
+        ss['outfolder'] = 'PSF3X/'
+
+    print("Generating PSFs using the following settings:")
+    for s, v in ss.items():
+        print(f"{s}={v}")
+
+    print("Channels and wavelengths")
+    for cc, lam in channels.items():
+        print(f"channel: {cc} lambda: {lam}")
+
+    try:
+        os.mkdir(ss['outfolder'])
+    except FileExistsError:
+        print(f"{ss['outfolder']} did already exist")
+        # ok, if folded did exist
+
+    with open(f"{ss['outfolder']}PSF_README.txt", "w") as ofile:
+        ofile.write("> PSFs generated from runPSFGenerator.py\n")
+        ofile.write("> Generating PSFs using the following settings:\n")
+        for s, v in ss.items():
+            ofile.write(f"{s}={v}\n")
+
+        print("> Channels and wavelengths\n")
+        for cc, lam in channels.items():
+            ofile.write(f"channel: {cc} lambda: {lam}\n")
+
+
+    for cc, lam in channels.items():
+        print(f"channel: {cc} lambda: {lam}")
+        cfname = f"{ss['outfolder']}config_{cc}.txt"
+        # PSFGenerator always outputs in the current folder
+        outfile = f"PSF {ss['method']}.tif"
+        psffile = f"{ss['outfolder']}PSF_{cc}.tif"
+        if os.path.isfile(psffile):
+            print(f"{psffile} exists, skipping")
+            continue
+
+        config = getConfig(NA=ss['NA'], resxy=ss['resxy'], resz=ss['resz'],
+                        nIM=ss['nIM'], NZ=ss['NZ'], NXY=ss['NXY'],
+                        lam=lam, method=ss['method'],
+                        nSample=ss['nSample'], wDist=ss['wDist'],
+                        ppos=ss['ppos']);
+        print(f"Writing config to {cfname}")
+        with open(cfname, "w") as cf:
+            cf.write(config)
+
+        cmd = f"java -cp PSFGenerator.jar PSFGenerator {cfname}"
+        if ss['run']:
+            os.system(cmd)
+        else:
+            print(f"# {cmd}")
+
+
+        if ss['run']:
+            os.rename(outfile, psffile)
+        else:
+            print(f"# mv {outfile} {psffile}")
+
+
 def getConfig(NA=1.45, lam=780, method="BW", resz=200,
               resxy=130.0, NZ = 181, NXY = 181, nIM=1.51,
               nSample=1.33,
@@ -91,6 +170,7 @@ def getConfig(NA=1.45, lam=780, method="BW", resz=200,
     psf-Defocus-DTop=30.0"""
     return config
 
+
 # Common settings
 ss_BS1_100x = {'run' : 1, # set to 0 for dry run
       'NA' : 1.45,
@@ -104,7 +184,8 @@ ss_BS1_100x = {'run' : 1, # set to 0 for dry run
       'nSample' : 1.33,
       'wDist': 130, # um
       'ppos' : 2000,
-      'mag' : '100x'}
+      'mag' : '100x',
+      'scope' : 'BS1'}
 
 ss_BS1_60x = {'run' : 1, # set to 0 for dry run
       'NA' : 1.4,
@@ -118,7 +199,8 @@ ss_BS1_60x = {'run' : 1, # set to 0 for dry run
       'nSample' : 1.33,
       'wDist': 130, # um (Su said 140 ...)
       'ppos' : 2000,
-      'mag' : '60x'}
+      'mag' : '60x',
+      'scope' : 'BS1'}
 
 ss_BS2 = {'run' : 1, # set to 0 for dry run
       'NA' : 1.4,
@@ -132,80 +214,17 @@ ss_BS2 = {'run' : 1, # set to 0 for dry run
       'nSample' : 1.33,
       'wDist': 130, # um (Su said 140 ...)
       'ppos' : 2000,
-      'mag' : 'xx'}
+      'mag' : 'xx',
+      'scope' : 'BS2'}
+
 
 ss = ss_BS1_100x
+for dZ in [200, 300]:
+    ss['resz'] = dZ
+    gen_psfs(ss)
 
-# Based on the dyes
-channels = {'dapi': 461,
-            'Cy5': 664, # alexa 647
-            'a594': 617,
-            'ir800': 794, # or 814 if it is alexa790
-            'a700':723,
-            'a488': 519,
-            'tmr': 562}
-
-ss['outfolder'] = f"PSF{ss['method']}_{ss['mag']}_{ss['resz']}/"
-
-if ss['oversample'] > 1:
-    print("Warning: You have to bin the PSF afterwards!")
-    x = ss['oversample']
-    ss['NZ']=x*ss['NZ']
-    ss['NXY']=x*ss['NXY']
-    ss['resxy'] = ss['resxy']/x
-    ss['resz'] = ss['resz']/x
-    ss['outfolder'] = 'PSF3X/'
-
-print("Generating PSFs using the following settings:")
-for s, v in ss.items():
-    print(f"{s}={v}")
-
-print("Channels and wavelengths")
-for cc, lam in channels.items():
-    print(f"channel: {cc} lambda: {lam}")
-
-
-try:
-    os.mkdir(ss['outfolder'])
-except FileExistsError:
-    print(f"{ss['outfolder']} did already exist")
-    # ok, if folded did exist
-
-with open(f"{ss['outfolder']}PSF_README.txt", "w") as ofile:
-    ofile.write("> PSFs generated from runPSFGenerator.py\n")
-    ofile.write("> Generating PSFs using the following settings:\n")
-    for s, v in ss.items():
-        ofile.write(f"{s}={v}\n")
-
-    print("> Channels and wavelengths\n")
-    for cc, lam in channels.items():
-        ofile.write(f"channel: {cc} lambda: {lam}\n")
-
-
-for cc, lam in channels.items():
-    print(f"channel: {cc} lambda: {lam}")
-    cfname = f"{ss['outfolder']}config_{cc}.txt"
-    config = getConfig(NA=ss['NA'], resxy=ss['resxy'], resz=ss['resz'],
-                       nIM=ss['nIM'], NZ=ss['NZ'], NXY=ss['NXY'],
-                       lam=lam, method=ss['method'],
-                       nSample=ss['nSample'], wDist=ss['wDist'],
-                       ppos=ss['ppos']);
-    print(f"Writing config to {cfname}")
-    with open(cfname, "w") as cf:
-        cf.write(config)
-
-    cmd = f"java -cp PSFGenerator.jar PSFGenerator {cfname}"
-    if ss['run']:
-        os.system(cmd)
-    else:
-        print(f"# {cmd}")
-
-    # PSFGenerator always outputs in the current folder
-    outfile = f"PSF {ss['method']}.tif"
-    psffile = f"{ss['outfolder']}PSF_{cc}.tif"
-
-    if ss['run']:
-        os.rename(outfile, psffile)
-    else:
-        print(f"# mv {outfile} {psffile}")
+ss = ss_BS1_60x
+for dZ in [200, 300]:
+    ss['resz'] = dZ
+    gen_psfs(ss)
 
