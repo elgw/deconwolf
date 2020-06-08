@@ -30,6 +30,7 @@
 #include <fftw3.h>
 #include <string.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include "fim.h"
 
 #define INLINED inline __attribute__((always_inline))

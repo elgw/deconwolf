@@ -68,7 +68,7 @@ void fim_tiff_ut()
   if(M != M2 || N != N2 || P != P2)
   {
     printf("Dimensions does not match!\n");
-    printf("Wrote: [%ld x %ld x %ld], Read: [%ld x %ld x %ld]\n",
+    printf("Wrote: [%" PRId64 " x %" PRId64 " x %" PRId64 "], Read: [%" PRId64 " x %" PRId64 " x %" PRId64 "]\n",
         M, N, P, M2, N2, P2);
     free(im);
     free(im2);
@@ -221,7 +221,7 @@ void readUint16_sub(TIFF * tfile, afloat * V,
 
         if(0){
           if(ipos % 100000 == 0){
-            printf("%ld %ld %ld, %zu -> (%ld, %ld, %ld)\n", M, N, P, ipos, iM, iN, iP);
+            printf("%" PRId64 " %" PRId64 " %" PRId64 ", %zu -> (%" PRId64 ", %" PRId64 ", %" PRId64 ")\n", M, N, P, ipos, iM, iN, iP);
             getchar();
           }}
 
@@ -934,7 +934,7 @@ afloat * fim_tiff_read_sub(const char * fName,
     {
       if(subregion)
       {
-        printf("%ld %ld %ld, %ld %ld %ld, %ld %ld %ld\n", M, N, P, sM, sN, sP, wM, wN, wP);
+        printf("%" PRId64 " %" PRId64 " %" PRId64 ", %" PRId64 " %" PRId64 " %" PRId64 ", %" PRId64 " %" PRId64 " %" PRId64 "\n", M, N, P, sM, sN, sP, wM, wN, wP);
         readUint16_sub(tfile, V, ssize, ndirs, nstrips, M*N,
             M, N, (int) P, sM, sN, sP, wM, wN, wP);
       } else {
