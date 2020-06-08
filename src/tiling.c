@@ -14,12 +14,6 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <assert.h>
-#include <string.h>
-#include <fftw3.h>
 #include "tiling.h"
 #include "fim_tiff.h"
 
@@ -54,7 +48,7 @@ int64_t * tiling_getDivision(const int64_t M, const int64_t m, int64_t * nDiv)
   if(0){
   for(int64_t dd = 0; dd < ns; dd++)
   {
-    printf("[%ld, %ld]\n", divs[dd*2], divs[dd*2+1]);
+    printf("[%" PRId64 ", %" PRId64 "]\n", divs[dd*2], divs[dd*2+1]);
   }
   }
   for(int64_t dd = 1; dd < ns; dd++)
@@ -85,10 +79,10 @@ tiling * tiling_create(const int64_t M, const int64_t N, const int64_t P, const 
   int64_t * divN = tiling_getDivision(N, maxSize, &nN);
 
 #ifndef NDEBUG
-  printf("Dividing %ld into:\n", M);
+  printf("Dividing %" PRId64 " into:\n", M);
   for(int64_t kk = 0; kk<nM; kk++)
   {
-    printf("[%ld, %ld]\n", divM[2*kk], divM[2*kk+1]);
+    printf("[%" PRId64 ", %" PRId64 "]\n", divM[2*kk], divM[2*kk+1]);
   }
 #endif
 
@@ -140,7 +134,7 @@ tiling * tiling_create(const int64_t M, const int64_t N, const int64_t P, const 
 void tiling_show(tiling * T)
 {
   printf("Tiling with %d tiles\n", T->nTiles);
-  printf("Generated for [%ld x %ld x %ld], maxSize: %d, overlap: %d\n",
+  printf("Generated for [%" PRId64 " x %" PRId64 " x %" PRId64 "], maxSize: %d, overlap: %d\n",
       T->M, T->N, T->P, T->maxSize, T->overlap);
   for(int kk = 0; kk<T->nTiles; kk++)
   {
@@ -161,14 +155,14 @@ void tiling_free(tiling * T)
 void tile_show(tile * T)
 {
   printf("-> tile_show\n");
-  printf("size: [%ld x %ld x %ld]\n", 
+  printf("size: [%" PRId64 " x %" PRId64 " x %" PRId64 "]\n", 
       T->size[0], T->size[1], T->size[2]);
-  printf("xsize: [%ld x %ld x %ld]\n", 
+  printf("xsize: [%" PRId64 " x %" PRId64 " x %" PRId64 "]\n", 
       T->xsize[0], T->xsize[1], T->xsize[2]);
-  printf("pos: %ld--%ld, %ld--%ld, %ld--%ld\n", 
+  printf("pos: %" PRId64 "--%" PRId64 ", %" PRId64 "--%" PRId64 ", %" PRId64 "--%" PRId64 "\n", 
       T->pos[0], T->pos[1], T->pos[2],
       T->pos[3], T->pos[4], T->pos[5]);
-  printf("xpos: %ld--%ld, %ld--%ld, %ld--%ld\n", 
+  printf("xpos: %" PRId64 "--%" PRId64 ", %" PRId64 "--%" PRId64 ", %" PRId64 "--%" PRId64 "\n", 
       T->xpos[0], T->xpos[1], T->xpos[2],
       T->xpos[3], T->xpos[4], T->xpos[5]);
 }
@@ -306,7 +300,7 @@ float * tiling_get_tile_tiff(tiling * T, const int tid, const char * fName)
       t->xpos[0], t->xpos[2], t->xpos[4], // Start pos
       t->xsize[0], t->xsize[1], t->xsize[2]); // size
 
-  printf("%ld %ld %ld\n", t->xsize[0], t->xsize[1], t->xsize[2]);
+  printf("%" PRId64 " %" PRId64 " %" PRId64 "\n", t->xsize[0], t->xsize[1], t->xsize[2]);
 
   if(0)
   {

@@ -17,6 +17,15 @@
 #ifndef tiling_h
 #define tiling_h
 
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <assert.h>
+#include <string.h>
+#include <fftw3.h>
+#include <stdint.h>
+#include <inttypes.h>
+
 typedef struct{
   int64_t * size; // M, N, P
   int64_t * xsize; // M, N, P with padding
