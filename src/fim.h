@@ -48,7 +48,7 @@ void fim_minus(float * restrict  A,
 
 void fim_invert(float * restrict A, const size_t N);
 
-void fim_set_min_to_zero(float * I, size_t N);
+void fim_set_min_to_zero(float * , size_t N);
 
 int fim_maxAtOrigo(const float * restrict V, const int64_t M, const int64_t N, const int64_t P);
   /* Check that the MAX of the fim is in the middle
@@ -127,7 +127,7 @@ void shift_vector_buf(float * restrict V,
     const int64_t N,
     int64_t k, float * restrict buffer);
 
-void fim_mult_scalar(float * I, size_t N, float x);
+void fim_mult_scalar(float * , size_t N, float x);
 
 void fim_ut(void);
 
