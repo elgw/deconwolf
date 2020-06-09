@@ -22,6 +22,7 @@ endif
 
 dw_LIBRARIES = -lm -lfftw3f -lfftw3f_threads -ltiff
 dwtm_LIBRARIES = -lm -ltiff
+dwbw_LIBRARIES = -lm -ltiff -lpthread -ltiff -lfftw3f
 
 # on MacOS add -Xpreprocessor
 UNAME_S := $(shell uname -s)
@@ -48,12 +49,14 @@ SRCDIR = src/
 dw = bin/dw
 dw_OBJECTS = fim.o tiling.o fft.o fim_tiff.o dw.o deconwolf.o
 
+dwbw = bin/dw_bw
+dwbw_OBJECTS = fim_tiff.o dw_bwpsf.o
 
 dwtm = bin/dw_tiffmax
 dwtm_OBJECTS = fim_tiff.o deconwolf_tif_max.o
 
 
-all: $(dw) $(dwtm)
+all: $(dw) $(dwtm) $(dwbw)
 
 $(dwtm): $(dwtm_OBJECTS)
 	$(CC) -o $@ $^ $(dwtm_LIBRARIES)
@@ -61,16 +64,21 @@ $(dwtm): $(dwtm_OBJECTS)
 $(dw): $(dw_OBJECTS)
 	$(CC) -o $@ $^ $(dw_LIBRARIES)
 
+$(dwbw): $(dwbw_OBJECTS)
+	$(CC) -o $@ $^ $(dwbw_LIBRARIES)
+
 %.o: $(SRCDIR)%.c
 	$(CC) -c $<
 
 clean:
 	rm -f $(dw) $(dw_OBJECTS)
 	rm -f $(dwtm) $(dwtm_OBJECTS)
+	rm -f $(dwbw) $(dwbw_OBJECTS)
 
 install:
 	# Binaries
 	cp bin/dw /usr/bin/dw
+	cp bin/dw_bw /usr/bin/dw_bw
 	cp bin/dw_tiffmax /usr/bin/
 	cp src/deconwolf_batch.py /usr/bin/dw_batch
 	chmod +x /usr/bin/dw_batch
@@ -81,6 +89,7 @@ install:
 
 uninstall:
 	rm /usr/bin/dw
+	rm /usr/bin/dw_bw
 	rm /usr/bin/dw_tiffmax
 	rm /usr/share/man/man1/dw.1.gz
 	rm /usr/bin/dw_batch
