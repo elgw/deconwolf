@@ -22,7 +22,8 @@ class Guide(object):
         self.creg = r"(.*)\_[0-9]*\.tiff?"
 
         # Known channels
-        self.lambdas = {'dapi': 461,
+        self.lambdas = {'dapi': 461, # actually for hoechst
+                        'hoechst': 461,
                     'cy5': 664,  # alexa 647
                     'a594': 617,
                     'ir800': 794,  # or 814 if it is alexa790
@@ -35,20 +36,20 @@ class Guide(object):
         self.psfdir = 'PSFBW/'
 
         config_BS1_100 = {'NA' : 1.45,
-              'ni' : 1.15,
+              'ni' : 1.515,
               'xy_res_nm' : 130,
               'z_res_nm' : 200
               }
 
         config_BS1_60 = {'NA' : 1.40,
-                  'ni' : 1.15,
-                  'xy_res_nm' : 130,
+                  'ni' : 1.515,
+                  'xy_res_nm' : 216.6,
                   'z_res_nm' : 200
                   }
 
         config_BS2_40 = {'NA' : 1.4,
-                     'ni' : 1.15,
-                     'zy_res_nm' : 100,
+                     'ni' : 1.515,
+                     'zy_res_nm' : 108.3,
                      'z_res_nm' : 600}
 
         self.templates = {'BS1 100x' : config_BS1_100,
@@ -77,7 +78,11 @@ class Guide(object):
 
     def defaultLambda(self, c):
         c = c.lower()
-        lam = self.lambdas[c]
+        try:
+            lam = self.lambdas[c]
+        except KeyError:
+            lam = None
+
         if lam is None:
             lam = 600
             print(f"Warning: don't know what wavelength that {c} has")
