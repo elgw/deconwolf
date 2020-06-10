@@ -103,8 +103,8 @@ void usage(int argc, char ** argv)
   printf(" --verbose L\n\t Set verbosity level to L\n");
   printf(" --NA\n\t Set numerical aperture\n");
   printf(" --lamda\n\t Set emission wavelength [nm]\n");
-  printf(" --ni\n\t Set refractive index\n\t");
-  printf(" --threads\n\t Set number of threads\n\t");
+  printf(" --ni\n\t Set refractive index\n");
+  printf(" --threads\n\t Set number of threads\n");
   printf(" --resxy\n\t Set pixel size in x-y [nm]\n");
   printf(" --resz\n\t Set pixel size in z [nm]\n");
   printf(" --size N \n\t Set output size to N x N x N [pixels]\n");
@@ -179,13 +179,20 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
       case 'l':
         s->lambda = atof(optarg)*1e-9;
         break;
-      case 'N':
+      case 'N':        
         s->M = atoi(optarg);
         s->N = s->M;
         s->P = s->M;
         break;
     }
   }
+
+  if(s->M % 2 == 0)
+  {
+    printf("Error: The size has to be odd, 1, 3, ...\n");
+    exit(-1);
+  }
+
   if(optind + 1 == argc)
   {
     s->outFile = malloc(strlen(argv[argc-1]) + 1);
@@ -469,10 +476,10 @@ int main(int argc, char ** argv)
 
   // Write to disk
   if(conf->verbose > 0) {
-    printf("Writing to psf.tif\n");
+    printf("Writing as 32-bit floats to %s\n", conf->outFile);
   }
 
-  fim_tiff_write(conf->outFile, conf->V, conf->M, conf->N, conf->P);
+  fim_tiff_write_float(conf->outFile, conf->V, conf->M, conf->N, conf->P);
   
   fprint_time(conf->log);
   clock_gettime(CLOCK_REALTIME, &tend);

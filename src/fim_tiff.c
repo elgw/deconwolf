@@ -639,6 +639,78 @@ int fim_tiff_write_zeros(const char * fName, int64_t N, int64_t M, int64_t P)
   return fim_tiff_write(fName, NULL, N, M, P);
 }
 
+int fim_tiff_write_float(const char * fName, const afloat * V, 
+    int64_t N, int64_t M, int64_t P)
+{
+  
+ 
+  size_t bytesPerSample = sizeof(float);
+  char formatString[4] = "w";
+  if(M*N*P*sizeof(uint16) >= pow(2, 32))
+  {
+    sprintf(formatString, "w8\n");
+    printf("WARNING: File is > 2 GB, using BigTIFF format\n");
+  }
+
+  TIFF* out = TIFFOpen(fName, formatString);
+  assert(out != NULL);
+
+  size_t linbytes = (M+N)*bytesPerSample;
+  float * buf = _TIFFmalloc(linbytes);
+  memset(buf, 0, linbytes);
+
+  for(size_t dd = 0; dd<P; dd++)
+  {
+
+    TIFFSetField(out, TIFFTAG_IMAGEWIDTH, N);  // set the width of the image
+    TIFFSetField(out, TIFFTAG_IMAGELENGTH, M);    // set the height of the image
+    TIFFSetField(out, TIFFTAG_SAMPLESPERPIXEL, 1);   // set number of channels per pixel
+    TIFFSetField(out, TIFFTAG_BITSPERSAMPLE, 8*bytesPerSample);    // set the size of the channels
+    TIFFSetField(out, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);    // set the origin of the image.
+    //   Some other essential fields to set that you do not have to understand for now.
+    TIFFSetField(out, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
+    TIFFSetField(out, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
+    TIFFSetField(out, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_IEEEFP);
+
+    /* We are writing single page of the multipage file */
+    TIFFSetField(out, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
+    /* Set the page number */
+    TIFFSetField(out, TIFFTAG_PAGENUMBER, dd, P); 
+
+
+    for(size_t kk = 0; kk<M; kk++)
+    {
+      if(V != NULL)
+      {
+        for(size_t ll = 0; ll<N; ll++)
+        {
+          float value = V[M*N*dd + kk*N + ll];
+          if(!isfinite(value))
+          { value = 0; }
+
+          buf[ll] = value;
+        }
+      }
+
+      int ok = TIFFWriteScanline(out, // TIFF
+          buf, 
+          kk, // row
+          0); //sample
+      if(ok != 1)
+      {
+        printf("TIFFWriteScanline failed\n");
+      }
+    }
+
+    TIFFWriteDirectory(out);
+  }
+
+  _TIFFfree(buf);
+
+  TIFFClose(out);
+  return 0;
+}
+
 int fim_tiff_write(const char * fName, const afloat * V, 
     int64_t N, int64_t M, int64_t P)
 {

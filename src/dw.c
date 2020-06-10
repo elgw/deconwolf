@@ -1387,11 +1387,6 @@ int dw_run(dw_opts * s)
 
   s->verbosity > 1 ? dw_fprint_info(NULL, s) : 0;
 
-  int tiling = 0;
-  if(s->tiling_maxSize > 0)
-  {
-    tiling = 1;
-  }
 
 
   int64_t M = 0, N = 0, P = 0;
@@ -1404,6 +1399,12 @@ int dw_run(dw_opts * s)
   if(s->verbosity > 0)
   {
     printf("Image dimensions: %" PRId64 " x %" PRId64 " x %" PRId64 "\n", M, N, P);
+  }
+
+  int tiling = 0;
+  if(s->tiling_maxSize > 0 && (M > s->tiling_maxSize || N > s->tiling_maxSize))
+  {
+    tiling = 1;
   }
 
 

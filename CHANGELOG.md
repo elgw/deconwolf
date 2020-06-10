@@ -1,5 +1,8 @@
 # CHANGELOG
 
+### 2020-06-09 v0.0.6
+ * Added the binary `dw_bw` which generates PSFs according to the Born-Wolf model. It is based on, and compared to [https://github.com/Biomedical-Imaging-Group/PSFGenerator/blob/master/src/psf/bornwolf/KirchhoffDiffractionSimpson.java](https://github.com/Biomedical-Imaging-Group/PSFGenerator/blob/master/src/psf/bornwolf/KirchhoffDiffractionSimpson.java)
+
 ### 2020-06-05 v0.0.5
  * Changing name of the main binary to `dw` and prefixing the utility binaries with `dw_`.
  * Does not load the full images neither for reading or writing in tiling mode.

@@ -38,6 +38,9 @@
 int fim_tiff_write(const char * fName, const float * V, 
     int64_t M, int64_t N, int64_t P);
 
+int fim_tiff_write_float(const char * fName, const float * V, 
+    int64_t M, int64_t N, int64_t P);
+
 int fim_tiff_write_zeros(const char * fName, int64_t M, int64_t N, int64_t P);
 
 // Write to the tif file fName as uint16, using the raw data

@@ -12,56 +12,150 @@ import sys
 # https://github.com/wong2/pick/blob/master/pick/__init__.py
 
 
-def do_nothing(*args):
-    pass
+class Guide(object):
 
-def defaultLambda(c):
-    c = c.lower()
-    lambdas = {'dapi': 461,
-                'cy5': 664,  # alexa 647
-                'a594': 617,
-                'ir800': 794,  # or 814 if it is alexa790
-                'a700':723,
-                'a488': 519,
-                'tmr': 562}
-    lam = lambdas[c]
-    if lam is None:
-        lam = 600
-        print(f"Warning: don't know what wavelength that {c} has")
-        print(f" setting it to {lam}, please set it correctly.")
-    return lam
+    def __init__(self):
+        # Regular expression to detect images
+        self.ireg = '^.*_.*\\.tiff?$'
+        # Regular expression to identify channels from file names
+        # Only the first group, within () is used.
+        self.creg = r"(.*)\_[0-9]*\.tiff?"
+
+        # Known channels
+        self.lambdas = {'dapi': 461,
+                    'cy5': 664,  # alexa 647
+                    'a594': 617,
+                    'ir800': 794,  # or 814 if it is alexa790
+                    'a700':723,
+                    'a488': 519,
+                    'tmr': 562}
+        self.images = []
+        self.channels = []
+        self.jobfile = 'dw_job'
+        self.psfdir = 'PSFBW/'
+
+        config_BS1_100 = {'NA' : 1.45,
+              'ni' : 1.15,
+              'xy_res_nm' : 130,
+              'z_res_nm' : 200
+              }
+
+        config_BS1_60 = {'NA' : 1.45,
+                  'ni' : 1.15,
+                  'xy_res_nm' : 130,
+                  'z_res_nm' : 200
+                  }
+
+        config_BS2_40 = {'NA' : 1.4,
+                     'ni' : 1.15,
+                     'zy_res_nm' : 100,
+                     'z_res_nm' : 600}
+
+        self.templates = {'BS1 100x' : config_BS1_100,
+                          'BS1 60x' : config_BS1_60,
+                          'BS2 40x' : config_BS2_40}
+
+    def selectTemplate(self):
+        option, index = pick(list(self.templates.keys()),
+                             'Please choose a template')
+        self.config = self.templates[option]
+        self.config['threads'] = 10
+        self.config['tilesize'] = 2048
+
+    def selectOptions(self):
+        for c in self.channels:
+            self.config[c + "_iter"] = 50
+            self.config[c + "_nm"] = self.defaultLambda(c)
+
+        print(f"Found {len(self.channels)} different channels/emitters")
+
+        # Add config for discovered channels
+        curses.wrapper(MyApp, self.config)
+
+    def do_nothing(self, *args):
+        pass
+
+    def defaultLambda(self, c):
+        c = c.lower()
+        lam = self.lambdas[c]
+        if lam is None:
+            lam = 600
+            print(f"Warning: don't know what wavelength that {c} has")
+            print(f" setting it to {lam}, please set it correctly.")
+        return lam
+
+    def getImFiles(self):
+        self.images = [f for f in os.listdir('./')
+                if (os.path.isfile(os.path.join('./', f))
+                     and (re.match(self.ireg, f) is not None)
+                         and (re.match('dw\_', f) is None))]
+
+        return self.images
 
 
-def getImFiles():
-    ireg = '^.*\\.tiff?$'
-    images = [f for f in os.listdir('./')
-              if (os.path.isfile(os.path.join('./', f))
-                  and (re.match(ireg, f) is not None)
-                      and (re.match('dw\_', f) is None))]
+    def getChannel(self, imfile):
+        m = re.match(self.creg, imfile)
 
-    return images
+        if m:
+            return m.group(1)
+        else:
+            return None
+
+    def getChannels(self):
+        # Remove trailing .tif / .tiff
+        # Remove trailing _ABC
+        self.channels = []
+        for imfile in self.images:
+            chan = self.getChannel(imfile)
+            if chan is not None:
+                self.channels.append(chan)
+                print(chan)
+
+        self.channels = list(set(self.channels))
+        return self.channels
+
+    def runConfig(self):
+        if self.config['write']:
+            self.writeConfig()
+
+        if self.config['run']:
+            print("running 'bash dw_jobs'")
+            print("restart it any time")
+            os.system('bash dw_jobs')
 
 
-def getChannel(imfile):
-    m = re.match(r"(.*)\_[0-9]*\.tiff?", imfile)
-    if m:
-        # print(f"{m.group(1)}")
-        return m.group(1)
-    else:
-        return None
+    def writeConfig(self):
+        config = self.config
+        config['threads'] = int(round(float(config['threads'])))
+        config['tilesize'] = int(round(float(config['tilesize'])))
 
+        try:
+            os.mkdir(self.psfdir)
+        except FileExistsError:
+            pass
 
-def getChannels(imfiles):
-    # Remove trailing .tif / .tiff
-    # Remove trailing _ABC
-    channels = []
-    for imfile in imfiles:
-        chan = getChannel(imfile)
-        if chan is not None:
-            channels.append(chan)
-
-    channels = list(set(channels))
-    return channels
+        print(f"Writing things to do to `{self.jobfile}`")
+        with open(self.jobfile, "w") as file:
+            for c in self.channels:
+                lambd = config[c + '_nm']
+                file.write(f"dw_bw --NA {config['NA']} "
+                    f"--lambda {lambd} "
+                    f"--ni {config['ni']} "
+                    f"--threads {round(config['threads'])} "
+                    f"--resxy {config['xy_res_nm']} "
+                    f"--resz {config['z_res_nm']} "
+                    f"{self.psfdir}PSF_{c}.tif "
+                    f"\n")
+            for f in self.images:
+                c = self.getChannel(f)
+                if c is None:
+                    continue
+                it = int(round(float((config[c + '_iter']))))
+                psf = f"{self.psfdir}PSF_{c}.tif"
+                file.write(f"dw --iter {it} "
+                        f"--threads {config['threads']} "
+                        f"--tilesize {config['tilesize']} "
+                        f"{f} {psf}\n")
 
 
 KEYS_ENTER = (curses.KEY_ENTER, ord('\n'), ord('\r'))
@@ -267,12 +361,12 @@ class Menu(object):
     def updateItems(self):
         self.items = []
 
-        self.items.append(("-- Settings (select with arrows and press <enter> to change)", 0, do_nothing))
+        self.items.append(("-- Settings (select with arrows and press <enter> to change)", -1, None))
 
-        for name, value in config.items():
+        for name, value in self.config.items():
             self.items.append((f"{name} = {value}", 1, name))
 
-        self.items.append(("-- Actions", 0, do_nothing))
+        self.items.append(("-- Actions", -1, None))
         self.items.append(("run now!", "run"))
         self.items.append(("exit (and run later)", "exit"))
         self.items.append(("cancel", "cancel"))
@@ -307,21 +401,23 @@ class Menu(object):
             if key in [curses.KEY_ENTER, ord("\n")]:
 
                 if self.position == len(self.items) - 1:
-                    config['write'] = 0
-                    config['run'] = 0
+                    self.config['write'] = 0
+                    self.config['run'] = 0
                     break
 
                 if self.position == len(self.items) - 2:
-                    config['write'] = 1
-                    config['run'] = 0
+                    self.config['write'] = 1
+                    self.config['run'] = 0
                     break
 
                 if self.position == len(self.items) - 3:
-                    config['write'] = 1
-                    config['run'] = 1
-                    break;
+                    self.config['write'] = 1
+                    self.config['run'] = 1
+                    break
                 else:
                     item = self.items[self.position]
+                    if(item[1] == -1):
+                        pass
                     if(item[1] == 0):
                         # if type 0: run the function
                         item[2]()
@@ -335,10 +431,10 @@ class Menu(object):
                         while not self.window.getch() in [curses.KEY_ENTER, ord("\n")]:
                             # just wait
                             0
-                        cstring = self.window.instr(posy, posx, 10);
+                        cstring = self.window.instr(posy, posx, 10)
                         try:
                             value = str(float(cstring))
-                            self.config[item[2]] = value;
+                            self.config[item[2]] = value
                         except ValueError:
                             0
 
@@ -359,6 +455,7 @@ class Menu(object):
 
 class MyApp(object):
     def __init__(self, stdscreen, config):
+        print(config)
         self.screen = stdscreen
         curses.curs_set(0)
 
@@ -367,90 +464,26 @@ class MyApp(object):
         self.config = main_menu.config
 
 
-def writeConfig():
-    config['threads'] = int(round(float(config['threads'])))
-    config['tilesize'] = int(round(float(config['tilesize'])))
-
-    # Write out commands to generate PSF
-
-    # Write out command to deonwolf
-    print("Writing things to do to `dw_jobs`")
-    with open('dw_jobs', "w") as file:
-        for c in channels:
-            lambd = config[c + '_nm']
-            file.write(f"dw_bw --NA {config['NA']} "
-                  f"--lambda {lambd} "
-                  f"--ni {config['ni']} "
-                  f"--threads {round(config['threads'])} "
-                  f"--resxy {config['xy_res_nm']} "
-                  f"--resz {config['z_res_nm']} "
-                  f"PSF_{c}.tif "
-                  f"\n")
-        for f in imfiles:
-            c = getChannel(f)
-            if c is None:
-                continue
-            it = int(round(float((config[c + '_iter']))))
-            psf = f"PSF_{c}.tif"
-            file.write(f"dw --iter {it} "
-                       f"--threads {config['threads']} "
-                       f"--tilesize {config['tilesize']} "
-                       f"{f} {psf}\n")
-
-
 if __name__ == "__main__":
-    #
+
+    g = Guide()
 
     # Identify images
-    imfiles = getImFiles()
-    if len(imfiles) == 0:
+    if len(g.getImFiles()) == 0:
         print(f"No files ending with .tif, or .tiff")
         print(f"Please run dw_guide in a folder with images")
         sys.exit(1)
 
-    print(f"Found {len(imfiles)} images to be deconvolved")
+    print(f"Found {len(g.getImFiles())} images to be deconvolved")
 
     # Get defaults for known channels
-    channels = getChannels(imfiles)
+    if len(g.getChannels()) == 0:
+        print(f"Could not identify any channels from the file names")
+        sys.exit(1)
 
-    config_BS1_100 = {'NA' : 1.45,
-              'ni' : 1.15,
-              'xy_res_nm' : 130,
-              'z_res_nm' : 200
-              }
+    g.selectTemplate()
+    g.selectOptions()
 
-    config_BS1_60 = {'NA' : 1.45,
-              'ni' : 1.15,
-              'xy_res_nm' : 130,
-              'z_res_nm' : 200
-              }
+    g.runConfig()
 
-    config_BS2_40 = {'NA' : 1.4,
-                     'ni' : 1.15,
-                     'zy_res_nm' : 100,
-                     'z_res_nm' : 600}
-
-
-    configs = [config_BS1_100, config_BS1_60, config_BS2_40]
-    option, index = pick(['BS1 100x', 'BS1 60x', 'BS2 40'], 'Please choose a profile')
-    config = configs[index]
-
-    config['threads'] = 10
-    config['tilesize'] = 2048
-
-    for c in channels:
-        config[c + "_iter"] = 50
-        config[c + "_nm"] = defaultLambda(c)
-
-    print(f"Found {len(channels)} different channels/emitters")
-
-    # Add config for discovered channels
-    m = curses.wrapper(MyApp, config)
-    if config['write']:
-        writeConfig()
-
-    if config['run']:
-        print("running 'bash dw_jobs'")
-        print("restart it any time")
-        os.system('bash dw_jobs')
 

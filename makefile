@@ -15,9 +15,9 @@ CFLAGS = -Wall -std=gnu99 -march=native
 
 DEBUG?=0
 ifeq ($(DEBUG),1)
-    CFLAGS = -g3 -DDEBUG 
+    CFLAGS += -g3 -DDEBUG 
 else
-    CFLAGS= -Wno-unknown-pragmas -DNDEBUG -O3 -flto -ftree-vectorize
+    CFLAGS += -Wno-unknown-pragmas -DNDEBUG -O3 -flto -ftree-vectorize
 endif
 
 dw_LIBRARIES = -lm -lfftw3f -lfftw3f_threads -ltiff
@@ -82,6 +82,8 @@ install:
 	cp bin/dw_tiffmax /usr/bin/
 	cp src/deconwolf_batch.py /usr/bin/dw_batch
 	chmod +x /usr/bin/dw_batch
+	cp src/dw_guide.py /usr/bin/dw_guide
+	chmod +x /usr/bin/dw_guide
 	# Man pages
 	cp doc/deconwolf.1 .
 	gzip deconwolf.1
