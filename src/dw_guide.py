@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # https://stackoverflow.com/questions/14200721/how-to-create-a-menu-and-submenus-in-python-curses
 # https://docs.python.org/3/library/curses.html
