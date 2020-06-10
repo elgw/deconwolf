@@ -132,9 +132,9 @@ class Guide(object):
             self.writeConfig()
 
         if self.config['run']:
-            print("running 'bash dw_jobs'")
+            print("running 'bash dw_job'")
             print("restart it any time")
-            os.system('bash dw_jobs')
+            os.system('bash dw_job')
 
 
     def writeConfig(self):
