@@ -40,7 +40,7 @@ class Guide(object):
               'z_res_nm' : 200
               }
 
-        config_BS1_60 = {'NA' : 1.45,
+        config_BS1_60 = {'NA' : 1.40,
                   'ni' : 1.15,
                   'xy_res_nm' : 130,
                   'z_res_nm' : 200
