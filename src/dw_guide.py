@@ -29,32 +29,40 @@ class Guide(object):
                     'ir800': 794,  # or 814 if it is alexa790
                     'a700':723,
                     'a488': 519,
+                        'a647' : 665,
                     'tmr': 562}
         self.images = []
         self.channels = []
         self.jobfile = 'dw_job'
         self.psfdir = 'PSFBW/'
 
-        config_BS1_100 = {'NA' : 1.45,
-              'ni' : 1.515,
-              'xy_res_nm' : 130,
-              'z_res_nm' : 200
+        config_BS1_100 = {'NA': 1.45,
+              'ni': 1.515,
+              'xy_res_nm': 130,
+              'z_res_nm': 200
               }
 
-        config_BS1_60 = {'NA' : 1.40,
-                  'ni' : 1.515,
-                  'xy_res_nm' : 216.6,
-                  'z_res_nm' : 200
-                  }
+        config_BS1_100_old = {'NA': 1.40,
+                              'ni': 1.515,
+                              'xy_res_nm': 132.01,
+                              'z_res_nm': 300}
 
-        config_BS2_40 = {'NA' : 1.4,
-                     'ni' : 1.515,
-                     'zy_res_nm' : 108.3,
-                     'z_res_nm' : 600}
+        config_BS1_60 = {'NA': 1.40,
+                         'ni': 1.515,
+                         'xy_res_nm': 216.6,
+                         'z_res_nm': 200}
+
+        config_BS2_60 = {
+                         'Objective': 'Plan Apo Lambda 60x oil',
+                         'NA': 1.40,
+                         'ni': 1.515,
+                         'xy_res_nm': 108.3,
+                         'z_res_nm': 600}
 
         self.templates = {'BS1 100x' : config_BS1_100,
                           'BS1 60x' : config_BS1_60,
-                          'BS2 40x' : config_BS2_40}
+                          'BS2 60x' : config_BS2_60,
+                          'BS1 100x (OLD NA 1.4)' : config_BS1_100_old}
 
     def selectTemplate(self):
         option, index = pick(list(self.templates.keys()),
