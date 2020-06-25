@@ -70,6 +70,7 @@ typedef struct{
   float relax;
   float xycropfactor; // discard outer slices that are less than this of the central one
   char * commandline;
+  int borderQuality;
 
   int onetile; // For debugging -- only process the first tile if set
 } dw_opts;

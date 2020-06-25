@@ -2,46 +2,56 @@ function getmse()
 
 psf = df_readTif('PSF-Bars-stack.tif');
 
+files(1).Name = 'Bars-G10-P15-stack.tif';
+files(end).Tag = 'Synthetic SNR15';
+files(end+1).Name = 'Bars-G10-P30-stack.tif';
+files(end).Tag = 'Synthetic SNR30';
+
+files(end+1).Name = 'dw_Bars-G10-P15-stack.tif';
+files(end).Tag = 'dw SNR15';
+files(end+1).Name = 'dw_Bars-G10-P30-stack.tif';
+files(end).Tag = 'dw SNR30';
+
+files(end+1).Name = 'dw1_Bars-G10-P15-stack.tif';
+files(end).Tag = 'dw1 SNR15';
+files(end+1).Name = 'dw1_Bars-G10-P30-stack.tif';
+files(end).Tag = 'dw1 SNR30';
+
+files(end+1).Name = 'dw0_Bars-G10-P15-stack.tif';
+files(end).Tag = 'dw0 SNR15';
+files(end+1).Name = 'dw0_Bars-G10-P30-stack.tif';
+files(end).Tag = 'dw0 SNR30';
+
+files(end+1).Name = 'dw_P15_deconvolution_lab.tif';
+files(end).Tag = 'dwl SNR15';
+files(end+1).Name = 'dw_P30_deconvolution_lab.tif';
+files(end).Tag = 'dwl SNR30';
+
+% We don't scale the reference image
 Iref = df_readTif('Bars-stack.tif');
-Iref = double(Iref);
+Iref = double(Iref); 
 
-I15org = double(df_readTif('Bars-G10-P15-stack.tif'));
-I30org = double(df_readTif('Bars-G10-P30-stack.tif'));
+for ff = 1:numel(files)
+    file = files(ff).Name;
+    tag = files(ff).Tag;
+    I = df_readTif(file);
+    I = double(I);    
+    I = I*mean(Iref(:))/mean(I(:)); % For easier opimization
+    [scaling, mse] = fminunc(@(x) mseval(Iref, I*x), 0.1);
+    fprintf('mse(%s,ref) = %f\n', tag, mse);
+    files(ff).mse = mse;
+    files(ff).time_s = dwGetTime(file);
+    files(ff).mem_kb = dwGetMem(file);
+end
 
-I15 = df_readTif('dw_Bars-G10-P15-stack.tif');
-I15 = double(I15);
-%I15 = I15/0.036920;
-I30 = df_readTif('dw_Bars-G10-P30-stack.tif');
-I30 = double(I30);
-%I30 = I30/0.022979;
-L15 = df_readTif('dw_P15_deconvolution_lab.tif');
-L15 = double(L15);
-
-L30 = df_readTif('dw_P30_deconvolution_lab.tif');
-L30 = double(L30);
-whos
-
-
-[scaling, mseI15org] = fminunc(@(x) mse(Iref, I15org*x), 0.1);
-[scaling, mseI30org] = fminunc(@(x) mse(Iref, I30org*x), 0.1);
-[scaling, mse15] = fminunc(@(x) mse(Iref, I15*x), 1);
-[scaling, mse30] = fminunc(@(x) mse(Iref, I30*x), 1);
-[scaling, mseL15] = fminunc(@(x) mse(Iref, L15*x), 1);
-[scaling, mseL30] = fminunc(@(x) mse(Iref, L30*x), 1);
-
-%mse15 = mse(Iref, I15);
-%mse30 = mse(Iref, I30);
-fprintf('mse(org15,ref) = %f\n', mseI15org);
-fprintf('mse(org30, ref) = %f\n', mseI30org);
-fprintf('mse(P15,ref) = %f\n', mse15);
-fprintf('mse(P30, ref) = %f\n', mse30);
-fprintf('mse(LP15, ref) = %f\n', mseL15);
-fprintf('mse(LP30, ref) = %f\n', mseL30);
-%mse30 = mse(Iref, I30);
+tab = struct2table(files);
+% writetable(tab, 'tab.csv')
+% save as table circumvent whimsical rounding
+df_writeTable(tab, 'tab.csv');
 end
 
 
-function v = mse(A, B)
+function v = mseval(A, B)
  v = sqrt(mean((A(:)-B(:)).^2));
 end
 

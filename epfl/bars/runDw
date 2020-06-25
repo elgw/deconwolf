@@ -1,6 +1,6 @@
 
 im1=Bars-G10-P15-stack.tif
-im1=Bars-G10-P30-stack.tif
+im2=Bars-G10-P30-stack.tif
 psf=PSF-Bars-stack.tif
 
 # Normal settings

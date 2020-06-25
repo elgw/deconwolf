@@ -68,6 +68,7 @@ dw_opts * dw_opts_new(void)
   s->xycropfactor = 0.001;
   s->commandline = NULL;
   s->onetile = 0;
+  s->borderQuality = 2;
   return s;
 }
 
@@ -77,6 +78,14 @@ void nullfree(void * p)
   {
     free(p);
   }
+}
+
+
+static int64_t int64_t_max(int64_t a, int64_t b)
+{
+  if( a > b)
+    return a;
+  return b;
 }
 
 void dw_opts_free(dw_opts ** sp)
@@ -126,6 +135,20 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
   if(s->relax > 0)
   {
     fprintf(f, "PSF relaxation: %f\n", s->relax);
+  }
+  fprintf(f, "Border Quality: ");
+  switch(s->borderQuality){
+    case 0:
+      fprintf(f, "0 = worst\n");
+      break;
+    case 1:
+      fprintf(f, "1 = low\n");
+      break;
+    case 2:
+      fprintf(f, "2 = normal\n");
+        break;
+    default:
+        ;
   }
   if(s->onetile == 1)
   {
@@ -244,13 +267,17 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     { "relax",        required_argument, NULL,   'r' },
     { "xyfactor",     required_argument, NULL,   'x' },
     { "onetile",      no_argument,       NULL,   'T' },
+    { "bq",           required_argument, NULL,   'B' },
     { NULL,           0,                 NULL,   0   }
   };
 
   int ch;
-  while((ch = getopt_long(argc, argv, "vho:n:c:p:s:p:T", longopts, NULL)) != -1)
+  while((ch = getopt_long(argc, argv, "Bvho:n:c:p:s:p:T", longopts, NULL)) != -1)
   {
     switch(ch) {
+      case 'B':
+        s->borderQuality = atoi(optarg);
+        break;
       case 'v':
         dw_fprint_info(NULL, s);
         exit(0);
@@ -631,6 +658,7 @@ void dw_usage(const int argc, char ** argv, const dw_opts * s)
   printf(" --overwrite\n\t Allows deconwolf to overwrite already existing output files\n");
   printf(" --relax F\n\t Multiply the central pixel of the PSF by F. (F>1 relaxation)\n");
   printf(" --xyfactor F\n\t Discard outer planes of the PSF with sum < F of the central\n");
+  printf(" --bq Q\n\t Set border quality to 0 'worst', 1 'bad', or 2 'normal' which is default\n");
   //  printf(" --batch\n\t Generate a batch file to deconvolve all images in the `image_dir`\n");
   printf("\n");
 }
@@ -680,10 +708,30 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
 
   // This is the dimensions that we will work with
   // called M1 M2 M3 in the MATLAB code
+  // Default border quality
   int64_t wM = M + pM -1;
   int64_t wN = N + pN -1;
   int64_t wP = P + pP -1;
+
+  if(s->borderQuality == 1)
+  {
+  wM = M + (pM+1)/2;
+  wN = N + (pN+1)/2;
+  wP = P + (pP+1)/2;
+  }
+
+  if(s->borderQuality == 0)
+  {
+  wM = int64_t_max(M, pM);
+  wN = int64_t_max(N, pN);
+  wP = int64_t_max(P, pP);
+  }
+
+
+
   size_t wMNP = wM*wN*wP;
+
+
 
 
   if(s->verbosity > 0)

@@ -64,11 +64,25 @@ class Guide(object):
                           'BS2 60x' : config_BS2_60,
                           'BS1 100x (OLD NA 1.4)' : config_BS1_100_old}
 
+    def getIreg(self):
+        return self.ireg;
+
+    def getCreg(self):
+        return self.creg;
+
     def selectTemplate(self):
         option, index = pick(list(self.templates.keys()),
                              'Please choose a template')
         self.config = self.templates[option]
-        self.config['threads'] = 10
+
+        nThreads = 10;
+        try:
+            import psutil
+            nThreads = psutil.cpu_count(logical = False)
+        except ImportError:
+            print("WARNING: could not determine the number of cores, using default value")
+
+        self.config['threads'] = nThreads
         self.config['tilesize'] = 2048
 
     def selectOptions(self):
@@ -122,7 +136,6 @@ class Guide(object):
             chan = self.getChannel(imfile)
             if chan is not None:
                 self.channels.append(chan)
-                print(chan)
 
         self.channels = list(set(self.channels))
         return self.channels
@@ -485,6 +498,7 @@ if __name__ == "__main__":
     if len(g.getImFiles()) == 0:
         print(f"No files ending with .tif, or .tiff")
         print(f"Please run dw_guide in a folder with images")
+        print(f"Used the following regular expression: {g.getIreg()}")
         sys.exit(1)
 
     print(f"Found {len(g.getImFiles())} images to be deconvolved")
@@ -492,6 +506,7 @@ if __name__ == "__main__":
     # Get defaults for known channels
     if len(g.getChannels()) == 0:
         print(f"Could not identify any channels from the file names")
+        print(f"Used the following regular expression: {g.getCreg()}")
         sys.exit(1)
 
     g.selectTemplate()

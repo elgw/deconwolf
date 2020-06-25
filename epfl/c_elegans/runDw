@@ -1,0 +1,11 @@
+#dw --iter 40 --overwrite CElegans-CY3.tif PSF-CElegans-CY3.tif
+#dw --iter 40 --overwrite CElegans-DAPI.tif PSF-CElegans-DAPI.tif
+dw --iter 40 --overwrite CElegans-FITC.tif PSF-CElegans-FITC.tif
+
+#dw --bq 1 --overwrite --iter 40 --prefix dw1 --overwrite CElegans-CY3.tif PSF-CElegans-CY3.tif
+#dw --bq 1 --overwrite --iter 40 --prefix dw1 --overwrite CElegans-DAPI.tif PSF-CElegans-DAPI.tif
+dw --bq 1 --overwrite --iter 40 --prefix dw1 --overwrite CElegans-FITC.tif PSF-CElegans-FITC.tif
+
+#dw --bq 0 --overwrite --iter 40 --prefix dw0 --overwrite CElegans-CY3.tif PSF-CElegans-CY3.tif
+#dw --bq 0 --overwrite --iter 40 --prefix dw0 --overwrite CElegans-DAPI.tif PSF-CElegans-DAPI.tif
+dw --bq 0 --overwrite --iter 40 --prefix dw0 --overwrite CElegans-FITC.tif PSF-CElegans-FITC.tif
