@@ -1,0 +1,23 @@
+
+im1=Bars-G10-P15-stack.tif
+im1=Bars-G10-P30-stack.tif
+psf=PSF-Bars-stack.tif
+
+# Normal settings
+dw --overwrite --iter 40 $im1 $psf
+dw --overwrite --iter 40 $im1 $psf  
+dw --overwrite --iter 40 $im2 $psf 
+dw --overwrite --iter 40 $im2 $psf 
+
+# bq  0
+dw --overwrite --iter 40 --bq 0 --prefix dw0 $im1 $psf 
+dw --overwrite --iter 40 --bq 0 --prefix dw0 $im1 $psf 
+dw --overwrite --iter 40 --bq 0 --prefix dw0 $im2 $psf 
+dw --overwrite --iter 40 --bq 0 --prefix dw0 $im2 $psf 
+
+# bq1
+dw --overwrite --iter 40 --bq 1 --prefix dw1 $im1 $psf 
+dw --overwrite --iter 40 --bq 1 --prefix dw1 $im1 $psf 
+dw --overwrite --iter 40 --bq 1 --prefix dw1 $im2 $psf 
+dw --overwrite --iter 40 --bq 1 --prefix dw1 $im2 $psf 
+

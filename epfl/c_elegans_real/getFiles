@@ -1,0 +1,11 @@
+wget http://bigwww.epfl.ch/deconvolution/bio/CElegans-CY3.zip 
+wget http://bigwww.epfl.ch/deconvolution/bio/CElegans-DAPI.zip
+wget http://bigwww.epfl.ch/deconvolution/bio/CElegans-FITC.zip
+wget http://bigwww.epfl.ch/deconvolution/bio/PSF-CElegans-CY3.zip
+wget http://bigwww.epfl.ch/deconvolution/bio/PSF-CElegans-DAPI.zip
+wget http://bigwww.epfl.ch/deconvolution/bio/PSF-CElegans-FITC.zip
+
+for f in `ls *.zip`; do
+unzip $f
+done
+
