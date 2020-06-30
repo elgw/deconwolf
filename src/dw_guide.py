@@ -16,10 +16,16 @@ class Guide(object):
 
     def __init__(self):
         # Regular expression to detect images
-        self.ireg = '^.*_.*\\.tiff?$'
+        #self.ireg = '^.*_.*\\.tiff?$'
+        self.ireg = '^.*\\.tiff?$'
         # Regular expression to identify channels from file names
         # Only the first group, within () is used.
-        self.creg = r"(.*)\_[0-9]*\.tiff?"
+
+        self.creg_dotter = r"(.*)\_[0-9]*\.tiff?"
+        self.creg_pygpseq = r"(.*)\.channel[0-9]*\.series[0-9]*\.tiff?"
+
+        self.patterns = {'DOTTER -- CHAN_XYZ.tif' : self.creg_dotter,
+                         'PyGPSeq -- CHAN.channelABC.seriesXYZ.tif': self.creg_pygpseq};
 
         # Known channels
         self.lambdas = {'dapi': 461, # actually for hoechst
@@ -59,8 +65,14 @@ class Guide(object):
                          'xy_res_nm': 108.3,
                          'z_res_nm': 600}
 
+        config_BS2_100 = {'NA': 1.45,
+                          'ni': 1.515,
+                          'xy_res_nm': 65,
+                          'z_res_nm': 200}
+
         self.templates = {'BS1 100x' : config_BS1_100,
                           'BS1 60x' : config_BS1_60,
+                          'BS2 100x' : config_BS2_100,
                           'BS2 60x' : config_BS2_60,
                           'BS1 100x (OLD NA 1.4)' : config_BS1_100_old}
 
@@ -70,9 +82,13 @@ class Guide(object):
     def getCreg(self):
         return self.creg;
 
+    def selectPattern(self):
+        option, index = pick(list(self.patterns.keys()), 'Please choose a file pattern to look for');
+        self.creg = self.patterns[option];
+
     def selectTemplate(self):
         option, index = pick(list(self.templates.keys()),
-                             'Please choose a template')
+                             'Please choose a template.\nAlways double check all values, especially the pixel size in z.\nSend an e-mail to erik if you want to add/change a template\nAbort with Ctrl+C')
         self.config = self.templates[option]
 
         nThreads = 10;
@@ -420,7 +436,11 @@ class Menu(object):
 
                 # msg = "%d. %s" % (index, item[0])
                 msg = f"{item[0]}"
-                self.window.addstr(1 + index, 1, msg, mode)
+                try:
+                    self.window.addstr(1 + index, 1, msg, mode)
+                except:
+                    0
+                    # print("Window is too small, make it larger and run again!")
 
             key = self.window.getch()
 
@@ -493,6 +513,7 @@ class MyApp(object):
 if __name__ == "__main__":
 
     g = Guide()
+    g.selectPattern()
 
     # Identify images
     if len(g.getImFiles()) == 0:
@@ -501,7 +522,7 @@ if __name__ == "__main__":
         print(f"Used the following regular expression: {g.getIreg()}")
         sys.exit(1)
 
-    print(f"Found {len(g.getImFiles())} images to be deconvolved")
+    print(f"Found {len(g.getImFiles())} tif images")
 
     # Get defaults for known channels
     if len(g.getChannels()) == 0:

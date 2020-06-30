@@ -1,27 +1,37 @@
-
 function getfwhm()
+
+addpath('../')
 close all
 
-files = {'Bead.tif', 'Final Display of RL.tif', 'dw_Bead.tif', 'dw0_Bead.tif', 'dw1_Bead.tif'}
+files(1).name = 'Bead.tif';
+files(1).tag = 'Original';
+files(end+1).name = 'Final Display of RL.tif';
+files(end).tag = 'deLa2';
+files(end+1).name = 'dw_Bead.tif';
+files(end).tag = 'dw';
+files(end+1).name = 'dw1_Bead.tif';
+files(end).tag = 'dw --bq 1';
+files(end+1).name = 'dw0_Bead.tif';
+files(end).tag = 'dw --bq 0';
 
 % Spatial resolution	deltar: 64.5 nm
 % Axial resolution	deltaz: 160 nm
 
-for kk = 1:numel(files)    
-    file = files{kk};
+for kk = 1:numel(files)
+    file = files(kk).name;
     fprintf('File: %s\n', file);
     I = double(df_readTif(file));
     
-    px = sum(sum(I, 3), 2);
-    py = squeeze(sum(sum(I, 1), 3));
-    pz = squeeze(sum(sum(I, 1), 2));
+%     px = sum(sum(I, 3), 2);
+%     py = squeeze(sum(sum(I, 1), 3));
+%     pz = squeeze(sum(sum(I, 1), 2));
     %figure, plot(px), hold on, plot(py), plot(pz)
-       
+    
     midx = 125.0;
     midy = 128.5;
     midz = 101.75;
-       
-    % Extract profiles    
+    
+    % Extract profiles
     d = 45;
     XF = 17; % oversampling
     rx = linspace(midx-d, midx+d, (2*d+1)*XF);
@@ -38,20 +48,22 @@ for kk = 1:numel(files)
     
     fprintf('RC: %f\n', rc);
     
+    levels = [.25, .5, .75];
     imax = max(I(:)); % Use max from whole image
     imax = []; % use max from profile
-    fwhm_xy = (pfwhm(px, imax)*64.5/XF + pfwhm(py, imax)*64.5/XF)/2;
-    fwhm_z = pfwhm(pz, imax)*160/XF;            
-    
-    fprintf('fwhm radial: %f, axial: %f\n', fwhm_xy, fwhm_z);        
-    
-    if 0
-    figure
-    imagesc(I(:,:,round(midz))), axis image, colormap gray
-    hold on, plot(midy, midx, 'rx')
-    keyboard
+    for level = levels
+        fwhm_xy = (pfwhm(px, level, imax)*64.5/XF + pfwhm(py, level, imax)*64.5/XF)/2;
+        fwhm_z = pfwhm(pz, level, imax)*160/XF;
+        files(kk).(sprintf('fwhm_xy_%d', 100*level)) = fwhm_xy;
+        files(kk).(sprintf('fwhm_z_%d', 100*level)) = fwhm_z;        
+        files(kk).mem_Mb = dwGetMem(file)/1000;
+        files(kk).time_s = dwGetTime(file);
     end
     
+    tab = struct2table(files);
+    fprintf('Writing results to tab.csv\n');
+    
+    df_writeTable(tab, 'tab.csv');
     
     subplot(1,3,1)
     hold on
@@ -67,16 +79,18 @@ for kk = 1:numel(files)
     plot(rz-midz, pz/max(pz))
     title('Z')
     
-       %volumeSlide(I)
-       %keyboard
+    %volumeSlide(I)
+    %keyboard
 end
+
+
 
 subplot(1,3,1)
 legend({'original', 'dwl2', 'deconwolf', 'dw 0', 'dw 1'}, 'location', 'southWest')
 dprintpdf('radial_profiles', 'publish', 'w', 30, 'h', 6)
 end
 
-function fwhm = pfwhm(px, imax)
+function fwhm = pfwhm(px, level, imax)
 px = px-min(px(:));
 if numel(imax > 0)
     px = px/imax;
@@ -84,9 +98,9 @@ else
     px = px/max(px);
 end
 
-    maxx = max(px);
-    pix = find(px>=0.5*maxx);
-    left = pix(1);
-    right = pix(end);
-    fwhm = (right-left);
-    end
+maxx = max(px);
+pix = find(px>=level*maxx);
+left = pix(1);
+right = pix(end);
+fwhm = (right-left);
+end
