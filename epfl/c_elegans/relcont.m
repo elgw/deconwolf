@@ -2,12 +2,12 @@ function relcont()
 addpath('../');
 files(1).name = 'CElegans-FITC.tif';
 files(1).tag = 'Original';
-files(end+1).name = 'dw_CElegans-FITC.tif';
-files(end).tag = 'dw';
-files(end+1).name = 'dw0_CElegans-FITC.tif';
-files(end).tag = 'dw0';
-files(end+1).name = 'dw1_CElegans-FITC.tif';
-files(end).tag = 'dw1';
+files(end+1).name = 'dw40_CElegans-FITC.tif';
+files(end).tag = 'dw40';
+files(end+1).name = 'dw40.bq0_CElegans-FITC.tif';
+files(end).tag = 'dw40.bq1';
+files(end+1).name = 'dw40.bq1_CElegans-FITC.tif';
+files(end).tag = 'dw40.bq1';
 files(end+1).name = 'Final Display of RL_FITC.tif';
 files(end).tag = 'deLa2';
 

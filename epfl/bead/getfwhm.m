@@ -7,16 +7,22 @@ files(1).name = 'Bead.tif';
 files(1).tag = 'Original';
 files(end+1).name = 'Final Display of RL.tif';
 files(end).tag = 'deLa2';
-files(end+1).name = 'dw_Bead.tif';
-files(end).tag = 'dw';
-files(end+1).name = 'dw1_Bead.tif';
-files(end).tag = 'dw --bq 1';
+files(end+1).name = 'Final Display of RL_80it.tif';
+files(end).tag = 'deLa2 @80';
+files(end+1).name = 'Final Display of RL_160it.tif';
+files(end).tag = 'deLa2 @160';
+files(end+1).name = 'dw40_Bead.tif';
+files(end).tag = 'dw40';
+files(end+1).name = 'dw40.bq1_Bead.tif';
+files(end).tag = 'dw40 --bq 1';
 files(end+1).name = 'dw0_Bead.tif';
-files(end).tag = 'dw --bq 0';
+files(end).tag = 'dw40 --bq 0';
+%files(end+1).name = 'bwX_Bead.tif';
+%files(end).tag = 'bwX from newpsf';
 
 % Spatial resolution	deltar: 64.5 nm
 % Axial resolution	deltaz: 160 nm
-
+legendstrs = {};
 for kk = 1:numel(files)
     file = files(kk).name;
     fprintf('File: %s\n', file);
@@ -45,8 +51,8 @@ for kk = 1:numel(files)
     
     mid = interpn(I, midx, midy, midz)/max(I(:));
     rc = 1-mid;
-    
-    fprintf('RC: %f\n', rc);
+    files(kk).relContrastPerc = 100*rc;
+    %fprintf('RC: %f\n', rc);
     
     levels = [.25, .5, .75];
     imax = max(I(:)); % Use max from whole image
@@ -78,7 +84,7 @@ for kk = 1:numel(files)
     hold on
     plot(rz-midz, pz/max(pz))
     title('Z')
-    
+    legendstrs{end+1} = files(kk).tag;
     %volumeSlide(I)
     %keyboard
 end
@@ -86,7 +92,8 @@ end
 
 
 subplot(1,3,1)
-legend({'original', 'dwl2', 'deconwolf', 'dw 0', 'dw 1'}, 'location', 'southWest')
+%legend({'original', 'dwl2', 'deconwolf', 'dw 0', 'dw 1'}, 'location', 'southWest')
+legend(legendstrs, 'location', 'southWest')
 dprintpdf('radial_profiles', 'publish', 'w', 30, 'h', 6)
 end
 

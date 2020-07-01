@@ -71,6 +71,7 @@ typedef struct{
   float xycropfactor; // discard outer slices that are less than this of the central one
   char * commandline;
   int borderQuality;
+  int outFormat; // 16 (=16 bit int) or 32 (=32 bit float)
 
   int onetile; // For debugging -- only process the first tile if set
 } dw_opts;

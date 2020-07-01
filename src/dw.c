@@ -69,6 +69,7 @@ dw_opts * dw_opts_new(void)
   s->commandline = NULL;
   s->onetile = 0;
   s->borderQuality = 2;
+  s->outFormat = 16; // write 16 bit int
   return s;
 }
 
@@ -136,6 +137,19 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
   {
     fprintf(f, "PSF relaxation: %f\n", s->relax);
   }
+  fprintf(f, "Output Format: ");
+  switch(s->outFormat){
+    case 16:
+      fprintf(f, "16 bit integer\n");
+      break;
+    case 32:
+      fprintf(f, "32 bit float\n");
+      break;
+    default:
+      fprintf(f, "ERROR: Unknown\n");
+      break;
+  }
+
   fprintf(f, "Border Quality: ");
   switch(s->borderQuality){
     case 0:
@@ -268,13 +282,17 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     { "xyfactor",     required_argument, NULL,   'x' },
     { "onetile",      no_argument,       NULL,   'T' },
     { "bq",           required_argument, NULL,   'B' },
+    { "float",        no_argument,       NULL,   'F' },
     { NULL,           0,                 NULL,   0   }
   };
 
   int ch;
-  while((ch = getopt_long(argc, argv, "Bvho:n:c:p:s:p:T", longopts, NULL)) != -1)
+  while((ch = getopt_long(argc, argv, "FBvho:n:c:p:s:p:T", longopts, NULL)) != -1)
   {
     switch(ch) {
+      case 'F':
+        s->outFormat = 32;
+        break;
       case 'B':
         s->borderQuality = atoi(optarg);
         break;
@@ -659,6 +677,7 @@ void dw_usage(const int argc, char ** argv, const dw_opts * s)
   printf(" --relax F\n\t Multiply the central pixel of the PSF by F. (F>1 relaxation)\n");
   printf(" --xyfactor F\n\t Discard outer planes of the PSF with sum < F of the central\n");
   printf(" --bq Q\n\t Set border quality to 0 'worst', 1 'bad', or 2 'normal' which is default\n");
+  printf(" --float\n\t Set output format to 32-bit float (default is 16-bit int)\n");
   //  printf(" --batch\n\t Generate a batch file to deconvolve all images in the `image_dir`\n");
   printf("\n");
 }
@@ -1571,7 +1590,12 @@ int dw_run(dw_opts * s)
         printf("Writing to %s\n", s->outFile); fflush(stdout);
       }
       //    floatimage_normalize(out, M*N*P);
-      fim_tiff_write(s->outFile, out, M, N, P);
+      if(s->outFormat == 32)
+      {
+        fim_tiff_write_float(s->outFile, out, M, N, P);
+      } else {
+        fim_tiff_write(s->outFile, out, M, N, P);
+      }
     }
   }
 
