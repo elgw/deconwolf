@@ -1,20 +1,40 @@
-clear all
-close all
+function genSynthDots(settings)
+% Purpose: 
+% Generate synthetic image with increasing dot density.
+% See how densely they can be packed while still beeing separatable after
+% deconvolution.
+% 
 
-s.outFolder = 'set3/';
 s.bg = 1000; % Constant added to synthethic image
 s.dNoise = 10; % Detector noise power
 s.dotSigma = 0.8; % Gaussian size of dots (sigma)
 s.nDots = 10000;
+s.psfFile = 'PSF RW.tif'; 
+s.pixelSizeNM = [130 130 130];
+s.imsize = [256 256 40];
+s.viewVolume = 0; % View created volume at end
+
+if exist('settings', 'var')
+    s = df_structput(s, settings);
+end
+
+s.outFolder = sprintf('sdots_%d/', s.nDots);
+s.nDots = round(s.nDots);
+
 
 mkdir(s.outFolder)
+s.logFile = [s.outFolder, 'settings.txt'];
+log = fopen(s.logFile, 'a');
+df_printstruct(s, log);
 
 % Target size:
-M = 256; N = 256; P = 40;
+M = s.imsize(1); N = s.imsize(2); P = s.imsize(3);
 fprintf('xy-pixels/dot: %.2f\n', M*N/s.nDots);
+fprintf(log, 'xy-pixels/dot: %.2f\n', M*N/s.nDots);
+
 % PSF size:
 pM = 119; pN=119; pP = 2*P-1;
-PSF0 = df_readTif('PSF RW.tif');
+PSF0 = df_readTif(s.psfFile);
 while size(PSF0,3) > pP
     PSF0 = PSF0(2:end-1, 2:end-1, 2:end-1);
 end
@@ -60,4 +80,7 @@ S = S + s.dNoise*randn(size(S)); % Detector noise
 % Write as 32-bit float
 df_writeTif_single(single(S(1:M, 1:N, 1:P)), [s.outFolder 'sdots.tif']);
 
-volumeSlide([S(1:M, 1:N, 1:P)/max(S(:)), V(1:M, 1:N, 1:P)/max(V(:))])
+if s.viewVolume
+    volumeSlide([S(1:M, 1:N, 1:P)/max(S(:)), V(1:M, 1:N, 1:P)/max(V(:))])
+end
+fclose(log);

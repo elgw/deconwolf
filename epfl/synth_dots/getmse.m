@@ -1,91 +1,119 @@
-function getmse()
+function status = getmse(settings)
+% function status = getmse(struct settings)
+% Required fileds of settings: 'folder', 'file'
+% Optional: 'Tag'
+s.Tag = 'No Tag';
+
+
+
+s = df_structput(s, settings);
+status = s;
+
 addpath('../')
-% Note: in sage1701 they probably used https://www.imatest.com/docs/ssim/
-%
 
-%psf = df_readTif('psf.tif');
-
-files(1).Name = 'sdots.tif';
-files(end).Tag = 'input: w. noise';
-files(end+1).Name = 'dw50_sdots.tif';
-files(end).Tag = 'dw50';
-files(end+1).Name = 'dw100_sdots.tif';
-files(end).Tag = 'dw100';
-%files(end+1).Name = 'dw150_sdots.tif';
-%files(end).Tag = 'dw150';
-files(end+1).Name = 'dw200_sdots.tif';
-files(end).Tag = 'dw200';
-files(end+1).Name = 'dw250_sdots.tif';
-files(end).Tag = 'dw250';
-files(end+1).Name = 'Final Display of RL 250 iter.tif';
-files(end).Tag = 'DeLa2 250';
-files(end+1).Name = 'Ground Truth.tif';
-files(end).Tag = 'Ground Truth';
+% Note about SSIM:
+% in sage1701 they probably used https://www.imatest.com/docs/ssim/
 
 % We don't scale the reference image
-Iref = df_readTif('Ground Truth.tif');
-Iref = double(Iref); 
+Iref = df_readTif([s.folder 'Ground Truth.tif']);
+Iref = double(Iref);
 
-for ff = 1:numel(files)    
-    file = files(ff).Name;
-    fprintf('file: %s\n', file);
-    tag = files(ff).Tag;
-    I = df_readTif(file);
-    I = double(I);    
-    I = I*mean(Iref(:))/mean(I(:)); % For easier opimization
-    [scaling, mse] = fminunc(@(x) mseval(Iref, I*x), 0.1);
-    fprintf('mse(%s,ref) = %f\n', tag, mse);
-    files(ff).nDotsIsLMAX = getDots(I)*100;
-    %files(ff).mse = mse;
-    %files(ff).time_s = dwGetTime(file);
-    %files(ff).mem_kb = dwGetMem(file);
-    %files(ff).ssim = ssim(I, Iref);
-    %files(ff).psnr = psnr(I, Iref);
-end
+dwfile = [s.folder s.file];
+rfile = [s.folder s.inputfile];
+fprintf('file: %s\n', dwfile);
 
-tab = struct2table(files);
-% writetable(tab, 'tab.csv')
-% save as table circumvent whimsical rounding
-df_writeTable(tab, 'tab.csv');
+I0 = double(df_readTif(rfile)); % Non-deconvolved file
+I = df_readTif(dwfile);
+I = double(I);
+I = I*mean(Iref(:))/mean(I(:)); % For easier opimization
+
+[scaling, mse] = fminunc(@(x) mseval(Iref, I*x), 0.1);
+%fprintf('mse(%s,ref) = %f\n', s.Tag, mse);
+status.mse = mse;
+
+[scaling, mse] = fminunc(@(x) mseval(Iref, I0*x), 0.1);
+%fprintf('mse(%s,ref) = %f\n', s.Tag, mse);
+status.mse_raw = mse;
+
+[a, b] = getDots(s, I, Iref);
+status.DWnDotsIsLMAX = a*100;
+status.DWnDotsIsLMAX2 = b*100;
+[a, b] = getDots(s, I0, Iref);
+
+status.nDotsIsLMAX = a*100;
+status.nDotsIsLMAX2 = b*100;
+
+
+status.time_s = dwGetTime(dwfile);
+status.mem_kb = dwGetMem(dwfile);
+%status.ssim = ssim(I, Iref);
+%status.psnr = psnr(I, Iref);
+
 end
 
 
 function v = mseval(A, B)
- v = sqrt(mean((A(:)-B(:)).^2));
+v = sqrt(mean((A(:)-B(:)).^2));
 end
 
 
-function N  = getDots(I)
+function [N, N2]  = getDots(s, I, Iref)
+% Returns how many of the true dots that are local maximas
 
-D = load('X.mat');
+
+D = load([s.folder 'X.mat']);
 D = D.X; % Coordinates of the true dots
 [x, y,z, p, Map] = getLocalMaximas(I);
+[xr, yr,zr, pr, Mapr] = getLocalMaximas(Iref);
+N = sum(Map(:) == 1 & Mapr(:) == 1)/sum(Mapr(:));
+
+Map2 = max(Map, [], 3); Mapr2 = max(Mapr, [], 3);
+N2 = sum(Map2(:) == 1 & Mapr2(:) == 1)/sum(Mapr2(:));
+
+
+return
+keyboard
 
 Di = round(D(:,1:3));
+trueMap = 0*Map;
+trueMap(sub2ind(size(I), Di(:,1), Di(:,2), Di(:,3))) = 1;
+trueMap = clearBoarders(trueMap, 4, 0); % Same as in getLocalMaximas
+
 Di = Di(min(Di, [], 2) > 0, :);
 whos D
 whos Di
 idx = sub2ind(size(I), Di(:,1), Di(:,2), Di(:,3));
-N = sum(Map(idx))/size(Di,1);
- 
+N = sum(Map(:) == 1 & trueMap(:) == 1);
+N = N/sum(trueMap(:));
+
+if 0
+    figure
+    imagesc(sum(I,3)), title('Image')
+    figure, imagesc(sum(Map,3)), title('Maximas')
+    Map2 = 0*Map; Map2(idx) = 1;
+    figure, imagesc(sum(Map2, 3)); title('True locations')
+end
+
 end
 
 
 function [PX, PY, PZ,  Pos, Map] = getLocalMaximas(Image)
+
 conn26 = 0;
 if conn26
-sel = ones(3,3,3);
+    sel = ones(3,3,3);
 else
-sel = zeros(3,3, 3);
-sel(:, 2, 2) = 1;
-sel(2, :, 2) = 1;
-sel(2, 2, :) = 1;
+    sel = zeros(3,3, 3);
+    sel(:, 2, 2) = 1;
+    sel(2, :, 2) = 1;
+    sel(2, 2, :) = 1;
 end
 sel(2,2, 2) = 0;
 
 D = imdilate(Image, strel('arbitrary', sel));
 D = clearBoarders(D, 4, Inf);
-Pos = find(Image>D);
+Map = (Image > D) & (Image > (mean(Image(:))+std(Image(:))));
+Pos = find(Map == 1);
 [PX, PY, PZ]=ind2sub(size(Image), Pos);
-Map = Image>D;
+
 end

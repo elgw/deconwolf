@@ -131,4 +131,6 @@ void fim_mult_scalar(float * , size_t N, float x);
 
 void fim_ut(void);
 
+void fim_gsmooth(float * restrict V, size_t M, size_t N, size_t P, float sigma);
+
 #endif

@@ -1106,12 +1106,25 @@ char * tiff_is_supported(TIFF * tiff)
   }
 
   int isUint = 0;
+  int isFloat = 0;
 
   if(gotSF)
   {
+    int okFormat = 0;
     if( SF == SAMPLEFORMAT_UINT)
     {
       isUint = 1;
+      okFormat = 1;
+    }
+    if( SF == SAMPLEFORMAT_IEEEFP)
+    {
+      isFloat = 1;
+      okFormat = 1;
+    }
+    if(okFormat == 0)
+    {
+      sprintf(errStr, "Neither SAMPLEFORMAT_UINT or SAMPLEFORMAT_IEEEFP\n"); 
+      return errStr;
     }
   } 
   else {
@@ -1119,15 +1132,15 @@ char * tiff_is_supported(TIFF * tiff)
     isUint = 1;
   }
 
-  if(!(isUint))
+  if(isFloat && !(BPS == 32))
   {
-    sprintf(errStr, "Only unsigned integer and float images are supported\n");
+    sprintf(errStr, "Float %d-bit images are not supported, only 32-bit.\n", BPS);
     return errStr;
   }
 
   if(isUint && !(BPS == 16))
   {
-    sprintf(errStr, "Unsigned %d-bit images are not supported, 16.\n", BPS);
+    sprintf(errStr, "Unsigned %d-bit images are not supported, only 16-bit.\n", BPS);
     return errStr;
   }
 
@@ -1170,15 +1183,28 @@ int fim_tiff_maxproj(char * in, char * out)
     return -1;
   }
 
+  uint32_t SF;
+  int gotSF = TIFFGetField(input, TIFFTAG_SAMPLEFORMAT, &SF);
+
   TIFF * output = TIFFOpen(out, "w");
   TIFFSetField(output, TIFFTAG_IMAGEWIDTH, M);  
   TIFFSetField(output, TIFFTAG_IMAGELENGTH, N); 
   TIFFSetField(output, TIFFTAG_SAMPLESPERPIXEL, 1); 
-  TIFFSetField(output, TIFFTAG_BITSPERSAMPLE, 16); 
+  if(SF == SAMPLEFORMAT_UINT)
+  {
+    TIFFSetField(output, TIFFTAG_BITSPERSAMPLE, 16); 
+    TIFFSetField(output, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_UINT);
+  }
+
+  if(SF == SAMPLEFORMAT_IEEEFP)
+  {
+    TIFFSetField(output, TIFFTAG_BITSPERSAMPLE, 32); 
+    TIFFSetField(output, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_IEEEFP);
+  }
+
   TIFFSetField(output, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);
   TIFFSetField(output, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
   TIFFSetField(output, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
-  TIFFSetField(output, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_UINT);
   TIFFSetField(output, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
   TIFFSetField(output, TIFFTAG_PAGENUMBER, 1, 1);
 
@@ -1186,10 +1212,14 @@ int fim_tiff_maxproj(char * in, char * out)
 //  printf("Strip size: %zu b\n", (size_t) ssize);
   uint32_t nstrips = TIFFNumberOfStrips(input);
 
+
+
+  // Input is 16 bit unsigned int.
+  if(SF == SAMPLEFORMAT_UINT)
+  {
   uint16_t * mstrip = _TIFFmalloc(ssize); // For max over all directories
   uint16_t * strip    = _TIFFmalloc(ssize);
 
-  // Input is 16 bit unsigned int.
   for(int64_t nn = 0; nn<nstrips; nn++) // Each strip
   {
     memset(mstrip, 0, ssize);
@@ -1211,6 +1241,37 @@ int fim_tiff_maxproj(char * in, char * out)
 
   _TIFFfree(strip);
   _TIFFfree(mstrip);
+  }
+
+  // Input is 32-bit float
+  if(SF == SAMPLEFORMAT_IEEEFP)
+  {
+  float * mstrip = _TIFFmalloc(ssize); // For max over all directories
+  float * strip    = _TIFFmalloc(ssize);
+
+  for(int64_t nn = 0; nn<nstrips; nn++) // Each strip
+  {
+    memset(mstrip, 0, ssize);
+    tsize_t read = 0;
+    for(int64_t pp = 0; pp<P; pp++) // For each directory
+    {
+      TIFFSetDirectory(input, pp); // Does it keep the location for each directory?
+      read = TIFFReadEncodedStrip(input, nn, strip, (tsize_t)-1);
+      for(int64_t kk = 0; kk<read/4; kk++)
+      {
+        if(strip[kk] > mstrip[kk])
+        {
+          mstrip[kk] = strip[kk];
+        }
+      }
+    }
+    TIFFWriteRawStrip(output, 0, mstrip, read);
+  }
+  _TIFFfree(strip);
+  _TIFFfree(mstrip);
+
+  }
+
 
   TIFFClose(input);
   TIFFClose(output);

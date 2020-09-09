@@ -512,3 +512,129 @@ void fim_ut()
   shift_vector_ut();
 
 }
+
+static size_t min_size_t(size_t a, size_t b)
+{
+  if(a < b)
+    return a;
+  return b;
+}
+
+static size_t max_size_t(size_t a, size_t b)
+{
+  if(a > b)
+    return a;
+  return b;
+}
+
+
+
+
+
+int conv1(float * restrict V, int stride, float * restrict W, 
+    const size_t nV, 
+    const float * restrict K, const size_t nKu)
+{
+  const size_t k2 = (nKu-1)/2;
+  const size_t N = nV;
+  size_t bpos = 0;
+
+  // First part
+  for(size_t vv = 0;vv<k2; vv++)
+  {
+    double acc0 = 0;
+    for(size_t kk = k2-vv; kk<nKu; kk++)      
+    {
+        acc0 = acc0 + K[kk]*V[(vv-k2+kk)*stride];
+    }
+    W[bpos++] = acc0;
+  }
+
+  // Central part where K fits completely
+  size_t vv = k2;
+  const size_t block_size = 8;
+  for(size_t vv = k2 ; vv+k2 < N; vv++) 
+  {
+    double acc = 0; 
+    for(size_t kk = 0; kk<nKu; kk++)
+    {
+      acc = acc + K[kk]*V[(vv-k2+kk)*stride];
+     }
+    W[bpos++] = acc;
+  }
+
+  // Last part
+  for(size_t vv = N-k2;vv<N; vv++)
+  {
+    double acc0 = 0;
+ for(size_t kk = 0; kk<N-vv+k2; kk++)  
+    {
+        acc0 = acc0 + K[kk]*V[(vv-k2+kk)*stride];
+    }
+    W[bpos++] = acc0;
+  }
+
+
+for(size_t pp = 0; pp<nV; pp++)
+{
+  V[pp*stride] = W[pp];
+}
+  return;
+}
+
+void fim_gsmooth(float * restrict V, size_t M, size_t N, size_t P, float sigma)
+{
+  size_t nW = max_size_t(M, max_size_t(N, P));
+  printf("gsmooth: M: %zu, N: %zu, P: %zu, nW: %zu\n", M, N, P, nW); fflush(stdout);
+  // Temporary storage
+float * W = malloc(nW*sizeof(float));
+
+// Create a kernel -- todo: use sigma
+size_t nK = 7;
+float * K = malloc(nK*sizeof(float));
+K[0] = 0.001; K[1] = 0.096; K[2] = 0.2054; K[3] = 0.5698; K[4] = K[2]; K[5] = K[1]; K[6] = K[0];
+
+// Normalize the kernel
+float sum = 0;
+for(size_t kk = 0; kk<nK; kk++)
+  sum+=K[kk];
+
+for(size_t kk = 0; kk<nK; kk++)
+  K[kk]/=sum;
+
+// X
+for(int pp = 0; pp<P; pp++)
+{
+for(int nn = 0; nn<N; nn++)
+{
+  conv1(V+pp*(M*N)+nn*M, 1, W, M, K, nK);
+}
+}
+
+if(1){
+// Y
+for(int pp = 0; pp<P; pp++)
+{
+for(int mm = 0; mm<M; mm++)
+{
+  conv1(V + pp*(M*N) + mm, M, W, N, K, nK);
+}
+}
+}
+
+if(1){
+
+// Z
+for(int mm = 0; mm<M; mm++)
+{
+for(int nn = 0; nn<N; nn++)
+{
+  conv1(V+mm+M*nn, M*N, W, P, K, nK);
+}
+}
+}
+
+free(W);
+return;
+}
+

@@ -74,6 +74,7 @@ typedef struct{
   int outFormat; // 16 (=16 bit int) or 32 (=32 bit float)
 
   int onetile; // For debugging -- only process the first tile if set
+  int experimental1;
 } dw_opts;
 
 dw_opts * dw_opts_new(void);

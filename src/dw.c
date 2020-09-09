@@ -70,6 +70,7 @@ dw_opts * dw_opts_new(void)
   s->onetile = 0;
   s->borderQuality = 2;
   s->outFormat = 16; // write 16 bit int
+  s->experimental1 = 0;
   return s;
 }
 
@@ -283,11 +284,12 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     { "onetile",      no_argument,       NULL,   'T' },
     { "bq",           required_argument, NULL,   'B' },
     { "float",        no_argument,       NULL,   'F' },
+    { "experimental1", no_argument, NULL, 'X' },
     { NULL,           0,                 NULL,   0   }
   };
 
   int ch;
-  while((ch = getopt_long(argc, argv, "FBvho:n:c:p:s:p:T", longopts, NULL)) != -1)
+  while((ch = getopt_long(argc, argv, "FBvho:n:c:p:s:p:TX", longopts, NULL)) != -1)
   {
     switch(ch) {
       case 'F':
@@ -363,6 +365,9 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         break;
       case 'T':
         s->onetile = 1;
+        break;
+      case 'X':
+        s->experimental1 = 1;
         break;
     }
   }
@@ -580,7 +585,6 @@ float iter(
     afloat ** xp, // Output, f_(t+1)
     const float * restrict im, // Input image
     fftwf_complex * restrict cK, // fft(psf)
-    fftwf_complex * restrict cKr, // = NULL
     afloat * restrict f, // Current guess
     afloat * restrict W, // Weights
     const int64_t wM, const int64_t wN, const int64_t wP, // expanded size
@@ -677,7 +681,7 @@ void dw_usage(const int argc, char ** argv, const dw_opts * s)
   printf(" --relax F\n\t Multiply the central pixel of the PSF by F. (F>1 relaxation)\n");
   printf(" --xyfactor F\n\t Discard outer planes of the PSF with sum < F of the central\n");
   printf(" --bq Q\n\t Set border quality to 0 'worst', 1 'bad', or 2 'normal' which is default\n");
-  printf(" --float\n\t Set output format to 32-bit float (default is 16-bit int)\n");
+  printf(" --float\n\t Set output format to 32-bit float (default is 16-bit int) and disable scaling\n");
   //  printf(" --batch\n\t Generate a batch file to deconvolve all images in the `image_dir`\n");
   printf("\n");
 }
@@ -706,6 +710,14 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
     const afloat * restrict psf, const int64_t pM, const int64_t pN, const int64_t pP,
     dw_opts * s)
 {
+
+  /*Deconvolve im [M x N x P]
+   * using psf [pM x pN x pP]
+   * with settings in s
+   *
+   * Returns a [M x N x P] float image
+   * */
+
   if(s->verbosity > 1)
   {
     printf("Deconvolving\n");
@@ -716,7 +728,6 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
     return fim_copy(im, M*N*P);
   }
 
-  /*Deconvolve im using psf */
   const int nIter = s->nIter;
 
   if(fim_maxAtOrigo(psf, pM, pN, pP) == 0)
@@ -727,10 +738,11 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
 
   // This is the dimensions that we will work with
   // called M1 M2 M3 in the MATLAB code
-  // Default border quality
+  // Default border quality when s->borderQuality == 2
   int64_t wM = M + pM -1;
   int64_t wN = N + pN -1;
   int64_t wP = P + pP -1;
+
 
   if(s->borderQuality == 1)
   {
@@ -746,11 +758,7 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
   wP = int64_t_max(P, pP);
   }
 
-
-
   size_t wMNP = wM*wN*wP;
-
-
 
 
   if(s->verbosity > 0)
@@ -775,12 +783,11 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
   fim_circshift(Z, wM, wN, wP, -(pM-1)/2, -(pN-1)/2, -(pP-1)/2);
   fftwf_complex * cK = fft(Z, wM, wN, wP);
   //fim_tiff_write("Z.tif", Z, wM, wN, wP);
-
   fftwf_free(Z);
 
-  fftwf_complex * cKr = NULL;
 
-  /* <-- This isn't needed ...
+  /* <-- This isn't needed ...  
+    fftwf_complex * cKr = NULL;
      float * Zr = fftwf_malloc(wMNP*sizeof(float));
      memset(Zr, 0, wMNP*sizeof(float));
      float * psf_flipped = malloc(wMNP*sizeof(float));
@@ -790,7 +797,7 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
      free(psf_flipped);
      fim_circshift(Zr, wM, wN, wP, -(pM-1)/2, -(pN-1)/2, -(pP-1)/2);
      cKr = fft(Zr, wM, wN, wP); 
-  // Possibly not needed due to f(-x) = ifft(conf(fft(f)))
+  // Not needed since f(-x) = ifft(conf(fft(f)))
   fftwf_free(Zr);
   --> */
 
@@ -860,6 +867,7 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
     for(size_t kk = 0; kk<wMNP; kk++)
     { 
       y[kk] = x[kk] + alpha*(x[kk]-xm[kk]);
+      // a priori information: only positive values
       y[kk] < 0 ? y[kk] = 0 : 0;
     }
 
@@ -868,7 +876,7 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
     double err = iter(
         &xp, // xp is updated to the next guess
         im,
-        cK, NULL, // FFT of PSF
+        cK, // FFT of PSF
         y, // Current guess
         W, // Weights (to handle boundaries)
         wM, wN, wP, // Expanded size
@@ -896,8 +904,17 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
     x = xp;
     xp = NULL;
 
+    if(s->experimental1 == 1 && (it == round(s->nIter/2)) )
+    {      
+      printf("gsmoothing()\n");
+      fim_gsmooth(x, wM, wN, wP, 0.5);
+      alpha = 0;
+    }
+
+
     it++;
   } // End of main loop
+
 
   if(s->verbosity > 0) {
     printf("\n");
@@ -905,6 +922,8 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
 
   fftwf_free(W); // is P1
   afloat * out = fim_subregion(x, wM, wN, wP, M, N, P);
+
+
   //  printf("DEBUG: writing final_full_tif\n");  
   //  fim_tiff_write("final_full.tif", x, wM, wN, wP);
   fftwf_free(f);
@@ -920,8 +939,8 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
   fftwf_free(g);
   fftwf_free(gm);
   fftwf_free(cK);
-  if(cKr != NULL)
-  { fftwf_free(cKr); }
+//  if(cKr != NULL)
+//  { fftwf_free(cKr); }
   fftwf_free(y);
   return out;
 }
@@ -975,7 +994,7 @@ float * psf_autocrop_centerZ(float * psf, int64_t * pM, int64_t * pN, int64_t * 
   if(s->verbosity > 2)
   {
     printf("PSF has %" PRId64 " slices\n", p);
-    printf("brighest at plane %" PRId64 "\n", maxp);
+    printf("brightest at plane %" PRId64 "\n", maxp);
     printf("Selecting Z-planes: %" PRId64 " -- %" PRId64 "\n", p0, p1);
   }
 
