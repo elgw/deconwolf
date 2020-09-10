@@ -16,37 +16,37 @@ class Guide(object):
 
     def __init__(self):
         # Regular expression to detect images
-        #self.ireg = '^.*_.*\\.tiff?$'
+        # self.ireg = '^.*_.*\\.tiff?$'
         self.ireg = '^.*\\.tiff?$'
         # Regular expression to identify channels from file names
         # Only the first group, within () is used.
 
-        self.creg_dotter = r"(.*)\_[0-9]*\.tiff?"
+        self.creg_dotter = r"([a-zA-Z0-9]*)\_[0-9]*\.tiff?"
         self.creg_pygpseq = r"(.*)\.channel[0-9]*\.series[0-9]*\.tiff?"
 
-        self.patterns = {'DOTTER -- CHAN_XYZ.tif' : self.creg_dotter,
-                         'PyGPSeq -- CHAN.channelABC.seriesXYZ.tif': self.creg_pygpseq};
+        self.patterns = {'DOTTER -- CHAN_XYZ.tif': self.creg_dotter,
+                         'PyGPSeq -- CHAN.channelABC.seriesXYZ.tif': self.creg_pygpseq}
 
         # Known channels
-        self.lambdas = {'dapi': 461, # actually for hoechst
+        self.lambdas = {'dapi': 461,  # actually for hoechst
                         'hoechst': 461,
-                    'cy5': 664,  # alexa 647
-                    'a594': 617,
-                    'ir800': 794,  # or 814 if it is alexa790
-                    'a700':723,
-                    'a488': 519,
-                        'a647' : 665,
-                    'tmr': 562}
+                        'cy5': 664,  # alexa 647
+                        'a594': 617,
+                        'ir800': 794,  # or 814 if it is alexa790
+                        'a700': 723,
+                        'a488': 519,
+                        'a647': 665,
+                        'tmr': 562}
         self.images = []
         self.channels = []
         self.jobfile = 'dw_job'
         self.psfdir = 'PSFBW/'
 
         config_BS1_100 = {'NA': 1.45,
-              'ni': 1.515,
-              'xy_res_nm': 130,
-              'z_res_nm': 200
-              }
+                          'ni': 1.515,
+                          'xy_res_nm': 130,
+                          'z_res_nm': 200
+                          }
 
         config_BS1_100_old = {'NA': 1.40,
                               'ni': 1.515,
@@ -59,52 +59,62 @@ class Guide(object):
                          'z_res_nm': 200}
 
         config_BS2_60 = {
-                         'Objective': 'Plan Apo Lambda 60x oil',
-                         'NA': 1.40,
-                         'ni': 1.515,
-                         'xy_res_nm': 108.3,
-                         'z_res_nm': 600}
+            'Objective': 'Plan Apo Lambda 60x oil',
+            'NA': 1.40,
+            'ni': 1.515,
+            'xy_res_nm': 108.3,
+            'z_res_nm': 600}
 
         config_BS2_100 = {'NA': 1.45,
                           'ni': 1.515,
                           'xy_res_nm': 65,
                           'z_res_nm': 200}
 
-        self.templates = {'BS1 100x' : config_BS1_100,
-                          'BS1 60x' : config_BS1_60,
-                          'BS2 100x' : config_BS2_100,
-                          'BS2 60x' : config_BS2_60,
-                          'BS1 100x (OLD NA 1.4)' : config_BS1_100_old}
+        self.templates = {'BS1 100x': config_BS1_100,
+                          'BS1 60x': config_BS1_60,
+                          'BS2 100x': config_BS2_100,
+                          'BS2 60x': config_BS2_60,
+                          'BS1 100x (OLD NA 1.4)': config_BS1_100_old}
 
     def getIreg(self):
-        return self.ireg;
+        return self.ireg
 
     def getCreg(self):
-        return self.creg;
+        return self.creg
 
     def selectPattern(self):
-        option, index = pick(list(self.patterns.keys()), 'Please choose a file pattern to look for');
-        self.creg = self.patterns[option];
+        option, index = pick(list(self.patterns.keys()),
+                             'Please choose a file pattern to look for')
+        self.creg = self.patterns[option]
 
     def selectTemplate(self):
         option, index = pick(list(self.templates.keys()),
-                             'Please choose a template.\nAlways double check all values, especially the pixel size in z.\nSend an e-mail to erik if you want to add/change a template\nAbort with Ctrl+C')
+                             'Please choose a template.\n' +
+                             'Always double check all values, ' +
+                             'especially the pixel size in z.\nSend ' +
+                             'an e-mail to erik if you want to add/change ' +
+                             'a template\nAbort with Ctrl+C')
         self.config = self.templates[option]
 
-        nThreads = 10;
+        nThreads = 10
         try:
             import psutil
-            nThreads = psutil.cpu_count(logical = False)
+            nThreads = psutil.cpu_count(logical=False)
         except ImportError:
-            print("WARNING: could not determine the number of cores, using default value")
+            print("WARNING: could not determine the number of cores, " +
+                  "using default value")
 
         self.config['threads'] = nThreads
         self.config['tilesize'] = 2048
 
     def selectOptions(self):
         for c in self.channels:
-            self.config[c + "_iter"] = 50
             self.config[c + "_nm"] = self.defaultLambda(c)
+            if c.upper().find('DAPI') >= 0:
+                self.config[c + "_iter"] = 25
+            else:
+                self.config[c + "_iter"] = 50
+
 
         print(f"Found {len(self.channels)} different channels/emitters")
 
@@ -125,16 +135,16 @@ class Guide(object):
             lam = 600
             print(f"Warning: don't know what wavelength that {c} has")
             print(f" setting it to {lam}, please set it correctly.")
+
         return lam
 
     def getImFiles(self):
         self.images = [f for f in os.listdir('./')
-                if (os.path.isfile(os.path.join('./', f))
-                     and (re.match(self.ireg, f) is not None)
-                         and (re.match('dw\_', f) is None))]
+                       if (os.path.isfile(os.path.join('./', f))
+                           and (re.match(self.ireg, f) is not None)
+                           and (re.match('dw\_', f) is None))]
 
         return self.images
-
 
     def getChannel(self, imfile):
         m = re.match(self.creg, imfile)
@@ -165,7 +175,6 @@ class Guide(object):
             print("restart it any time")
             os.system('bash dw_job')
 
-
     def writeConfig(self):
         config = self.config
         config['threads'] = int(round(float(config['threads'])))
@@ -181,13 +190,13 @@ class Guide(object):
             for c in self.channels:
                 lambd = config[c + '_nm']
                 file.write(f"dw_bw --NA {config['NA']} "
-                    f"--lambda {lambd} "
-                    f"--ni {config['ni']} "
-                    f"--threads {round(config['threads'])} "
-                    f"--resxy {config['xy_res_nm']} "
-                    f"--resz {config['z_res_nm']} "
-                    f"{self.psfdir}PSF_{c}.tif "
-                    f"\n")
+                           f"--lambda {lambd} "
+                           f"--ni {config['ni']} "
+                           f"--threads {round(config['threads'])} "
+                           f"--resxy {config['xy_res_nm']} "
+                           f"--resz {config['z_res_nm']} "
+                           f"{self.psfdir}PSF_{c}.tif "
+                           f"\n")
             for f in self.images:
                 c = self.getChannel(f)
                 if c is None:
@@ -205,6 +214,7 @@ KEYS_UP = (curses.KEY_UP, ord('k'))
 KEYS_DOWN = (curses.KEY_DOWN, ord('j'))
 KEYS_SELECT = (curses.KEY_RIGHT, ord(' '))
 
+
 class Picker(object):
     """The :class:`Picker <Picker>` object
     :param options: a list of options to choose from
@@ -215,7 +225,9 @@ class Picker(object):
     :param options_map_func: (optional) a mapping function to pass each option through before displaying
     """
 
-    def __init__(self, options, title=None, indicator='*', default_index=0, multiselect=False, multi_select=False, min_selection_count=0, options_map_func=None):
+    def __init__(self, options, title=None, indicator='*', default_index=0,
+                 multiselect=False, multi_select=False, min_selection_count=0,
+                 options_map_func=None):
 
         if len(options) == 0:
             raise ValueError('options should not be an empty list')
@@ -229,10 +241,13 @@ class Picker(object):
         self.all_selected = []
 
         if default_index >= len(options):
-            raise ValueError('default_index should be less than the length of options')
+            raise ValueError(
+                'default_index should be less than the length of options')
 
         if multiselect and min_selection_count > len(options):
-            raise ValueError('min_selection_count is bigger than the available options, you will not be able to make any selection')
+            raise ValueError('min_selection_count is bigger than the ' +
+                             'available options, you will not be able to ' +
+                             ' make any selection')
 
         if options_map_func is not None and not callable(options_map_func):
             raise ValueError('options_map_func must be a callable function')
@@ -262,13 +277,13 @@ class Picker(object):
 
     def get_selected(self):
         """return the current selected option as a tuple: (option, index)
-           or as a list of tuples (in case multiselect==True)
+        or as a list of tuples (in case multiselect==True)
         """
         if self.multiselect:
             return_tuples = []
             for selected in self.all_selected:
                 return_tuples.append((self.options[selected], selected))
-            return return_tuples
+                return return_tuples
         else:
             return self.options[self.index], self.index
 
@@ -294,7 +309,7 @@ class Picker(object):
                 line = ('{0} {1}'.format(prefix, option), format)
             else:
                 line = '{0} {1}'.format(prefix, option)
-            lines.append(line)
+                lines.append(line)
 
         return lines
 
@@ -321,7 +336,7 @@ class Picker(object):
             scroll_top = 0
         elif current_line - scroll_top > max_rows:
             scroll_top = current_line - max_rows
-        self.scroll_top = scroll_top
+            self.scroll_top = scroll_top
 
         lines_to_draw = lines[scroll_top:scroll_top+max_rows]
 
@@ -330,7 +345,7 @@ class Picker(object):
                 self.screen.addnstr(y, x, line[0], max_x-2, line[1])
             else:
                 self.screen.addnstr(y, x, line, max_x-2)
-            y += 1
+                y += 1
 
         self.screen.refresh()
 
@@ -378,10 +393,10 @@ class Picker(object):
 def pick(*args, **kwargs):
     """Construct and start a :class:`Picker <Picker>`.
     Usage::
-      >>> from pick import pick
-      >>> title = 'Please choose an option: '
-      >>> options = ['option1', 'option2', 'option3']
-      >>> option, index = pick(options, title)
+    >>> from pick import pick
+    >>> title = 'Please choose an option: '
+    >>> options = ['option1', 'option2', 'option3']
+    >>> option, index = pick(options, title)
     """
     picker = Picker(*args, **kwargs)
     return picker.start()
@@ -477,7 +492,7 @@ class Menu(object):
                         while not self.window.getch() in [curses.KEY_ENTER, ord("\n")]:
                             # just wait
                             0
-                        cstring = self.window.instr(posy, posx, 10)
+                            cstring = self.window.instr(posy, posx, 10)
                         try:
                             value = str(float(cstring))
                             self.config[item[2]] = value
