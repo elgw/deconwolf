@@ -187,6 +187,12 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
     }
   }
 
+  if(s->lambda < 50*1e-9)
+  {
+    printf("Error: lambda has be be at least 50 nm\n");
+    exit(-1);
+  }
+
   if(s->M % 2 == 0)
   {
     printf("Error: The size has to be odd, 1, 3, ...\n");
@@ -326,7 +332,7 @@ float calculate(float r, float defocus, bw_conf * conf) {
   float curI = 0.0, prevI = 0.0;
 
   // Initialization of the Simpson sum (first iteration)
-  int N = 2; // number of sub-intervals
+  int64_t N = 2; // number of sub-intervals
   int k = 0; // number of consecutive successful approximations
   float rho = 0.5;
 
@@ -344,7 +350,9 @@ float calculate(float r, float defocus, bw_conf * conf) {
   // Finer sampling grid until we meet the TOL value with the specified
   // number of repetitions, K
   size_t iteration = 1;
-  while (k < conf->K && iteration < 10000) {
+  size_t max_iterations = 22;
+  while (k < conf->K && iteration <= max_iterations) {
+//    printf("%zu\n", iteration); fflush(stdout);
     iteration++;
     N *= 2;
     del /= 2;
@@ -352,7 +360,7 @@ float calculate(float r, float defocus, bw_conf * conf) {
     sumEvenIndex = sumEvenIndex + sumOddIndex;
     sumOddIndex = 0 + I*0;
 
-    for (int n = 1; n < N; n = n + 2) {
+    for (int64_t n = 1; n < N; n = n + 2) {
       rho = n * del;
       value = integrand(rho, r, defocus, conf);
       sumOddIndex += value;
