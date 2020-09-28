@@ -35,13 +35,15 @@
 
 #define INLINED inline __attribute__((always_inline))
 
+// Last argument: where to print output
 int fim_tiff_write(const char * fName, const float * V, 
-    int64_t M, int64_t N, int64_t P);
+    int64_t M, int64_t N, int64_t P, FILE *);
+
 
 int fim_tiff_write_float(const char * fName, const float * V, 
-    int64_t M, int64_t N, int64_t P);
+    int64_t M, int64_t N, int64_t P, FILE *);
 
-int fim_tiff_write_zeros(const char * fName, int64_t M, int64_t N, int64_t P);
+int fim_tiff_write_zeros(const char * fName, int64_t M, int64_t N, int64_t P, FILE *);
 
 // Write to the tif file fName as uint16, using the raw data
 // in rName

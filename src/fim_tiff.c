@@ -15,6 +15,7 @@
  */
 
 #include "fim_tiff.h"
+#include "fim.h"
 
 /* see man 3 tifflib
  *
@@ -53,7 +54,7 @@ void fim_tiff_ut()
   im[pos2] = 2;
   im[pos3] = 3;
 
-  fim_tiff_write(fname, im, M, N, P);
+  fim_tiff_write(fname, im, M, N, P, stdout);
 
   int64_t M2 = 0, N2 = 0, P2 = 0;
   afloat * im2 = fim_tiff_read(fname, &M2, &N2, &P2, 0);
@@ -634,22 +635,22 @@ int fim_tiff_from_raw(const char * fName, // Name of tiff file to be written
   return 0;
 }
 
-int fim_tiff_write_zeros(const char * fName, int64_t N, int64_t M, int64_t P)
+int fim_tiff_write_zeros(const char * fName, int64_t N, int64_t M, int64_t P, FILE * fout)
 {
-  return fim_tiff_write(fName, NULL, N, M, P);
+  return fim_tiff_write(fName, NULL, N, M, P, fout);
 }
 
 int fim_tiff_write_float(const char * fName, const afloat * V, 
-    int64_t N, int64_t M, int64_t P)
+    int64_t N, int64_t M, int64_t P, FILE * fout)
 {
   
- 
+ fprintf(fout, "scaling: 1\n");
   size_t bytesPerSample = sizeof(float);
   char formatString[4] = "w";
   if(M*N*P*sizeof(uint16) >= pow(2, 32))
   {
     sprintf(formatString, "w8\n");
-    printf("WARNING: File is > 2 GB, using BigTIFF format\n");
+    fprintf(fout, "WARNING: File is > 2 GB, using BigTIFF format\n");
   }
 
   TIFF* out = TIFFOpen(fName, formatString);
@@ -698,7 +699,7 @@ int fim_tiff_write_float(const char * fName, const afloat * V,
           0); //sample
       if(ok != 1)
       {
-        printf("TIFFWriteScanline failed\n");
+        fprintf(fout, "TIFFWriteScanline failed\n");
       }
     }
 
@@ -712,7 +713,7 @@ int fim_tiff_write_float(const char * fName, const afloat * V,
 }
 
 int fim_tiff_write(const char * fName, const afloat * V, 
-    int64_t N, int64_t M, int64_t P)
+    int64_t N, int64_t M, int64_t P, FILE * fout)
 {
   // if V == NULL and empty file will be written
 
@@ -736,17 +737,17 @@ int fim_tiff_write(const char * fName, const afloat * V,
 
   if(!isfinite(scaling))
   {
-    printf("Non-finite scaling value, changing to 1\n");
+    fprintf(fout, "Non-finite scaling value, changing to 1\n");
     scaling = 1;
   }
-  printf("scaling: %f\n", scaling);
+  fprintf(fout, "scaling: %f\n", scaling);
 
   size_t bytesPerSample = sizeof(uint16_t);
   char formatString[4] = "w";
   if(M*N*P*sizeof(uint16) >= pow(2, 32))
   {
     sprintf(formatString, "w8\n");
-    printf("WARNING: File is > 2 GB, using BigTIFF format\n");
+    fprintf(fout, "WARNING: File is > 2 GB, using BigTIFF format\n");
   }
 
   TIFF* out = TIFFOpen(fName, formatString);
@@ -768,6 +769,7 @@ int fim_tiff_write(const char * fName, const afloat * V,
     TIFFSetField(out, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
     TIFFSetField(out, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
     TIFFSetField(out, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_UINT);
+    // TODO TIFFSSetFieldTIFFTAG_SOFTWARE
 
     /* We are writing single page of the multipage file */
     TIFFSetField(out, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
@@ -795,7 +797,7 @@ int fim_tiff_write(const char * fName, const afloat * V,
           0); //sample
       if(ok != 1)
       {
-        printf("TIFFWriteScanline failed\n");
+        fprintf(fout, "TIFFWriteScanline failed\n");
       }
     }
 
@@ -1185,6 +1187,11 @@ int fim_tiff_maxproj(char * in, char * out)
 
   uint32_t SF;
   int gotSF = TIFFGetField(input, TIFFTAG_SAMPLEFORMAT, &SF);
+  if(gotSF != 1)
+  {
+    printf("Unable to determine the sample format of %s\n", in);
+    return 1;
+  }
 
   TIFF * output = TIFFOpen(out, "w");
   TIFFSetField(output, TIFFTAG_IMAGEWIDTH, M);  

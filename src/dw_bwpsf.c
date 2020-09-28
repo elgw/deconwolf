@@ -487,7 +487,7 @@ int main(int argc, char ** argv)
     printf("Writing as 32-bit floats to %s\n", conf->outFile);
   }
 
-  fim_tiff_write_float(conf->outFile, conf->V, conf->M, conf->N, conf->P);
+  fim_tiff_write_float(conf->outFile, conf->V, conf->M, conf->N, conf->P, conf->log);
   
   fprint_time(conf->log);
   clock_gettime(CLOCK_REALTIME, &tend);

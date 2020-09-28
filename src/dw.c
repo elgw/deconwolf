@@ -859,7 +859,7 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
       char * tempname = malloc(100*sizeof(char));
       sprintf(tempname, "x_%03d.tif", it);
       printf("Writing current guess to %s\n", tempname);
-      fim_tiff_write(tempname, temp, M, N, P);
+      fim_tiff_write(tempname, temp, M, N, P, s->log);
       free(temp);
     }
 
@@ -1253,7 +1253,7 @@ int deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
 if(0)
 {
   printf("writing to tiledump.tif\n");
-    fim_tiff_write("tiledump.tif", im_tile, tileM, tileN, tileP);
+    fim_tiff_write("tiledump.tif", im_tile, tileM, tileN, tileP, s->log);
     getchar();
 }
 
@@ -1611,9 +1611,9 @@ int dw_run(dw_opts * s)
       //    floatimage_normalize(out, M*N*P);
       if(s->outFormat == 32)
       {
-        fim_tiff_write_float(s->outFile, out, M, N, P);
+        fim_tiff_write_float(s->outFile, out, M, N, P, s->log);
       } else {
-        fim_tiff_write(s->outFile, out, M, N, P);
+        fim_tiff_write(s->outFile, out, M, N, P, s->log);
       }
     }
   }

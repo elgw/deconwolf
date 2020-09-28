@@ -305,7 +305,7 @@ float * tiling_get_tile_tiff(tiling * T, const int tid, const char * fName)
   if(0)
   {
     printf("Writing to tile.tif\n");
-    fim_tiff_write("tile.tif", R, t->xsize[0], t->xsize[1], t->xsize[2]);
+    fim_tiff_write("tile.tif", R, t->xsize[0], t->xsize[1], t->xsize[2], stdout);
     printf("ok\n"); getchar();
   }
   return R;

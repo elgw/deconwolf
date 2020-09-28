@@ -13,7 +13,9 @@
  - [ ] Give some love to deconwolf_batch.py (tiff vs tif, help mapping channels, install systemwide, etc)
  - [ ] Add information on the input image -- especially to detect if some pixels are saturated.
  - [ ] Make sure that something that makes sense happens when a Pyramidal tif is supplied.
- - [ ] Write down the image scaling to the log files.
+
+## Done:
+ - [x] Write down the image scaling to the log files.
  - [x] A higher level interface with facilities for handling and generation of PSFs. -- runPSFGenerator.py
  - [x] *Reuse* more tile sizes in order to keep the number of training sessions low.
  - [x] faster BigTIFF writes, examples exist in [matlab](https://github.com/rharkes/Fast_Tiff_Write/blob/master/Fast_BigTiff_Write.m), (In C++)[https://github.com/jkriege2/TinyTIFF], ... -- decided that it was not necessary

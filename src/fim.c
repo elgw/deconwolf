@@ -513,12 +513,14 @@ void fim_ut()
 
 }
 
+#if 0
 static size_t min_size_t(size_t a, size_t b)
 {
   if(a < b)
     return a;
   return b;
 }
+#endif
 
 static size_t max_size_t(size_t a, size_t b)
 {
@@ -527,11 +529,7 @@ static size_t max_size_t(size_t a, size_t b)
   return b;
 }
 
-
-
-
-
-int conv1(float * restrict V, int stride, float * restrict W, 
+void conv1(float * restrict V, int stride, float * restrict W, 
     const size_t nV, 
     const float * restrict K, const size_t nKu)
 {
@@ -551,8 +549,6 @@ int conv1(float * restrict V, int stride, float * restrict W,
   }
 
   // Central part where K fits completely
-  size_t vv = k2;
-  const size_t block_size = 8;
   for(size_t vv = k2 ; vv+k2 < N; vv++) 
   {
     double acc = 0; 

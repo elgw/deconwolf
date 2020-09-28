@@ -21,7 +21,7 @@ else
 endif
 
 dw_LIBRARIES = -lm -lfftw3f -lfftw3f_threads -ltiff
-dwtm_LIBRARIES = -lm -ltiff
+dwtm_LIBRARIES = -lm -ltiff -lfftw3f
 dwbw_LIBRARIES = -lm -ltiff -lpthread -ltiff -lfftw3f
 
 # on MacOS add -Xpreprocessor
@@ -50,10 +50,10 @@ dw = bin/dw
 dw_OBJECTS = fim.o tiling.o fft.o fim_tiff.o dw.o deconwolf.o
 
 dwbw = bin/dw_bw
-dwbw_OBJECTS = fim_tiff.o dw_bwpsf.o
+dwbw_OBJECTS = fim.o fim_tiff.o dw_bwpsf.o
 
 dwtm = bin/dw_tiffmax
-dwtm_OBJECTS = fim_tiff.o deconwolf_tif_max.o
+dwtm_OBJECTS = fim.o fim_tiff.o deconwolf_tif_max.o
 
 
 all: $(dw) $(dwtm) $(dwbw)

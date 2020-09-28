@@ -22,7 +22,6 @@ int file_exist(char * fname)
   }
 }
 
-
 int main(int argc, char ** argv)
 {
   if(argc < 2)
