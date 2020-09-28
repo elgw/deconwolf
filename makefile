@@ -11,11 +11,27 @@ GIT_VERSION = "$(shell git log --pretty=format:'%aD:%H' -n 1)"
 XFLAGS = -DCC_VERSION=\"$(CC_VERSION)\"
 XFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
 
+CFLAGS = -Wall -std=gnu99 -march=native
+
 DEBUG?=0
 ifeq ($(DEBUG),1)
-    CFLAGS =-Wall -g3 -DDEBUG 
+    CFLAGS += -g3 -DDEBUG 
 else
-    CFLAGS=-Wall -Wno-unknown-pragmas -DNDEBUG -O3 -flto -march=native -ftree-vectorize
+    CFLAGS += -Wno-unknown-pragmas -DNDEBUG -O3 -flto -ftree-vectorize
+endif
+
+dw_LIBRARIES = -lm -lfftw3f -lfftw3f_threads -ltiff
+dwtm_LIBRARIES = -lm -ltiff -lfftw3f
+dwbw_LIBRARIES = -lm -ltiff -lpthread -ltiff -lfftw3f
+
+# on MacOS add -Xpreprocessor
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Linux)
+    CFLAGS += 
+endif
+ifeq ($(UNAME_S),Darwin)
+    CFLAGS += -Xpreprocessor
+    dw_LIBRARIES += -lomp
 endif
 
 OMP?=1
@@ -30,16 +46,17 @@ CFLAGS += $(XFLAGS)
 CC = cc $(CFLAGS)
 SRCDIR = src/
 
-dw = bin/deconwolf 
+dw = bin/dw
 dw_OBJECTS = fim.o tiling.o fft.o fim_tiff.o dw.o deconwolf.o
-dw_LIBRARIES = -lm -lfftw3f -lfftw3f_threads -ltiff
+
+dwbw = bin/dw_bw
+dwbw_OBJECTS = fim.o fim_tiff.o dw_bwpsf.o
 
 dwtm = bin/dw_tiffmax
-dwtm_OBJECTS = fim_tiff.o deconwolf_tif_max.o
-dwtm_LIBRARIES = -lm -ltiff
+dwtm_OBJECTS = fim.o fim_tiff.o deconwolf_tif_max.o
 
 
-all: $(dw) $(dwtm)
+all: $(dw) $(dwtm) $(dwbw)
 
 $(dwtm): $(dwtm_OBJECTS)
 	$(CC) -o $@ $^ $(dwtm_LIBRARIES)
@@ -47,19 +64,26 @@ $(dwtm): $(dwtm_OBJECTS)
 $(dw): $(dw_OBJECTS)
 	$(CC) -o $@ $^ $(dw_LIBRARIES)
 
+$(dwbw): $(dwbw_OBJECTS)
+	$(CC) -o $@ $^ $(dwbw_LIBRARIES)
+
 %.o: $(SRCDIR)%.c
 	$(CC) -c $<
 
 clean:
 	rm -f $(dw) $(dw_OBJECTS)
 	rm -f $(dwtm) $(dwtm_OBJECTS)
+	rm -f $(dwbw) $(dwbw_OBJECTS)
 
 install:
 	# Binaries
-	cp bin/deconwolf /usr/bin/dw
+	cp bin/dw /usr/bin/dw
+	cp bin/dw_bw /usr/bin/dw_bw
 	cp bin/dw_tiffmax /usr/bin/
 	cp src/deconwolf_batch.py /usr/bin/dw_batch
 	chmod +x /usr/bin/dw_batch
+	cp src/dw_guide.py /usr/bin/dw_guide
+	chmod +x /usr/bin/dw_guide
 	# Man pages
 	cp doc/deconwolf.1 .
 	gzip deconwolf.1
@@ -67,6 +91,7 @@ install:
 
 uninstall:
 	rm /usr/bin/dw
+	rm /usr/bin/dw_bw
 	rm /usr/bin/dw_tiffmax
 	rm /usr/share/man/man1/dw.1.gz
 	rm /usr/bin/dw_batch

@@ -15,6 +15,7 @@
  */
 
 #include "fim_tiff.h"
+#include "fim.h"
 
 /* see man 3 tifflib
  *
@@ -53,7 +54,7 @@ void fim_tiff_ut()
   im[pos2] = 2;
   im[pos3] = 3;
 
-  fim_tiff_write(fname, im, M, N, P);
+  fim_tiff_write(fname, im, M, N, P, stdout);
 
   int64_t M2 = 0, N2 = 0, P2 = 0;
   afloat * im2 = fim_tiff_read(fname, &M2, &N2, &P2, 0);
@@ -68,7 +69,7 @@ void fim_tiff_ut()
   if(M != M2 || N != N2 || P != P2)
   {
     printf("Dimensions does not match!\n");
-    printf("Wrote: [%ld x %ld x %ld], Read: [%ld x %ld x %ld]\n",
+    printf("Wrote: [%" PRId64 " x %" PRId64 " x %" PRId64 "], Read: [%" PRId64 " x %" PRId64 " x %" PRId64 "]\n",
         M, N, P, M2, N2, P2);
     free(im);
     free(im2);
@@ -221,7 +222,7 @@ void readUint16_sub(TIFF * tfile, afloat * V,
 
         if(0){
           if(ipos % 100000 == 0){
-            printf("%ld %ld %ld, %zu -> (%ld, %ld, %ld)\n", M, N, P, ipos, iM, iN, iP);
+            printf("%" PRId64 " %" PRId64 " %" PRId64 ", %zu -> (%" PRId64 ", %" PRId64 ", %" PRId64 ")\n", M, N, P, ipos, iM, iN, iP);
             getchar();
           }}
 
@@ -634,13 +635,85 @@ int fim_tiff_from_raw(const char * fName, // Name of tiff file to be written
   return 0;
 }
 
-int fim_tiff_write_zeros(const char * fName, int64_t N, int64_t M, int64_t P)
+int fim_tiff_write_zeros(const char * fName, int64_t N, int64_t M, int64_t P, FILE * fout)
 {
-  return fim_tiff_write(fName, NULL, N, M, P);
+  return fim_tiff_write(fName, NULL, N, M, P, fout);
+}
+
+int fim_tiff_write_float(const char * fName, const afloat * V, 
+    int64_t N, int64_t M, int64_t P, FILE * fout)
+{
+  
+ fprintf(fout, "scaling: 1\n");
+  size_t bytesPerSample = sizeof(float);
+  char formatString[4] = "w";
+  if(M*N*P*sizeof(uint16) >= pow(2, 32))
+  {
+    sprintf(formatString, "w8\n");
+    fprintf(fout, "WARNING: File is > 2 GB, using BigTIFF format\n");
+  }
+
+  TIFF* out = TIFFOpen(fName, formatString);
+  assert(out != NULL);
+
+  size_t linbytes = (M+N)*bytesPerSample;
+  float * buf = _TIFFmalloc(linbytes);
+  memset(buf, 0, linbytes);
+
+  for(size_t dd = 0; dd<P; dd++)
+  {
+
+    TIFFSetField(out, TIFFTAG_IMAGEWIDTH, N);  // set the width of the image
+    TIFFSetField(out, TIFFTAG_IMAGELENGTH, M);    // set the height of the image
+    TIFFSetField(out, TIFFTAG_SAMPLESPERPIXEL, 1);   // set number of channels per pixel
+    TIFFSetField(out, TIFFTAG_BITSPERSAMPLE, 8*bytesPerSample);    // set the size of the channels
+    TIFFSetField(out, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);    // set the origin of the image.
+    //   Some other essential fields to set that you do not have to understand for now.
+    TIFFSetField(out, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
+    TIFFSetField(out, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
+    TIFFSetField(out, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_IEEEFP);
+
+    /* We are writing single page of the multipage file */
+    TIFFSetField(out, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
+    /* Set the page number */
+    TIFFSetField(out, TIFFTAG_PAGENUMBER, dd, P); 
+
+
+    for(size_t kk = 0; kk<M; kk++)
+    {
+      if(V != NULL)
+      {
+        for(size_t ll = 0; ll<N; ll++)
+        {
+          float value = V[M*N*dd + kk*N + ll];
+          if(!isfinite(value))
+          { value = 0; }
+
+          buf[ll] = value;
+        }
+      }
+
+      int ok = TIFFWriteScanline(out, // TIFF
+          buf, 
+          kk, // row
+          0); //sample
+      if(ok != 1)
+      {
+        fprintf(fout, "TIFFWriteScanline failed\n");
+      }
+    }
+
+    TIFFWriteDirectory(out);
+  }
+
+  _TIFFfree(buf);
+
+  TIFFClose(out);
+  return 0;
 }
 
 int fim_tiff_write(const char * fName, const afloat * V, 
-    int64_t N, int64_t M, int64_t P)
+    int64_t N, int64_t M, int64_t P, FILE * fout)
 {
   // if V == NULL and empty file will be written
 
@@ -664,17 +737,17 @@ int fim_tiff_write(const char * fName, const afloat * V,
 
   if(!isfinite(scaling))
   {
-    printf("Non-finite scaling value, changing to 1\n");
+    fprintf(fout, "Non-finite scaling value, changing to 1\n");
     scaling = 1;
   }
-  printf("scaling: %f\n", scaling);
+  fprintf(fout, "scaling: %f\n", scaling);
 
   size_t bytesPerSample = sizeof(uint16_t);
   char formatString[4] = "w";
   if(M*N*P*sizeof(uint16) >= pow(2, 32))
   {
     sprintf(formatString, "w8\n");
-    printf("WARNING: File is > 2 GB, using BigTIFF format\n");
+    fprintf(fout, "WARNING: File is > 2 GB, using BigTIFF format\n");
   }
 
   TIFF* out = TIFFOpen(fName, formatString);
@@ -696,6 +769,7 @@ int fim_tiff_write(const char * fName, const afloat * V,
     TIFFSetField(out, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
     TIFFSetField(out, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
     TIFFSetField(out, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_UINT);
+    // TODO TIFFSSetFieldTIFFTAG_SOFTWARE
 
     /* We are writing single page of the multipage file */
     TIFFSetField(out, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
@@ -723,7 +797,7 @@ int fim_tiff_write(const char * fName, const afloat * V,
           0); //sample
       if(ok != 1)
       {
-        printf("TIFFWriteScanline failed\n");
+        fprintf(fout, "TIFFWriteScanline failed\n");
       }
     }
 
@@ -934,7 +1008,7 @@ afloat * fim_tiff_read_sub(const char * fName,
     {
       if(subregion)
       {
-        printf("%ld %ld %ld, %ld %ld %ld, %ld %ld %ld\n", M, N, P, sM, sN, sP, wM, wN, wP);
+        printf("%" PRId64 " %" PRId64 " %" PRId64 ", %" PRId64 " %" PRId64 " %" PRId64 ", %" PRId64 " %" PRId64 " %" PRId64 "\n", M, N, P, sM, sN, sP, wM, wN, wP);
         readUint16_sub(tfile, V, ssize, ndirs, nstrips, M*N,
             M, N, (int) P, sM, sN, sP, wM, wN, wP);
       } else {
@@ -1034,12 +1108,25 @@ char * tiff_is_supported(TIFF * tiff)
   }
 
   int isUint = 0;
+  int isFloat = 0;
 
   if(gotSF)
   {
+    int okFormat = 0;
     if( SF == SAMPLEFORMAT_UINT)
     {
       isUint = 1;
+      okFormat = 1;
+    }
+    if( SF == SAMPLEFORMAT_IEEEFP)
+    {
+      isFloat = 1;
+      okFormat = 1;
+    }
+    if(okFormat == 0)
+    {
+      sprintf(errStr, "Neither SAMPLEFORMAT_UINT or SAMPLEFORMAT_IEEEFP\n"); 
+      return errStr;
     }
   } 
   else {
@@ -1047,15 +1134,15 @@ char * tiff_is_supported(TIFF * tiff)
     isUint = 1;
   }
 
-  if(!(isUint))
+  if(isFloat && !(BPS == 32))
   {
-    sprintf(errStr, "Only unsigned integer and float images are supported\n");
+    sprintf(errStr, "Float %d-bit images are not supported, only 32-bit.\n", BPS);
     return errStr;
   }
 
   if(isUint && !(BPS == 16))
   {
-    sprintf(errStr, "Unsigned %d-bit images are not supported, 16.\n", BPS);
+    sprintf(errStr, "Unsigned %d-bit images are not supported, only 16-bit.\n", BPS);
     return errStr;
   }
 
@@ -1098,26 +1185,48 @@ int fim_tiff_maxproj(char * in, char * out)
     return -1;
   }
 
+  uint32_t SF;
+  int gotSF = TIFFGetField(input, TIFFTAG_SAMPLEFORMAT, &SF);
+  if(gotSF != 1)
+  {
+    printf("Unable to determine the sample format of %s\n", in);
+    return 1;
+  }
+
   TIFF * output = TIFFOpen(out, "w");
   TIFFSetField(output, TIFFTAG_IMAGEWIDTH, M);  
   TIFFSetField(output, TIFFTAG_IMAGELENGTH, N); 
   TIFFSetField(output, TIFFTAG_SAMPLESPERPIXEL, 1); 
-  TIFFSetField(output, TIFFTAG_BITSPERSAMPLE, 16); 
+  if(SF == SAMPLEFORMAT_UINT)
+  {
+    TIFFSetField(output, TIFFTAG_BITSPERSAMPLE, 16); 
+    TIFFSetField(output, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_UINT);
+  }
+
+  if(SF == SAMPLEFORMAT_IEEEFP)
+  {
+    TIFFSetField(output, TIFFTAG_BITSPERSAMPLE, 32); 
+    TIFFSetField(output, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_IEEEFP);
+  }
+
   TIFFSetField(output, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);
   TIFFSetField(output, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
   TIFFSetField(output, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
-  TIFFSetField(output, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_UINT);
   TIFFSetField(output, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
   TIFFSetField(output, TIFFTAG_PAGENUMBER, 1, 1);
 
   tmsize_t ssize = TIFFStripSize(input); // Seems to be in bytes
-  printf("Strip size: %zu b\n", (size_t) ssize);
+//  printf("Strip size: %zu b\n", (size_t) ssize);
   uint32_t nstrips = TIFFNumberOfStrips(input);
 
+
+
+  // Input is 16 bit unsigned int.
+  if(SF == SAMPLEFORMAT_UINT)
+  {
   uint16_t * mstrip = _TIFFmalloc(ssize); // For max over all directories
   uint16_t * strip    = _TIFFmalloc(ssize);
 
-  // Input is 16 bit unsigned int.
   for(int64_t nn = 0; nn<nstrips; nn++) // Each strip
   {
     memset(mstrip, 0, ssize);
@@ -1139,6 +1248,37 @@ int fim_tiff_maxproj(char * in, char * out)
 
   _TIFFfree(strip);
   _TIFFfree(mstrip);
+  }
+
+  // Input is 32-bit float
+  if(SF == SAMPLEFORMAT_IEEEFP)
+  {
+  float * mstrip = _TIFFmalloc(ssize); // For max over all directories
+  float * strip    = _TIFFmalloc(ssize);
+
+  for(int64_t nn = 0; nn<nstrips; nn++) // Each strip
+  {
+    memset(mstrip, 0, ssize);
+    tsize_t read = 0;
+    for(int64_t pp = 0; pp<P; pp++) // For each directory
+    {
+      TIFFSetDirectory(input, pp); // Does it keep the location for each directory?
+      read = TIFFReadEncodedStrip(input, nn, strip, (tsize_t)-1);
+      for(int64_t kk = 0; kk<read/4; kk++)
+      {
+        if(strip[kk] > mstrip[kk])
+        {
+          mstrip[kk] = strip[kk];
+        }
+      }
+    }
+    TIFFWriteRawStrip(output, 0, mstrip, read);
+  }
+  _TIFFfree(strip);
+  _TIFFfree(mstrip);
+
+  }
+
 
   TIFFClose(input);
   TIFFClose(output);

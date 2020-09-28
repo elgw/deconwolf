@@ -1,0 +1,3 @@
+dw --float --iter 40 --prefix dw40 --overwrite CElegans-FITC.tif PSF-CElegans-FITC.tif
+dw --float --bq 1 --overwrite --iter 40 --prefix dw40.bq1 --overwrite CElegans-FITC.tif PSF-CElegans-FITC.tif
+dw --float --bq 0 --overwrite --iter 40 --prefix dw40.bq0 --overwrite CElegans-FITC.tif PSF-CElegans-FITC.tif
