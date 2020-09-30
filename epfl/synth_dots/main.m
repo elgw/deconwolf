@@ -1,5 +1,7 @@
+function main()
 clear all
 close all
+
 
 %% Settings
 N = [1000 2000 3000 4000 5000 6000 7000 8000 9000 10000];
@@ -7,7 +9,7 @@ N = [11000 12000 13000 14000 15000];
 N = [16000 17000 18000 19000 20000];
 N = (1:25)*1000;
 N = round(N);
-
+ 
 s.gen = 0; % Generate new images?
 s.nIter = 50; % Number of iterations of deconwolf
 
@@ -30,15 +32,31 @@ if s.gen == 1
             disp(message)
         end
     end
+end 
+
+tab1 = analyse(s, N, sprintf('%d_sdots.tif', s.nIter));
+df_writeTable(tab1, 'tab1.csv');
+tab2 = analyse(s, N, sprintf('dl2_%d_sdots.tif', s.nIter));
+df_writeTable(tab2, 'tab2.csv');
+keyboard
+
+
+
+% writetable(tab, 'tab.csv')
+% save as table circumvent whimsical rounding
+
+
+
 end
 
 
+function tab = analyse(s, N, filename)
 %% Analyze the images
 for kk = 1:numel(N)
     folder = sprintf('sdots_%d/', N(kk));
     settings = [];
     settings.folder = folder;
-    settings.file = sprintf('%d_sdots.tif', s.nIter);
+    settings.file = filename;
     settings.inputfile = sprintf('sdots.tif');
     status = getmse(settings);
     % Add number of dots
@@ -55,7 +73,4 @@ for kk = 1:numel(N)
         tab = struct2table(status);
     end
 end
-
-% writetable(tab, 'tab.csv')
-% save as table circumvent whimsical rounding
-df_writeTable(tab, 'tab.csv');
+end
