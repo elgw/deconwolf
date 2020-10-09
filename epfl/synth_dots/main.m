@@ -34,13 +34,31 @@ if s.gen == 1
     end
 end 
 
+if 0
 tab1 = analyse(s, N, sprintf('%d_sdots.tif', s.nIter));
 df_writeTable(tab1, 'tab1.csv');
+
 tab2 = analyse(s, N, sprintf('dl2_%d_sdots.tif', s.nIter));
 df_writeTable(tab2, 'tab2.csv');
+end
+
+if 1
+s.nIter = 100;
+tab3 = analyse(s, N, sprintf('dl2_%d_sdots.tif', s.nIter));
+df_writeTable(tab3, 'tab3.csv');
+end
+if 0
+s.nIter = 200;
+tab4 = analyse(s, N, sprintf('dl2_%d_sdots.tif', s.nIter));
+df_writeTable(tab4, 'tab4.csv');
+end
+if 0
+s.nIter = 0;
+tab5 = analyse(s, N, sprintf('sdots.tif', s.nIter));
+df_writeTable(tab5, 'tab5.csv');
+end
+ 
 keyboard
-
-
 
 % writetable(tab, 'tab.csv')
 % save as table circumvent whimsical rounding

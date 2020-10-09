@@ -4,8 +4,6 @@ function status = getmse(settings)
 % Optional: 'Tag'
 s.Tag = 'No Tag';
 
-
-
 s = df_structput(s, settings);
 status = s;
 
@@ -24,7 +22,12 @@ fprintf('file: %s\n', dwfile);
 
 I0 = double(df_readTif(rfile)); % Non-deconvolved file
 
-I = df_readTif(dwfile);
+if isfile(dwfile)
+    I = df_readTif(dwfile);
+else
+    warning('Can''t open %s\n', dwfile);
+    I = -1*ones(size(I0));
+end
 
 if contains(dwfile, 'dl2')
     warning('Shifting dots based on the image file name');
