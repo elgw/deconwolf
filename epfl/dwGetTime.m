@@ -1,9 +1,9 @@
 function t = dwGetTime(file)
+t = -1;
 
 logFile = [file, '.log.txt'];
 fid = fopen(logFile, "r");
-if fid == -1
-    t = 0;
+if fid == -1   
     return;
 end
 while 1
