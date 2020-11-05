@@ -1,4 +1,5 @@
 # Todo
+ - [ ] Put some checks to see what arrays are not properly aligned and causes crashes with `-ftree-vectorize`
  - [ ] Documentation, examples and test data.
  - [ ] Flag to save one image after each iteration (to facilitate setting the number of iterations).
  - [ ] Demos, for example on the effect of the tiling.
@@ -38,7 +39,7 @@
  - [x] Block mode for low memory systems, accessible through the options `--tilesize` and `--tilepad`
  - [x] Eliminate one or two arrays in the main loop to save memory.
  - [x] Use some kind of logging
- - [x] Argument parsing 
+ - [x] Argument parsing
  - [x] Proper automatic name on output file.
  - [x] Make use of symmetries to save memory?
  - [x] Save FFTW wisdom (saved to `./config/deconwolf/`)

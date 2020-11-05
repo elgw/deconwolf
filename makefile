@@ -11,13 +11,14 @@ GIT_VERSION = "$(shell git log --pretty=format:'%aD:%H' -n 1)"
 XFLAGS = -DCC_VERSION=\"$(CC_VERSION)\"
 XFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
 
-CFLAGS = -Wall -std=gnu99 -march=native
+CFLAGS = -Wall -Wextra -std=gnu99 -march=native
 
 DEBUG?=0
 ifeq ($(DEBUG),1)
-    CFLAGS += -g3 -DDEBUG 
+    CFLAGS += -g3 -DDEBUG
 else
-    CFLAGS += -Wno-unknown-pragmas -DNDEBUG -O3 -flto -ftree-vectorize
+# The flag -ftree-vectorize causes the program to crash
+CFLAGS +=  -O3 -fno-tree-vectorize -Wno-unknown-pragmas -flto -DNDEBUG
 endif
 
 dw_LIBRARIES = -lm -lfftw3f -lfftw3f_threads -ltiff
@@ -27,7 +28,7 @@ dwbw_LIBRARIES = -lm -ltiff -lpthread -ltiff -lfftw3f
 # on MacOS add -Xpreprocessor
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
-    CFLAGS += 
+    CFLAGS +=
 endif
 ifeq ($(UNAME_S),Darwin)
     CFLAGS += -Xpreprocessor
@@ -95,4 +96,3 @@ uninstall:
 	rm /usr/bin/dw_tiffmax
 	rm /usr/share/man/man1/dw.1.gz
 	rm /usr/bin/dw_batch
-
