@@ -24,7 +24,9 @@
  * RowsPerStrip tag. A reader should not assume that each decoded strip contains a full set of rows in it.
  */
 
-typedef float afloat __attribute__ ((__aligned__(16)));
+//typedef float afloat __attribute__ ((__aligned__(16)));
+typedef float afloat;
+
 
 void fim_tiff_ut()
 {
@@ -245,31 +247,31 @@ void readUint16_sub(TIFF * tfile, afloat * V,
 }
 
 
-void readUint16(TIFF * tfile, afloat * V,
+void readUint16(TIFF * tfile, float * V,
     const uint32_t ssize,
     const uint32_t ndirs,
     const uint32_t nstrips,
     const uint32_t perDirectory
     )
 {
-
   // Number of elements per strip
   size_t nes = ssize/sizeof(uint16_t);
 //  uint16_t * buf = _TIFFmalloc(ssize);
   uint16_t * buf = malloc(ssize);
+
   if(buf == NULL)
   {
       printf("Failed to allocate %u bytes of memory!", ssize);
       fflush(stdout);
       return;
   }
-  printf("..\n"); fflush(stdout);
 
   for(int64_t dd=0; dd<ndirs; dd++) {
     int ok = TIFFSetDirectory(tfile, dd);
     if(ok == 0)
     {
-        printf("Failed to choose directory %u\n", dd);
+        printf("Failed to choose directory %lu\n", dd);
+        printf("Either the file is corrupt or this program has a bug\n");
         fflush(stdout);
     }
     for(int64_t kk=0; kk<nstrips; kk++) {
@@ -287,11 +289,12 @@ void readUint16(TIFF * tfile, afloat * V,
       {
           printf("Read to much!\n"); fflush(stdout);
       }
-
       uint16_t * fbuf = (uint16_t*) buf;
-      for(int64_t ii = 0; ii < read/sizeof(uint16_t); ii++) {
-        size_t pos = ii+kk*nes + dd*perDirectory;
-        V[pos] = fbuf[kk];
+      printf("\r%lu/%lu", dd, kk); fflush(stdout);
+      for(size_t ii = 0; ii < read/sizeof(uint16_t); ii++) {
+          size_t pos = (size_t)( ii+kk*nes + dd*perDirectory);
+          //printf("pos=%zu\n", pos);
+        V[pos] = buf[ii];
       }
     }
   }
@@ -492,7 +495,7 @@ int fim_tiff_to_raw(const char * fName, const char * oName)
 
   if(gotSF)
   {
-    if( SF == SAMPLEFORMAT_UINT)
+      if( SF == SAMPLEFORMAT_UINT)
     {
       isUint = 1;
     }
@@ -1082,6 +1085,7 @@ afloat * fim_tiff_read_sub(const char * fName,
 int main(int argc, char ** argv)
 {
 
+    printf("This test will read a file from command line, normalize it and write back to 'foo.tif'\n");
   char * outname = NULL;
   char * inname = NULL;
 
@@ -1101,9 +1105,9 @@ int main(int argc, char ** argv)
   }
   printf("Will read from %s and write to %s.\n", inname, outname);
 
-  size_t M = 0, N = 0, P = 0;
+  int64_t M = 0, N = 0, P = 0;
 
-  afloat * I = (afloat *) fim_tiff_read(inname, &M, &N, &P);
+  afloat * I = (afloat *) fim_tiff_read(inname, &M, &N, &P, 1);
 
   if(I == NULL)
   {
@@ -1112,9 +1116,9 @@ int main(int argc, char ** argv)
   }
 
   floatimage_show_stats(I, M, N, P);
-  floatimage_normalize(I, M*N*P);
+  // floatimage_normalize(I, M*N*P);
 
-  fim_tiff_write(outname, I, M, N, P);
+  fim_tiff_write(outname, I, M, N, P, stdout);
 
   free(I);
 

@@ -41,10 +41,8 @@
 #define tic clock_gettime(CLOCK_REALTIME, &tictoc_start);
 #define toc(X) clock_gettime(CLOCK_REALTIME, &tictoc_end); printf(#X); printf(" %f s\n", timespec_diff(&tictoc_end, &tictoc_start)); fflush(stdout);
 
-/* This is what fftw_malloc returns
- * http://www.fftw.org/fftw3_doc/SIMD-alignment-and-fftw_005fmalloc.html#SIMD-alignment-and-fftw_005fmalloc
- */
-typedef float afloat __attribute__ ((__aligned__(16)));
+//typedef float afloat __attribute__ ((__aligned__(16)));
+typedef float afloat;
 
 dw_opts * dw_opts_new(void)
 {
@@ -1505,7 +1503,7 @@ int dw_run(dw_opts * s)
   }
 
 
-  float * im = NULL;
+  afloat * im = NULL;
 
   if(tiling == 0)
   {

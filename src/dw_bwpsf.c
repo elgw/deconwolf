@@ -17,6 +17,10 @@ void bw_conf_printf(FILE * out, bw_conf * conf)
   fprintf(out, "Overwrite: %d\n", conf->overwrite);
   fprintf(out, "File: %s\n", conf->outFile);
   fprintf(out, "Log: %s\n", conf->logFile);
+  if(conf->Simpson)
+  {
+      fprintf(out, "Simpson integration: %dx%d samples per pixel\n", conf->Simpson_N, conf->Simpson_N, conf->logFile);
+  }
 }
 
 
@@ -40,6 +44,8 @@ bw_conf * bw_conf_new()
   conf->outFile = NULL;
   conf->logFile = NULL;
   conf->overwrite = 0;
+  conf->Simpson = 1;
+  conf->Simpson_N = 9;
   return conf;
 }
 
@@ -126,7 +132,7 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
   getCmdLine(argc, argv, s);
 
   struct option longopts[] = {
-    { "version",     no_argument,       NULL,   'v' }, 
+    { "version",     no_argument,       NULL,   'v' },
     { "help",         no_argument,       NULL,   'h' },
     // Settings
     { "lambda", required_argument, NULL, 'l'},
@@ -179,7 +185,7 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
       case 'l':
         s->lambda = atof(optarg)*1e-9;
         break;
-      case 'N':        
+      case 'N':
         s->M = atoi(optarg);
         s->N = s->M;
         s->P = s->M;
@@ -394,9 +400,47 @@ float calculate(float r, float defocus, bw_conf * conf) {
   return curI;
 }
 
+float simp1_weight(k, N)
+{
+    // Weights for 1D-Simpson
+    // [1, 4, 1] N=3
+    // [1, 4, 2, 4, 1] N=5
+    // [1, 4, 2, 4, 2, 5, 1] N=7, ...
+
+    if(k == 0 || k == N-1)
+        return 1;
+    if(k%2 == 0)
+        return 2;
+    return 4;
+}
+
+float simp2(float xc, float yc, float * H, float * R, float x0, float x1, float y0, float y1, int N)
+{
+    float dx = (x1-x0)/(float) N;
+    float dy = (y1-y0)/(float) N;
+    float v = 0;
+    for(int kk = 0; kk<N; kk++)
+    {
+        float wx = simp1_weight(kk, N);
+        for(int ll = 0; ll<N; ll++)
+        {
+            float wy = simp1_weight(ll, N);
+            float w = wx*wy;
+            float x = x0+kk*dx;
+            float y = y0+kk*dy;
+            float r = sqrt(pow(x-xc, 2) + pow(y-yc, 2));
+            int index = (int) floor(r);
+            v+=w*(H[index] + (H[index+1] - H[index]) * (r-R[index]));
+        }
+    }
+    v = v/9*dx*dy;
+    return v;
+}
 
 void BW_slice(float * V, float z, bw_conf * conf)
 {
+    int USE_INTEGRATION = 1; // Not ready yet.
+
   // V is a pointer to the _slice_ not the whole volume
   // The center of the image in units of [pixels]
   float x0 = (conf->M - 1) / 2.0;
@@ -422,14 +466,23 @@ void BW_slice(float * V, float z, bw_conf * conf)
   //exit(1);
   for (int x = 0; 2*x <= conf->M; x++) {
     for (int y = 0; 2*y <= conf->N; y++) {
+        float v = 0;
+        if(conf->Simpson)
+        {
+            v = simp2(x0, y0, h, r, x - 0.5, x + 0.5, y - 0.5, y + 0.5, conf->Simpson_N);
+        }
+        else
+        {
       // radius of the current pixel in units of [pixels]
-      float rPixel = sqrt(pow(x-x0, 2) + pow(y-y0, 2));
+            float rPixel = sqrt(pow((float) x - x0, 2) + pow((float) y - y0, 2));
       // Index of nearest coordinate from below (replace by pixel integration)
       int index = (int) floor(rPixel * OVER_SAMPLING);
       assert(index < nr);
       // Interpolated value.
-      float v = h[index] + (h[index + 1] - h[index]) * (rPixel - r[index]) * OVER_SAMPLING;
+      v = h[index] + (h[index + 1] - h[index]) * (rPixel - r[index]) * OVER_SAMPLING;
+        }
 
+// Use symmetry to fill the output image
       int xf = conf->M-x-1;
       int yf = conf->N-y-1;
 
@@ -488,7 +541,7 @@ int main(int argc, char ** argv)
   }
 
   fim_tiff_write_float(conf->outFile, conf->V, conf->M, conf->N, conf->P, conf->log);
-  
+
   fprint_time(conf->log);
   clock_gettime(CLOCK_REALTIME, &tend);
   fprintf(conf->log, "Took: %f s\n", timespec_diff(&tend, &tstart));

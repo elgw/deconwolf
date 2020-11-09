@@ -33,6 +33,9 @@ typedef struct {
   size_t K; // Number of iterations
   float resLateral;
   float resAxial;
+  int Simpson; // Use Simpson integration
+  int Simpson_N; // Division
+
   float * V;
   // shape of output image
   int M;
@@ -58,4 +61,3 @@ void getCmdLine(int argc, char ** argv, bw_conf * s);
 
 
 #endif
-

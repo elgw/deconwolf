@@ -16,7 +16,8 @@
 
 #include "fim.h"
 
-typedef float afloat __attribute__ ((__aligned__(16)));
+//typedef float afloat __attribute__ ((__aligned__(16)));
+typedef float afloat;
 
 
 int fim_maxAtOrigo(const afloat * restrict V, const int64_t M, const int64_t N, const int64_t P)
@@ -58,10 +59,10 @@ int fim_maxAtOrigo(const afloat * restrict V, const int64_t M, const int64_t N, 
 
 
   if(maxV > midValue)
-  { 
-    printf("max I(%" PRId64 ", %" PRId64 ", %" PRId64 ")=%f > mid I(%" PRId64 ", %" PRId64 ", %" PRId64 ")=%f\n", 
+  {
+    printf("max I(%" PRId64 ", %" PRId64 ", %" PRId64 ")=%f > mid I(%" PRId64 ", %" PRId64 ", %" PRId64 ")=%f\n",
         m, n, p, maxV, mM, mN, mP, midValue);
-    return 0; 
+    return 0;
   }
 
   return 1;
@@ -92,9 +93,9 @@ float fim_min(const afloat * A, size_t N)
   return amin;
 }
 
-void fim_minus(afloat * restrict  A, 
-    const afloat * restrict B, 
-    const afloat * restrict C, 
+void fim_minus(afloat * restrict  A,
+    const afloat * restrict B,
+    const afloat * restrict C,
     const size_t N)
   // A = B - C
 {
@@ -157,7 +158,7 @@ void fim_flipall(afloat * restrict T, const afloat * restrict A, const int64_t a
 }
 
 
-void fim_insert(afloat * restrict T, const int64_t t1, const int64_t t2, const int64_t t3, 
+void fim_insert(afloat * restrict T, const int64_t t1, const int64_t t2, const int64_t t3,
     const afloat * restrict F, const int64_t f1, const int64_t f2, const int64_t f3)
   /* Insert F [f1xf2xf3] into T [t1xt2xt3] in the "upper left" corner */
 {
@@ -174,7 +175,7 @@ void fim_insert(afloat * restrict T, const int64_t t1, const int64_t t2, const i
   return;
 }
 
-void fim_insert_ref(afloat * T, int64_t t1, int64_t t2, int64_t t3, 
+void fim_insert_ref(afloat * T, int64_t t1, int64_t t2, int64_t t3,
     afloat * F, int64_t f1, int64_t f2, int64_t f3)
   /* Insert F [f1xf2xf3] into T [t1xt2xt3] in the "upper left" corner */
 {
@@ -214,8 +215,8 @@ afloat * fim_get_cuboid(afloat * restrict A, const int64_t M, const int64_t N, c
         size_t Aidx = aa + bb*M + cc*M*N;
         assert(Aidx < M*N*P);
         // New coordinates are offset ...
-        size_t Cidx = (aa - m0) + 
-          (bb - n0)*m + 
+        size_t Cidx = (aa - m0) +
+          (bb - n0)*m +
           (cc - p0)*m*n;
         assert(Cidx < m*n*p);
         C[Cidx] = A[Aidx];
@@ -286,7 +287,7 @@ void fim_mult_scalar(afloat * I, size_t N, float x)
 }
 
 void fim_normalize_sum1(afloat * psf, int64_t M, int64_t N, int64_t P)
-  /* 
+  /*
    * MATLAB:
    * Y = X/max(X(:))
    */
@@ -296,7 +297,7 @@ void fim_normalize_sum1(afloat * psf, int64_t M, int64_t N, int64_t P)
   for(size_t kk = 0; kk<pMNP; kk++)
   { psf_sum += psf[kk]; }
   //  printf("psf_sum: %f\n", psf_sum);
-  for(size_t kk = 0; kk<pMNP; kk++) 
+  for(size_t kk = 0; kk<pMNP; kk++)
   { psf[kk]/=psf_sum; }
 }
 
@@ -327,8 +328,8 @@ afloat * fim_constant(const size_t N, const float value)
   return A;
 }
 
-void fim_circshift(afloat * restrict A, 
-    const int64_t M, const int64_t N, const int64_t P, 
+void fim_circshift(afloat * restrict A,
+    const int64_t M, const int64_t N, const int64_t P,
     const int64_t sm, const int64_t sn, const int64_t sp)
   /* Shift the image A [MxNxP] by sm, sn, sp in each dimension */
 {
@@ -343,7 +344,7 @@ void fim_circshift(afloat * restrict A,
     for(int64_t cc = 0; cc<P; cc++)
     {
       for(int64_t bb = 0; bb<N; bb++)
-      {    
+      {
         //shift_vector(A + bb*M + cc*M*N, 1, M, sm);
         shift_vector_buf(A + bb*M + cc*M*N, 1, M, sm, buf);
       }
@@ -354,7 +355,7 @@ void fim_circshift(afloat * restrict A,
     for(int64_t cc = 0; cc<P; cc++)
     {
       for(int64_t aa = 0; aa<M; aa++)
-      {    
+      {
         //shift_vector(A + aa+cc*M*N, M, N, sn);
         shift_vector_buf(A + aa+cc*M*N, M, N, sn, buf);
       }
@@ -365,7 +366,7 @@ void fim_circshift(afloat * restrict A,
     for(int64_t bb = 0; bb<N; bb++)
     {
       for(int64_t aa = 0; aa<M; aa++)
-      {  
+      {
         //shift_vector(A + aa+bb*M, M*N, P, sp);
         shift_vector_buf(A + aa+bb*M, M*N, P, sp, buf);
       }
@@ -383,8 +384,8 @@ INLINED static int64_t mod_int(const int64_t a, const int64_t b)
   return r < 0 ? r + b : r;
 }
 
-void shift_vector_buf(afloat * restrict V, 
-    const int64_t S, 
+void shift_vector_buf(afloat * restrict V,
+    const int64_t S,
     const int64_t N,
     int64_t k, afloat * restrict buffer)
   /* Circular shift of a vector of length N with stride S by step k */
@@ -402,8 +403,8 @@ void shift_vector_buf(afloat * restrict V,
   return;
 }
 
-void shift_vector(afloat * restrict V, 
-    const int64_t S, 
+void shift_vector(afloat * restrict V,
+    const int64_t S,
     const int64_t N,
     const int64_t k)
   /* Circular shift of a vector of length N with stride S by step k */
@@ -416,10 +417,10 @@ void shift_vector(afloat * restrict V,
 }
 
 
-afloat * fim_expand(const afloat * restrict in, 
-    const int64_t pM, const int64_t pN, const int64_t pP, 
+afloat * fim_expand(const afloat * restrict in,
+    const int64_t pM, const int64_t pN, const int64_t pP,
     const int64_t M, const int64_t N, const int64_t P)
-  /* "expand an image" by making it larger 
+  /* "expand an image" by making it larger
    * pM, ... current size
    * M, Nm ... new size
    * */
@@ -529,8 +530,8 @@ static size_t max_size_t(size_t a, size_t b)
   return b;
 }
 
-void conv1(float * restrict V, int stride, float * restrict W, 
-    const size_t nV, 
+void conv1(float * restrict V, int stride, float * restrict W,
+    const size_t nV,
     const float * restrict K, const size_t nKu)
 {
   const size_t k2 = (nKu-1)/2;
@@ -541,7 +542,7 @@ void conv1(float * restrict V, int stride, float * restrict W,
   for(size_t vv = 0;vv<k2; vv++)
   {
     double acc0 = 0;
-    for(size_t kk = k2-vv; kk<nKu; kk++)      
+    for(size_t kk = k2-vv; kk<nKu; kk++)
     {
         acc0 = acc0 + K[kk]*V[(vv-k2+kk)*stride];
     }
@@ -549,9 +550,9 @@ void conv1(float * restrict V, int stride, float * restrict W,
   }
 
   // Central part where K fits completely
-  for(size_t vv = k2 ; vv+k2 < N; vv++) 
+  for(size_t vv = k2 ; vv+k2 < N; vv++)
   {
-    double acc = 0; 
+    double acc = 0;
     for(size_t kk = 0; kk<nKu; kk++)
     {
       acc = acc + K[kk]*V[(vv-k2+kk)*stride];
@@ -563,7 +564,7 @@ void conv1(float * restrict V, int stride, float * restrict W,
   for(size_t vv = N-k2;vv<N; vv++)
   {
     double acc0 = 0;
- for(size_t kk = 0; kk<N-vv+k2; kk++)  
+ for(size_t kk = 0; kk<N-vv+k2; kk++)
     {
         acc0 = acc0 + K[kk]*V[(vv-k2+kk)*stride];
     }
@@ -633,4 +634,3 @@ for(int nn = 0; nn<N; nn++)
 free(W);
 return;
 }
-
