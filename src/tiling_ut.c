@@ -44,7 +44,7 @@ printf(" -> test_weights\n");
       W[aa + bb*M] = w;
     }
   }
- 
+
   char outFile[] = "tiling_ut_weights.tif";
   printf("Writing weights from all tiles to %s\n", outFile); fflush(stdout);
 
@@ -55,7 +55,7 @@ printf(" -> test_weights\n");
   }
 
 
-  fim_tiff_write(outFile, W, M, N, 1);
+ fim_tiff_write(outFile, W, M, N, 1, stdout);
   for(int aa = 0; aa<M; aa++)
   {
     for(int bb = 0; bb<N; bb++)
@@ -68,7 +68,7 @@ printf(" -> test_weights\n");
 
   char outFileTile[] = "tiling_ut_weights_tile1.tif";
   printf("Writing weights from the first tile to %s\n", outFileTile); fflush(stdout);
-  fim_tiff_write(outFileTile, W, M, N, 1);
+  fim_tiff_write(outFileTile, W, M, N, 1, stdout);
 
 
   // Assuming that is it same behaviour for all P
@@ -89,34 +89,54 @@ void test_copy_paste(int M, int N, int P, int maxSize, int overlap)
     printf("-> test_copy_paste\n"); fflush(stdout);
 
   tiling * T = tiling_create(M,N,P, maxSize, overlap);
-//  tiling_show(T);
+  //  tiling_show(T);
+  size_t MNP = M*N*P;
 
-  float * source = malloc(M*N*P*sizeof(float));
-  for(size_t kk = 0; kk<M*N*P; kk++)
-  { 
-    source[kk] = 7; //rand()/RAND_MAX; 
+  float * source = malloc(MNP*sizeof(float));
+  for(size_t kk = 0; kk < MNP; kk++)
+  {
+    source[kk] = 7; //rand()/RAND_MAX;
   }
 
-  float * target = malloc(M*N*P*sizeof(float));
+  float * target = calloc(MNP, sizeof(float));
   char * fname = malloc(100);
 
-  for(int tt = 0; tt<T->nTiles; tt++)
+  for(int tt = 0; tt < T->nTiles; tt++)
   {
     float * Ttile = tiling_get_tile(T, tt, source);
     tile * tl = T->tiles[tt];
+    size_t mnp = tl->xsize[0]*tl->xsize[1]*tl->xsize[2];
+    for(size_t uu = 0; uu<mnp; uu++)
+    {
+        assert(Ttile[uu] == 7);
+    }
+
     sprintf(fname, "tile%d.tif", tt);
-    fim_tiff_write(fname, Ttile, tl->xsize[0], tl->xsize[1], tl->xsize[2]);
+    fim_tiff_write(fname, Ttile, tl->xsize[0], tl->xsize[1], tl->xsize[2], stdout);
 
     // P has size T->tiles[kk]->xsize;
     tiling_put_tile(T, tt, target, Ttile);
     free(Ttile);
   }
-free(fname);
-  fim_tiff_write("joined.tif", target, M, N, P);
 
-  for(size_t kk = 0; kk<M*N*P; kk++)
-  { 
-    assert( fabs(source[kk]-target[kk]) < 1e-4); 
+  free(fname);
+  fim_tiff_write("joined.tif", target, M, N, P, stdout);
+
+  if(MNP < 500)
+  {
+      for(int kk = 0; kk< M; kk++)
+      {
+          for(int ll = 0; ll < N; ll++)
+          {
+              printf("%.0f/%.0f ", source[kk + ll*M], target[kk + ll*M]);
+          }
+          printf("\n");
+      }
+  }
+
+  for(size_t kk = 0; kk < MNP; kk++)
+  {
+    assert( fabs(source[kk]-target[kk]) < 1e-4);
   }
 
   free(target);

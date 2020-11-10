@@ -289,11 +289,10 @@ void readUint16(TIFF * tfile, float * V,
       {
           printf("Read to much!\n"); fflush(stdout);
       }
-      uint16_t * fbuf = (uint16_t*) buf;
       printf("\r%lu/%lu", dd, kk); fflush(stdout);
-      for(size_t ii = 0; ii < read/sizeof(uint16_t); ii++) {
+      for(size_t ii = 0; ii < read/sizeof(uint16_t); ii++)
+      {
           size_t pos = (size_t)( ii+kk*nes + dd*perDirectory);
-          //printf("pos=%zu\n", pos);
         V[pos] = buf[ii];
       }
     }

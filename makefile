@@ -20,7 +20,7 @@ else
 # The flag -ftree-vectorize causes the program to crash
 # Continue debugging with the next line
 
-CFLAGS +=  -g -O1 -fno-inline -ftree-vectorize -Wno-unknown-pragmas -flto -ftree-vectorizer-verbose=2
+CFLAGS +=  -g -O2 -ftree-vectorize -Wno-unknown-pragmas -flto
 
 # This runs
 #CFLAGS +=  -O3 -fno-tree-vectorize -Wno-unknown-pragmas -flto -DNDEBUG
