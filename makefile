@@ -17,13 +17,10 @@ DEBUG?=0
 ifeq ($(DEBUG),1)
     CFLAGS += -g3 -DDEBUG
 else
-# The flag -ftree-vectorize causes the program to crash
-# Continue debugging with the next line
 
-CFLAGS +=  -g -O2 -ftree-vectorize -Wno-unknown-pragmas -flto
+#CFLAGS +=  -g -O2 -ftree-vectorize -Wno-unknown-pragmas -flto
+CFLAGS +=  -O3 -fno-tree-vectorize -Wno-unknown-pragmas -flto -DNDEBUG
 
-# This runs
-#CFLAGS +=  -O3 -fno-tree-vectorize -Wno-unknown-pragmas -flto -DNDEBUG
 endif
 
 dw_LIBRARIES = -lm -lfftw3f -lfftw3f_threads -ltiff

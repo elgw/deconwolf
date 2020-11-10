@@ -197,10 +197,10 @@ float getWeight1d(const float a, const float b, const float c, const float d, co
 }
 
 float tile_getWeight(tile * t,
-    const int64_t m, const int64_t n, const int64_t p,
-    const float pad)
+    const int64_t m, const int64_t n, const int64_t p)
   /* Calculate the weight for tile t at position (m,n,p) */
 {
+    ((void) p);
   assert(p>=t->xpos[4]);
   assert(p<=t->xpos[5]);
   float wm = getWeight1d(t->xpos[0], t->pos[0], t->pos[1], t->xpos[1], m);
@@ -217,10 +217,9 @@ float tile_getWeight(tile * t,
 float tiling_getWeights(tiling * T, const int64_t M, const int64_t N, const int64_t P)
 {
   float w = 0;
-  const float pad = (float) T->overlap;
   for(int tt = 0; tt < T->nTiles; tt++)
   {
-    w+=tile_getWeight(T->tiles[tt], M, N, P, pad);
+    w+=tile_getWeight(T->tiles[tt], M, N, P);
   }
   return w;
 }
@@ -268,9 +267,9 @@ float * tiling_get_tile_raw(tiling * T, const int tid, const char * fName)
   }
   memset(R, 0, npixels*sizeof(float));
 
-  for(size_t pp = t->xpos[4]; pp <= t->xpos[5]; pp++)
+  for(size_t pp = t->xpos[4]; pp <= (size_t) t->xpos[5]; pp++)
   {
-    for(size_t nn = t->xpos[2]; nn <= t->xpos[3]; nn++)
+      for(size_t nn = t->xpos[2]; nn <= (size_t) t->xpos[3]; nn++)
     {
       // seek position in big raw file
       size_t spos = t->xpos[0] + nn*T->M + pp*T->M*T->N;
@@ -332,12 +331,12 @@ float * tiling_get_tile(tiling * T, const int tid, const float * restrict V)
       {
         // printf("aa:%d, bb:%d, cc:%d\n", aa, bb, cc);
         size_t Vidx = aa + bb*M + cc*M*N;
-        assert(Vidx < M*N*P);
+        assert(Vidx < (size_t) M*N*P);
         // New coordinates are offset ...
         size_t Ridx = (aa - t->xpos[0]) +
           (bb - t->xpos[2])*m +
           (cc - t->xpos[4])*m*n;
-        assert(Ridx < m*n*p);
+        assert(Ridx < (size_t) m*n*p);
         R[Ridx] = V[Vidx];
       }
     }
@@ -389,7 +388,7 @@ void tiling_put_tile_raw(tiling * T, int tid, const char * fname, float * restri
         size_t Sidx = (aa - t->xpos[0]) +
           (bb - t->xpos[2])*m +
           (cc - t->xpos[4])*m*n;
-        float w = tile_getWeight(t, aa, bb, cc, T->overlap);
+        float w = tile_getWeight(t, aa, bb, cc);
         w/= tiling_getWeights(T, aa, bb, cc);
         buf[buf_pos++] += w*(float) S[Sidx];
       }
@@ -425,7 +424,7 @@ void tiling_put_tile(tiling * T, int tid, float * restrict V, float * restrict S
         size_t Sidx = (aa-t->xpos[0]) +
           (bb-t->xpos[2])*m +
           (cc-t->xpos[4])*m*n;
-        float w = tile_getWeight(t, aa, bb, cc, T->overlap);
+        float w = tile_getWeight(t, aa, bb, cc);
         w/= tiling_getWeights(T, aa, bb, cc);
         V[Vidx] += w*S[Sidx];
       }

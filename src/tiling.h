@@ -71,7 +71,7 @@ void tiling_put_tile_raw(tiling * T, int t, const char * fName, float * S);
 tile * tile_create();
 void tile_free(tile *);
 void tile_show(tile *);
-float tile_getWeight(tile *, int64_t m, int64_t n, int64_t p, float pad);
+float tile_getWeight(tile *, int64_t m, int64_t n, int64_t p);
 float getWeight1d(float a, float b, float c, float d, int64_t x);
 
 #endif

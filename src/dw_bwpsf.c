@@ -19,7 +19,7 @@ void bw_conf_printf(FILE * out, bw_conf * conf)
   fprintf(out, "Log: %s\n", conf->logFile);
   if(conf->Simpson)
   {
-      fprintf(out, "Simpson integration: %dx%d samples per pixel\n", conf->Simpson_N, conf->Simpson_N, conf->logFile);
+      fprintf(out, "Simpson integration: %dx%d samples per pixel\n", conf->Simpson_N, conf->Simpson_N);
   }
 }
 
@@ -98,7 +98,7 @@ void bw_version(FILE* f)
   fprintf(f, "deconwolf: '%s' PID: %d\n", deconwolf_version, (int) getpid());
 }
 
-void usage(int argc, char ** argv)
+void usage(__attribute__((unused)) int argc, char ** argv)
 {
   printf("Usage:\n");
   printf("\t$ %s <options> psf.tif \n", argv[0]);
@@ -339,7 +339,7 @@ float calculate(float r, float defocus, bw_conf * conf) {
 
   // Initialization of the Simpson sum (first iteration)
   int64_t N = 2; // number of sub-intervals
-  int k = 0; // number of consecutive successful approximations
+  size_t k = 0; // number of consecutive successful approximations
   float rho = 0.5;
 
   complex float sumOddIndex = integrand(rho, r, defocus, conf);
@@ -400,7 +400,7 @@ float calculate(float r, float defocus, bw_conf * conf) {
   return curI;
 }
 
-float simp1_weight(k, N)
+float simp1_weight(size_t k, size_t N)
 {
     // Weights for 1D-Simpson
     // [1, 4, 1] N=3
@@ -439,7 +439,7 @@ float simp2(float xc, float yc, float * H, float * R, float x0, float x1, float 
 
 void BW_slice(float * V, float z, bw_conf * conf)
 {
-    int USE_INTEGRATION = 1; // Not ready yet.
+// Calculate the PSF for a single plane/slice
 
   // V is a pointer to the _slice_ not the whole volume
   // The center of the image in units of [pixels]
@@ -456,7 +456,7 @@ void BW_slice(float * V, float z, bw_conf * conf)
   float * r = malloc(nr * sizeof(float));
   float * h = malloc(nr * sizeof(float));
 
-  for (int n = 0; n < nr; n++) {
+  for (size_t n = 0; n < nr; n++) {
     r[n] = ((float) n) / ((float) OVER_SAMPLING);
     h[n] = calculate(r[n] * conf->resLateral, z, conf);
     //    printf("r[%d=%e] = %e, h[%d] = %e\n", n, r[n]*conf->resLateral, r[n], n, h[n]);
@@ -476,7 +476,7 @@ void BW_slice(float * V, float z, bw_conf * conf)
       // radius of the current pixel in units of [pixels]
             float rPixel = sqrt(pow((float) x - x0, 2) + pow((float) y - y0, 2));
       // Index of nearest coordinate from below (replace by pixel integration)
-      int index = (int) floor(rPixel * OVER_SAMPLING);
+      size_t index = (int) floor(rPixel * OVER_SAMPLING);
       assert(index < nr);
       // Interpolated value.
       v = h[index] + (h[index + 1] - h[index]) * (rPixel - r[index]) * OVER_SAMPLING;

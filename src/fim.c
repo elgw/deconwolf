@@ -162,6 +162,12 @@ void fim_insert(afloat * restrict T, const int64_t t1, const int64_t t2, const i
     const afloat * restrict F, const int64_t f1, const int64_t f2, const int64_t f3)
   /* Insert F [f1xf2xf3] into T [t1xt2xt3] in the "upper left" corner */
 {
+     if(f3 > t3 || f2 > t2 || f1 > t1)
+    {
+        printf("Error: can't insert image of size %ld x %ld x %ld into target of size %ld x %ld x %ld\n",
+               f1, f2, f3, t1, t2, t3);
+        exit(-1);
+    }
   for(int64_t pp = 0; pp<f3; pp++)
   {
     for(int64_t nn = 0; nn<f2; nn++)
@@ -179,7 +185,13 @@ void fim_insert_ref(afloat * T, int64_t t1, int64_t t2, int64_t t3,
     afloat * F, int64_t f1, int64_t f2, int64_t f3)
   /* Insert F [f1xf2xf3] into T [t1xt2xt3] in the "upper left" corner */
 {
-  for(int64_t mm = 0; mm<f1; mm++)
+    if(f3 > t3 || f2 > t2 || f1 > t1)
+    {
+        printf("Error: can't insert image of size %ld x %ld x %ld into target of size %ld x %ld x %ld\n",
+               f1, f2, f3, t1, t2, t3);
+        exit(-1);
+    }
+    for(int64_t mm = 0; mm<f1; mm++)
   {
     for(int64_t nn = 0; nn<f2; nn++)
     {
@@ -197,6 +209,10 @@ void fim_insert_ref(afloat * T, int64_t t1, int64_t t2, int64_t t3,
 afloat * fim_get_cuboid(afloat * restrict A, const int64_t M, const int64_t N, const int64_t P,
     const int64_t m0, const int64_t m1, const int64_t n0, const int64_t n1, const int64_t p0, const int64_t p1)
 {
+
+
+    ((void) P);
+
   /* Create a new array from V using [m0, m1]x[n0, n1]x[p0, p1] */
   int64_t m = m1-m0+1;
   int64_t n = n1-n0+1;
@@ -213,12 +229,12 @@ afloat * fim_get_cuboid(afloat * restrict A, const int64_t M, const int64_t N, c
       {
         // printf("aa:%d, bb:%d, cc:%d\n", aa, bb, cc);
         size_t Aidx = aa + bb*M + cc*M*N;
-        assert(Aidx < M*N*P);
+        assert(Aidx < (size_t) M*N*P);
         // New coordinates are offset ...
         size_t Cidx = (aa - m0) +
           (bb - n0)*m +
           (cc - p0)*m*n;
-        assert(Cidx < m*n*p);
+        assert(Cidx < (size_t) m*n*p);
         C[Cidx] = A[Aidx];
       }
     }
@@ -228,6 +244,8 @@ afloat * fim_get_cuboid(afloat * restrict A, const int64_t M, const int64_t N, c
 
 afloat * fim_subregion(afloat * restrict A, const int64_t M, const int64_t N, const int64_t P, const int64_t m, const int64_t n, const int64_t p)
 {
+    ((void) P);
+
   /* Extract sub region starting at (0,0,0) */
   afloat * S = fftwf_malloc(m*n*p*sizeof(float));
   assert(S != NULL);
@@ -239,8 +257,8 @@ afloat * fim_subregion(afloat * restrict A, const int64_t M, const int64_t N, co
       {
         size_t Aidx = mm + nn*M + pp*M*N;
         size_t Sidx = mm + nn*m + pp*m*n;
-        assert(Aidx < M*N*P);
-        assert(Sidx < m*n*p);
+        assert(Aidx < (size_t) M*N*P);
+        assert(Sidx < (size_t) m*n*p);
         S[Sidx] = A[Aidx];
       }
     }
@@ -250,6 +268,7 @@ afloat * fim_subregion(afloat * restrict A, const int64_t M, const int64_t N, co
 
 afloat * fim_subregion_ref(afloat * A, int64_t M, int64_t N, int64_t P, int64_t m, int64_t n, int64_t p)
 {
+    ((void) P);
   afloat * S = fftwf_malloc(m*n*p*sizeof(float));
   assert(S != NULL);
   for(int64_t mm = 0; mm<m; mm++)
@@ -260,8 +279,8 @@ afloat * fim_subregion_ref(afloat * A, int64_t M, int64_t N, int64_t P, int64_t 
       {
         size_t Aidx = mm + nn*M + pp*M*N;
         size_t Sidx = mm + nn*m + pp*m*n;
-        assert(Aidx < M*N*P);
-        assert(Sidx < m*n*p);
+        assert(Aidx < (size_t) M*N*P);
+        assert(Sidx < (size_t) m*n*p);
         S[Sidx] = A[Aidx];
       }
     }
@@ -392,11 +411,11 @@ void shift_vector_buf(afloat * restrict V,
 {
 
   k = -k;
-  for(size_t pp = 0; pp<N; pp++)
+  for(size_t pp = 0; pp<(size_t) N; pp++)
   {
     buffer[pp] = V[pp*S];
   }
-  for(size_t pp = 0; pp<N; pp++)
+  for(size_t pp = 0; pp < (size_t) N; pp++)
   {
     V[pp*S] = buffer[mod_int(pp+k, N)];
   }
@@ -432,7 +451,7 @@ afloat * fim_expand(const afloat * restrict in,
   afloat * out = fftwf_malloc(M*N*P*sizeof(float));
   assert(in != NULL);
   assert(out != NULL);
-  for(size_t kk = 0; kk<M*N*P; kk++)
+  for(size_t kk = 0; kk < (size_t) M*N*P; kk++)
     out[kk] = 0;
   fim_insert(out, M, N, P, in, pM, pN, pP);
   return out;
@@ -581,6 +600,11 @@ for(size_t pp = 0; pp<nV; pp++)
 
 void fim_gsmooth(float * restrict V, size_t M, size_t N, size_t P, float sigma)
 {
+    if(sigma < 0)
+    {
+        printf("fim_gsmooth sigma=%f does not make sense.", sigma);
+    }
+
   size_t nW = max_size_t(M, max_size_t(N, P));
   printf("gsmooth: M: %zu, N: %zu, P: %zu, nW: %zu\n", M, N, P, nW); fflush(stdout);
   // Temporary storage
@@ -600,9 +624,9 @@ for(size_t kk = 0; kk<nK; kk++)
   K[kk]/=sum;
 
 // X
-for(int pp = 0; pp<P; pp++)
+for(size_t pp = 0; pp < P; pp++)
 {
-for(int nn = 0; nn<N; nn++)
+for(size_t nn = 0; nn < N; nn++)
 {
   conv1(V+pp*(M*N)+nn*M, 1, W, M, K, nK);
 }
@@ -610,9 +634,9 @@ for(int nn = 0; nn<N; nn++)
 
 if(1){
 // Y
-for(int pp = 0; pp<P; pp++)
+for(size_t pp = 0; pp<P; pp++)
 {
-for(int mm = 0; mm<M; mm++)
+for(size_t mm = 0; mm<M; mm++)
 {
   conv1(V + pp*(M*N) + mm, M, W, N, K, nK);
 }
@@ -622,9 +646,9 @@ for(int mm = 0; mm<M; mm++)
 if(1){
 
 // Z
-for(int mm = 0; mm<M; mm++)
+for(size_t mm = 0; mm<M; mm++)
 {
-for(int nn = 0; nn<N; nn++)
+for(size_t nn = 0; nn<N; nn++)
 {
   conv1(V+mm+M*nn, M*N, W, P, K, nK);
 }

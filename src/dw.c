@@ -228,12 +228,6 @@ void dw_fprint_info(FILE * f, dw_opts * s)
   return;
 }
 
-void deconwolf_batch(dw_opts * s)
-{
-  // Better to do in Lua/Python/bash/...
-  printf("Not implemented !\n");
-}
-
 static void getCmdLine(int argc, char ** argv, dw_opts * s)
 {
   // Copy the command line to s->commandline
@@ -259,7 +253,6 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
 
   getCmdLine(argc, argv, s);
 
-  int generate_batch = 0;
 
   struct option longopts[] = {
     { "version",     no_argument,       NULL,   'v' },
@@ -275,7 +268,6 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     { "tilepad",     required_argument,  NULL,   'p' },
     { "overwrite",   no_argument,        NULL,   'w' },
     { "prefix",       required_argument, NULL,   'f' },
-    { "batch",        no_argument, NULL, 'b' },
     { "method",       required_argument, NULL,   'm' },
     { "relax",        required_argument, NULL,   'r' },
     { "xyfactor",     required_argument, NULL,   'x' },
@@ -339,9 +331,6 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         s->prefix = malloc(strlen(optarg) + 1);
         strcpy(s->prefix, optarg);
         break;
-      case 'b':
-        generate_batch = 1;
-        break;
       case 'm':
         if(strcmp(optarg, "rl") == 0)
         {
@@ -379,12 +368,6 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
   {
     printf("At least image and PSF has to be specified, hint: try '--help'!\n");
     exit(1);
-  }
-
-  if(generate_batch)
-  {
-    deconwolf_batch(s);
-    exit(0);
   }
 
   s->imFile = realpath(argv[optind], 0);
@@ -521,13 +504,18 @@ void fprint_peakMemory(FILE * fout)
 float getErrorX(const float * restrict y, const float * restrict g, const int64_t M, const int64_t N, const int64_t P, const int64_t wM, const int64_t wN, const int64_t wP)
 {
   /* Same as getError with the difference that G is expanded to MxNxP */
-  assert(wM>=M);
-  double e = 0;
-  for(size_t c = 0; c<P; c++)
+  if(M > wM || N > wN || P > wP)
   {
-    for(size_t b = 0; b<N; b++)
+      perror("Something is funky with the dimensions of the images.");
+      exit(-1);
+  }
+
+  double e = 0;
+  for(size_t c = 0; c < (size_t) P; c++)
+  {
+      for(size_t b = 0; b < (size_t) N; b++)
     {
-      for(size_t a = 0; a<M; a++)
+        for(size_t a = 0; a < (size_t) M; a++)
       {
         double yval = y[a + b*wM + c*wM*wN];
         double gval = g[a + b*wM + c*wM*wN];
@@ -544,6 +532,11 @@ float getError(const afloat * restrict y, const afloat * restrict g,
     const int64_t M, const int64_t N, const int64_t P,
     const int64_t wM, const int64_t wN, const int64_t wP)
 {
+    if(M > wM || N > wN || P > wP)
+    {
+        perror("Something is funky with the dimensions of the images.");
+        exit(-1);
+    }
   double e = 0;
 #pragma omp parallel for reduction(+: e)
   for(int64_t c = 0; c<P; c++)
@@ -565,6 +558,13 @@ float getError(const afloat * restrict y, const afloat * restrict g,
 
 float getError_ref(float * y, float * g, int64_t M, int64_t N, int64_t P, int64_t wM, int64_t wN, int64_t wP)
 {
+
+    if(M > wM || N > wN || P > wP)
+    {
+        perror("Something is funky with the dimensions of the images.");
+        exit(-1);
+    }
+
   double e = 0;
   for(int64_t a = 0; a<M; a++)
   {
@@ -591,7 +591,7 @@ float iter(
     afloat * restrict W, // Weights
     const int64_t wM, const int64_t wN, const int64_t wP, // expanded size
     const int64_t M, const int64_t N, const int64_t P, // input image size
-    const dw_opts * s)
+    __attribute__((unused)) const dw_opts * s)
 {
   // We could reduce memory even further by using
   // the allocation for xp
@@ -603,12 +603,12 @@ float iter(
 
 
 #pragma omp parallel for
-  for(size_t cc =0; cc<wP; cc++){
-    for(size_t bb = 0; bb<wN; bb++){
-      for(size_t aa = 0; aa<wM; aa++){
+  for(size_t cc =0; cc < (size_t) wP; cc++){
+      for(size_t bb = 0; bb < (size_t) wN; bb++){
+          for(size_t aa = 0; aa < (size_t) wM; aa++){
         size_t yidx = aa + bb*wM + cc*wM*wN;
         size_t imidx = aa + bb*M + cc*M*N;
-        if(aa<M && bb<N && cc<P)
+        if(aa < (size_t) M && bb < (size_t) N && cc < (size_t) P)
         {
           y[yidx] < 1e-6 ? y[yidx] = 1e-6 : 0;
           y[yidx]=im[imidx]/y[yidx];
@@ -661,7 +661,7 @@ fftwf_complex * initial_guess(const int64_t M, const int64_t N, const int64_t P,
   return Fone;
 }
 
-void dw_usage(const int argc, char ** argv, const dw_opts * s)
+void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opts * s)
 {
   printf(" Usage:\n");
   printf("\t$ %s <options> image.tif psf.tif\n", argv[0]);
@@ -1083,7 +1083,9 @@ float * psf_autocrop_byImage(float * psf, int64_t * pM, int64_t * pN, int64_t * 
 }
 
 float * psf_autocrop_XY(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  // psf and size
-    int64_t M, int64_t N, int64_t P, // image size
+                        __attribute__((unused))    int64_t M,
+                        __attribute__((unused)) int64_t N,
+                                      __attribute__((unused)) int64_t P, // image size
     dw_opts * s)
 {
   // Find the y-z plane with the largest sum
@@ -1322,7 +1324,7 @@ void timings()
 
 
   tic
-    for(size_t kk = 0; kk<M*N*P; kk++)
+      for(size_t kk = 0; kk < (size_t) M*N*P; kk++)
     {
       A[kk] = (float) rand()/(float) RAND_MAX;
     }
