@@ -4,8 +4,6 @@ function status = getmse(settings)
 % Optional: 'Tag'
 s.Tag = 'No Tag';
 
-
-
 s = df_structput(s, settings);
 status = s;
 
@@ -23,9 +21,23 @@ rfile = [s.folder s.inputfile];
 fprintf('file: %s\n', dwfile);
 
 I0 = double(df_readTif(rfile)); % Non-deconvolved file
-I = df_readTif(dwfile);
+
+if isfile(dwfile)
+    I = df_readTif(dwfile);
+else
+    warning('Can''t open %s\n', dwfile);
+    I = -1*ones(size(I0));
+end
+
+if contains(dwfile, 'dl2')
+    warning('Shifting dots based on the image file name');
+    I = circshift(I, -1, 1);
+    I = circshift(I, -1, 2);
+end
+
 I = double(I);
 I = I*mean(Iref(:))/mean(I(:)); % For easier opimization
+
 
 [scaling, mse] = fminunc(@(x) mseval(Iref, I*x), 0.1);
 %fprintf('mse(%s,ref) = %f\n', s.Tag, mse);
@@ -38,6 +50,7 @@ status.mse_raw = mse;
 [a, b] = getDots(s, I, Iref);
 status.DWnDotsIsLMAX = a*100;
 status.DWnDotsIsLMAX2 = b*100;
+%keyboard
 [a, b] = getDots(s, I0, Iref);
 
 status.nDotsIsLMAX = a*100;
@@ -59,12 +72,39 @@ end
 
 function [N, N2]  = getDots(s, I, Iref)
 % Returns how many of the true dots that are local maximas
+%
+% TODO: over all thresholds
+% TODO: fix potential shifts with Deconvolution Lab2 ... why?
 
+METHOD_NDOTS = 2;
+
+method = METHOD_NDOTS;
 
 D = load([s.folder 'X.mat']);
 D = D.X; % Coordinates of the true dots
 [x, y,z, p, Map] = getLocalMaximas(I);
 [xr, yr,zr, pr, Mapr] = getLocalMaximas(Iref);
+
+if method == METHOD_NDOTS
+N = numel(x)/numel(xr);
+N2 = numel(x)/numel(xr);
+return
+end
+
+
+if 0
+    figure,
+    plot(x, y, 'ro')
+    hold on
+    plot(xr+1, yr+1, 'gx')
+    figure,
+    plot(x, z, 'ro')
+    hold on
+    plot(xr+1, zr, 'gx')
+end
+
+
+
 N = sum(Map(:) == 1 & Mapr(:) == 1)/sum(Mapr(:));
 
 Map2 = max(Map, [], 3); Mapr2 = max(Mapr, [], 3);

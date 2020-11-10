@@ -14,6 +14,10 @@ s.pixelSizeNM = [130 130 130];
 s.imsize = [256 256 40];
 s.viewVolume = 0; % View created volume at end
 
+volume = prod(s.imsize.*s.pixelSizeNM/1000) % um3
+nucVol = 374; % um3 https://bionumbers.hms.harvard.edu/bionumber.aspx?id=101402&ver=14
+nucVol/volume
+
 if exist('settings', 'var')
     s = df_structput(s, settings);
 end

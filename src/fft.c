@@ -47,7 +47,7 @@ const unsigned int MYPLAN = FFTW_MEASURE;
 
 static int isdir(char * dir)
 {
-  /* Check if directory exist, do not create if missing 
+  /* Check if directory exist, do not create if missing
    * returns 1 if it exist
    * */
 
@@ -66,7 +66,7 @@ static int isdir(char * dir)
 }
 
 static int ensuredir(char * dir)
-  /* Create dir if it does not exist. 
+  /* Create dir if it does not exist.
    * Returns 0 if the dir already existed or could be created
    * returns non-zeros if the dir can't be created
    */
@@ -89,12 +89,12 @@ static char * get_swf_file_name(int nThreads)
   char * dir_home = getenv("HOME");
   char * dir_config = malloc(1024*sizeof(char));
   char * swf = malloc(1024*sizeof(char));
-  sprintf(swf, "fftw_wisdom_float_threads_%d.dat", nThreads);    
+  sprintf(swf, "fftw_wisdom_float_threads_%d.dat", nThreads);
 
   sprintf(dir_config, "%s/.config/", dir_home);
   // printf("dir_config = %s\n", dir_config);
   if( !isdir(dir_config) )
-  {     
+  {
     free(dir_config);
     return swf;
   }
@@ -115,15 +115,15 @@ static char * get_swf_file_name(int nThreads)
 }
 
 void myfftw_start(const int nThreads)
-{  
+{
   //  printf("\t using %s with %d threads\n", fftwf_version, nThreads);
   fftwf_init_threads();
   fftwf_plan_with_nthreads(nThreads);
   char * swf = get_swf_file_name(nThreads);
   if(swf == NULL)
-  { 
+  {
     assert(0);
-  } 
+  }
   else
   {
     fftwf_import_wisdom_from_filename(swf);
@@ -145,18 +145,18 @@ fftwf_complex * fft(afloat * restrict in, const int n1, const int n2, const int 
   fftwf_complex * out = fftwf_malloc(N*sizeof(fftwf_complex));
   memset(out, 0, N*sizeof(fftwf_complex));
 
-  fftwf_plan p = fftwf_plan_dft_r2c_3d(n3, n2, n1, 
+  fftwf_plan p = fftwf_plan_dft_r2c_3d(n3, n2, n1,
       in, // Float
-      out, // fftwf_complex 
+      out, // fftwf_complex
       MYPLAN);
-  fftwf_execute(p); 
+  fftwf_execute(p);
   fftwf_destroy_plan(p);
   return out;
 }
 
-void fft_mul(fftwf_complex * restrict C, 
-    fftwf_complex * restrict A, 
-    fftwf_complex * restrict B, 
+void fft_mul(fftwf_complex * restrict C,
+    fftwf_complex * restrict A,
+    fftwf_complex * restrict B,
     const size_t n1, const size_t n2, const size_t n3)
 {
   size_t N = (n1+3)/2*n2*n3;
@@ -172,11 +172,11 @@ void fft_mul(fftwf_complex * restrict C,
 }
 
 
-void fft_mul_conj(fftwf_complex * restrict C, 
-    fftwf_complex * restrict A, 
-    fftwf_complex * restrict B, 
+void fft_mul_conj(fftwf_complex * restrict C,
+    fftwf_complex * restrict A,
+    fftwf_complex * restrict B,
     const size_t n1, const size_t n2, const size_t n3)
-  /* Multiply and conjugate the elements in the array A 
+  /* Multiply and conjugate the elements in the array A
    * i.e. C = conj(A)*B
    * All inputs should have the same size [n1 x n2 x n3]
    * */
@@ -195,101 +195,105 @@ void fft_mul_conj(fftwf_complex * restrict C,
   return;
 }
 
-afloat * fft_convolve_cc_f2(fftwf_complex * A, fftwf_complex * B, 
+afloat * fft_convolve_cc_f2(fftwf_complex * A, fftwf_complex * B,
     const int M, const int N, const int P)
 {
   size_t n = (M+3)/2*N*P;
   fftwf_complex * C = fftwf_malloc(n*sizeof(fftwf_complex));
-  fft_mul(C, A, B, M, N, P); 
+  fft_mul(C, A, B, M, N, P);
   fftwf_free(B);
 
   afloat * out = fftwf_malloc(M*N*P*sizeof(float));
 
-  fftwf_plan p = fftwf_plan_dft_c2r_3d(P, N, M, 
-      C, out, 
+  fftwf_plan p = fftwf_plan_dft_c2r_3d(P, N, M,
+      C, out,
       MYPLAN);
   fftwf_execute(p);
   fftwf_destroy_plan(p);
   fftwf_free(C);
+
+  const size_t MNP = M*N*P;
 
 #pragma omp parallel for
-  for(size_t kk = 0; kk<M*N*P; kk++)
+  for(size_t kk = 0; kk < MNP; kk++)
   {
-    out[kk]/=(M*N*P);
+      out[kk]/=(MNP);
   }
 
   return out;
 }
 
-afloat * fft_convolve_cc_conj_f2(fftwf_complex * A, fftwf_complex * B, 
+afloat * fft_convolve_cc_conj_f2(fftwf_complex * A, fftwf_complex * B,
     const int M, const int N, const int P)
 {
 
   size_t n = (M+3)/2*N*P;
   fftwf_complex * C = fftwf_malloc(n*sizeof(fftwf_complex));
-  fft_mul_conj(C, A, B, M, N, P); 
+  fft_mul_conj(C, A, B, M, N, P);
   fftwf_free(B);
 
   afloat * out = fftwf_malloc(M*N*P*sizeof(float));
 
-  fftwf_plan p = fftwf_plan_dft_c2r_3d(P, N, M, 
-      C, out, 
+  fftwf_plan p = fftwf_plan_dft_c2r_3d(P, N, M,
+      C, out,
       MYPLAN);
   fftwf_execute(p);
   fftwf_destroy_plan(p);
   fftwf_free(C);
-
-  for(size_t kk = 0; kk<M*N*P; kk++)
+  const size_t MNP = M*N*P;
+  for(size_t kk = 0; kk<MNP; kk++)
   {
-    out[kk]/=(M*N*P);
+    out[kk]/=(MNP);
   }
   return out;
 }
 
 
 
-afloat * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B, 
+afloat * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B,
     const int M, const int N, const int P)
 {
   size_t n = (M+3)/2*N*P;
   fftwf_complex * C = fftwf_malloc(n*sizeof(fftwf_complex));
-  fft_mul(C, A, B, M, N, P); 
+  fft_mul(C, A, B, M, N, P);
 
   afloat * out = fftwf_malloc(M*N*P*sizeof(float));
 
-  fftwf_plan p = fftwf_plan_dft_c2r_3d(P, N, M, 
-      C, out, 
+  fftwf_plan p = fftwf_plan_dft_c2r_3d(P, N, M,
+      C, out,
       MYPLAN);
   fftwf_execute(p);
   fftwf_destroy_plan(p);
   fftwf_free(C);
 
-  for(size_t kk = 0; kk<M*N*P; kk++)
+  const size_t MNP = M*N*P;
+  for(size_t kk = 0; kk<MNP; kk++)
   {
-    out[kk]/=(M*N*P);
+    out[kk]/=(MNP);
   }
   return out;
 }
 
-afloat * fft_convolve_cc_conj(fftwf_complex * A, fftwf_complex * B, 
+afloat * fft_convolve_cc_conj(fftwf_complex * A, fftwf_complex * B,
     const int M, const int N, const int P)
 {
    size_t n = (M+3)/2*N*P;
   fftwf_complex * C = fftwf_malloc(n*sizeof(fftwf_complex));
-  fft_mul_conj(C, A, B, M, N, P); 
+  fft_mul_conj(C, A, B, M, N, P);
 
   afloat * out = fftwf_malloc(M*N*P*sizeof(float));
 
-  fftwf_plan p = fftwf_plan_dft_c2r_3d(P, N, M, 
-      C, out, 
+  fftwf_plan p = fftwf_plan_dft_c2r_3d(P, N, M,
+      C, out,
       MYPLAN);
   fftwf_execute(p);
   fftwf_destroy_plan(p);
   fftwf_free(C);
 
-  for(size_t kk = 0; kk<M*N*P; kk++)
+  const size_t MNP = M*N*P;
+  for(size_t kk = 0; kk<MNP; kk++)
   {
-    out[kk]/=(M*N*P);
+    out[kk]/=(MNP);
   }
   return out;
 }
@@ -311,16 +315,16 @@ void fft_train(const size_t M, const size_t N, const size_t P, const int verbosi
   fftwf_complex * C = fftwf_malloc(MNP*sizeof(fftwf_complex));
   afloat * R = fftwf_malloc(MNP*sizeof(float));
 
-  fftwf_plan p0 = fftwf_plan_dft_c2r_3d(P, N, M, 
+  fftwf_plan p0 = fftwf_plan_dft_c2r_3d(P, N, M,
       C, R, MYPLAN | FFTW_WISDOM_ONLY);
 
   if(p0 == NULL)
-  {    
+  {
     if(verbosity > 0)
     {
       printf("> generating c2r plan\n");
     }
-    fftwf_plan p1 = fftwf_plan_dft_c2r_3d(P, N, M, 
+    fftwf_plan p1 = fftwf_plan_dft_c2r_3d(P, N, M,
         C, R, MYPLAN);
     fftwf_execute(p1);
     fftwf_destroy_plan(p1);
@@ -332,7 +336,7 @@ void fft_train(const size_t M, const size_t N, const size_t P, const int verbosi
   }
   fftwf_destroy_plan(p0);
 
-  p0 = fftwf_plan_dft_r2c_3d(P, N, M, 
+  p0 = fftwf_plan_dft_r2c_3d(P, N, M,
       R, C, MYPLAN | FFTW_WISDOM_ONLY);
 
   if(p0 == NULL)
@@ -340,7 +344,7 @@ void fft_train(const size_t M, const size_t N, const size_t P, const int verbosi
     if(verbosity > 0){
       printf("> generating r2c plan \n");
     }
-    fftwf_plan p2 = fftwf_plan_dft_r2c_3d(P, N, M, 
+    fftwf_plan p2 = fftwf_plan_dft_r2c_3d(P, N, M,
         R, C, MYPLAN);
     fftwf_execute(p2);
     fftwf_destroy_plan(p2);
@@ -357,7 +361,7 @@ void fft_train(const size_t M, const size_t N, const size_t P, const int verbosi
 
   char * swf = get_swf_file_name(nThreads);
   if(swf == NULL)
-  { assert(0); } 
+  { assert(0); }
   else {
     fftwf_export_wisdom_to_filename(swf);
     free(swf);
@@ -369,7 +373,7 @@ void fft_train(const size_t M, const size_t N, const size_t P, const int verbosi
 void fft_ut_wisdom_name(void){
   /* Wisdom file names
    * Try this when $HOME/.config/deconwolf/ does not exist
-   * and when it does ... jonas.paulsen1 
+   * and when it does ... jonas.paulsen1
    * could also test it when that dir isn't writeable.
    * */
 
@@ -382,7 +386,7 @@ void fft_ut_wisdom_name(void){
 void fft_ut_flipall_conj()
 {
   myfftw_start(2);
-  /* Test the identity 
+  /* Test the identity
    * flip(X) = ifft(conj(fft(X)))
    */
   int M = 12, N = 13, P = 15;
@@ -406,7 +410,7 @@ void fft_ut_flipall_conj()
   float mse = fim_mse(Y1, Y2, M*N*P);
   printf("mse=%f ", mse);
   if(mse < 1e-5)
-  { printf("ok!\n"); } else 
+  { printf("ok!\n"); } else
   { printf("BAD :(\n"); }
 
   fftwf_free(A); fftwf_free(FA);

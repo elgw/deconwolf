@@ -1,5 +1,10 @@
 # CHANGELOG
 
+### 2020-11-10 v0.0.9
+ * Updated the PSF generator to use Simpson's rule with 9x9 valuations in X-Y per pixel. This should produce more accurate PSF's when the pixel size is large. It is future work to also integrate in Z.
+ * Fixed some bugs/issues related to vector aliasing that caused dw to crash when compiled with the `O3` flag.
+ * General cleanup including warning free compilation.
+
 ### 2020-06-09 v0.0.6
  * Added the binary `dw_bw` which generates PSFs according to the Born-Wolf model. It is based on, and compared to [https://github.com/Biomedical-Imaging-Group/PSFGenerator/blob/master/src/psf/bornwolf/KirchhoffDiffractionSimpson.java](https://github.com/Biomedical-Imaging-Group/PSFGenerator/blob/master/src/psf/bornwolf/KirchhoffDiffractionSimpson.java)
 

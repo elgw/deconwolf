@@ -29,7 +29,7 @@
 #include <time.h>
 #ifdef _OPENMP // turned on with -fopenmp
 #include <omp.h>
-#endif 
+#endif
 #include "fft.h"
 #include "dw.h"
 #include "tiling.h"
@@ -41,10 +41,8 @@
 #define tic clock_gettime(CLOCK_REALTIME, &tictoc_start);
 #define toc(X) clock_gettime(CLOCK_REALTIME, &tictoc_end); printf(#X); printf(" %f s\n", timespec_diff(&tictoc_end, &tictoc_start)); fflush(stdout);
 
-/* This is what fftw_malloc returns
- * http://www.fftw.org/fftw3_doc/SIMD-alignment-and-fftw_005fmalloc.html#SIMD-alignment-and-fftw_005fmalloc
- */
-typedef float afloat __attribute__ ((__aligned__(16)));
+//typedef float afloat __attribute__ ((__aligned__(16)));
+typedef float afloat;
 
 dw_opts * dw_opts_new(void)
 {
@@ -115,7 +113,7 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
   fprintf(f, "nThreads: %d\n", s->nThreads);
   fprintf(f, "verbosity: %d\n", s->verbosity);
   switch(s->method)
-  { 
+  {
     case DW_METHOD_RL:
       fprintf(f, "method: Richardson-Lucy\n");
       break;
@@ -195,7 +193,7 @@ void dw_fprint_info(FILE * f, dw_opts * s)
   char cwd[1024];
   if (getcwd(cwd, sizeof(cwd)) != NULL) {
     fprintf(f, "PWD: %s\n", cwd);
-  } 
+  }
 
   if(s->commandline != NULL)
   {
@@ -217,8 +215,8 @@ void dw_fprint_info(FILE * f, dw_opts * s)
 
   char * hname = malloc(1024*sizeof(char));
   if(gethostname(hname, 1023) == 0)
-  { 
-    fprintf(f, "HOSTNAME: '%s'\n", hname); 
+  {
+    fprintf(f, "HOSTNAME: '%s'\n", hname);
     free(hname);
   }
 #ifdef _OPENMP
@@ -228,12 +226,6 @@ void dw_fprint_info(FILE * f, dw_opts * s)
   fprintf(f, "\n");
   fflush(f);
   return;
-}
-
-void deconwolf_batch(dw_opts * s)
-{
-  // Better to do in Lua/Python/bash/...
-  printf("Not implemented !\n");
 }
 
 static void getCmdLine(int argc, char ** argv, dw_opts * s)
@@ -261,10 +253,9 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
 
   getCmdLine(argc, argv, s);
 
-  int generate_batch = 0;
 
   struct option longopts[] = {
-    { "version",     no_argument,       NULL,   'v' }, 
+    { "version",     no_argument,       NULL,   'v' },
     { "help",         no_argument,       NULL,   'h' },
     // Data
     { "out",        required_argument, NULL,   'o' },
@@ -273,11 +264,10 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     { "threads",      required_argument, NULL,   'c' },
     { "verbose",      required_argument, NULL,   'l' },
     { "test",        no_argument,        NULL,   't' },
-    { "tilesize",    required_argument,  NULL,   's' }, 
+    { "tilesize",    required_argument,  NULL,   's' },
     { "tilepad",     required_argument,  NULL,   'p' },
     { "overwrite",   no_argument,        NULL,   'w' },
     { "prefix",       required_argument, NULL,   'f' },
-    { "batch",        no_argument, NULL, 'b' },
     { "method",       required_argument, NULL,   'm' },
     { "relax",        required_argument, NULL,   'r' },
     { "xyfactor",     required_argument, NULL,   'x' },
@@ -285,11 +275,12 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     { "bq",           required_argument, NULL,   'B' },
     { "float",        no_argument,       NULL,   'F' },
     { "experimental1", no_argument, NULL, 'X' },
+    { "iterdump", no_argument, NULL, 'i'},
     { NULL,           0,                 NULL,   0   }
   };
 
   int ch;
-  while((ch = getopt_long(argc, argv, "FBvho:n:c:p:s:p:TX", longopts, NULL)) != -1)
+  while((ch = getopt_long(argc, argv, "iFBvho:n:c:p:s:p:TX", longopts, NULL)) != -1)
   {
     switch(ch) {
       case 'F':
@@ -316,6 +307,9 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
       case 'c':
         s->nThreads = atoi(optarg);
         break;
+    case 'i':
+        s->iterdump = 1;
+        break;
       case 'l':
         s->verbosity = atoi(optarg);
         break;
@@ -337,18 +331,15 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         s->prefix = malloc(strlen(optarg) + 1);
         strcpy(s->prefix, optarg);
         break;
-      case 'b':
-        generate_batch = 1;
-        break;
       case 'm':
         if(strcmp(optarg, "rl") == 0)
-        { 
-          s->method = DW_METHOD_RL; 
+        {
+          s->method = DW_METHOD_RL;
           sprintf(s->prefix, "drl");
         }
         if(strcmp(optarg, "id") == 0)
-        { 
-          s->method = DW_METHOD_ID; 
+        {
+          s->method = DW_METHOD_ID;
           sprintf(s->prefix, "id");
         }
         break;
@@ -377,12 +368,6 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
   {
     printf("At least image and PSF has to be specified, hint: try '--help'!\n");
     exit(1);
-  }
-
-  if(generate_batch)
-  {
-    deconwolf_batch(s);
-    exit(0);
   }
 
   s->imFile = realpath(argv[optind], 0);
@@ -438,7 +423,7 @@ void fsetzeros(const char * fname, size_t N)
     written += bsize;
   }
   //  printf("\r %zu / %zu \n", written, N); fflush(stdout);
-  
+
   fwrite(buffer, N-written, 1, fid);
   fclose(fid);
   free(buffer);
@@ -519,13 +504,18 @@ void fprint_peakMemory(FILE * fout)
 float getErrorX(const float * restrict y, const float * restrict g, const int64_t M, const int64_t N, const int64_t P, const int64_t wM, const int64_t wN, const int64_t wP)
 {
   /* Same as getError with the difference that G is expanded to MxNxP */
-  assert(wM>=M);
-  double e = 0;
-  for(size_t c = 0; c<P; c++)
+  if(M > wM || N > wN || P > wP)
   {
-    for(size_t b = 0; b<N; b++)
+      perror("Something is funky with the dimensions of the images.");
+      exit(-1);
+  }
+
+  double e = 0;
+  for(size_t c = 0; c < (size_t) P; c++)
+  {
+      for(size_t b = 0; b < (size_t) N; b++)
     {
-      for(size_t a = 0; a<M; a++)
+        for(size_t a = 0; a < (size_t) M; a++)
       {
         double yval = y[a + b*wM + c*wM*wN];
         double gval = g[a + b*wM + c*wM*wN];
@@ -538,10 +528,15 @@ float getErrorX(const float * restrict y, const float * restrict g, const int64_
 }
 
 
-float getError(const afloat * restrict y, const afloat * restrict g, 
-    const int64_t M, const int64_t N, const int64_t P, 
+float getError(const afloat * restrict y, const afloat * restrict g,
+    const int64_t M, const int64_t N, const int64_t P,
     const int64_t wM, const int64_t wN, const int64_t wP)
 {
+    if(M > wM || N > wN || P > wP)
+    {
+        perror("Something is funky with the dimensions of the images.");
+        exit(-1);
+    }
   double e = 0;
 #pragma omp parallel for reduction(+: e)
   for(int64_t c = 0; c<P; c++)
@@ -563,6 +558,13 @@ float getError(const afloat * restrict y, const afloat * restrict g,
 
 float getError_ref(float * y, float * g, int64_t M, int64_t N, int64_t P, int64_t wM, int64_t wN, int64_t wP)
 {
+
+    if(M > wM || N > wN || P > wP)
+    {
+        perror("Something is funky with the dimensions of the images.");
+        exit(-1);
+    }
+
   double e = 0;
   for(int64_t a = 0; a<M; a++)
   {
@@ -589,9 +591,9 @@ float iter(
     afloat * restrict W, // Weights
     const int64_t wM, const int64_t wN, const int64_t wP, // expanded size
     const int64_t M, const int64_t N, const int64_t P, // input image size
-    const dw_opts * s)
+    __attribute__((unused)) const dw_opts * s)
 {
-  // We could reduce memory even further by using 
+  // We could reduce memory even further by using
   // the allocation for xp
   const size_t wMNP = wM*wN*wP;
 
@@ -601,12 +603,12 @@ float iter(
 
 
 #pragma omp parallel for
-  for(size_t cc =0; cc<wP; cc++){
-    for(size_t bb = 0; bb<wN; bb++){
-      for(size_t aa = 0; aa<wM; aa++){
+  for(size_t cc =0; cc < (size_t) wP; cc++){
+      for(size_t bb = 0; bb < (size_t) wN; bb++){
+          for(size_t aa = 0; aa < (size_t) wM; aa++){
         size_t yidx = aa + bb*wM + cc*wM*wN;
         size_t imidx = aa + bb*M + cc*M*N;
-        if(aa<M && bb<N && cc<P)
+        if(aa < (size_t) M && bb < (size_t) N && cc < (size_t) P)
         {
           y[yidx] < 1e-6 ? y[yidx] = 1e-6 : 0;
           y[yidx]=im[imidx]/y[yidx];
@@ -617,10 +619,10 @@ float iter(
     }
   }
 
-  fftwf_complex * F_sn = fft(y, wM, wN, wP); 
-  fftwf_free(y); 
+  fftwf_complex * F_sn = fft(y, wM, wN, wP);
+  fftwf_free(y);
 
-  afloat * x = fft_convolve_cc_conj_f2(cK, F_sn, wM, wN, wP); 
+  afloat * x = fft_convolve_cc_conj_f2(cK, F_sn, wM, wN, wP);
 
 #pragma omp parallel for
   for(size_t cc = 0; cc<wMNP; cc++)
@@ -630,7 +632,7 @@ float iter(
   return error;
 }
 
-fftwf_complex * initial_guess(const int64_t M, const int64_t N, const int64_t P, 
+fftwf_complex * initial_guess(const int64_t M, const int64_t N, const int64_t P,
     const int64_t wM, const int64_t wN, const int64_t wP)
 {
   /* Create initial guess: the fft of an image that is 1 in MNP and 0 outside
@@ -659,7 +661,7 @@ fftwf_complex * initial_guess(const int64_t M, const int64_t N, const int64_t P,
   return Fone;
 }
 
-void dw_usage(const int argc, char ** argv, const dw_opts * s)
+void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opts * s)
 {
   printf(" Usage:\n");
   printf("\t$ %s <options> image.tif psf.tif\n", argv[0]);
@@ -724,7 +726,7 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
   }
 
   if(s->nIter == 0)
-  {  
+  {
     return fim_copy(im, M*N*P);
   }
 
@@ -773,7 +775,7 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
       M, N, P, pM, pN, pP, wM, wN, wP, wMNP);
   fflush(s->log);
 
-  fft_train(wM, wN, wP, 
+  fft_train(wM, wN, wP,
       s->verbosity, s->nThreads);
 
   // cK : "full size" fft of the PSF
@@ -786,7 +788,7 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
   fftwf_free(Z);
 
 
-  /* <-- This isn't needed ...  
+  /* <-- This isn't needed ...
     fftwf_complex * cKr = NULL;
      float * Zr = fftwf_malloc(wMNP*sizeof(float));
      memset(Zr, 0, wMNP*sizeof(float));
@@ -796,7 +798,7 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
      fim_insert(Zr, wM, wN, wP, psf_flipped, pM, pN, pP);
      free(psf_flipped);
      fim_circshift(Zr, wM, wN, wP, -(pM-1)/2, -(pN-1)/2, -(pP-1)/2);
-     cKr = fft(Zr, wM, wN, wP); 
+     cKr = fft(Zr, wM, wN, wP);
   // Not needed since f(-x) = ifft(conf(fft(f)))
   fftwf_free(Zr);
   --> */
@@ -809,7 +811,7 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
   //  writetif("P1.tif", P1, wM, wN, wP);
 
   float sigma = 0.001;
-#pragma omp parallel for 
+#pragma omp parallel for
   for(size_t kk = 0; kk<wMNP; kk++)
   {
     if(P1[kk] < sigma)
@@ -858,14 +860,14 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
       afloat * temp = fim_subregion(x, wM, wN, wP, M, N, P);
       char * tempname = malloc(100*sizeof(char));
       sprintf(tempname, "x_%03d.tif", it);
-      printf("Writing current guess to %s\n", tempname);
+      printf(" Writing current guess to %s\n", tempname);
       fim_tiff_write(tempname, temp, M, N, P, s->log);
       free(temp);
     }
 
 #pragma omp parallel for
     for(size_t kk = 0; kk<wMNP; kk++)
-    { 
+    {
       y[kk] = x[kk] + alpha*(x[kk]-xm[kk]);
       // a priori information: only positive values
       y[kk] < 0 ? y[kk] = 0 : 0;
@@ -905,7 +907,7 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
     xp = NULL;
 
     if(s->experimental1 == 1 && (it == round(s->nIter/2)) )
-    {      
+    {
       printf("gsmoothing()\n");
       fim_gsmooth(x, wM, wN, wP, 0.5);
       alpha = 0;
@@ -924,7 +926,7 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
   afloat * out = fim_subregion(x, wM, wN, wP, M, N, P);
 
 
-  //  printf("DEBUG: writing final_full_tif\n");  
+  //  printf("DEBUG: writing final_full_tif\n");
   //  fim_tiff_write("final_full.tif", x, wM, wN, wP);
   fftwf_free(f);
   if(x != NULL)
@@ -1035,7 +1037,7 @@ float * psf_autocrop_byImage(float * psf, int64_t * pM, int64_t * pN, int64_t * 
   }
 
   if(m > mopt || n > nopt || p > popt)
-  { 
+  {
     int64_t m0 = 0, m1 = m-1;
     int64_t n0 = 0, n1 = n-1;
     int64_t p0 = 0, p1 = p-1;
@@ -1068,10 +1070,10 @@ float * psf_autocrop_byImage(float * psf, int64_t * pM, int64_t * pN, int64_t * 
 
     if(s->verbosity > 0)
     {
-      fprintf(stdout, "PSF crop [%" PRId64 " x %" PRId64 " x %" PRId64 "] -> [%" PRId64 " x %" PRId64 " x %" PRId64 "]\n", 
+      fprintf(stdout, "PSF crop [%" PRId64 " x %" PRId64 " x %" PRId64 "] -> [%" PRId64 " x %" PRId64 " x %" PRId64 "]\n",
           m, n, p, pM[0], pN[0], pP[0]);
     }
-    fprintf(s->log, "PSF crop [%" PRId64 " x %" PRId64 " x %" PRId64 "] -> [%" PRId64 " x %" PRId64 " x %" PRId64 "]\n", 
+    fprintf(s->log, "PSF crop [%" PRId64 " x %" PRId64 " x %" PRId64 "] -> [%" PRId64 " x %" PRId64 " x %" PRId64 "]\n",
         m, n, p, pM[0], pN[0], pP[0]);
 
     return psf_cropped;
@@ -1081,7 +1083,9 @@ float * psf_autocrop_byImage(float * psf, int64_t * pM, int64_t * pN, int64_t * 
 }
 
 float * psf_autocrop_XY(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  // psf and size
-    int64_t M, int64_t N, int64_t P, // image size
+                        __attribute__((unused))    int64_t M,
+                        __attribute__((unused)) int64_t N,
+                                      __attribute__((unused)) int64_t P, // image size
     dw_opts * s)
 {
   // Find the y-z plane with the largest sum
@@ -1128,8 +1132,8 @@ float * psf_autocrop_XY(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  
   }
 
   float * p = fim_get_cuboid(psf, pM[0], pN[0], pP[0],
-      first, pM[0] - first -1, 
-      first, pN[0] - first -1, 
+      first, pM[0] - first -1,
+      first, pN[0] - first -1,
       0, pP[0]-1);
   pM[0] -= 2*first;
   pN[0] -= 2*first;
@@ -1207,7 +1211,7 @@ int deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
       {
         printf("Dumping %s to %s (for quicker io)\n", s->imFile, imFileRaw);
       }
-    
+
     fim_tiff_to_raw(s->imFile, imFileRaw);
     if(0){
     printf("Writing to imdump.tif\n");
@@ -1249,7 +1253,7 @@ int deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
     int64_t tileM = T->tiles[tt]->xsize[0];
     int64_t tileN = T->tiles[tt]->xsize[1];
     int64_t tileP = T->tiles[tt]->xsize[2];
-    
+
 if(0)
 {
   printf("writing to tiledump.tif\n");
@@ -1259,7 +1263,7 @@ if(0)
 
     fim_normalize_sum1(tpsf, tpM, tpN, tpP);
 
-    tpsf = psf_autocrop(tpsf, &tpM, &tpN, &tpP, 
+    tpsf = psf_autocrop(tpsf, &tpM, &tpN, &tpP,
         tileM, tileN, tileP, s);
 
     fim_normalize_sum1(tpsf, tpM, tpN, tpP);
@@ -1320,7 +1324,7 @@ void timings()
 
 
   tic
-    for(size_t kk = 0; kk<M*N*P; kk++)
+      for(size_t kk = 0; kk < (size_t) M*N*P; kk++)
     {
       A[kk] = (float) rand()/(float) RAND_MAX;
     }
@@ -1328,8 +1332,8 @@ void timings()
 
     // ---
     tic
-    fftwf_plan p = fftwf_plan_dft_r2c_3d(P, N, M, 
-        V, NULL, 
+    fftwf_plan p = fftwf_plan_dft_r2c_3d(P, N, M,
+        V, NULL,
         FFTW_WISDOM_ONLY | FFTW_MEASURE);
   fftwf_destroy_plan(p);
   toc(fftwf_plan_create_and_destroy)
@@ -1341,7 +1345,7 @@ void timings()
   toc(fim_flipall)
 
     // ---
-    tic 
+    tic
     temp = update_alpha(V, A, M*N*P);
   toc(update_alpha)
     V[0]+= temp;
@@ -1374,7 +1378,7 @@ void timings()
   // ---
   tic
     fim_insert(V, M, N, P, A, M-1, N-1, P-1);
-  toc(fim_subregion)      
+  toc(fim_subregion)
 
     tic
     fim_insert_ref(V, M, N, P, A, M-1, N-1, P-1);
@@ -1428,9 +1432,9 @@ float * psf_makeOdd(float * psf, int64_t * pM, int64_t * pN, int64_t *pP)
   float * psf2 = fim_zeros(m*n*p);
   fim_insert(psf2, m, n, p, psf, pM[0], pN[0], pP[0]);
   free(psf);
-  pM[0] = m; 
-  pN[0] = n; 
-  pP[0] = p; 
+  pM[0] = m;
+  pN[0] = n;
+  pP[0] = p;
   return psf2;
 }
 
@@ -1440,7 +1444,7 @@ void dcw_init_log(dw_opts * s)
   s->log = fopen(s->logFile, "w");
   assert(s->log != NULL);
   show_time(s->log);
-  dw_opts_fprint(s->log, s); 
+  dw_opts_fprint(s->log, s);
   dw_fprint_info(s->log, s);
 }
 
@@ -1462,24 +1466,31 @@ int dw_run(dw_opts * s)
 #ifdef _OPENMP
   omp_set_num_threads(s->nThreads);
   omp_set_dynamic(1);
-  //  printf("omp_get_max_threads: %d\n", omp_get_max_threads());
+  if(s->verbosity>3)
+  {
+       printf("omp_get_max_threads: %d\n", omp_get_max_threads());
+  }
+
 #endif
 
-  if(s->verbosity > 1) 
+  if(s->verbosity > 1)
   {
-    dw_opts_fprint(NULL, s); 
+    dw_opts_fprint(NULL, s);
     printf("\n");
   }
 
   s->verbosity > 1 ? dw_fprint_info(NULL, s) : 0;
-
-
 
   int64_t M = 0, N = 0, P = 0;
   if(fim_tiff_get_size(s->imFile, &M, &N, &P))
   {
     printf("Failed to open %s\n", s->imFile);
     return -1;
+  } else {
+      if(s->verbosity > 3)
+      {
+          printf("Got image info from %s\n", s->imFile);
+      }
   }
 
   if(s->verbosity > 0)
@@ -1494,7 +1505,7 @@ int dw_run(dw_opts * s)
   }
 
 
-  float * im = NULL;
+  afloat * im = NULL;
 
   if(tiling == 0)
   {
@@ -1555,7 +1566,7 @@ int dw_run(dw_opts * s)
   // Possibly the PSF will be cropped even more per tile later on
 
   fim_normalize_sum1(psf, pM, pN, pP);
-  psf = psf_autocrop(psf, &pM, &pN, &pP, 
+  psf = psf_autocrop(psf, &pM, &pN, &pP,
       M, N, P, s);
 
   if(s->relax > 0)
@@ -1563,7 +1574,7 @@ int dw_run(dw_opts * s)
     // Note: only works with odd sized PSF
     fprintf(s->log, "Relaxing the PSF by %f\n", s->relax);
     if(s->verbosity > 0)
-    {    
+    {
       printf("Relaxing the PSF\n");
     }
     size_t mid = (pM-1)/2 + (pN-1)/2*pM + (pP-1)/2*pM*pN;
@@ -1602,7 +1613,7 @@ int dw_run(dw_opts * s)
       {
         printf("Nothing to write to disk :(\n");
       }
-    } else 
+    } else
     {
       if(s->verbosity > 0)
       {
@@ -1633,5 +1644,3 @@ int dw_run(dw_opts * s)
 
   return 0;
 }
-
-

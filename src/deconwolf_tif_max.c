@@ -5,7 +5,7 @@
 #include "fim_tiff.h"
 #include "dw_version.h"
 
-void usage(int argc, char ** argv)
+void usage(__attribute__((unused)) int argc, char ** argv)
 {
   printf("Make a maximum intensity projection of uint16_t multi-page tiff file\n");
   printf("Usage: %s input1.tif input2.tif ... \n", argv[0]);
@@ -50,4 +50,3 @@ int main(int argc, char ** argv)
   }
 
 }
-

@@ -489,10 +489,7 @@ class Menu(object):
                         posy = self.position+1
                         posx = len(item[0])+5
                         self.window.addstr(self.position+1, len(item[0])+2, "-> ", curses.A_NORMAL)
-                        while not self.window.getch() in [curses.KEY_ENTER, ord("\n")]:
-                            # just wait
-                            0
-                            cstring = self.window.instr(posy, posx, 10)
+                        cstring = self.window.getstr(posy, posx, 10)
                         try:
                             value = str(float(cstring))
                             self.config[item[2]] = value
