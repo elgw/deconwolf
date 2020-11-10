@@ -1,0 +1,5 @@
+*.tif
+*~
+*.csv
+*.log.txt
+*.o
