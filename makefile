@@ -17,14 +17,12 @@ DEBUG?=0
 ifeq ($(DEBUG),1)
     CFLAGS += -g3 -DDEBUG
 else
-
 #CFLAGS +=  -g -O2 -ftree-vectorize -Wno-unknown-pragmas -flto
-CFLAGS +=  -O3 -fno-tree-vectorize -Wno-unknown-pragmas -flto -DNDEBUG
-
+CFLAGS +=  -O3 -Wno-unknown-pragmas -flto -DNDEBUG
 endif
 
-dw_LIBRARIES = -lm -lfftw3f -lfftw3f_threads -ltiff
-dwtm_LIBRARIES = -lm -ltiff -lfftw3f
+dw_LIBRARIES =  -lm -lfftw3f -lfftw3f_threads -ltiff
+dwtm_LIBRARIES =  -lm -ltiff -lfftw3f
 dwbw_LIBRARIES = -lm -ltiff -lpthread -ltiff -lfftw3f
 
 # on MacOS add -Xpreprocessor
