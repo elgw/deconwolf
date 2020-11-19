@@ -953,7 +953,8 @@ afloat * fim_tiff_read_sub(const char * fName,
 
   if(isFloat && (BPS != 32))
   {
-    printf("For floating point images, only 32-bit samples are supported %u\n", BPS);
+    printf("ERROR: For floating point images, only 32-bit samples are supported (this image has %u bits per sample)\n", BPS);
+    exit(-1);
   }
 
   M0[0] = (size_t) M;

@@ -69,6 +69,7 @@ dw_opts * dw_opts_new(void)
   s->borderQuality = 2;
   s->outFormat = 16; // write 16 bit int
   s->experimental1 = 0;
+  s->fulldump = 0;
   return s;
 }
 
@@ -274,15 +275,19 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     { "onetile",      no_argument,       NULL,   'T' },
     { "bq",           required_argument, NULL,   'B' },
     { "float",        no_argument,       NULL,   'F' },
+    { "fulldump",     no_argument,       NULL,   'D' },
     { "experimental1", no_argument, NULL, 'X' },
     { "iterdump", no_argument, NULL, 'i'},
     { NULL,           0,                 NULL,   0   }
   };
 
   int ch;
-  while((ch = getopt_long(argc, argv, "iFBvho:n:c:p:s:p:TX", longopts, NULL)) != -1)
+  while((ch = getopt_long(argc, argv, "iFBvho:n:c:p:s:p:TXfD", longopts, NULL)) != -1)
   {
     switch(ch) {
+    case 'D':
+        s->fulldump = 1;
+        break;
       case 'F':
         s->outFormat = 32;
         break;
@@ -923,6 +928,13 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
   }
 
   fftwf_free(W); // is P1
+
+  if(s->fulldump)
+  {
+      printf("Dumping to fulldump.tif\n");
+      fim_tiff_write("fulldump.tif", x, wM, wN, wP, stdout);
+  }
+
   afloat * out = fim_subregion(x, wM, wN, wP, M, N, P);
 
 

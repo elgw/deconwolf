@@ -14,6 +14,10 @@
  - [ ] Give some love to deconwolf_batch.py (tiff vs tif, help mapping channels, install systemwide, etc)
  - [ ] Add information on the input image -- especially to detect if some pixels are saturated.
  - [ ] Make sure that something that makes sense happens when a Pyramidal tif is supplied.
+ - [ ] Is there any reason to build fftw3 from source using
+ ``` bash
+ ./configure CFLAGS="-march=native" --enable-float
+ ```
 
 ## Done:
  - [x] Write down the image scaling to the log files.
