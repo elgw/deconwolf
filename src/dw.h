@@ -39,10 +39,10 @@
 
 
 /* fftw3 wisdom data is stored and loaded from
- * $home/.config/ 
+ * $home/.config/
  *
- * Internally column major indexing is used, i.e., the distance 
- * between elements is 1 for the first dimension and increases with 
+ * Internally column major indexing is used, i.e., the distance
+ * between elements is 1 for the first dimension and increases with
  * each new dimension.
  */
 
@@ -66,7 +66,7 @@ typedef struct{
   int verbosity;
   fftwf_plan fft_plan;
   fftwf_plan ifft_plan;
-  int iterdump; // Dump each iteration to file ... 
+  int iterdump; // Dump each iteration to file ...
   float relax;
   float xycropfactor; // discard outer slices that are less than this of the central one
   char * commandline;
@@ -75,6 +75,7 @@ typedef struct{
 
   int onetile; // For debugging -- only process the first tile if set
   int experimental1;
+  int fulldump; // write also what is outside of the image
 } dw_opts;
 
 dw_opts * dw_opts_new(void);

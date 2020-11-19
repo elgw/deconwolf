@@ -26,7 +26,8 @@
 #include <sys/types.h>
 #include "fim.h"
 
-typedef float afloat __attribute__ ((__aligned__(16)));
+//typedef float afloat __attribute__ ((__aligned__(16)));
+typedef float afloat;
 
 
 #define tictoc struct timespec tictoc_start, tictoc_end;
