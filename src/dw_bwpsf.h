@@ -29,10 +29,13 @@ typedef struct {
   float lambda; // Emission maxima
   float NA; // Numerical aperture of lens
   float ni;
-  float TOL;
-  size_t K; // Number of iterations
-  float resLateral;
-  float resAxial;
+
+    // Settings for 'calculate'
+  size_t K; // stop at this number of successful iterations
+    float TOL; // Defines a successful iteration
+
+    float resLateral; // pixel size in x and y
+    float resAxial; // pixel size in z
   int Simpson; // Use this number of points for Simpson integration
   int fast_li; // Use Li's method for the integral
   int oversampling_R; // Oversampling in radial direction

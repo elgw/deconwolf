@@ -137,7 +137,6 @@ void usage(__attribute__((unused)) int argc, char ** argv)
 
 void bw_argparsing(int argc, char ** argv, bw_conf * s)
 {
-
     if(argc < 2)
     {
         // Well it could run with the defaults but that does not make sense
@@ -147,23 +146,24 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
 
     getCmdLine(argc, argv, s);
 
-    struct option longopts[] = {
-                                { "version",     no_argument,       NULL,   'v' },
-                                { "help",         no_argument,       NULL,   'h' },
-                                // Settings
-                                { "lambda", required_argument, NULL, 'l'},
-                                { "threads",      required_argument, NULL,   't' },
-                                { "verbose",      required_argument, NULL,   'p' },
-                                { "overwrite",   no_argument,        NULL,   'w' },
-                                { "NA", required_argument, NULL, 'n' },
-                                { "ni", required_argument, NULL, 'i' },
-                                { "resxy", required_argument, NULL, 'x'},
-                                { "resz", required_argument, NULL, 'z'},
-                                { "size", required_argument, NULL, 'N'},
-                                { "quality", required_argument, NULL, 'q'},
-                                { "fast", no_argument, NULL, 'f'},
-                                { NULL,           0,                 NULL,   0   }
-    };
+    struct option longopts[] =
+        {
+         { "version",      no_argument,       NULL, 'v'},
+         { "help",         no_argument,       NULL, 'h'},
+         // Settings
+         { "lambda",       required_argument, NULL, 'l'},
+         { "threads",      required_argument, NULL, 't'},
+         { "verbose",      required_argument, NULL, 'p'},
+         { "overwrite",    no_argument,       NULL, 'w'},
+         { "NA",           required_argument, NULL, 'n'},
+         { "ni",           required_argument, NULL, 'i'},
+         { "resxy",        required_argument, NULL, 'x'},
+         { "resz",         required_argument, NULL, 'z'},
+         { "size",         required_argument, NULL, 'N'},
+         { "quality",      required_argument, NULL, 'q'},
+         { "fast",         no_argument,       NULL, 'f'},
+         { NULL,           0,                 NULL,  0 }
+        };
     int ch;
     while((ch = getopt_long(argc, argv, "fq:vho:t:p:w:n:i:x:z:N:l:", longopts, NULL)) != -1)
     {
@@ -256,6 +256,7 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
 
     s->logFile = malloc(strlen(s->outFile) + 10);
     sprintf(s->logFile, "%s.log.txt", s->outFile);
+    return;
 }
 
 void * BW_thread(void * data)
@@ -333,14 +334,11 @@ void BW(bw_conf * conf)
 }
 
 
-float complex integrand(float rho, float r, float defocus, bw_conf * conf) {
+float complex integrand(float rho, float r, float z, bw_conf * conf) {
 
     // 'rho' is the integration parameter.
     // 'r' is the radial distance of the detector relative to the optical
     // axis.
-    // NA is assumed to be less than 1.0, i.e. it assumed to be already
-    // normalized by the refractive index of the immersion layer, ni.
-    // The return value is a complex number.
 
     assert(rho<=1); assert(rho>=0);
 
@@ -349,36 +347,26 @@ float complex integrand(float rho, float r, float defocus, bw_conf * conf) {
     // j0f is much faster
 
     float BesselValue = j0f(k0 * conf->NA * r * rho);
-
     // Optical path difference
-    float OPD = pow(conf->NA,2) * defocus * pow(rho,2) / (2.0 * conf->ni);
+    float OPD = pow(conf->NA,2) * z * pow(rho,2) / (2.0 * conf->ni);
     // Phase aberrations.
     float W = k0 * OPD;
-
     float complex y = BesselValue*cos(W)*rho - I*BesselValue*sin(W)*rho;
     return y;
 }
 
 
-
-// Simpson approximation for the Kirchhoff diffraction integral
-// 'r' is the radial distance of the detector relative to the optical axis.
 float calculate(float r, float defocus, bw_conf * conf) {
-    // is the stopping criterion really good?
-    // why del^2 -- isn't it a 1D integral?
-    // Better set a tolerance relative to the wanted precision (never more than 32-bit)
-    // doubling the number of points 9 times!!
+    // Simpson approximation for the Kirchhoff diffraction integral
 
     float curDifference = conf->TOL; // Stopping criterion
 
     complex float value = 0;
-
     float curI = 0.0, prevI = 0.0;
 
     // Initialization of the Simpson sum (first iteration)
     int64_t N = 2; // number of sub-intervals
     double del = 1.0/N; // sub-interval length
-
 
     // Initial 3-point estimation
     complex float sumOddIndex = integrand(0.5, r, defocus, conf);
@@ -387,16 +375,13 @@ float calculate(float r, float defocus, bw_conf * conf) {
     complex float valueXn = integrand(1.0, r, defocus, conf);
     float complex sum = valueX0 + 2*sumEvenIndex + 4*sumOddIndex + valueXn;
     curI = (pow(creal(sum),2) + pow(cimag(sum), 2)) * pow(del,2);
-
     prevI = curI;
 
-    // Increase the number of points until desired precision
-
+    // (almost) double the number of points until desired precision
     size_t k = 0; // number of consecutive successful approximations
     size_t iteration = 1;
     size_t max_iterations = 16;
     while (k < conf->K && iteration <= max_iterations) {
-        //    printf("%zu\n", iteration); fflush(stdout);
         iteration++;
         N *= 2;
         del /= 2;
@@ -427,18 +412,17 @@ float calculate(float r, float defocus, bw_conf * conf) {
             k = 0;
         }
 
+        // This gives a quick finish for close-to-zero pixels
+        // the relative error is not that interesting for those
         if(fabs(curI-prevI) < 1e-12)
-        {
-            // This gives a quick finish for close-to-zero pixels
-            //   printf("Absolute error break\n");
-            //   printf("Iteration: %zu, curDifference: %e, curI: %e\n", iteration, curDifference, curI);
-            break;
-        }
+        { break; }
+
         prevI = curI;
     }
 
     return curI/9;
 }
+
 
 double simp1_weight(size_t k, size_t N)
 {
@@ -453,6 +437,7 @@ double simp1_weight(size_t k, size_t N)
         return 2;
     return 4;
 }
+
 
 double simp2(int OVER_SAMPLING, double xc, double yc, double * H, double * R, double x0, double x1, double y0, double y1, int N)
 {
@@ -481,17 +466,15 @@ double simp2(int OVER_SAMPLING, double xc, double yc, double * H, double * R, do
     return v;
 }
 
+
 void BW_slice(float * V, float z, bw_conf * conf)
 {
     // Calculate the PSF for a single plane/slice
-    // Todo: incorporate the integration element, dx*dy*dz
-    // So that actual values are comparable
 
     // V is a pointer to the _slice_ not the whole volume
     // The center of the image in units of [pixels]
     double x0 = (conf->M - 1) / 2.0;
     double y0 = (conf->N - 1) / 2.0;
-
 
     int maxRadius = (int) round(sqrt(pow(conf->M - x0, 2) + pow(conf->N - y0, 2))) + 1;
     int OVER_SAMPLING = 10;
@@ -505,7 +488,7 @@ void BW_slice(float * V, float z, bw_conf * conf)
 
     for(size_t n = 0; n < nr; n++)
     {
-      r[n] = ((double) n) / ((double) OVER_SAMPLING);
+        r[n] = ((double) n) / ((double) OVER_SAMPLING);
     }
 
     if(conf->Simpson == 0)
@@ -518,7 +501,7 @@ void BW_slice(float * V, float z, bw_conf * conf)
     if(conf->Simpson > 0 && conf->fast_li == 0)
     {
         int NS = conf->Simpson;
-    for (size_t n = 0; n < nr; n++) {
+        for (size_t n = 0; n < nr; n++) {
             h[n] = 0;
             double last = calculate(r[n] * conf->resLateral, z, conf);
             double now = last;
@@ -556,7 +539,6 @@ void BW_slice(float * V, float z, bw_conf * conf)
             L->ni = conf->ni;
             for(size_t n = 0; n < nr; n++) // over r
             {
-                //printf("lambda = %e, r = %e\n", L->lambda, r[n]*conf->resLateral*1e9);
                 h[n] += w*li_calc(L, r[n]*conf->resLateral*1e9);
             }
             li_free(&L);
@@ -569,15 +551,15 @@ void BW_slice(float * V, float z, bw_conf * conf)
     }
 
     if(0){
-    for(size_t kk = 0; kk < nr; kk++)
-    {
-        printf("%f ", h[kk]);
-    }
-    printf("\n");
-    exit(1);
+        for(size_t kk = 0; kk < nr; kk++)
+        {
+            printf("%f ", h[kk]);
+        }
+        printf("\n");
+        exit(1);
     }
     assert(r[0] == 0);
-    //exit(1);
+
     for (int x = 0; 2*x <= conf->M; x++) {
         for (int y = 0; 2*y <= conf->N; y++) {
             double v = 0;
@@ -597,7 +579,7 @@ void BW_slice(float * V, float z, bw_conf * conf)
             }
 
 
-            // Use symmetry to fill the output image
+            // Use symmetry to fill the output image plane
             int xf = conf->M-x-1;
             int yf = conf->N-y-1;
 
@@ -609,8 +591,6 @@ void BW_slice(float * V, float z, bw_conf * conf)
             //      V[y + conf->M * xf] = v;
             V[xf + conf->M * yf] = v;
             V[yf + conf->M * xf] = v;
-
-
         }
     }
     free(r);
@@ -626,7 +606,6 @@ int main(int argc, char ** argv)
     // Use defaults
     bw_conf * conf = bw_conf_new();
     bw_argparsing(argc, argv, conf);
-
 
     if( conf->overwrite == 0 && file_exist(conf->outFile))
     {
@@ -647,13 +626,6 @@ int main(int argc, char ** argv)
     fprint_time(conf->log);
     bw_conf_printf(conf->log, conf);
 
-    if(0){
-        printf("i(rho=.5, r=0, z=0) = %f + %fi\n", creal(integrand(.5, 0, 0, conf)), cimag(integrand(0,0,0,conf)));
-        printf("I(r = 0, z = 0) = %f\n", calculate(0,0, conf));
-        printf("I(r = 300, z = 0) = %f\n", calculate(300*1e-9,0, conf));
-        printf("I(r = 600, z = 0) = %f\n", calculate(600*1e-9,0, conf));
-        exit(1);
-    }
     // Run
     BW(conf);
 
@@ -667,7 +639,6 @@ int main(int argc, char ** argv)
     fprint_time(conf->log);
     clock_gettime(CLOCK_REALTIME, &tend);
     fprintf(conf->log, "Took: %f s\n", timespec_diff(&tend, &tstart));
-
     fprintf(conf->log, "done!\n");
 
     // Clean up
@@ -677,7 +648,6 @@ int main(int argc, char ** argv)
     free(conf->logFile);
     free(conf->cmd);
     free(conf);
-
 
     return 0;
 }
