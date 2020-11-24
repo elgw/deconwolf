@@ -1,4 +1,5 @@
 #include "dw_bwpsf.h"
+#include "li.c"
 
 pthread_mutex_t stdout_mutex;
 
@@ -20,7 +21,7 @@ void bw_conf_printf(FILE * out, bw_conf * conf)
     if(conf->Simpson)
     {
         fprintf(out, "Pixel integration: %dx%dx%d samples per pixel\n", conf->Simpson_N, conf->Simpson_N, conf->Simpson_N);
-        fprintf(out, "Oversampling of radial profile: %d X\n", conf->Simpson_N);
+        fprintf(out, "Oversampling of radial profile: %d X\n", conf->oversampling_R);
     }
 }
 
@@ -45,8 +46,9 @@ bw_conf * bw_conf_new()
     conf->outFile = NULL;
     conf->logFile = NULL;
     conf->overwrite = 0;
-    conf->Simpson = 1;
+    conf->Simpson = 2;
     conf->Simpson_N = 5;
+    conf->oversampling_R = 10;
     return conf;
 }
 
@@ -430,7 +432,7 @@ double simp1_weight(size_t k, size_t N)
 
 double simp2(int OVER_SAMPLING, double xc, double yc, double * H, double * R, double x0, double x1, double y0, double y1, int N)
 {
-    // TODO: Also use oversampling here
+
     double dx = (x1-x0)/(double) N;
     double dy = (y1-y0)/(double) N;
     double v = 0;
@@ -468,58 +470,94 @@ void BW_slice(float * V, float z, bw_conf * conf)
 
 
     int maxRadius = (int) round(sqrt(pow(conf->M - x0, 2) + pow(conf->N - y0, 2))) + 1;
-    int OVER_SAMPLING = 1; // FIX ISSUES BEFORE CHANGING
-    if(conf->Simpson)
-    {
-        OVER_SAMPLING = conf->Simpson_N;
-    }
+    int OVER_SAMPLING = 10;
 
-    size_t nr = maxRadius*OVER_SAMPLING;
+    size_t nr = maxRadius*conf->oversampling_R;
     double * r = malloc(nr * sizeof(double));
     double * h = malloc(nr * sizeof(double));
 
-    /* Dynamic number of points when integrating over Z */
+    /* Calculate the radial profile
+       possibly by integrating over Z */
+
+    for(size_t n = 0; n < nr; n++)
+    {
+      r[n] = ((double) n) / ((double) OVER_SAMPLING);
+    }
+
+    if(conf->Simpson == 0)
+    {
+        for (size_t n = 0; n < nr; n++) {
+            h[n] = calculate(r[n] * conf->resLateral, z, conf);
+        }
+    }
+
+    if(conf->Simpson == 1)
+    {
+        int NS = conf->Simpson_N;
     for (size_t n = 0; n < nr; n++) {
-        r[n] = ((double) n) / ((double) OVER_SAMPLING);
-        if(conf->Simpson)
-        {
             h[n] = 0;
             double last = calculate(r[n] * conf->resLateral, z, conf);
             double now = last;
-            int NS = 1;
-            //        do{
+
             last = now;
-            //NS = NS+2;
-            NS = 9;
             now = 0;
             double dz = (conf->resAxial)/(NS-1);
             size_t sW = 0;
             for(int kk = 0; kk < NS; kk++)
             {
-
                 double zs = z + kk*dz -(NS-1)/2*dz;
-                //printf("kk = %d, sz = %e\n", kk, zs);
                 double w = simp1_weight(kk, NS);
                 sW += w;
                 now += w*calculate(r[n] * conf->resLateral, zs, conf);
             }
             now = now/sW;
-
-            //} while (fabs((last-now)/now) > 1e-6 && NS < 10);
             h[n] = now;
-            assert(NS<23); // Would be very strange if more points were needed
-        } else {
-            h[n] = calculate(r[n] * conf->resLateral, z, conf);
         }
-        //    printf("r[%d=%e] = %e, h[%d] = %e\n", n, r[n]*conf->resLateral, r[n], n, h[n]);
     }
 
+    if(conf->Simpson == 2) // Using Li
+    {
+        int NS = conf->Simpson_N;
+        memset(h, 0, nr*sizeof(double));
+        double dz = (conf->resAxial)/(NS-1);
+
+        for(int kk = 0; kk < NS; kk++) // Over z
+        {
+            double zs = z + kk*dz - (NS-1)/2*dz;
+            double w = simp1_weight(kk, NS);
+
+            li_conf * L = li_new(zs*1e9);
+            L->lambda = conf->lambda*1e9;
+            L->NA = conf->NA;
+            L->ni = conf->ni;
+            for(size_t n = 0; n < nr; n++) // over r
+            {
+                //printf("lambda = %e, r = %e\n", L->lambda, r[n]*conf->resLateral*1e9);
+                h[n] += w*li_calc(L, r[n]*conf->resLateral*1e9)/(double) NS;
+            }
+            li_free(&L);
+        }
+        double wtot = 0;
+        for(int kk = 0; kk < NS; kk++)
+            wtot += simp1_weight(kk, NS);
+        for(size_t n = 0; n < nr; n++)
+            h[n]/=wtot;
+    }
+
+    if(0){
+    for(size_t kk = 0; kk < nr; kk++)
+    {
+        printf("%f ", h[kk]);
+    }
+    printf("\n");
+    exit(1);
+    }
     assert(r[0] == 0);
     //exit(1);
     for (int x = 0; 2*x <= conf->M; x++) {
         for (int y = 0; 2*y <= conf->N; y++) {
             double v = 0;
-            if(conf->Simpson)
+            if(conf->Simpson > 0)
             {
                 v = simp2(OVER_SAMPLING, x0, y0, h, r, x - 0.5, x + 0.5, y - 0.5, y + 0.5, conf->Simpson_N);
             }

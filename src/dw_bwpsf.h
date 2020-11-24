@@ -35,6 +35,7 @@ typedef struct {
   float resAxial;
   int Simpson; // Use Simpson integration
   int Simpson_N; // Division
+    int oversampling_R; // Oversampling in radial direction
 
   float * V;
   // shape of output image

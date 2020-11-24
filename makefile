@@ -23,7 +23,7 @@ endif
 
 dw_LIBRARIES =  -lm -lfftw3f -lfftw3f_threads -ltiff
 dwtm_LIBRARIES =  -lm -ltiff -lfftw3f
-dwbw_LIBRARIES = -lm -ltiff -lpthread -ltiff -lfftw3f
+dwbw_LIBRARIES = -lm -ltiff -lpthread -ltiff -lfftw3f -lgsl
 
 # on MacOS add -Xpreprocessor
 UNAME_S := $(shell uname -s)
