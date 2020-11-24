@@ -18,10 +18,17 @@ void bw_conf_printf(FILE * out, bw_conf * conf)
     fprintf(out, "Overwrite: %d\n", conf->overwrite);
     fprintf(out, "File: %s\n", conf->outFile);
     fprintf(out, "Log: %s\n", conf->logFile);
-    if(conf->Simpson)
+    if(conf->Simpson > 0)
     {
-        fprintf(out, "Pixel integration: %dx%dx%d samples per pixel\n", conf->Simpson_N, conf->Simpson_N, conf->Simpson_N);
-        fprintf(out, "Oversampling of radial profile: %d X\n", conf->oversampling_R);
+        fprintf(out, "Pixel integration: %dx%dx%d samples per pixel\n",
+                conf->Simpson, conf->Simpson, conf->Simpson);
+    }
+    fprintf(out, "Oversampling of radial profile: %d X\n", conf->oversampling_R);
+    if(conf->fast_li)
+    {
+        fprintf(out, "Li's fast method: enabled\n");
+    } else {
+        fprintf(out, "Li's fast method: disabled\n");
     }
 }
 
@@ -46,9 +53,9 @@ bw_conf * bw_conf_new()
     conf->outFile = NULL;
     conf->logFile = NULL;
     conf->overwrite = 0;
-    conf->Simpson = 2;
-    conf->Simpson_N = 5;
+    conf->Simpson = 5;
     conf->oversampling_R = 10;
+    conf->fast_li = 0;
     return conf;
 }
 
@@ -107,18 +114,23 @@ void usage(__attribute__((unused)) int argc, char ** argv)
     printf("\t$ %s <options> psf.tif \n", argv[0]);
     printf("\n");
     printf(" Options:\n");
-    printf(" --version\n\t Show version info\n");
-    printf(" --help\n\t Show this message\n");
-    printf(" --verbose L\n\t Set verbosity level to L\n");
-    printf(" --NA\n\t Set numerical aperture\n");
-    printf(" --lamda\n\t Set emission wavelength [nm]\n");
-    printf(" --ni\n\t Set refractive index\n");
-    printf(" --threads\n\t Set number of threads\n");
-    printf(" --resxy\n\t Set pixel size in x-y [nm]\n");
-    printf(" --resz\n\t Set pixel size in z [nm]\n");
-    printf(" --size N \n\t Set output size to N x N x N [pixels]\n");
-    printf(" --overwrite \n\t Toggles overwriting of existing files to YES\n");
-    printf(" --quality N\n\t Sets the integration quality to NxNxN samples per pixel\n");
+    printf(" --version\n\t Show version info and quit.\n");
+    printf(" --help\n\t Show this message.\n");
+    printf(" --verbose L\n\t Set verbosity level to L.\n");
+    printf(" --NA\n\t Set numerical aperture.\n");
+    printf(" --lamda\n\t Set emission wavelength [nm].\n");
+    printf(" --ni\n\t Set refractive index.\n");
+    printf(" --threads\n\t Set number of threads.\n");
+    printf(" --resxy\n\t Set pixel size in x-y [nm].\n");
+    printf(" --resz\n\t Set pixel size in z [nm].\n");
+    printf(" --size N \n\t Set output size to N x N x N [pixels].\n");
+    printf("\t N has to be an odd number.\n");
+    printf(" --quality N\n\t Sets the integration quality to NxNxN samples per pixel.\n");
+    printf("\t N has to be an odd number.\n");
+    printf(" --fast\n\t Enable Li's fast method for the BW integral.\n");
+    printf("\t About 14x faster for the default PSF size. Not thoroughly tested.\n");
+    printf("\t Possibly unstable for large values of z.\n");
+    printf(" --overwrite \n\t Overwrite the target image if it exists.\n");
     printf("\b");
     return;
 }
@@ -149,18 +161,18 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
                                 { "resz", required_argument, NULL, 'z'},
                                 { "size", required_argument, NULL, 'N'},
                                 { "quality", required_argument, NULL, 'q'},
+                                { "fast", no_argument, NULL, 'f'},
                                 { NULL,           0,                 NULL,   0   }
     };
     int ch;
-    while((ch = getopt_long(argc, argv, "q:vho:t:p:w:n:i:x:z:N:l:", longopts, NULL)) != -1)
+    while((ch = getopt_long(argc, argv, "fq:vho:t:p:w:n:i:x:z:N:l:", longopts, NULL)) != -1)
     {
         switch(ch) {
+        case 'f':
+            s->fast_li = 1;
+            break;
         case 'q':
-            s->Simpson_N = atoi(optarg);
-            if(s->Simpson_N == 0)
-            {
-                s->Simpson = 0;
-            }
+            s->Simpson = atoi(optarg);
             break;
         case 'v':
             bw_version(stdout);
@@ -208,6 +220,18 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
     if(s->lambda < 50*1e-9)
     {
         printf("Error: lambda has be be at least 50 nm\n");
+        exit(-1);
+    }
+
+    if(s->lambda > 10000*1e9)
+    {
+        printf("Error lambda can be at most 1000 nm\n");
+        exit(-1);
+    }
+
+    if(s->Simpson % 2 == 0)
+    {
+        printf("Error: The number of integration points (per dimension) has to be odd\n");
         exit(-1);
     }
 
@@ -491,9 +515,9 @@ void BW_slice(float * V, float z, bw_conf * conf)
         }
     }
 
-    if(conf->Simpson == 1)
+    if(conf->Simpson > 0 && conf->fast_li == 0)
     {
-        int NS = conf->Simpson_N;
+        int NS = conf->Simpson;
     for (size_t n = 0; n < nr; n++) {
             h[n] = 0;
             double last = calculate(r[n] * conf->resLateral, z, conf);
@@ -515,9 +539,9 @@ void BW_slice(float * V, float z, bw_conf * conf)
         }
     }
 
-    if(conf->Simpson == 2) // Using Li
+    if(conf->Simpson > 0 && conf->fast_li == 1) // Using Li
     {
-        int NS = conf->Simpson_N;
+        int NS = conf->Simpson;
         memset(h, 0, nr*sizeof(double));
         double dz = (conf->resAxial)/(NS-1);
 
@@ -533,7 +557,7 @@ void BW_slice(float * V, float z, bw_conf * conf)
             for(size_t n = 0; n < nr; n++) // over r
             {
                 //printf("lambda = %e, r = %e\n", L->lambda, r[n]*conf->resLateral*1e9);
-                h[n] += w*li_calc(L, r[n]*conf->resLateral*1e9)/(double) NS;
+                h[n] += w*li_calc(L, r[n]*conf->resLateral*1e9);
             }
             li_free(&L);
         }
@@ -559,7 +583,7 @@ void BW_slice(float * V, float z, bw_conf * conf)
             double v = 0;
             if(conf->Simpson > 0)
             {
-                v = simp2(OVER_SAMPLING, x0, y0, h, r, x - 0.5, x + 0.5, y - 0.5, y + 0.5, conf->Simpson_N);
+                v = simp2(OVER_SAMPLING, x0, y0, h, r, x - 0.5, x + 0.5, y - 0.5, y + 0.5, conf->Simpson);
             }
             else
             {

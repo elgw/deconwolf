@@ -33,9 +33,9 @@ typedef struct {
   size_t K; // Number of iterations
   float resLateral;
   float resAxial;
-  int Simpson; // Use Simpson integration
-  int Simpson_N; // Division
-    int oversampling_R; // Oversampling in radial direction
+  int Simpson; // Use this number of points for Simpson integration
+  int fast_li; // Use Li's method for the integral
+  int oversampling_R; // Oversampling in radial direction
 
   float * V;
   // shape of output image
