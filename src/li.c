@@ -21,12 +21,19 @@
  * The method is less accurate than computing the integral using standard
  * numerical integration but should be good enough in most cases.
  *
+ * It seems like the method is less accurate for large values of z.
+ *
  * For usage, see the main function in this file.
  *
  * 1] Jizhou Li, Feng Xue, and Thierry Blu, "Fast and accurate three-dimensional
  * point spread function computation for fluorescence microscopy,"
  * J. Opt. Soc. Am. A 34, 1029-1034 (2017)
  * https://doi.org/10.1364/JOSAA.34.001029
+ *
+ * TODO:
+ * - Add an option to check the reconstruction error in debug mode.
+ * - Consider j0f and j1f (the single precision counterparts to j0 and j1)
+ *   for some extra speed.
  */
 
 #include <stdlib.h>
@@ -192,6 +199,7 @@ double li_calc(li_conf * L, const double r)
 #ifdef LI_TEST
 int main(int argc, char ** argv)
 {
+    // Here is an example of how to use this "class"
 
     /* Create a new configuration, L, use defaults
        and initialize it for z = 0 nm. */
