@@ -69,8 +69,15 @@ li_conf * li_new(double z)
 {
     li_conf * L = malloc(sizeof(li_conf));
     L->lambda = 436;
-    L->N = 150; // 100 in the original paper
+    // L->N = 100; // 100 in the original paper
+
+    L->N = 100 + floor(fabs(z)/135000.0*400); // Dynamic
+    //printf("z=%f, fabs(z)=%f, N=%d\n", z, fabs(z), L->N);
     L->M = 1000;
+    if(L->M < L->N)
+    { // Ensure that the equation system can be solved
+        L->M = L->N;
+    }
     L->z = z;
     L->new = 1;
     L->NA = 1.45;
@@ -103,6 +110,7 @@ li_conf * li_free(li_conf ** LP)
 
 double li_calc(li_conf * L, const double r)
 {
+
     const double alpha = 2*M_PI/L->lambda*L->NA*r;
     const double beta = 2*M_PI/L->lambda*pow(L->NA,2)/(2*L->ni)*L->z;
 

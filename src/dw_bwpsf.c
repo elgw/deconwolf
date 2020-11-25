@@ -59,7 +59,7 @@ bw_conf * bw_conf_new()
     conf->K = 9; // corresponding to "best" in PSFGenerator
     conf->M = 181;
     conf->N = 181;
-    conf->P = 181;
+    conf->P = 181; // Does only need to be 2*size(I,3)+1
     conf->resAxial = 300*1e-9;
     conf->resLateral = 130*1e-9;
     conf->nThreads = 4;
@@ -139,7 +139,8 @@ void usage(__attribute__((unused)) int argc, char ** argv)
     printf(" --threads\n\t Set number of threads.\n");
     printf(" --resxy\n\t Set pixel size in x-y [nm].\n");
     printf(" --resz\n\t Set pixel size in z [nm].\n");
-    printf(" --size N \n\t Set output size to N x N x N [pixels].\n");
+    printf(" --size N \n\t Set output size to N x N x P [pixels].\n");
+    printf(" --nslice P\n\t Set output size to N x N x P [pixels].\n");
     printf("\t N has to be an odd number.\n");
     printf(" --quality N\n\t Sets the integration quality to NxNxN samples per pixel.\n");
     printf("\t N has to be an odd number.\n");
@@ -176,12 +177,14 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
          { "resxy",        required_argument, NULL, 'x'},
          { "resz",         required_argument, NULL, 'z'},
          { "size",         required_argument, NULL, 'N'},
+         { "nslice",       required_argument, NULL, 'P'},
          { "quality",      required_argument, NULL, 'q'},
          { "fast",         no_argument,       NULL, 'f'},
          { NULL,           0,                 NULL,  0 }
         };
+    int Pset = 0;
     int ch;
-    while((ch = getopt_long(argc, argv, "fq:vho:t:p:w:n:i:x:z:N:l:", longopts, NULL)) != -1)
+    while((ch = getopt_long(argc, argv, "fq:vho:t:p:w:n:i:x:z:N:P:l:", longopts, NULL)) != -1)
     {
         switch(ch) {
         case 'f':
@@ -228,7 +231,10 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
         case 'N':
             s->M = atoi(optarg);
             s->N = s->M;
-            s->P = s->M;
+            break;
+        case 'P':
+            s->P = atoi(optarg);
+            Pset = 1;
             break;
         }
     }
@@ -253,12 +259,33 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
 
     if(s->M % 2 == 0)
     {
-        printf("Error: The size has to be odd, 1, 3, ...\n");
-        exit(-1);
+        printf("Warning: The size has to be odd, 1, 3, ...\n");
+        printf("Changing from %d to %d.\n", s->M, s->M+1);
+        s->M++;
+        s->N++;
+    }
+
+    if(s->P % 2 == 0)
+    {
+        printf("Warning: The number of slices has to be odd, 1, 3, ...\n");
+        printf("          Changing from %d to %d.\n", s->P, s->P+1);
+        s->P++;
+    }
+
+    if(Pset == 0)
+    {
+        // Assume that samples are imaged with about the same thickness
+        // regardless of resolution
+        int nslice = floor(200.0 * 130.0/(s->resAxial*1e9)/2.0);
+        s->P = nslice*2+3;
+
+        printf("Setting the number of slices to %d, based on the pixel size.\n", s->P);
+        printf("     Please adjust manually with the --nslice P argument.\n");
     }
 
     if(optind + 1 == argc)
     {
+        printf("---> %s\n", argv[argc-1]); fflush(stdout);
         s->outFile = malloc(strlen(argv[argc-1]) + 1);
         sprintf(s->outFile, "%s", argv[argc-1]);
     }
@@ -269,6 +296,8 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
         sprintf(s->outFile, "PSFBW_%.2f_%.2f_%.1f_%.1f_%.1f.tif",
                 s->NA, s->ni, s->lambda*1e9, s->resLateral*1e9, s->resAxial*1e9);
     }
+
+
 
     s->logFile = malloc(strlen(s->outFile) + 10);
     sprintf(s->logFile, "%s.log.txt", s->outFile);
