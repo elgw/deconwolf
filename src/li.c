@@ -69,8 +69,8 @@ li_conf * li_new(double z)
 {
     li_conf * L = malloc(sizeof(li_conf));
     L->lambda = 436;
-    L->N = 150;
-    L->M = 2500;
+    L->N = 150; // 100 in the original paper
+    L->M = 1000;
     L->z = z;
     L->new = 1;
     L->NA = 1.45;
@@ -115,7 +115,8 @@ double li_calc(li_conf * L, const double r)
 
         for(int kk = 0; kk < L->N; kk++)
         {
-            Z->data[kk] = L->NA*(3.0*kk-2.0)*436.0/L->lambda;
+            // The scaling 0.9 is not in the original paper.
+            Z->data[kk] = 0.9*L->NA*(3.0*kk-2.0)*436.0/L->lambda;
             // Z->data[kk] = Z->data[kk-1] + M_PI/2;
             L->Z[kk] = Z->data[kk];
         }

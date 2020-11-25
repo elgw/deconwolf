@@ -71,7 +71,7 @@ bw_conf * bw_conf_new()
     conf->overwrite = 0;
     conf->Simpson = 5;
     conf->oversampling_R = 10;
-    conf->fast_li = 0;
+    conf->fast_li = 1;
     return conf;
 }
 
@@ -143,7 +143,7 @@ void usage(__attribute__((unused)) int argc, char ** argv)
     printf("\t N has to be an odd number.\n");
     printf(" --quality N\n\t Sets the integration quality to NxNxN samples per pixel.\n");
     printf("\t N has to be an odd number.\n");
-    printf(" --fast\n\t Enable Li's fast method for the BW integral.\n");
+    printf(" --no-fast\n\t Disable Li's fast method for the BW integral.\n");
     printf("\t About 14x faster for the default PSF size. Not thoroughly tested.\n");
     printf("\t Possibly unstable for large values of z.\n");
     printf(" --overwrite \n\t Overwrite the target image if it exists.\n");
@@ -185,7 +185,7 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
     {
         switch(ch) {
         case 'f':
-            s->fast_li = 1;
+            s->fast_li = 0;
             break;
         case 'q':
             s->Simpson = atoi(optarg);
