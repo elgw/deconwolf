@@ -40,6 +40,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <assert.h>
+#include <string.h>
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_permutation.h>
 #include <gsl/gsl_linalg.h>
@@ -68,20 +69,18 @@ typedef struct
 li_conf * li_new(double z)
 {
     li_conf * L = malloc(sizeof(li_conf));
-    L->lambda = 436;
-    // L->N = 100; // 100 in the original paper
 
-    L->N = 100 + floor(fabs(z)/135000.0*400); // Dynamic
-    //printf("z=%f, fabs(z)=%f, N=%d\n", z, fabs(z), L->N);
-    L->M = 1000;
-    if(L->M < L->N)
-    { // Ensure that the equation system can be solved
-        L->M = L->N;
-    }
+    // These can be changed by the user
     L->z = z;
-    L->new = 1;
+    L->lambda = 436;
     L->NA = 1.45;
     L->ni = 1.512;
+
+    // Values below should not be set/changed by the user
+    // L->N = 100; // 100 in the original paper
+    L->N = 0; // Dynamic -- this is set at the first call
+    L->M = 1000;
+
     L->new = 1;
     L->Z = NULL;
     L->j0Z = NULL;
@@ -116,18 +115,48 @@ double li_calc(li_conf * L, const double r)
 
     if(L->new == 1)
     {
+
+        L->N = 6+ceil(fabs(beta));
+
+        if(L->M < L->N)
+        { // Ensure that the equation system can be solved
+            L->M = L->N;
+        }
+
         gsl_vector * Z = gsl_vector_calloc(L->N);
         L->Z = malloc(L->N*sizeof(double));
         gsl_vector * Freal = gsl_vector_calloc(L->M);
         gsl_vector * Fimag = gsl_vector_calloc(L->M);
 
-        for(int kk = 0; kk < L->N; kk++)
+        //
+        // Set the scaling coefficients (\sigma)
+        //
+
+
+        /* This is the version from the paper
+           for(int kk = 0; kk < L->N; kk++)
+           {
+           double skk = L->NA*(3.0*kk-2.0)*436.0/L->lambda;
+           Z->data[kk] = skk;
+           }
+        */
+
+        double s0 = 0.6;
+        Z->data[0] = s0;
+        double sd = 0.8;
+        double sdd = 0.05;
+        for(int kk = 1; kk< L->N; kk++)
         {
-            // The scaling 0.9 is not in the original paper.
-            Z->data[kk] = 0.9*L->NA*(3.0*kk-2.0)*436.0/L->lambda;
-            // Z->data[kk] = Z->data[kk-1] + M_PI/2;
-            L->Z[kk] = Z->data[kk];
+            double skk = Z->data[kk-1];
+            skk += fmin(M_PI, sd+sdd*(kk-1));
+            Z->data[kk] = skk;
         }
+
+        memcpy(L->Z, Z->data, L->N*sizeof(double));
+
+        //
+        // Sample the function to expand as a series
+        //
 
         double delta = 1.0/(L->M-1.0);
         for(int kk = 0; kk < L->M; kk++)
@@ -139,6 +168,10 @@ double li_calc(li_conf * L, const double r)
 
         gsl_matrix * B = gsl_matrix_calloc(L->M, L->N);
 
+        //
+        // Sample the Bessel functions
+        //
+
         for(int cc = 0; cc<L->M; cc++)
         {
             for(int rr = 0; rr<L->N; rr++)
@@ -146,6 +179,10 @@ double li_calc(li_conf * L, const double r)
                 B->data[cc*L->N + rr] = j0(cc*delta*Z->data[rr]);
             }
         }
+
+        //
+        // Find the coefficients
+        //
 
         gsl_vector * Creal = gsl_vector_calloc(L->N);
         gsl_vector * Cimag = gsl_vector_calloc(L->N);
@@ -165,42 +202,44 @@ double li_calc(li_conf * L, const double r)
             L->Creal[kk] = Creal->data[kk];
             L->Cimag[kk] = Cimag->data[kk];
         }
-            L->j0Z = malloc(L->N*sizeof(double));
-            L->j1Z = malloc(L->N*sizeof(double));
-            for(int kk = 0; kk < L->N; kk++)
-            {
-                L->j0Z[kk] = j0(L->Z[kk]);
-                L->j1Z[kk] = j1(L->Z[kk]);
-            }
-            L->new = 0;
-            gsl_vector_free(Creal);
-            gsl_vector_free(Cimag);
-            gsl_vector_free(work);
-            gsl_matrix_free(V);
-            gsl_vector_free(S);
-            gsl_matrix_free(B);
-            gsl_vector_free(Freal);
-            gsl_vector_free(Fimag);
-            gsl_vector_free(Z);
-        }
-
-        // Calculate the value of the integral
-        double vreal = 0;
-        double vcomp = 0;
-
-        double u = alpha;
-        double j1u = j1(u);
-        double j0u = j0(u);
-        double * j1Z = L->j1Z;
-        double * j0Z = L->j0Z;
-
-        for(int kk = 0; kk<L->N; kk++)
+        L->j0Z = malloc(L->N*sizeof(double));
+        L->j1Z = malloc(L->N*sizeof(double));
+        for(int kk = 0; kk < L->N; kk++)
         {
-            double v = L->Z[kk];
-            double k = (u*j1u*j0Z[kk] - v*j0u*j1Z[kk])/(pow(u,2)-pow(v,2));
-            vreal += k*L->Creal[kk];
-            vcomp += k*L->Cimag[kk];
+            L->j0Z[kk] = j0(L->Z[kk]);
+            L->j1Z[kk] = j1(L->Z[kk]);
         }
+        L->new = 0;
+        gsl_vector_free(Creal);
+        gsl_vector_free(Cimag);
+        gsl_vector_free(work);
+        gsl_matrix_free(V);
+        gsl_vector_free(S);
+        gsl_matrix_free(B);
+        gsl_vector_free(Freal);
+        gsl_vector_free(Fimag);
+        gsl_vector_free(Z);
+    }
+
+    //
+    // Calculate the value of the integral
+    //
+    double vreal = 0;
+    double vcomp = 0;
+
+    double u = alpha;
+    double j1u = j1(u);
+    double j0u = j0(u);
+    double * j1Z = L->j1Z;
+    double * j0Z = L->j0Z;
+
+    for(int kk = 0; kk<L->N; kk++)
+    {
+        double v = L->Z[kk];
+        double k = (u*j1u*j0Z[kk] - v*j0u*j1Z[kk])/(pow(u,2)-pow(v,2));
+        vreal += k*L->Creal[kk];
+        vcomp += k*L->Cimag[kk];
+    }
 
     return pow(vreal,2) + pow(vcomp,2);
 }

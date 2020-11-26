@@ -14,6 +14,11 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+/*
+ * TODO:
+ * Use dynamic integration, at least in x-y
+*/
+
 #include "dw_bwpsf.h"
 #include "li.c"
 
@@ -21,7 +26,10 @@ pthread_mutex_t stdout_mutex;
 
 void bw_conf_printf(FILE * out, bw_conf * conf)
 {
-    fprintf(out, "cmd: %s\n", conf->cmd);
+    if(out != stdout)
+    {
+        fprintf(out, "cmd: %s\n", conf->cmd);
+    }
     fprintf(out, "lambda = %.2f nm\n", conf->lambda*1e9);
     fprintf(out, "NA = %f\n", conf->NA);
     fprintf(out, "ni = %f\n", conf->ni);
@@ -69,8 +77,8 @@ bw_conf * bw_conf_new()
     conf->outFile = NULL;
     conf->logFile = NULL;
     conf->overwrite = 0;
-    conf->Simpson = 5;
-    conf->oversampling_R = 10;
+    conf->Simpson = 21;
+    conf->oversampling_R = 20;
     conf->fast_li = 1;
     return conf;
 }
@@ -276,7 +284,7 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
     {
         // Assume that samples are imaged with about the same thickness
         // regardless of resolution
-        int nslice = floor(200.0 * 130.0/(s->resAxial*1e9)/2.0);
+        int nslice = floor(181.0 * 300.0/(s->resAxial*1e9)/2.0);
         s->P = nslice*2+3;
 
         printf("Setting the number of slices to %d, based on the pixel size.\n", s->P);
@@ -285,7 +293,6 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
 
     if(optind + 1 == argc)
     {
-        printf("---> %s\n", argv[argc-1]); fflush(stdout);
         s->outFile = malloc(strlen(argv[argc-1]) + 1);
         sprintf(s->outFile, "%s", argv[argc-1]);
     }
@@ -296,7 +303,6 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
         sprintf(s->outFile, "PSFBW_%.2f_%.2f_%.1f_%.1f_%.1f.tif",
                 s->NA, s->ni, s->lambda*1e9, s->resLateral*1e9, s->resAxial*1e9);
     }
-
 
 
     s->logFile = malloc(strlen(s->outFile) + 10);
