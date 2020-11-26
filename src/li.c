@@ -77,9 +77,10 @@ li_conf * li_new(double z)
     L->ni = 1.512;
 
     // Values below should not be set/changed by the user
-    // L->N = 100; // 100 in the original paper
+    // In the original paper N = 100, and M = 1000;
+
     L->N = 0; // Dynamic -- this is set at the first call
-    L->M = 1000;
+    L->M = 0; // Dynamic -- this is set at the first call
 
     L->new = 1;
     L->Z = NULL;
@@ -117,11 +118,8 @@ double li_calc(li_conf * L, const double r)
     {
 
         L->N = 6+ceil(fabs(beta));
+        L->M = 2*L->N;
 
-        if(L->M < L->N)
-        { // Ensure that the equation system can be solved
-            L->M = L->N;
-        }
 
         gsl_vector * Z = gsl_vector_calloc(L->N);
         L->Z = malloc(L->N*sizeof(double));
