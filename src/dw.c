@@ -70,6 +70,7 @@ dw_opts * dw_opts_new(void)
   s->outFormat = 16; // write 16 bit int
   s->experimental1 = 0;
   s->fulldump = 0;
+  s->positivity = 1;
   return s;
 }
 
@@ -278,13 +279,18 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     { "fulldump",     no_argument,       NULL,   'D' },
     { "experimental1", no_argument, NULL, 'X' },
     { "iterdump", no_argument, NULL, 'i'},
+    { "nopos", no_argument, NULL, 'P'},
     { NULL,           0,                 NULL,   0   }
   };
 
   int ch;
-  while((ch = getopt_long(argc, argv, "iFBvho:n:c:p:s:p:TXfD", longopts, NULL)) != -1)
+  while((ch = getopt_long(argc, argv, "iFBvho:n:c:p:s:p:TXfDP", longopts, NULL)) != -1)
   {
     switch(ch) {
+    case 'P':
+        s->positivity = 0;
+        printf("Turning off positivity constraint!\n");
+        break;
     case 'D':
         s->fulldump = 1;
         break;
@@ -873,9 +879,16 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
 #pragma omp parallel for
     for(size_t kk = 0; kk<wMNP; kk++)
     {
-      y[kk] = x[kk] + alpha*(x[kk]-xm[kk]);
-      // a priori information: only positive values
-      y[kk] < 0 ? y[kk] = 0 : 0;
+        y[kk] = x[kk] + alpha*(x[kk]-xm[kk]);
+        // a priori information: only positive values
+    }
+    if(s->positivity)
+    {
+#pragma omp parallel for
+        for(size_t kk = 0; kk<wMNP; kk++)
+        {
+            y[kk] < 0 ? y[kk] = 0 : 0;
+        }
     }
 
     xp = xm;
@@ -1467,6 +1480,18 @@ void dcw_close_log(dw_opts * s)
   fclose(s->log);
 }
 
+double get_nzeros(float * I, size_t N)
+{ // count the number of 0s in the image
+    double nZeros = 0;
+    for(size_t kk = 0; kk<N; kk++)
+    {
+        if(I[kk] == 0)
+        {
+            nZeros++;
+        }
+    }
+    return nZeros;
+}
 
 int dw_run(dw_opts * s)
 {
@@ -1627,10 +1652,14 @@ int dw_run(dw_opts * s)
       }
     } else
     {
+        double nZeros = get_nzeros(out, M*N*P);
+        fprintf(s->log, "%f%% zeros in the output image.\n", 100*nZeros/(M*N*P));
       if(s->verbosity > 0)
       {
+          printf("%f%% zeros in the output image.\n", 100*nZeros/(M*N*P));
         printf("Writing to %s\n", s->outFile); fflush(stdout);
       }
+
       //    floatimage_normalize(out, M*N*P);
       if(s->outFormat == 32)
       {

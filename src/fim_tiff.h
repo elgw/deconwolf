@@ -36,11 +36,11 @@
 #define INLINED inline __attribute__((always_inline))
 
 // Last argument: where to print output
-int fim_tiff_write(const char * fName, const float * V, 
+int fim_tiff_write(const char * fName, const float * V,
     int64_t M, int64_t N, int64_t P, FILE *);
 
 
-int fim_tiff_write_float(const char * fName, const float * V, 
+int fim_tiff_write_float(const char * fName, const float * V,
     int64_t M, int64_t N, int64_t P, FILE *);
 
 int fim_tiff_write_zeros(const char * fName, int64_t M, int64_t N, int64_t P, FILE *);
@@ -54,13 +54,13 @@ int fim_tiff_from_raw(const char * fName, int64_t M, int64_t N, int64_t P,
 int fim_tiff_to_raw(const char *fName, const char * oName);
 
 // Read a 3D tif stack as a float array
-float * fim_tiff_read(const char * fName, 
+float * fim_tiff_read(const char * fName,
     int64_t * M0, int64_t * N0, int64_t * P0, int verbosity);
 
 // Read a sub region of a 3D stack as float array
 // set sub to 1
 // reads sM:sM+wM-1, sN:sN+wN-1, sP:sP+wP-1
-float * fim_tiff_read_sub(const char * fName, 
+float * fim_tiff_read_sub(const char * fName,
     int64_t * M0, int64_t * N0, int64_t * P0, int verbosity,
     int sub,
    int64_t sM, int64_t sN, int64_t sP, // start
@@ -70,10 +70,13 @@ void fim_tiff_ut();
 
 // Get the size of a tiff file (by name)
 // Returns 0 upon success.
-int fim_tiff_get_size(char * fname, 
+int fim_tiff_get_size(char * fname,
     int64_t * M, int64_t * N, int64_t * P);
 
 /* Max projection from input to output file */
 int fim_tiff_maxproj(char * in, char * out);
+
+/* Extract a single slice from input to output file */
+int fim_tiff_extract_slice(char *in, char *out, int slice);
 
 #endif

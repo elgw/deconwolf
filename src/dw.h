@@ -68,6 +68,7 @@ typedef struct{
   fftwf_plan ifft_plan;
   int iterdump; // Dump each iteration to file ...
   float relax;
+  int positivity; // Positivity constraint
   float xycropfactor; // discard outer slices that are less than this of the central one
   char * commandline;
   int borderQuality;

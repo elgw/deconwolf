@@ -187,7 +187,7 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
          { "size",         required_argument, NULL, 'N'},
          { "nslice",       required_argument, NULL, 'P'},
          { "quality",      required_argument, NULL, 'q'},
-         { "fast",         no_argument,       NULL, 'f'},
+         { "no-fast",         no_argument,       NULL, 'f'},
          { NULL,           0,                 NULL,  0 }
         };
     int Pset = 0;
@@ -386,20 +386,28 @@ void BW(bw_conf * conf)
 
 
 float complex integrand(float rho, float r, float z, bw_conf * conf) {
-
-    // 'rho' is the integration parameter.
-    // 'r' is the radial distance of the detector relative to the optical
-    // axis.
-
-    assert(rho<=1); assert(rho>=0);
+     assert(rho<=1); assert(rho>=0);
 
     float k0 = 2.0 * M_PI / conf->lambda;
     // j0 has smaller errors but I don't think that we need that precision.
     // j0f is much faster
 
+    #if 0
+    // This is how it looks in the Java code
     float BesselValue = j0f(k0 * conf->NA * r * rho);
     // Optical path difference
     float OPD = pow(conf->NA,2) * z * pow(rho,2) / (2.0 * conf->ni);
+#endif
+
+    // This is how it looks on their web page
+    // as well as in Optics by Born and Wolf,
+    // p. 437 (section 8.8), 6th edition.
+    // "Three-dimensional light distribution near focus"
+    float q = conf->NA / conf->ni;
+    float BesselValue = j0f(k0 * q * r * rho);
+    float OPD = pow(q,2) * z * pow(rho,2) / (2.0);
+
+
     // Phase aberrations.
     float W = k0 * OPD;
     float complex y = BesselValue*cos(W)*rho - I*BesselValue*sin(W)*rho;

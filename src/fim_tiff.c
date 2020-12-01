@@ -1269,8 +1269,6 @@ int fim_tiff_maxproj(char * in, char * out)
 //  printf("Strip size: %zu b\n", (size_t) ssize);
   uint32_t nstrips = TIFFNumberOfStrips(input);
 
-
-
   // Input is 16 bit unsigned int.
   if(SF == SAMPLEFORMAT_UINT)
   {
@@ -1321,6 +1319,133 @@ int fim_tiff_maxproj(char * in, char * out)
           mstrip[kk] = strip[kk];
         }
       }
+    }
+    TIFFWriteRawStrip(output, 0, mstrip, read);
+  }
+  _TIFFfree(strip);
+  _TIFFfree(mstrip);
+
+  }
+
+
+  TIFFClose(input);
+  TIFFClose(output);
+
+  return 0;
+}
+
+
+int fim_tiff_extract_slice(char * in, char * out, int slice)
+{
+
+    if(slice < 1)
+    {
+        printf("Slice %d does not make sense\n", slice);
+        return -1;
+    }
+
+  int64_t M, N, P;
+
+  if(fim_tiff_get_size(in, &M, &N, &P))
+  {
+    printf("Can't open %s to get image dimension\n", in);
+    return -1;
+  }
+
+  if(slice > P)
+  {
+      printf("Can't extract slice %d from an image with %lu slices\n", slice, P);
+      return -1;
+  }
+
+  TIFF * input = TIFFOpen(in, "r");
+  char * errStr = tiff_is_supported(input);
+  if(errStr != NULL)
+  {
+    printf("Can't process %s\n", in);
+    printf("Error: %s\n", errStr);
+    return -1;
+  }
+
+  uint32_t SF;
+  int gotSF = TIFFGetField(input, TIFFTAG_SAMPLEFORMAT, &SF);
+  if(gotSF != 1)
+  {
+    printf("Unable to determine the sample format of %s\n", in);
+    return 1;
+  }
+
+  TIFF * output = TIFFOpen(out, "w");
+  TIFFSetField(output, TIFFTAG_IMAGEWIDTH, M);
+  TIFFSetField(output, TIFFTAG_IMAGELENGTH, N);
+  TIFFSetField(output, TIFFTAG_SAMPLESPERPIXEL, 1);
+  if(SF == SAMPLEFORMAT_UINT)
+  {
+    TIFFSetField(output, TIFFTAG_BITSPERSAMPLE, 16);
+    TIFFSetField(output, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_UINT);
+  }
+
+  if(SF == SAMPLEFORMAT_IEEEFP)
+  {
+    TIFFSetField(output, TIFFTAG_BITSPERSAMPLE, 32);
+    TIFFSetField(output, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_IEEEFP);
+  }
+
+  TIFFSetField(output, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);
+  TIFFSetField(output, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
+  TIFFSetField(output, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
+  TIFFSetField(output, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
+  TIFFSetField(output, TIFFTAG_PAGENUMBER, 1, 1);
+
+  tmsize_t ssize = TIFFStripSize(input); // Seems to be in bytes
+//  printf("Strip size: %zu b\n", (size_t) ssize);
+  uint32_t nstrips = TIFFNumberOfStrips(input);
+
+  // Input is 16 bit unsigned int.
+  if(SF == SAMPLEFORMAT_UINT)
+  {
+  uint16_t * mstrip = _TIFFmalloc(ssize); // For max over all directories
+  uint16_t * strip    = _TIFFmalloc(ssize);
+
+  TIFFSetDirectory(input, slice-1); // Does it keep the location for each directory?
+
+  for(int64_t nn = 0; nn<nstrips; nn++) // Each strip
+  {
+    memset(mstrip, 0, ssize);
+    tsize_t read = 0;
+
+
+      read = TIFFReadEncodedStrip(input, nn, strip, (tsize_t)-1);
+      for(int64_t kk = 0; kk<read/2; kk++)
+      {
+          mstrip[kk] = strip[kk];
+
+      }
+
+    TIFFWriteRawStrip(output, 0, mstrip, read);
+  }
+
+  _TIFFfree(strip);
+  _TIFFfree(mstrip);
+  }
+
+  // Input is 32-bit float
+  if(SF == SAMPLEFORMAT_IEEEFP)
+  {
+  float * mstrip = _TIFFmalloc(ssize); // For max over all directories
+  float * strip    = _TIFFmalloc(ssize);
+
+  TIFFSetDirectory(input, slice-1); // Does it keep the location for each directory?
+  for(int64_t nn = 0; nn<nstrips; nn++) // Each strip
+  {
+    memset(mstrip, 0, ssize);
+    tsize_t read = 0;
+
+
+      read = TIFFReadEncodedStrip(input, nn, strip, (tsize_t)-1);
+      for(int64_t kk = 0; kk<read/4; kk++)
+      {
+          mstrip[kk] = strip[kk];
     }
     TIFFWriteRawStrip(output, 0, mstrip, read);
   }
