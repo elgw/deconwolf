@@ -34,13 +34,34 @@
 #include "fim.h"
 
 #define INLINED inline __attribute__((always_inline))
+#define XTAG_IJIJUNKNOWN 50838
+#define XTAG_IJIJINFO 50839
+
+// Tags that imagej uses and possibly should be transferred
+typedef struct{
+    float xresolution;
+    float yresolution;
+    char * imagedescription;
+    char * software;
+    uint16_t resolutionunit;
+    char * IJIJinfo; // Tag 50839 contains a string, used by Imagej.
+    uint32_t nIJIJinfo;
+} ijtags;
+
+void ijtags_get(TIFF *, ijtags *);
+void ijtags_show(FILE *, ijtags *);
+void ijtags_set(TIFF *, ijtags *);
+void ijtags_free(ijtags **);
+void ijtags_set_software(ijtags * , char *);
 
 // Last argument: where to print output
 int fim_tiff_write(const char * fName, const float * V,
+                   ijtags * T,
     int64_t M, int64_t N, int64_t P, FILE *);
 
 
 int fim_tiff_write_float(const char * fName, const float * V,
+                         ijtags * T,
     int64_t M, int64_t N, int64_t P, FILE *);
 
 int fim_tiff_write_zeros(const char * fName, int64_t M, int64_t N, int64_t P, FILE *);
@@ -55,12 +76,14 @@ int fim_tiff_to_raw(const char *fName, const char * oName);
 
 // Read a 3D tif stack as a float array
 float * fim_tiff_read(const char * fName,
+                      ijtags * T,
     int64_t * M0, int64_t * N0, int64_t * P0, int verbosity);
 
 // Read a sub region of a 3D stack as float array
 // set sub to 1
 // reads sM:sM+wM-1, sN:sN+wN-1, sP:sP+wP-1
 float * fim_tiff_read_sub(const char * fName,
+                          ijtags *,
     int64_t * M0, int64_t * N0, int64_t * P0, int verbosity,
     int sub,
    int64_t sM, int64_t sN, int64_t sP, // start

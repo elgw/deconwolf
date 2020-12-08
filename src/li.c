@@ -41,6 +41,7 @@
 #include <math.h>
 #include <assert.h>
 #include <string.h>
+#include <complex.h>
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_permutation.h>
 #include <gsl/gsl_linalg.h>
@@ -66,13 +67,22 @@ typedef struct
     double * Cimag; // complex part of the coefficients
 } li_conf;
 
+void li_show(li_conf * L)
+{
+    printf("lambda = %f\n", L->lambda);
+    printf("NA = %f\n", L->NA);
+    printf("ni = %f\n", L->ni);
+    printf("z = %f\n", L->z);
+    return;
+}
+
 li_conf * li_new(double z)
 {
     li_conf * L = malloc(sizeof(li_conf));
 
     // These can be changed by the user
     L->z = z;
-    L->lambda = 436;
+    L->lambda = 461;
     L->NA = 1.45;
     L->ni = 1.512;
 
@@ -108,7 +118,7 @@ li_conf * li_free(li_conf ** LP)
     return NULL;
 }
 
-double li_calc(li_conf * L, const double r)
+double complex li_calc(li_conf * L, const double r)
 {
 
     // Most likely wrong if ni != 1
@@ -116,8 +126,8 @@ double li_calc(li_conf * L, const double r)
     //const double beta = 2*M_PI/L->lambda*pow(L->NA,2)/(2*L->ni)*L->z;
 
     // Updated 2020-12-01
-    const double alpha = (2*M_PI/L->lambda)*L->NA/L->ni*r;
-    const double beta =  (2*M_PI/L->lambda)*pow(L->NA/L->ni,2)/2*L->z;
+    const double alpha = (2.0*M_PI/L->lambda)*L->NA/L->ni*r;
+    const double beta =  (2.0*M_PI/L->lambda)*pow(L->NA/L->ni,2)/2.0*L->z;
 
     if(L->new == 1)
     {
@@ -239,12 +249,12 @@ double li_calc(li_conf * L, const double r)
     for(int kk = 0; kk<L->N; kk++)
     {
         double v = L->Z[kk];
-        double k = (u*j1u*j0Z[kk] - v*j0u*j1Z[kk])/(pow(u,2)-pow(v,2));
+        double k = (u*j1u*j0Z[kk] - v*j0u*j1Z[kk])/(pow(u, 2)-pow(v, 2));
         vreal += k*L->Creal[kk];
         vcomp += k*L->Cimag[kk];
     }
 
-    return pow(vreal,2) + pow(vcomp,2);
+    return vreal + I*vcomp;
 }
 
 #ifdef LI_TEST
@@ -256,10 +266,18 @@ int main(int argc, char ** argv)
        and initialize it for z = 0 nm. */
     double z = 0;
     li_conf * L = li_new(z);
+
+    li_show(L);
     assert(L != NULL);
 
-    for(double r = 0; r<300; r+=130)
-        printf("PSF(r=%f, z=%f) = %f dV\n", r, L->z, li_calc(L, r));
+    for(double r = 0; r<500; r+=130)
+    {
+        double complex v = li_calc(L, r);
+        double vreal = pow(creal(v),2) + pow(cimag(v),2);
+        printf("LI(r=%f, z=%f) = (%f %fi) %f dV\n", r, L->z, creal(v), cimag(v), vreal);
+
+
+    }
 
     L = li_free(&L);
     assert(L == NULL);

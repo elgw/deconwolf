@@ -60,6 +60,7 @@ typedef struct {
     int Simpson; // Use this number of points for Simpson integration
     int fast_li; // Use Li's method for the integral
     int oversampling_R; // Oversampling in radial direction
+    int complexPixel; // Integrate pixels as complex?
 
     float * V; // output image
     // shape of output image
@@ -70,6 +71,8 @@ typedef struct {
     // For parallel processing
     int thread;
     int nThreads;
+
+    int testing;
 } bw_conf;
 
 void bw_conf_printf(FILE * out, bw_conf * conf);
