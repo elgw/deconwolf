@@ -265,19 +265,19 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
 
     if(s->lambda < 50)
     {
-        printf("Error: lambda has be be at least 50 nm\n");
+        fprintf(stderr, "Error: lambda has be be at least 50 nm\n");
         exit(-1);
     }
 
     if(s->lambda > 10000)
     {
-        printf("Error lambda can be at most 1000 nm\n");
+        fprintf(stderr, "Error lambda can be at most 1000 nm\n");
         exit(-1);
     }
 
     if(s->Simpson % 2 == 0)
     {
-        printf("Error: The number of integration points (per dimension) has to be odd\n");
+        fprintf(stderr, "The number of integration points (per dimension) has to be odd\n");
         exit(-1);
     }
 
@@ -833,7 +833,7 @@ int main(int argc, char ** argv)
     conf->log = fopen(conf->logFile, "w");
     if(conf->log == NULL)
     {
-        printf("ERROR: Failed to open %s for writing\n", conf->logFile);
+        fprintf(stderr, "Failed to open %s for writing\n", conf->logFile);
         exit(-1);
     }
     fprint_time(conf->log);

@@ -367,7 +367,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         s->xycropfactor = atof(optarg);
         if(s->xycropfactor > 1 || s->xycropfactor < 0)
         {
-          printf("The crop factor in x and y has to be => 0 and < 1\n");
+            fprintf(stderr, "The crop factor in x and y has to be => 0 and < 1\n");
           exit(1);
         }
         break;
@@ -383,20 +383,20 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
   /* Take care of the positional arguments */
   if(optind + 2 != argc)
   {
-    printf("At least image and PSF has to be specified, hint: try '--help'!\n");
+      fprintf(stderr, "At least image and PSF has to be specified, hint: try '--help'!\n");
     exit(1);
   }
 
   s->imFile = realpath(argv[optind], 0);
   if(s->imFile == NULL)
   {
-    printf("ERROR: Can't read %s\n", argv[optind]);
+      fprintf(stderr, "ERROR: Can't read %s\n", argv[optind]);
     exit(1);
   }
   s->psfFile = realpath(argv[++optind], 0);
   if(s->psfFile == NULL)
   {
-    printf("ERROR: Can't read %s\n", argv[optind]);
+      fprintf(stderr, "ERROR: Can't read %s\n", argv[optind]);
     exit(1);
   }
 
@@ -1053,7 +1053,7 @@ float * psf_autocrop_byImage(float * psf, int64_t * pM, int64_t * pN, int64_t * 
 
   if((p % 2) == 0)
   {
-    printf("Error: The PSF should have odd number of slices\n");
+      fprintf(stderr, "Error: The PSF should have odd number of slices\n");
     exit(1);
   }
 
@@ -1205,13 +1205,13 @@ int deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
   tiling * T = tiling_create(M,N,P, s->tiling_maxSize, s->tiling_padding);
   if( T == NULL)
   {
-    printf("Tiling failed, please check your settings\n");
+      fprintf(stderr, "Tiling failed, please check your settings\n");
     exit(1);
   }
 
   if( T->nTiles == 1)
   {
-    printf("\n"
+      fprintf(stderr, "\n"
         "ERROR: Only one tile! Please omit the `--tilesize` parameter if "
         "that is what you intended to to or decrease the value if you "
         "want to process the image in tiles."
@@ -1572,7 +1572,7 @@ int dw_run(dw_opts * s)
     }
     if(im == NULL)
     {
-      printf("Failed to open %s\n", s->imFile);
+        fprintf(stderr, "Failed to open %s\n", s->imFile);
       exit(1);
     }
 
@@ -1596,7 +1596,7 @@ int dw_run(dw_opts * s)
     psf = fim_tiff_read(s->psfFile, NULL, &pM, &pN, &pP, s->verbosity);
     if(psf == NULL)
     {
-      printf("Failed to open %s\n", s->psfFile);
+        fprintf(stderr, "Failed to open %s\n", s->psfFile);
       exit(1);
     }
   } else {
