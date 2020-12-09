@@ -523,7 +523,7 @@ float getErrorX(const float * restrict y, const float * restrict g, const int64_
   /* Same as getError with the difference that G is expanded to MxNxP */
   if(M > wM || N > wN || P > wP)
   {
-      perror("Something is funky with the dimensions of the images.");
+      fprintf(stderr,"Something is funky with the dimensions of the images.\n");
       exit(-1);
   }
 
@@ -551,7 +551,7 @@ float getError(const afloat * restrict y, const afloat * restrict g,
 {
     if(M > wM || N > wN || P > wP)
     {
-        perror("Something is funky with the dimensions of the images.");
+        fprintf(stderr, "Something is funky with the dimensions of the images.\n");
         exit(-1);
     }
   double e = 0;
@@ -573,12 +573,22 @@ float getError(const afloat * restrict y, const afloat * restrict g,
   return (float) e;
 }
 
+void putdot(const dw_opts *s)
+{
+    if(s->verbosity > 0)
+    {
+        printf(ANSI_COLOR_GREEN "." ANSI_COLOR_RESET);
+        fflush(stdout);
+    }
+    return;
+}
+
 float getError_ref(float * y, float * g, int64_t M, int64_t N, int64_t P, int64_t wM, int64_t wN, int64_t wP)
 {
 
     if(M > wM || N > wN || P > wP)
     {
-        perror("Something is funky with the dimensions of the images.");
+        fprintf(stderr, "Something is funky with the dimensions of the images.\n");
         exit(-1);
     }
 
@@ -615,6 +625,7 @@ float iter(
   const size_t wMNP = wM*wN*wP;
 
   fftwf_complex * F = fft(f, wM, wN, wP);
+  putdot(s);
   afloat * y = fft_convolve_cc_f2(cK, F, wM, wN, wP); // F is freed
   float error = getError(y, im, M, N, P, wM, wN, wP);
 
@@ -640,7 +651,7 @@ float iter(
   fftwf_free(y);
 
   afloat * x = fft_convolve_cc_conj_f2(cK, F_sn, wM, wN, wP);
-
+  putdot(s);
 #pragma omp parallel for
   for(size_t cc = 0; cc<wMNP; cc++)
   { x[cc] *= f[cc]*W[cc]; }
@@ -726,6 +737,8 @@ float update_alpha(const afloat * restrict g, const afloat * restrict gm, const 
   return alpha;
 }
 
+
+
 float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, const int64_t P,
     const afloat * restrict psf, const int64_t pM, const int64_t pN, const int64_t pP,
     dw_opts * s)
@@ -796,6 +809,11 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
   fft_train(wM, wN, wP,
       s->verbosity, s->nThreads);
 
+  if(s->verbosity > 0)
+  {
+      printf("Iterating "); fflush(stdout);
+  }
+
   // cK : "full size" fft of the PSF
   afloat * Z = fftwf_malloc(wMNP*sizeof(float));
   memset(Z, 0, wMNP*sizeof(float));
@@ -805,6 +823,7 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
   //fim_tiff_write("Z.tif", Z, wM, wN, wP);
   fftwf_free(Z);
 
+  putdot(s);
 
   /* <-- This isn't needed ...
     fftwf_complex * cKr = NULL;
@@ -827,6 +846,8 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
   //printf("P1\n");
   //fim_stats(P1, pM*pN*pP);
   //  writetif("P1.tif", P1, wM, wN, wP);
+
+  putdot(s);
 
   float sigma = 0.001;
 #pragma omp parallel for
@@ -865,10 +886,7 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
   afloat * gm = fim_zeros(wMNP);
   afloat * g = fim_zeros(wMNP);
 
-  if(s->verbosity > 0)
-  {
-    printf("Iterating ..."); fflush(stdout);
-  }
+
 
   int it = 0;
   while(it<nIter)
@@ -898,6 +916,8 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
         }
     }
 
+    putdot(s);
+
     xp = xm;
     free(xp);
     double err = iter(
@@ -910,8 +930,11 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
         M, N, P, // Original size
         s);
 
+    putdot(s);
+
     if(s->verbosity > 0){
-      printf("\rIteration %3d/%3d, error=%e", it+1, nIter, err);
+        printf("\r                                             ");
+        printf("\rIteration %3d/%3d, error=%e ", it+1, nIter, err);
       fflush(stdout);
     }
 
@@ -1538,7 +1561,7 @@ int dw_run(dw_opts * s)
       }
   }
 
-  if(s->verbosity > 0)
+  if(s->verbosity > 1)
   {
     printf("Image dimensions: %" PRId64 " x %" PRId64 " x %" PRId64 "\n", M, N, P);
   }
@@ -1700,16 +1723,28 @@ int dw_run(dw_opts * s)
 
   if(s->verbosity > 1)
   {
-    printf("Finalizing\n"); fflush(stdout);
+    printf("Finalizing "); fflush(stdout);
   }
   free(psf);
   if(out != NULL) free(out);
   myfftw_stop();
-  if(s->verbosity > 1) fprint_peakMemory(NULL);
+
+
   clock_gettime(CLOCK_REALTIME, &tend);
   fprintf(s->log, "Took: %f s\n", timespec_diff(&tend, &tstart));
   dcw_close_log(s);
   dw_opts_free(&s);
+  if(s->verbosity > 1) fprint_peakMemory(NULL);
+
+  if(s->verbosity > 0)
+  {
+      stdout = fdopen(0, "w");
+      setlocale(LC_CTYPE, "");
+      //wchar_t star = 0x2605;
+      wchar_t star = 0x2728;
+      wprintf(L"%lc Done!\n", star);
+  }
+
 
   return 0;
 }

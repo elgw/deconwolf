@@ -31,6 +31,8 @@
 #include <stdlib.h>
 #include <libgen.h>
 #include <time.h>
+#include <wchar.h>
+#include <locale.h>
 #include "fft.h"
 #include "tiling.h"
 #include "fim.h"
