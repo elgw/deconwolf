@@ -37,31 +37,41 @@
 #define XTAG_IJIJUNKNOWN 50838
 #define XTAG_IJIJINFO 50839
 
-// Tags that imagej uses and possibly should be transferred
+
+/* Tiff tags -- for simple transfer from one image to another */
 typedef struct{
     float xresolution;
     float yresolution;
+    float zresolution;
     char * imagedescription;
     char * software;
     uint16_t resolutionunit;
     char * IJIJinfo; // Tag 50839 contains a string, used by Imagej.
     uint32_t nIJIJinfo;
-} ijtags;
+    // Image size
+    int M;
+    int N;
+    int P;
+} ttags;
 
-void ijtags_get(TIFF *, ijtags *);
-void ijtags_show(FILE *, ijtags *);
-void ijtags_set(TIFF *, ijtags *);
-void ijtags_free(ijtags **);
-void ijtags_set_software(ijtags * , char *);
+// new with everything set to defaults
+ttags * ttags_new();
+void ttags_get(TIFF *, ttags *);
+void ttags_show(FILE *, ttags *);
+void ttags_set(TIFF *, ttags *);
+void ttags_set_software(ttags * , char *);
+void ttags_set_imagesize(ttags *, int M, int N, int P);
+void ttags_set_pixelsize(ttags *, double, double, double);
+void ttags_free(ttags **);
 
 // Last argument: where to print output
 int fim_tiff_write(const char * fName, const float * V,
-                   ijtags * T,
+                   ttags * T,
     int64_t M, int64_t N, int64_t P, FILE *);
 
 
 int fim_tiff_write_float(const char * fName, const float * V,
-                         ijtags * T,
+                         ttags * T,
     int64_t M, int64_t N, int64_t P, FILE *);
 
 int fim_tiff_write_zeros(const char * fName, int64_t M, int64_t N, int64_t P, FILE *);
@@ -76,14 +86,14 @@ int fim_tiff_to_raw(const char *fName, const char * oName);
 
 // Read a 3D tif stack as a float array
 float * fim_tiff_read(const char * fName,
-                      ijtags * T,
+                      ttags * T,
     int64_t * M0, int64_t * N0, int64_t * P0, int verbosity);
 
 // Read a sub region of a 3D stack as float array
 // set sub to 1
 // reads sM:sM+wM-1, sN:sN+wN-1, sP:sP+wP-1
 float * fim_tiff_read_sub(const char * fName,
-                          ijtags *,
+                          ttags *,
     int64_t * M0, int64_t * N0, int64_t * P0, int verbosity,
     int sub,
    int64_t sM, int64_t sN, int64_t sP, // start

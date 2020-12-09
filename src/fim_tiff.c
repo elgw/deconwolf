@@ -680,7 +680,7 @@ int fim_tiff_write_zeros(const char * fName, int64_t N, int64_t M, int64_t P, FI
 }
 
 int fim_tiff_write_float(const char * fName, const afloat * V,
-                         ijtags * T,
+                         ttags * T,
                          int64_t N, int64_t M, int64_t P, FILE * fout)
 {
 
@@ -696,7 +696,7 @@ int fim_tiff_write_float(const char * fName, const afloat * V,
     TIFF* out = TIFFOpen(fName, formatString);
     if(T != NULL)
     {
-        ijtags_set(out, T);
+        ttags_set(out, T);
     }
     assert(out != NULL);
 
@@ -757,7 +757,7 @@ int fim_tiff_write_float(const char * fName, const afloat * V,
 }
 
 int fim_tiff_write(const char * fName, const afloat * V,
-                   ijtags * T,
+                   ttags * T,
                    int64_t N, int64_t M, int64_t P, FILE * fout)
 {
     // if V == NULL and empty file will be written
@@ -800,7 +800,7 @@ int fim_tiff_write(const char * fName, const afloat * V,
 
     if(T)
     {
-        ijtags_set(out, T);
+        ttags_set(out, T);
     }
 
     size_t linbytes = (M+N)*bytesPerSample;
@@ -887,7 +887,7 @@ int fim_tiff_get_size(char * fname, int64_t * M, int64_t * N, int64_t * P)
 
 
 afloat * fim_tiff_read(const char * fName,
-                       ijtags * T,
+                       ttags * T,
                        int64_t * N0, int64_t * M0, int64_t * P0, int verbosity)
 {
     return fim_tiff_read_sub(fName, T, N0, M0, P0, verbosity,
@@ -896,9 +896,59 @@ afloat * fim_tiff_read(const char * fName,
                              0,0,0); // width
 }
 
-void ijtags_free(ijtags ** Tp)
+
+ttags * ttags_new()
 {
-    ijtags * T = Tp[0];
+    ttags * T  = malloc(sizeof(ttags));
+    T->xresolution = 1;
+    T->yresolution = 1;
+    T->zresolution = 1;
+    T->imagedescription = NULL;
+    T->software = NULL;
+    T-> resolutionunit = RESUNIT_NONE;
+    T->IJIJinfo = NULL;
+    T->nIJIJinfo = 0;
+    // Image size MxNxP
+    T->M = 0;
+    T->N = 0;
+    T->P = 0;
+    return T;
+}
+
+void ttags_set_imagesize(ttags * T, int M, int N, int P)
+{
+    T->M = M;
+    T->N = N;
+    T->P = P;
+}
+
+void ttags_set_pixelsize(ttags * T, double xres, double yres, double zres)
+{
+    if(T->M == 0)
+    {
+        fprintf(stderr, "use ttags_set_imagesize before ttags_set_pixelsize");
+        assert(0);
+        exit(1);
+    }
+    if(xres != yres)
+    {
+        fprintf(stderr, "Only supports isotropic pixels in x-y\n");
+    }
+    T->xresolution = 1/xres; // Pixels per nm
+    T->yresolution = 1/yres;
+    T->zresolution = zres; // nm
+    if(T->imagedescription)
+    {
+        free(T->imagedescription);
+    }
+    T->imagedescription = malloc(1024);
+    //sprintf(T->imagedescription, "ImageJ=1.11a.images=%d.slices=%d.hyperstack=true.mode=grayscale.unit=nm.spacing=%.3f.", T->P, T->P, T->zresolution);
+    sprintf(T->imagedescription, "ImageJ=1.52r\nimages=%d\nslices=%d\nunit=nm\nspacing=%.1f\nloop=false.", T->P, T->P, T->zresolution);
+}
+
+void ttags_free(ttags ** Tp)
+{
+    ttags * T = Tp[0];
     if(T == NULL)
     {
         fprintf(stderr, "T = NULL, on line %d in %s\n", __LINE__, __FILE__);
@@ -916,7 +966,7 @@ void ijtags_free(ijtags ** Tp)
     free(T);
 }
 
-void ijtags_set_software(ijtags * T, char * sw)
+void ttags_set_software(ttags * T, char * sw)
 {
     if(T->software != NULL)
     {
@@ -926,7 +976,7 @@ void ijtags_set_software(ijtags * T, char * sw)
     sprintf(T->software, "%s", sw);
 }
 
-void ijtags_get(TIFF * tfile, ijtags * T)
+void ttags_get(TIFF * tfile, ttags * T)
 {
     // https://docs.openmicroscopy.org/ome-model/5.6.3/ome-tiff/specification.html
     // a string of OME-XML metadata embedded in the ImageDescription tag of the first IFD (Image File Directory) of each file. The XML string must be UTF-8 encoded.
@@ -1003,7 +1053,7 @@ void ijtags_get(TIFF * tfile, ijtags * T)
 #endif
 }
 
-void ijtags_set(TIFF * tfile, ijtags * T)
+void ttags_set(TIFF * tfile, ttags * T)
 {
     TIFFSetDirectory(tfile, 0);
     if(T->software != NULL)
@@ -1052,7 +1102,7 @@ void ijtags_set(TIFF * tfile, ijtags * T)
     return;
 }
 
-void ijtags_show(FILE * fout, ijtags* T)
+void ttags_show(FILE * fout, ttags* T)
 {
 
     fprintf(fout, "Resolution unit: ");
@@ -1089,7 +1139,7 @@ void ijtags_show(FILE * fout, ijtags* T)
 }
 
 afloat * fim_tiff_read_sub(const char * fName,
-                           ijtags * T,
+                           ttags * T,
                            int64_t * M0, int64_t * N0, int64_t * P0, int verbosity,
                            int subregion,
                            int64_t sM, int64_t sN, int64_t sP, // start
@@ -1105,7 +1155,7 @@ afloat * fim_tiff_read_sub(const char * fName,
 
     if(T != NULL)
     {
-        ijtags_get(tfile, T);
+        ttags_get(tfile, T);
     }
 
     if(tfile == NULL) {
@@ -1323,10 +1373,10 @@ int main(int argc, char ** argv)
 
     int64_t M = 0, N = 0, P = 0;
 
-    ijtags * T = malloc(sizeof(ijtags));
+    ttags * T = malloc(sizeof(ttags));
     afloat * I = (afloat *) fim_tiff_read(inname, T, &M, &N, &P, 1);
 
-    ijtags_show(stdout, T);
+    ttags_show(stdout, T);
 
     if(I == NULL)
     {
@@ -1337,10 +1387,10 @@ int main(int argc, char ** argv)
     floatimage_show_stats(I, M, N, P);
     // floatimage_normalize(I, M*N*P);
 
-    ijtags_show(stdout, T);
+    ttags_show(stdout, T);
 
     fim_tiff_write(outname, I, T, M, N, P, stdout);
-    ijtags_free(&T);
+    ttags_free(&T);
 
     free(I);
     free(outname);

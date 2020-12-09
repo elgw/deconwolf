@@ -1551,7 +1551,7 @@ int dw_run(dw_opts * s)
 
 
   afloat * im = NULL;
-  ijtags * T = malloc(sizeof(ijtags));
+  ttags * T = malloc(sizeof(ttags));
 
   if(tiling == 0)
   {
@@ -1581,7 +1581,7 @@ int dw_run(dw_opts * s)
   // Set up the string for the TIFFTAG_SOFTWARE
   char * swstring = malloc(1024);
   sprintf(swstring, "deconwolf %s", deconwolf_version);
-  ijtags_set_software(T, swstring);
+  ttags_set_software(T, swstring);
   free(swstring);
 
   // fim_tiff_write("identity.tif", im, M, N, P);
@@ -1696,7 +1696,7 @@ int dw_run(dw_opts * s)
     }
   }
 
-  ijtags_free(&T);
+  ttags_free(&T);
 
   if(s->verbosity > 1)
   {

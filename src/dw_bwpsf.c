@@ -852,7 +852,16 @@ int main(int argc, char ** argv)
         printf("Writing as 32-bit floats to %s\n", conf->outFile);
     }
 
-    fim_tiff_write_float(conf->outFile, conf->V, NULL, conf->M, conf->N, conf->P, conf->log);
+    ttags * T = ttags_new();
+    char * swstring = malloc(1024);
+    sprintf(swstring, "deconwolf %s", deconwolf_version);
+    ttags_set_software(T, swstring);
+    ttags_set_imagesize(T, conf->M, conf->N, conf->P);
+    ttags_set_pixelsize(T, conf->resLateral, conf->resLateral, conf->resAxial);
+    free(swstring);
+
+    fim_tiff_write_float(conf->outFile, conf->V, T, conf->M, conf->N, conf->P, conf->log);
+    ttags_free(&T);
 
     fprint_time(conf->log);
     clock_gettime(CLOCK_REALTIME, &tend);
