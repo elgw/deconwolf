@@ -972,7 +972,7 @@ void ttags_set_software(ttags * T, char * sw)
     {
         free(T->software);
     }
-    T->software = malloc(strlen(sw+2));
+    T->software = malloc(strlen(sw)+2);
     sprintf(T->software, "%s", sw);
 }
 

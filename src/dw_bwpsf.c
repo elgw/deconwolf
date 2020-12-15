@@ -46,11 +46,11 @@ void bw_conf_printf(FILE * out, bw_conf * conf)
     {
         fprintf(out, "Complex pixel integration enabled -- not recommended.\n");
     }
-    if(conf->Simpson > 0)
-    {
+
+
         fprintf(out, "Pixel integration: %dx%dx%d samples per pixel\n",
-                conf->Simpson, conf->Simpson, conf->Simpson);
-    }
+                conf->Simpson, conf->Simpson, conf->Simpson_z);
+
     fprintf(out, "Oversampling of radial profile: %d X\n", conf->oversampling_R);
     if(conf->fast_li)
     {
@@ -82,6 +82,7 @@ bw_conf * bw_conf_new()
     conf->logFile = NULL;
     conf->overwrite = 0;
     conf->Simpson = 21;
+    conf->Simpson_z = 1;
     conf->oversampling_R = 20;
     conf->fast_li = 1;
     conf->testing = 0;
@@ -156,8 +157,10 @@ void usage(__attribute__((unused)) int argc, char ** argv)
     printf(" --size N \n\t Set output size to N x N x P [pixels].\n");
     printf(" --nslice P\n\t Set output size to N x N x P [pixels].\n");
     printf("\t N has to be an odd number.\n");
-    printf(" --quality N\n\t Sets the integration quality to NxNxN samples per pixel.\n");
-    printf("\t N has to be an odd number.\n");
+    printf(" --quality Q\n\t Sets the integration quality to QxQxM samples per pixel.\n");
+    printf("\t Q has to be an odd number.\n");
+    printf(" --qualityz R\n\t Sets the integration quality to QxQxR samples per pixel.\n");
+    printf("\t R has to be an odd number.\n");
     printf(" --no-fast\n\t Disable Li's fast method for the BW integral.\n");
     printf("\t About 14x faster for the default PSF size. Not thoroughly tested.\n");
     printf("\t Possibly unstable for large values of z.\n");
@@ -195,6 +198,7 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
          { "size",         required_argument, NULL, 'N'},
          { "nslice",       required_argument, NULL, 'P'},
          { "quality",      required_argument, NULL, 'q'},
+         { "qualityz",      required_argument, NULL, 'Z'},
          { "no-fast",         no_argument,       NULL, 'f'},
          { "testing",       no_argument, NULL, 'T'},
          { "complex",       no_argument, NULL, 'c'},
@@ -202,7 +206,7 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
         };
     int Pset = 0;
     int ch;
-    while((ch = getopt_long(argc, argv, "fq:vho:t:p:w:n:i:x:z:N:P:l:Tc", longopts, NULL)) != -1)
+    while((ch = getopt_long(argc, argv, "fq:vho:t:p:w:n:i:x:z:N:P:l:TcZ:", longopts, NULL)) != -1)
     {
         switch(ch) {
         case 'c':
@@ -216,6 +220,9 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
             break;
         case 'q':
             s->Simpson = atoi(optarg);
+            break;
+        case 'Z':
+            s->Simpson_z = atoi(optarg);
             break;
         case 'v':
             bw_version(stdout);
@@ -608,20 +615,11 @@ void BW_slice(float * V, float z, bw_conf * conf)
         r[n] = ((double) n) / ((double) OVER_SAMPLING);
     }
 
-    // Don't integrate over Z
-    if(conf->Simpson == 0)
-    {
-        for (size_t n = 0; n < nr; n++) {
-            complex double v = calculate(r[n] * conf->resLateral, z, conf);
-            hComplex[n] = v;
-            hReal[n] = cabs2(v);
-        }
-    }
 
     // Radial profile using Simpsons's integral
-    if(conf->Simpson > 0 && conf->fast_li == 0)
+    if(conf->fast_li == 0)
     {
-        int NS = conf->Simpson;
+        int NS = conf->Simpson_z;
         for (size_t n = 0; n < nr; n++) {
             hReal[n] = 0;
             hComplex[n] = 0;
@@ -651,9 +649,9 @@ void BW_slice(float * V, float z, bw_conf * conf)
     }
 
     // Radial profile using Bessel series
-    if(conf->Simpson > 0 && conf->fast_li == 1) // Using Li
+    if(conf->fast_li == 1) // Using Li
     {
-        int NS = conf->Simpson;
+        int NS = conf->Simpson_z;
         // NS = 1; Just for testing
         memset(hReal, 0, nr*sizeof(double));
         memset(hComplex, 0, nr*sizeof(complex double));
@@ -826,7 +824,7 @@ int main(int argc, char ** argv)
         exit(0);
     }
 
-    if(conf->verbose > 0)
+    if(conf->verbose > 1)
     {
         bw_conf_printf(stdout, conf);
     }
@@ -850,6 +848,7 @@ int main(int argc, char ** argv)
     // Write to disk
     if(conf->verbose > 0) {
         printf("Writing as 32-bit floats to %s\n", conf->outFile);
+
     }
 
     ttags * T = ttags_new();
@@ -875,6 +874,19 @@ int main(int argc, char ** argv)
     free(conf->logFile);
     free(conf->cmd);
     free(conf);
+
+    if(conf->verbose > 0)
+    {
+        stdout = fdopen(0, "w");
+        fflush(stdout);
+        setlocale(LC_CTYPE, "");
+        //wchar_t star = 0x2605;
+        wchar_t star = 0x2728;
+        wprintf(L"%lc Done!\n", star);
+        fflush(stdout);
+        stdout = fdopen(0, "w");
+        fflush(stdout);
+    }
 
     return 0;
 }

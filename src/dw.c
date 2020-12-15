@@ -1574,7 +1574,7 @@ int dw_run(dw_opts * s)
 
 
   afloat * im = NULL;
-  ttags * T = malloc(sizeof(ttags));
+  ttags * T = ttags_new();
 
   if(tiling == 0)
   {
@@ -1743,6 +1743,7 @@ int dw_run(dw_opts * s)
       //wchar_t star = 0x2605;
       wchar_t star = 0x2728;
       wprintf(L"%lc Done!\n", star);
+      stdout = fdopen(0, "w");
   }
 
 

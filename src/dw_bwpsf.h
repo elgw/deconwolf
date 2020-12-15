@@ -33,6 +33,8 @@
 #include <pthread.h>
 #include <getopt.h>
 #include <time.h>
+#include <wchar.h>
+#include <locale.h>
 #include "fim_tiff.h"
 #include "dw_version.h"
 
@@ -58,6 +60,7 @@ typedef struct {
 
     // Integration options
     int Simpson; // Use this number of points for Simpson integration
+    int Simpson_z; // Number of points in Z
     int fast_li; // Use Li's method for the integral
     int oversampling_R; // Oversampling in radial direction
     int complexPixel; // Integrate pixels as complex?
@@ -87,5 +90,15 @@ void BW(bw_conf * conf);
 
 // Get the command line options
 void getCmdLine(int argc, char ** argv, bw_conf * s);
+
+
+#define ANSI_COLOR_RED     "\x1b[31m"
+#define ANSI_COLOR_GREEN   "\x1b[32m"
+#define ANSI_COLOR_YELLOW  "\x1b[33m"
+#define ANSI_COLOR_BLUE    "\x1b[34m"
+#define ANSI_COLOR_MAGENTA "\x1b[35m"
+#define ANSI_COLOR_CYAN    "\x1b[36m"
+#define ANSI_COLOR_RESET   "\x1b[0m"
+
 
 #endif
