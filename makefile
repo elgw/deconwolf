@@ -25,6 +25,7 @@ endif
 dw_LIBRARIES =  -lm -lfftw3f -lfftw3f_threads -ltiff
 dwtm_LIBRARIES =  -lm -ltiff -lfftw3f
 dwbw_LIBRARIES = -lm -ltiff -lpthread -ltiff -lfftw3f -lgsl
+MANPATH=/usr/share/man/man1/
 
 # on MacOS add -Xpreprocessor
 UNAME_S := $(shell uname -s)
@@ -34,6 +35,7 @@ endif
 ifeq ($(UNAME_S),Darwin)
     CFLAGS += -Xpreprocessor
     dw_LIBRARIES += -lomp
+    MANPATH=/usr/local/share/man1
 endif
 
 OMP?=1
@@ -88,11 +90,11 @@ install:
 	# Man pages
 	cp doc/deconwolf.1 .
 	gzip deconwolf.1
-	mv deconwolf.1.gz /usr/share/man/man1/dw.1.gz
+	mv deconwolf.1.gz $(MANPATH)/dw.1.gz
 
 uninstall:
 	rm $(DESTDIR)/dw
 	rm $(DESTDIR)/usr/bin/dw_bw
 	rm $(DESTDIR)/dw_tiffmax
 	rm $(DESTDIR)/dw_batch
-	rm /usr/share/man/man1/dw.1.gz
+	rm $(MANPATH)/dw.1.gz
