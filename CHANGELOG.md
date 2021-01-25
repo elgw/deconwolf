@@ -1,5 +1,11 @@
 # CHANGELOG
 
+### 2020-12-21 v0.0.12
+ * Redirected warnings and errors from the tiff library to the log file.
+ * Carries over ImageJ metadata from input image to output image.
+ * Using the method by Li to speed up the PSF calculations.
+ * Changed the "error= ..." during iterations for "MSE = ..." (there was a user that mailed me and asked if there was a problem!).
+
 ### 2020-11-10 v0.0.9
  * Updated the PSF generator to use Simpson's rule with 9x9 valuations in X-Y per pixel. This should produce more accurate PSF's when the pixel size is large. It is future work to also integrate in Z.
  * Fixed some bugs/issues related to vector aliasing that caused dw to crash when compiled with the `O3` flag.

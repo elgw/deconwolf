@@ -41,6 +41,14 @@
 #define tic clock_gettime(CLOCK_REALTIME, &tictoc_start);
 #define toc(X) clock_gettime(CLOCK_REALTIME, &tictoc_end); printf(#X); printf(" %f s\n", timespec_diff(&tictoc_end, &tictoc_start)); fflush(stdout);
 
+
+// GLOBALS
+
+// used by tiffErrHandler
+FILE * tifflogfile = NULL; // Set to stdout or a file
+
+// END GLOBALS
+
 //typedef float afloat __attribute__ ((__aligned__(16)));
 typedef float afloat;
 
@@ -934,12 +942,12 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
 
     if(s->verbosity > 0){
         printf("\r                                             ");
-        printf("\rIteration %3d/%3d, error=%e ", it+1, nIter, err);
+        printf("\rIteration %3d/%3d, MSE=%e ", it+1, nIter, err);
       fflush(stdout);
     }
 
     if(s->log != NULL)
-    { fprintf(s->log, "Iteration %d/%d, error=%e\n", it+1, nIter, err); fflush(s->log); }
+    { fprintf(s->log, "Iteration %d/%d, MSE=%e\n", it+1, nIter, err); fflush(s->log); }
 
     afloat * swap = g;
     g = gm; gm = swap;
@@ -1524,6 +1532,19 @@ double get_nbg(float * I, size_t N, float bg)
     return nbg;
 }
 
+
+
+
+void tiffErrHandler(const char* module, const char* fmt, va_list ap)
+{
+    assert(tifflogfile != NULL);
+    fprintf(tifflogfile, "libtiff: Module: %s\n", module);
+    fprintf(tifflogfile, "libtiff: ");
+    vfprintf(tifflogfile, fmt, ap);
+    fprintf(tifflogfile, "\n");
+}
+
+
 int dw_run(dw_opts * s)
 {
   struct timespec tstart, tend;
@@ -1548,6 +1569,14 @@ int dw_run(dw_opts * s)
   }
 
   s->verbosity > 1 ? dw_fprint_info(NULL, s) : 0;
+
+  tifflogfile = stdout;
+  if(s->verbosity < 2)
+  {
+      tifflogfile = s->log;
+      TIFFSetWarningHandler(tiffErrHandler);
+      TIFFSetErrorHandler(tiffErrHandler);
+  }
 
   int64_t M = 0, N = 0, P = 0;
   if(fim_tiff_get_size(s->imFile, &M, &N, &P))
@@ -1738,12 +1767,15 @@ int dw_run(dw_opts * s)
 
   if(s->verbosity > 0)
   {
+      printf("Done!\n");
+      /*
       stdout = fdopen(0, "w");
       setlocale(LC_CTYPE, "");
       //wchar_t star = 0x2605;
       wchar_t star = 0x2728;
       wprintf(L"%lc Done!\n", star);
       stdout = fdopen(0, "w");
+      */
   }
 
 

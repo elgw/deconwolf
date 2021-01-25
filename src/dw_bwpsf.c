@@ -1,4 +1,4 @@
-/*    Copyright (C) 2020 Erik L. G. Wernersson
+/* (C) 2020 Erik L. G. Wernersson
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -21,6 +21,12 @@
 
 #include "dw_bwpsf.h"
 #include "li.c"
+
+// j0f, i.e., the float version of j0 is not available on mac
+#ifdef __APPLE__
+#define j0f j0
+#endif
+
 
 pthread_mutex_t stdout_mutex;
 
@@ -874,19 +880,6 @@ int main(int argc, char ** argv)
     free(conf->logFile);
     free(conf->cmd);
     free(conf);
-
-    if(conf->verbose > 0)
-    {
-        stdout = fdopen(0, "w");
-        fflush(stdout);
-        setlocale(LC_CTYPE, "");
-        //wchar_t star = 0x2605;
-        wchar_t star = 0x2728;
-        wprintf(L"%lc Done!\n", star);
-        fflush(stdout);
-        stdout = fdopen(0, "w");
-        fflush(stdout);
-    }
 
     return 0;
 }

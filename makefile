@@ -78,10 +78,10 @@ clean:
 
 install:
 	# Binaries
-	cp bin/dw /usr/bin/dw
 	cp bin/dw_bw /usr/bin/dw_bw
 	cp bin/dw_tiffmax /usr/bin/
 	cp src/deconwolf_batch.py /usr/bin/dw_batch
+	cp bin/dw /usr/bin/dw
 	chmod +x /usr/bin/dw_batch
 	cp src/dw_guide.py /usr/bin/dw_guide
 	chmod +x /usr/bin/dw_guide
