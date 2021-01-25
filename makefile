@@ -35,7 +35,7 @@ endif
 ifeq ($(UNAME_S),Darwin)
     CFLAGS += -Xpreprocessor
     dw_LIBRARIES += -lomp
-    MANPATH=/usr/local/share/man1
+    MANPATH=/usr/local/share/man/man1
 endif
 
 OMP?=1
