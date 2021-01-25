@@ -13,6 +13,7 @@ XFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
 
 CFLAGS = -Wall -Wextra -std=gnu99 -march=native
 
+DESTDIR?=/usr/local/bin
 DEBUG?=0
 ifeq ($(DEBUG),1)
     CFLAGS += -g3 -DDEBUG
@@ -78,21 +79,20 @@ clean:
 
 install:
 	# Binaries
-	cp bin/dw_bw /usr/bin/dw_bw
-	cp bin/dw_tiffmax /usr/bin/
-	cp src/deconwolf_batch.py /usr/bin/dw_batch
-	cp bin/dw /usr/bin/dw
-	chmod +x /usr/bin/dw_batch
-	cp src/dw_guide.py /usr/bin/dw_guide
-	chmod +x /usr/bin/dw_guide
+	cp bin/dw_bw $(DESTDIR)/dw_bw
+	cp bin/dw_tiffmax $(DESTDIR)/dw_tiffmax
+	cp src/deconwolf_batch.py $(DESTDIR)/dw_batch
+	cp bin/dw $(DESTDIR)/dw
+	cp src/dw_guide.py $(DESTDIR)/dw_guide
+	chmod +x $(DESTDIR)/dw_guide
 	# Man pages
 	cp doc/deconwolf.1 .
 	gzip deconwolf.1
 	mv deconwolf.1.gz /usr/share/man/man1/dw.1.gz
 
 uninstall:
-	rm /usr/bin/dw
-	rm /usr/bin/dw_bw
-	rm /usr/bin/dw_tiffmax
+	rm $(DESTDIR)/dw
+	rm $(DESTDIR)/usr/bin/dw_bw
+	rm $(DESTDIR)/dw_tiffmax
+	rm $(DESTDIR)/dw_batch
 	rm /usr/share/man/man1/dw.1.gz
-	rm /usr/bin/dw_batch
