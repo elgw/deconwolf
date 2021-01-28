@@ -803,8 +803,8 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
 
 
   if(s->verbosity > 0)
-  { printf("image: [%" PRId64 "x%" PRId64 "x%" PRId64 "], psf: [%" PRId64 "x%" PRId64 "x%" PRId64 "], job: [%" PRId64 "x%" PRId64 "x%" PRId64 "] (%zu voxels)\n",
-      M, N, P, pM, pN, pP, wM, wN, wP, wMNP);
+  { printf("image: [%" PRId64 "x%" PRId64 "x%" PRId64 "], psf: [%" PRId64 "x%" PRId64 "x%" PRId64 "], job: [%" PRId64 "x%" PRId64 "x%" PRId64 "]\n",
+      M, N, P, pM, pN, pP, wM, wN, wP);
   }
   if(s->verbosity > 1)
   {

@@ -827,7 +827,7 @@ int main(int argc, char ** argv)
     if( conf->overwrite == 0 && file_exist(conf->outFile))
     {
         printf("%s already exist. Doing nothing\n", conf->outFile);
-        exit(0);
+        return EXIT_SUCCESS;
     }
 
     if(conf->verbose > 1)
@@ -881,5 +881,5 @@ int main(int argc, char ** argv)
     free(conf->cmd);
     free(conf);
 
-    return 0;
+    return EXIT_SUCCESS;
 }
