@@ -54,16 +54,19 @@ make -B
 sudo make install
 ```
 
-On OSX, you might have to install"
+On OSX you will need XCode from the App Store and [brew](https://brew.sh/). After that you need to install
 ```
+xcode-select --install
 brew install libopenmpt
+brew install libtiff
+brew install fftw
 ```
 
 On Ubuntu 19.10 you might have to:
 ```
 sudo apt-get update
 
-# sudo apt-cache search libtiff 
+# sudo apt-cache search libtiff
 sudo apt-get install libtiff5-dev
 
 # sudo apt-cache search libfftw3
@@ -91,8 +94,7 @@ The algoritm is based on these papers:
 
  * Richardson, William Hadley (1972). "Bayesian-Based Iterative Method of Image Restoration". JOSA. 62 (1): 55–59. [doi](https://doi.org/10.1364/JOSA.62.000055)
  * Lucy, L. B. (1974). "An iterative technique for the rectification of observed distributions". Astronomical Journal. 79 (6): 745–754. [doi](https://doi.org/10.1086%2F111605)
- * Biggs, D.S.C. “Acceleration of Iterative Image Restoration Algorithms.” Applied Optics. Vol. 36. Number 8, 1997, pp. 1766–1775. 
- * M. Bertero and P. Boccacci, A simple method for the reduction of boundary effects in the Richardson-Lucy approach to image deconvolution, 
+ * Biggs, D.S.C. “Acceleration of Iterative Image Restoration Algorithms.” Applied Optics. Vol. 36. Number 8, 1997, pp. 1766–1775.
+ * M. Bertero and P. Boccacci, A simple method for the reduction of boundary effects in the Richardson-Lucy approach to image deconvolution,
 A&A 437, 369-374 (2005), [doi](https://doi.org/10.1051/0004-6361:20052717)
  * Lee, Ji-Yeon & Lee, Nam-Yong. (2014). Cause Analysis and Removal of Boundary Artifacts in Image Deconvolution. Journal of Korea Multimedia Society. 17. 838-848. [doi](https://doi.org/10.9717/kmms.2014.17.7.838).
-
