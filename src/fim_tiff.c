@@ -1507,8 +1507,8 @@ int fim_tiff_maxproj(char * in, char * out)
     int gotSF = TIFFGetField(input, TIFFTAG_SAMPLEFORMAT, &SF);
     if(gotSF != 1)
     {
-        printf("Unable to determine the sample format of %s\n", in);
-        return 1;
+        printf("Warning: Unable to determine the sample format of %s\n, assuming uint but that could be wrong.\n", in);
+        SF = SAMPLEFORMAT_UINT;
     }
 
     TIFF * output = TIFFOpen(out, "w");
