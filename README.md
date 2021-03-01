@@ -8,25 +8,25 @@
 
 Except for this README there is also a [CHANGELOG](CHANGELOG.md) and a [TODO](TODO.md) list.
 
-## Usage:
-deconwolf has a simple command line interface and only need to know which image that you want to deconvolve and what PSF that should be used. For example, to deconvolve the image `dapi_001.tif` by the PSF in `PSF_dapi.tif`, just type:
-```
-deconwolf dapi_001.tif PSF_dapi.tif
-```
-which will produce a new image called `dw_dapi_001.tif` along with a log file called `dw_dapi_001.tif.log.txt`. For the other options, see
-```
-deonwolf --help
-```
+It does not:
+ - Show your images, for that, try [ImageJ](https://imagej.net/Welcome)
+ - Diagnose your imaging system.
+ - Estimate your PSF based on real images.
+ ...
 
-In the source directory there is also a small script that might be useful for batch processing, example:
+There is also a [GUI](https://github.com/elgw/dw_gui) that could be handy.
+
+At the moment we don't maintain any packages so you will have to build the program from the source code.
+
+## Command line usage:
+deconwolf has a simple command line interface (CLI) and only need to know which image that you want to deconvolve and what PSF that should be used. For example, to deconvolve the image `dapi_001.tif` by the PSF in `PSF_dapi.tif`, just type:
+``` shell
+dw dapi_001.tif PSF_dapi.tif
 ```
-$ python3 deconwolf_batch.py iMERULA91_20200125_001/ ../PSF/ '--iter 50 --tilesize 512'
-deconwolf --iter 50 --tilesize 512 iMERULA91_20200125_001/Cy5_012.tif ../PSF/PSF_Cy5.tif
-deconwolf --iter 50 --tilesize 512 iMERULA91_20200125_001/Cy5_013.tif ../PSF/PSF_Cy5.tif
-deconwolf --iter 50 --tilesize 512 iMERULA91_20200125_001/dapi_013.tif ../PSF/PSF_dapi.tif
-...
+which will produce a new image called `dw_dapi_001.tif` along with a log file called `dw_dapi_001.tif.log.txt`. For the other options, see:
+``` shell
+dw --help
 ```
-the output can be run directly with `| bash` or piped to a file and executed later (possibly using `parallel`). Since deconwolf does not overwrite output files such list of jobs to be run can be aborted and restarted.
 
 ### Test data
 No special test data has been prepared, but you can get some images from the [DeconvolutionLab2](http://bigwww.epfl.ch/deconvolution/deconvolutionlab2/) web page.
@@ -34,8 +34,12 @@ No special test data has been prepared, but you can get some images from the [De
 ### Memory considerations
 The peak memory usage is written at the end of the log file.
 
-### PSF
-PSFs can be generate from ImageJ with a [plugin](http://bigwww.epfl.ch/algorithms/psfgenerator/). If the image has N slices, it is recommended that the PSF has 2xN-1 slices. Unfortunately that will require a lot of memory and processing out of your machine. If the PSF is larger than needed it will be cropped automagically.
+### Point Spread Function (PSF)
+Theoretical PSFs according to the "Born-Wolf" model can be generated with `dw_bw`. As an example:
+
+``` shell
+dw_bw --lambda 466 --resxy 65 --resz 250 PSF_dapi.tif
+```
 
 In the current release deconwolf requires that the PSF is centered, i.e., that the largest value is in the middle. Consequently it prefers PFSs that have an odd size in each dimension.
 
@@ -46,7 +50,7 @@ Currently deconwolf does only support tif images, specifically: multipage, 16-bi
 The reported error is the mean square error between the input image and the current guess convolved with the PSF.
 
 ## Building and installing
-deconwolf requires `fftw3f`, `fftw3f_threads` `openmp` and `tiff-5`.
+To build deconwolf on Ubuntu 20.04 you will need these packages: `fftw3f`, `fftw3f_threads` `openmp` and `tiff-5`, `libgsl-dev`.
 
 Typical installation procedure:
 ```
@@ -60,6 +64,7 @@ xcode-select --install
 brew install libopenmpt
 brew install libtiff
 brew install fftw
+brew install gsl
 ```
 
 On Ubuntu 19.10 you might have to:
