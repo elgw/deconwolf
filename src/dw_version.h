@@ -1,4 +1,4 @@
 #ifndef dw_version_h
 #define dw_version_h
-#define deconwolf_version "0.0.12"
+#define deconwolf_version "0.0.14"
 #endif
