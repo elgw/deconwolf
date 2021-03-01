@@ -1,23 +1,19 @@
 # Todo
- - [ ] Put some checks to see what arrays are not properly aligned and causes crashes with `-ftree-vectorize`
- - [ ] Documentation, examples and test data.
- - [ ] Flag to save one image after each iteration (to facilitate setting the number of iterations).
- - [ ] Demos, for example on the effect of the tiling.
- - [ ] Use tif tags to write meta data (also to transfer from input image).
+## Top priority
  - [ ] Crash-safe writing of output images, write to temporary file and move when write is complete to avoid bad luck.
- - [ ] Highly parsable log file.
- - [ ] Proper logger.
- - [ ] Custom TIFF warning handle (not to overflow the console)
+ - [ ] Get documentation up to date.
+
+## Maybes
+ - [ ] Provide test data and demos
+ - [ ] Decide about default tiling settings based on the PSF.
+ - [ ] Demos, for example on the effect of the tiling.
  - [ ] Include normal `Richardson-Lucy`
  - [ ] Make `FFTW_ESTIMATE` an option.
  - [ ] Double check the tiling weights using gradients and other patterns.
  - [ ] Give some love to deconwolf_batch.py (tiff vs tif, help mapping channels, install systemwide, etc)
- - [ ] Add information on the input image -- especially to detect if some pixels are saturated.
+ - [ ] Add information on the input image to the log -- especially detect saturated pixels.
  - [ ] Make sure that something that makes sense happens when a Pyramidal tif is supplied.
- - [ ] Is there any reason to build fftw3 from source using
- ``` bash
- ./configure CFLAGS="-march=native" --enable-float
- ```
+ - [ ] Figure out if there are any performance benefits by buildin fftw3 from source for `-march=native`.
 
 ## Done:
  - [x] Write down the image scaling to the log files.
@@ -48,3 +44,7 @@
  - [x] Make use of symmetries to save memory?
  - [x] Save FFTW wisdom (saved to `./config/deconwolf/`)
  - [x] Identical results to matlab code.
+ - [x] Custom TIFF warning handle (not to overflow the console). -- disables messages from libtiff at default verbosity level.
+  - [x] Use tif tags to write meta data (also to transfer from input image). -- Transfers some metadata from ImageJ
+   - [x] Flag to save one image after each iteration (to facilitate setting the number of iterations). -- There is now the `--iterdump` option for that.
+    - [x] Put some checks to see what arrays are not properly aligned and causes crashes with `-ftree-vectorize` -- Should work now.

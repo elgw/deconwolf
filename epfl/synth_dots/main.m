@@ -10,9 +10,16 @@ N = [16000 17000 18000 19000 20000];
 N = (1:25)*1000;
 N = round(N);
 
+volume_um3 = prod(1/1000*[130 130 130].*[256 256 40]);
+cell_volume_um3 = 3000;
+fprintf('Image volume: %f um3, Cell volume: %f um3\n', volume_um3, cell_volume_um3);
+for kk = 1:numel(N)
+    fprintf('N=%d, dots/cell=%.1f\n', N(kk), N(kk)/volume_um3*cell_volume_um3);
+end
+
 s.gen = 0; % Generate new images?
 s.genSynth = 0;
-s.nIter = 100; % Number of iterations of deconwolf
+s.nIter = 150; % Number of iterations of deconwolf
 
 %% Run
 if s.gen == 1
@@ -40,21 +47,29 @@ if s.gen == 1
 end
 
 % 20201020 - switched from analyse to analyse2
+outfolder =  'csv20200120/';
+mkdir(outfolder);
 method = @analyse2;
 files = {'Ground Truth.tif', 'sdots.tif'}
-for niter = [25, 50, 100]
+for niter = [25, 50, 100, 125, 150]
     files{end+1} = sprintf('%d_sdots.tif', niter);
 end
 for niter = [50, 100, 200]
     files{end+1} = sprintf('dl2_%d_sdots.tif', niter);
 end
 
-for kk = 2:numel(files)       
+fprintf('Files:\n');
+for kk = 1:numel(files)       
+    fprintf('newtab%d : %s\n', kk, files{kk});
+end
+pause
+for kk = 1:numel(files)       
     fprintf('Pattern: %s\n', files{kk});
-    tab = method(s, N, files{kk});
-    df_writeTable(tab, sprintf('newtab%d.csv', kk));
+    tab = method(s, N, files{kk});    
+    df_writeTable(tab, sprintf('%s/newtab%d.csv', outfolder, kk));
 end
 disp('Done')
+
 
 
 end

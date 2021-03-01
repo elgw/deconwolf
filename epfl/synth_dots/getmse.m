@@ -72,9 +72,6 @@ end
 
 function [N, N2]  = getDots(s, I, Iref)
 % Returns how many of the true dots that are local maximas
-%
-% TODO: over all thresholds
-% TODO: fix potential shifts with Deconvolution Lab2 ... why?
 
 METHOD_NDOTS = 2;
 
@@ -82,13 +79,14 @@ method = METHOD_NDOTS;
 
 D = load([s.folder 'X.mat']);
 D = D.X; % Coordinates of the true dots
+keyboard
 [x, y,z, p, Map] = getLocalMaximas(I);
 [xr, yr,zr, pr, Mapr] = getLocalMaximas(Iref);
 
 if method == METHOD_NDOTS
-N = numel(x)/numel(xr);
-N2 = numel(x)/numel(xr);
-return
+    N = numel(x)/numel(xr);
+    N2 = numel(x)/numel(xr);
+    return
 end
 
 

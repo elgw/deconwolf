@@ -31,6 +31,8 @@
 #include <stdlib.h>
 #include <libgen.h>
 #include <time.h>
+#include <wchar.h>
+#include <locale.h>
 #include "fft.h"
 #include "tiling.h"
 #include "fim.h"
@@ -68,6 +70,9 @@ typedef struct{
   fftwf_plan ifft_plan;
   int iterdump; // Dump each iteration to file ...
   float relax;
+  float bg; // Background level, 0 by default
+
+  int positivity; // Positivity constraint
   float xycropfactor; // discard outer slices that are less than this of the central one
   char * commandline;
   int borderQuality;
@@ -97,5 +102,12 @@ float * psf_autocrop(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  // 
     int64_t M, int64_t N, int64_t P, // image size
     dw_opts * s);
 
+#define ANSI_COLOR_RED     "\x1b[31m"
+#define ANSI_COLOR_GREEN   "\x1b[32m"
+#define ANSI_COLOR_YELLOW  "\x1b[33m"
+#define ANSI_COLOR_BLUE    "\x1b[34m"
+#define ANSI_COLOR_MAGENTA "\x1b[35m"
+#define ANSI_COLOR_CYAN    "\x1b[36m"
+#define ANSI_COLOR_RESET   "\x1b[0m"
 
 #endif

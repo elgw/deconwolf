@@ -3,10 +3,11 @@ library(plyr)
 require('purrr')
 #install.packages('sjmisc')
 #install.packages('glue')
+#install.packages('plyr')
 library('sjmisc')
 
 # Define files to load
-files = c("newtab1.csv", "newtab2.csv", "newtab3.csv", "newtab4.csv", "newtab5.csv", "newtab6.csv", "newtab7.csv", "newtab8.csv")
+files = c("newtab1.csv", "newtab2.csv", "newtab3.csv", "newtab4.csv", "newtab5.csv", "newtab6.csv", "newtab7.csv", "newtab8.csv", "newtab9.csv", "newtab10.csv")
 
 # Load the files
 tab = data.frame()
@@ -26,8 +27,8 @@ tab$file
 
 fs  <- tab$file
 fs = mapvalues(fs, from = 
-c("dl2_50_sdots.tif", "dl2_100_sdots.tif", "dl2_200_sdots.tif", "sdots.tif", "25_sdots.tif", "50_sdots.tif", "100_sdots.tif"), 
-  to=c("DeLa2@50", "DeLa2@100", "DeLa2@200", "Synth", "DW@25", "DW@50", "DW@100"))
+c("dl2_50_sdots.tif", "dl2_100_sdots.tif", "dl2_200_sdots.tif", "sdots.tif", "25_sdots.tif", "50_sdots.tif", "100_sdots.tif", "125_sdots.tif", "150_sdots.tif"), 
+  to=c("DeLa2@50", "DeLa2@100", "DeLa2@200", "Synth", "DW@25", "DW@50", "DW@100", "DW@125", "DW@150"))
 tab$Dset = fs
 
 getMethod <- function(mstring)

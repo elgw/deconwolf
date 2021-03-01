@@ -41,6 +41,14 @@
 #define tic clock_gettime(CLOCK_REALTIME, &tictoc_start);
 #define toc(X) clock_gettime(CLOCK_REALTIME, &tictoc_end); printf(#X); printf(" %f s\n", timespec_diff(&tictoc_end, &tictoc_start)); fflush(stdout);
 
+
+// GLOBALS
+
+// used by tiffErrHandler
+FILE * tifflogfile = NULL; // Set to stdout or a file
+
+// END GLOBALS
+
 //typedef float afloat __attribute__ ((__aligned__(16)));
 typedef float afloat;
 
@@ -70,6 +78,8 @@ dw_opts * dw_opts_new(void)
   s->outFormat = 16; // write 16 bit int
   s->experimental1 = 0;
   s->fulldump = 0;
+  s->positivity = 1;
+  s->bg = 0;
   return s;
 }
 
@@ -113,6 +123,7 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
   fprintf(f, "nIter:  %d\n", s->nIter);
   fprintf(f, "nThreads: %d\n", s->nThreads);
   fprintf(f, "verbosity: %d\n", s->verbosity);
+  fprintf(f, "background level: %f\n", s->bg);
   switch(s->method)
   {
     case DW_METHOD_RL:
@@ -278,13 +289,22 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     { "fulldump",     no_argument,       NULL,   'D' },
     { "experimental1", no_argument, NULL, 'X' },
     { "iterdump", no_argument, NULL, 'i'},
+    { "nopos", no_argument, NULL, 'P'},
+    { "bg", required_argument, NULL, 'b'},
     { NULL,           0,                 NULL,   0   }
   };
 
   int ch;
-  while((ch = getopt_long(argc, argv, "iFBvho:n:c:p:s:p:TXfD", longopts, NULL)) != -1)
+  while((ch = getopt_long(argc, argv, "iFBvho:n:b:c:p:s:p:TXfDP", longopts, NULL)) != -1)
   {
     switch(ch) {
+    case 'b':
+        s->bg = atof(optarg);
+        break;
+    case 'P':
+        s->positivity = 0;
+        printf("Turning off positivity constraint!\n");
+        break;
     case 'D':
         s->fulldump = 1;
         break;
@@ -355,7 +375,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         s->xycropfactor = atof(optarg);
         if(s->xycropfactor > 1 || s->xycropfactor < 0)
         {
-          printf("The crop factor in x and y has to be => 0 and < 1\n");
+            fprintf(stderr, "The crop factor in x and y has to be => 0 and < 1\n");
           exit(1);
         }
         break;
@@ -371,20 +391,20 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
   /* Take care of the positional arguments */
   if(optind + 2 != argc)
   {
-    printf("At least image and PSF has to be specified, hint: try '--help'!\n");
+      fprintf(stderr, "At least image and PSF has to be specified, hint: try '--help'!\n");
     exit(1);
   }
 
   s->imFile = realpath(argv[optind], 0);
   if(s->imFile == NULL)
   {
-    printf("ERROR: Can't read %s\n", argv[optind]);
+      fprintf(stderr, "ERROR: Can't read %s\n", argv[optind]);
     exit(1);
   }
   s->psfFile = realpath(argv[++optind], 0);
   if(s->psfFile == NULL)
   {
-    printf("ERROR: Can't read %s\n", argv[optind]);
+      fprintf(stderr, "ERROR: Can't read %s\n", argv[optind]);
     exit(1);
   }
 
@@ -511,7 +531,7 @@ float getErrorX(const float * restrict y, const float * restrict g, const int64_
   /* Same as getError with the difference that G is expanded to MxNxP */
   if(M > wM || N > wN || P > wP)
   {
-      perror("Something is funky with the dimensions of the images.");
+      fprintf(stderr,"Something is funky with the dimensions of the images.\n");
       exit(-1);
   }
 
@@ -539,7 +559,7 @@ float getError(const afloat * restrict y, const afloat * restrict g,
 {
     if(M > wM || N > wN || P > wP)
     {
-        perror("Something is funky with the dimensions of the images.");
+        fprintf(stderr, "Something is funky with the dimensions of the images.\n");
         exit(-1);
     }
   double e = 0;
@@ -561,12 +581,22 @@ float getError(const afloat * restrict y, const afloat * restrict g,
   return (float) e;
 }
 
+void putdot(const dw_opts *s)
+{
+    if(s->verbosity > 0)
+    {
+        printf(ANSI_COLOR_GREEN "." ANSI_COLOR_RESET);
+        fflush(stdout);
+    }
+    return;
+}
+
 float getError_ref(float * y, float * g, int64_t M, int64_t N, int64_t P, int64_t wM, int64_t wN, int64_t wP)
 {
 
     if(M > wM || N > wN || P > wP)
     {
-        perror("Something is funky with the dimensions of the images.");
+        fprintf(stderr, "Something is funky with the dimensions of the images.\n");
         exit(-1);
     }
 
@@ -603,6 +633,7 @@ float iter(
   const size_t wMNP = wM*wN*wP;
 
   fftwf_complex * F = fft(f, wM, wN, wP);
+  putdot(s);
   afloat * y = fft_convolve_cc_f2(cK, F, wM, wN, wP); // F is freed
   float error = getError(y, im, M, N, P, wM, wN, wP);
 
@@ -628,7 +659,7 @@ float iter(
   fftwf_free(y);
 
   afloat * x = fft_convolve_cc_conj_f2(cK, F_sn, wM, wN, wP);
-
+  putdot(s);
 #pragma omp parallel for
   for(size_t cc = 0; cc<wMNP; cc++)
   { x[cc] *= f[cc]*W[cc]; }
@@ -689,6 +720,7 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
   printf(" --xyfactor F\n\t Discard outer planes of the PSF with sum < F of the central\n");
   printf(" --bq Q\n\t Set border quality to 0 'worst', 1 'bad', or 2 'normal' which is default\n");
   printf(" --float\n\t Set output format to 32-bit float (default is 16-bit int) and disable scaling\n");
+  printf(" --bg l\n\t Set background level, l\n");
   //  printf(" --batch\n\t Generate a batch file to deconvolve all images in the `image_dir`\n");
   printf("\n");
 }
@@ -712,6 +744,8 @@ float update_alpha(const afloat * restrict g, const afloat * restrict gm, const 
 
   return alpha;
 }
+
+
 
 float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, const int64_t P,
     const afloat * restrict psf, const int64_t pM, const int64_t pN, const int64_t pP,
@@ -769,8 +803,8 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
 
 
   if(s->verbosity > 0)
-  { printf("image: [%" PRId64 "x%" PRId64 "x%" PRId64 "], psf: [%" PRId64 "x%" PRId64 "x%" PRId64 "], job: [%" PRId64 "x%" PRId64 "x%" PRId64 "] (%zu voxels)\n",
-      M, N, P, pM, pN, pP, wM, wN, wP, wMNP);
+  { printf("image: [%" PRId64 "x%" PRId64 "x%" PRId64 "], psf: [%" PRId64 "x%" PRId64 "x%" PRId64 "], job: [%" PRId64 "x%" PRId64 "x%" PRId64 "]\n",
+      M, N, P, pM, pN, pP, wM, wN, wP);
   }
   if(s->verbosity > 1)
   {
@@ -783,6 +817,11 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
   fft_train(wM, wN, wP,
       s->verbosity, s->nThreads);
 
+  if(s->verbosity > 0)
+  {
+      printf("Iterating "); fflush(stdout);
+  }
+
   // cK : "full size" fft of the PSF
   afloat * Z = fftwf_malloc(wMNP*sizeof(float));
   memset(Z, 0, wMNP*sizeof(float));
@@ -792,6 +831,7 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
   //fim_tiff_write("Z.tif", Z, wM, wN, wP);
   fftwf_free(Z);
 
+  putdot(s);
 
   /* <-- This isn't needed ...
     fftwf_complex * cKr = NULL;
@@ -814,6 +854,8 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
   //printf("P1\n");
   //fim_stats(P1, pM*pN*pP);
   //  writetif("P1.tif", P1, wM, wN, wP);
+
+  putdot(s);
 
   float sigma = 0.001;
 #pragma omp parallel for
@@ -852,10 +894,7 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
   afloat * gm = fim_zeros(wMNP);
   afloat * g = fim_zeros(wMNP);
 
-  if(s->verbosity > 0)
-  {
-    printf("Iterating ..."); fflush(stdout);
-  }
+
 
   int it = 0;
   while(it<nIter)
@@ -866,17 +905,26 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
       char * tempname = malloc(100*sizeof(char));
       sprintf(tempname, "x_%03d.tif", it);
       printf(" Writing current guess to %s\n", tempname);
-      fim_tiff_write(tempname, temp, M, N, P, s->log);
+      fim_tiff_write(tempname, temp, NULL, M, N, P, s->log);
       free(temp);
     }
 
 #pragma omp parallel for
     for(size_t kk = 0; kk<wMNP; kk++)
     {
-      y[kk] = x[kk] + alpha*(x[kk]-xm[kk]);
-      // a priori information: only positive values
-      y[kk] < 0 ? y[kk] = 0 : 0;
+        y[kk] = x[kk] + alpha*(x[kk]-xm[kk]);
+        // a priori information: only positive values
     }
+    if(s->positivity)
+    {
+#pragma omp parallel for
+        for(size_t kk = 0; kk<wMNP; kk++)
+        {
+            y[kk] < s->bg ? y[kk] = s->bg : 0;
+        }
+    }
+
+    putdot(s);
 
     xp = xm;
     free(xp);
@@ -890,13 +938,16 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
         M, N, P, // Original size
         s);
 
+    putdot(s);
+
     if(s->verbosity > 0){
-      printf("\rIteration %3d/%3d, error=%e", it+1, nIter, err);
+        printf("\r                                             ");
+        printf("\rIteration %3d/%3d, MSE=%e ", it+1, nIter, err);
       fflush(stdout);
     }
 
     if(s->log != NULL)
-    { fprintf(s->log, "Iteration %d/%d, error=%e\n", it+1, nIter, err); fflush(s->log); }
+    { fprintf(s->log, "Iteration %d/%d, MSE=%e\n", it+1, nIter, err); fflush(s->log); }
 
     afloat * swap = g;
     g = gm; gm = swap;
@@ -932,7 +983,7 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
   if(s->fulldump)
   {
       printf("Dumping to fulldump.tif\n");
-      fim_tiff_write("fulldump.tif", x, wM, wN, wP, stdout);
+      fim_tiff_write("fulldump.tif", x, NULL, wM, wN, wP, stdout);
   }
 
   afloat * out = fim_subregion(x, wM, wN, wP, M, N, P);
@@ -1033,7 +1084,7 @@ float * psf_autocrop_byImage(float * psf, int64_t * pM, int64_t * pN, int64_t * 
 
   if((p % 2) == 0)
   {
-    printf("Error: The PSF should have odd number of slices\n");
+      fprintf(stderr, "Error: The PSF should have odd number of slices\n");
     exit(1);
   }
 
@@ -1185,13 +1236,13 @@ int deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
   tiling * T = tiling_create(M,N,P, s->tiling_maxSize, s->tiling_padding);
   if( T == NULL)
   {
-    printf("Tiling failed, please check your settings\n");
+      fprintf(stderr, "Tiling failed, please check your settings\n");
     exit(1);
   }
 
   if( T->nTiles == 1)
   {
-    printf("\n"
+      fprintf(stderr, "\n"
         "ERROR: Only one tile! Please omit the `--tilesize` parameter if "
         "that is what you intended to to or decrease the value if you "
         "want to process the image in tiles."
@@ -1269,7 +1320,7 @@ int deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
 if(0)
 {
   printf("writing to tiledump.tif\n");
-    fim_tiff_write("tiledump.tif", im_tile, tileM, tileN, tileP, s->log);
+  fim_tiff_write("tiledump.tif", im_tile, NULL, tileM, tileN, tileP, s->log);
     getchar();
 }
 
@@ -1467,6 +1518,32 @@ void dcw_close_log(dw_opts * s)
   fclose(s->log);
 }
 
+double get_nbg(float * I, size_t N, float bg)
+{ // count the number of pixels in the image
+    // that are set to the background level
+    double nbg = 0;
+    for(size_t kk = 0; kk<N; kk++)
+    {
+        if(I[kk] == bg)
+        {
+            nbg++;
+        }
+    }
+    return nbg;
+}
+
+
+
+
+void tiffErrHandler(const char* module, const char* fmt, va_list ap)
+{
+    assert(tifflogfile != NULL);
+    fprintf(tifflogfile, "libtiff: Module: %s\n", module);
+    fprintf(tifflogfile, "libtiff: ");
+    vfprintf(tifflogfile, fmt, ap);
+    fprintf(tifflogfile, "\n");
+}
+
 
 int dw_run(dw_opts * s)
 {
@@ -1493,6 +1570,14 @@ int dw_run(dw_opts * s)
 
   s->verbosity > 1 ? dw_fprint_info(NULL, s) : 0;
 
+  tifflogfile = stdout;
+  if(s->verbosity < 2)
+  {
+      tifflogfile = s->log;
+      TIFFSetWarningHandler(tiffErrHandler);
+      TIFFSetErrorHandler(tiffErrHandler);
+  }
+
   int64_t M = 0, N = 0, P = 0;
   if(fim_tiff_get_size(s->imFile, &M, &N, &P))
   {
@@ -1505,7 +1590,7 @@ int dw_run(dw_opts * s)
       }
   }
 
-  if(s->verbosity > 0)
+  if(s->verbosity > 1)
   {
     printf("Image dimensions: %" PRId64 " x %" PRId64 " x %" PRId64 "\n", M, N, P);
   }
@@ -1518,6 +1603,7 @@ int dw_run(dw_opts * s)
 
 
   afloat * im = NULL;
+  ttags * T = ttags_new();
 
   if(tiling == 0)
   {
@@ -1526,7 +1612,7 @@ int dw_run(dw_opts * s)
       printf("Reading %s\n", s->imFile);
     }
 
-    im = fim_tiff_read(s->imFile, &M, &N, &P, s->verbosity);
+    im = fim_tiff_read(s->imFile, T, &M, &N, &P, s->verbosity);
     if(fim_min(im, M*N*P) < 0)
     {
       printf("min value of the image is %f, shifting to 0\n", fim_min(im, M*N*P));
@@ -1538,11 +1624,17 @@ int dw_run(dw_opts * s)
     }
     if(im == NULL)
     {
-      printf("Failed to open %s\n", s->imFile);
+        fprintf(stderr, "Failed to open %s\n", s->imFile);
       exit(1);
     }
 
   }
+
+  // Set up the string for the TIFFTAG_SOFTWARE
+  char * swstring = malloc(1024);
+  sprintf(swstring, "deconwolf %s", deconwolf_version);
+  ttags_set_software(T, swstring);
+  free(swstring);
 
   // fim_tiff_write("identity.tif", im, M, N, P);
 
@@ -1553,10 +1645,10 @@ int dw_run(dw_opts * s)
     {
       printf("Reading %s\n", s->psfFile);
     }
-    psf = fim_tiff_read(s->psfFile, &pM, &pN, &pP, s->verbosity);
+    psf = fim_tiff_read(s->psfFile, NULL, &pM, &pN, &pP, s->verbosity);
     if(psf == NULL)
     {
-      printf("Failed to open %s\n", s->psfFile);
+        fprintf(stderr, "Failed to open %s\n", s->psfFile);
       exit(1);
     }
   } else {
@@ -1589,9 +1681,20 @@ int dw_run(dw_opts * s)
     {
       printf("Relaxing the PSF\n");
     }
-    size_t mid = (pM-1)/2 + (pN-1)/2*pM + (pP-1)/2*pM*pN;
-    psf[mid] *= s->relax;
     fim_normalize_sum1(psf, pM, pN, pP);
+    size_t mid = (pM-1)/2 + (pN-1)/2*pM + (pP-1)/2*pM*pN;
+    for(int64_t kk = 0; kk<pM*pN*pP; kk++)
+    {
+        psf[kk] *= (1-s->relax);
+    }
+    printf("mid: %f -> %f\n", psf[mid], psf[mid]+s->relax);
+    psf[mid] += s->relax;
+    double spsf = 0;
+    for(int64_t kk = 0 ; kk<pM*pN*pP; kk++)
+    {
+        spsf+=psf[kk];
+    }
+    printf("Sum of PSF: %f\n", spsf);
   }
 
   if(s->verbosity > 0)
@@ -1627,32 +1730,54 @@ int dw_run(dw_opts * s)
       }
     } else
     {
-      if(s->verbosity > 0)
+        double nZeros = get_nbg(out, M*N*P, s->bg);
+        fprintf(s->log, "%f%% pixels at bg level in the output image.\n", 100*nZeros/(M*N*P));
+      if(s->verbosity > 1)
       {
+          printf("%f%% pixels at bg level in the output image.\n", 100*nZeros/(M*N*P));
         printf("Writing to %s\n", s->outFile); fflush(stdout);
       }
+
       //    floatimage_normalize(out, M*N*P);
       if(s->outFormat == 32)
       {
-        fim_tiff_write_float(s->outFile, out, M, N, P, s->log);
+          fim_tiff_write_float(s->outFile, out, T, M, N, P, s->log);
       } else {
-        fim_tiff_write(s->outFile, out, M, N, P, s->log);
+          fim_tiff_write(s->outFile, out, T, M, N, P, s->log);
       }
     }
   }
 
+  ttags_free(&T);
+
   if(s->verbosity > 1)
   {
-    printf("Finalizing\n"); fflush(stdout);
+    printf("Finalizing "); fflush(stdout);
   }
   free(psf);
   if(out != NULL) free(out);
   myfftw_stop();
-  if(s->verbosity > 1) fprint_peakMemory(NULL);
+
+
   clock_gettime(CLOCK_REALTIME, &tend);
   fprintf(s->log, "Took: %f s\n", timespec_diff(&tend, &tstart));
   dcw_close_log(s);
   dw_opts_free(&s);
+  if(s->verbosity > 1) fprint_peakMemory(NULL);
+
+  if(s->verbosity > 0)
+  {
+      printf("Done!\n");
+      /*
+      stdout = fdopen(0, "w");
+      setlocale(LC_CTYPE, "");
+      //wchar_t star = 0x2605;
+      wchar_t star = 0x2728;
+      wprintf(L"%lc Done!\n", star);
+      stdout = fdopen(0, "w");
+      */
+  }
+
 
   return 0;
 }

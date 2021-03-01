@@ -21,3 +21,6 @@ dw_tiff_max:
 
 tiff_from_raw:
 	$(cc) tiff_from_raw.c fim_tiff.c $(CFLAGS2) -lm -ltiff -o ../bin/dw_tiff_from_raw
+
+li:
+	$(cc) -DLI_TEST li.c  -o li_ut -lm `pkg-config --cflags --libs gsl`
