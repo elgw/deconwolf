@@ -164,7 +164,14 @@ void fim_insert(afloat * restrict T, const int64_t t1, const int64_t t2, const i
 {
      if(f3 > t3 || f2 > t2 || f1 > t1)
     {
-        printf("Error: can't insert image of size %ld x %ld x %ld into target of size %ld x %ld x %ld\n",
+        printf("Error: can't insert image of size %" PRId64
+               " x %" PRIu64
+               " x %" PRIu64
+               " into target of size "
+               "%" PRIu64
+               " x %" PRIu64
+               " x %" PRIu64
+               "\n",
                f1, f2, f3, t1, t2, t3);
         exit(-1);
     }
@@ -187,7 +194,14 @@ void fim_insert_ref(afloat * T, int64_t t1, int64_t t2, int64_t t3,
 {
     if(f3 > t3 || f2 > t2 || f1 > t1)
     {
-        printf("Error: can't insert image of size %ld x %ld x %ld into target of size %ld x %ld x %ld\n",
+        printf("Error: can't insert image of size %" PRId64
+               " x %" PRIu64
+               " x %" PRIu64
+               " into target of size "
+               "%" PRIu64
+               " x %" PRIu64
+               " x %" PRIu64
+               "\n",
                f1, f2, f3, t1, t2, t3);
         exit(-1);
     }
