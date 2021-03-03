@@ -4,9 +4,9 @@
  - The deconvolved images shows very mild boundary effects which means that you can crop and deconvolve small regions of interest.
  - RAM usage can be reduced at the cost of slightly longer computation times by tiling. That makes it possible to deconvolve large images on small machines.
  - It can make use of all precious cores of your "big" machine since the critical parts run on separate threads (as many as you would like).
- - Deconwolf is tiny! The installation size of less than 0.1 MB it would fit most floppy drives (if you are fortunate enough to own one of those antiquities).
+ - Deconwolf is tiny! It could even fit on a floppy drive (if you are fortunate enough to own one of those antiquities).
 
-Except for this README there is also a [CHANGELOG](CHANGELOG.md) and a [TODO](TODO.md) list.
+Except for this README there is also a short [manual](USAGE.md), a [CHANGELOG](CHANGELOG.md) and a [TODO](TODO.md) list.
 
 It does not:
  - Show your images, for that, try [ImageJ](https://imagej.net/Welcome)
@@ -16,50 +16,34 @@ It does not:
 
 There is also a [GUI](https://github.com/elgw/dw_gui) that could be handy.
 
-At the moment we don't maintain any packages so you will have to build the program from the source code.
-
-## Command line usage:
-deconwolf has a simple command line interface (CLI) and only need to know which image that you want to deconvolve and what PSF that should be used. For example, to deconvolve the image `dapi_001.tif` by the PSF in `PSF_dapi.tif`, just type:
-``` shell
-dw dapi_001.tif PSF_dapi.tif
-```
-which will produce a new image called `dw_dapi_001.tif` along with a log file called `dw_dapi_001.tif.log.txt`. For the other options, see:
-``` shell
-dw --help
-```
-
-### Test data
-No special test data has been prepared, but you can get some images from the [DeconvolutionLab2](http://bigwww.epfl.ch/deconvolution/deconvolutionlab2/) web page.
-
-### Memory considerations
-The peak memory usage is written at the end of the log file.
-
-### Point Spread Function (PSF)
-Theoretical PSFs according to the "Born-Wolf" model can be generated with `dw_bw`. As an example:
-
-``` shell
-dw_bw --lambda 466 --resxy 65 --resz 250 PSF_dapi.tif
-```
-
-In the current release deconwolf requires that the PSF is centered, i.e., that the largest value is in the middle. Consequently it prefers PFSs that have an odd size in each dimension.
-
-### Supported image formats
-Currently deconwolf does only support tif images, specifically: multipage, 16-bit unsigned or 32-bit floats, written in strip mode. The output is 16-bit unsigned and can be read by Matlab, ImageJ, etc.
-
-### Log files and output
-The reported error is the mean square error between the input image and the current guess convolved with the PSF.
+At the moment no pre-built packages are maintained so you will have to build deconwolf from the source code.
 
 ## Building and installing
-To build deconwolf on Ubuntu 20.04 you will need these packages: `fftw3f`, `fftw3f_threads` `openmp` and `tiff-5`, `libgsl-dev`.
+Deconwolf runs on 64-bit machines with x86_64 architecture, it has been built and installed on Ubuntu 20.04 and macOS Big Sur.
 
-Typical installation procedure:
+### Ubuntu 20.04
+Ensure that the required packages are installed
+
+``` shell
+sudo apt-get update
+sudo apt-get install fftw3f
+sudo apt-get install fftw3f_threads
+sudo apt-get install openmp
+sudo apt-get install tiff-5
+sudo apt-get install libgsl-dev
 ```
+
+To build and install:
+``` shell
 make -B
 sudo make install
 ```
 
-On OSX you will need XCode from the App Store and [brew](https://brew.sh/). After that you need to install the following packages. Please install them one by one so that you will notice any errors.
-```
+### macOS Big Sur
+You will need XCode from the App Store and [brew](https://brew.sh/).
+
+First install the required libraries:
+``` shell
 xcode-select --install
 brew install libopenmpt # Not sure if this is needed
 brew install libomp
@@ -68,29 +52,11 @@ brew install fftw
 brew install gsl
 ```
 
-On Ubuntu 19.10 you might have to:
-```
-sudo apt-get update
-
-# sudo apt-cache search libtiff
-sudo apt-get install libtiff5-dev
-
-# sudo apt-cache search libfftw3
-sudo apt-get install libfftw3-dev
-```
-
-If you need/want to build fftw3 from source, that was not too tricky:
-```
-# download source first ...
-./configure --help
-./configure --enable-threads --enable-single
-make
+To build and install:
+``` shell
+make -B
 sudo make install
 ```
-
-## Notes
- * FFTW is self tuning and will perform some tuning every time it presented for a new problem size. The result of this tuning is called wisdom and is stored in files like `fftw_wisdom_float_threads_16.dat` by deconwolf (in `~/config/deonwolf/`). Do not transfer that file to other machines and expect the tuning to take some time.
-
 
 ## Resources and references
  * [fftw3 documentation](http://www.fftw.org/fftw3_doc/).

@@ -51,19 +51,17 @@ CC = cc $(CFLAGS)
 SRCDIR = src/
 
 dw = bin/dw
-dw_OBJECTS = fim.o tiling.o fft.o fim_tiff.o dw.o deconwolf.o
+dw_OBJECTS = fim.o tiling.o fft.o fim_tiff.o dw.o deconwolf.o deconwolf_tif_max.o
 
 dwbw = bin/dw_bw
 dwbw_OBJECTS = fim.o fim_tiff.o dw_bwpsf.o
 
-dwtm = bin/dw_tiffmax
-dwtm_OBJECTS = fim.o fim_tiff.o deconwolf_tif_max.o
-
+# dwtm = bin/dw_tiffmax
+# dwtm_OBJECTS = fim.o fim_tiff.o deconwolf_tif_max.o
 
 all: $(dw) $(dwtm) $(dwbw)
+# all: $(dw) $(dwtm) $(dwbw)
 
-$(dwtm): $(dwtm_OBJECTS)
-	$(CC) -o $@ $^ $(dwtm_LIBRARIES)
 
 $(dw): $(dw_OBJECTS)
 	$(CC) -o $@ $^ $(dw_LIBRARIES)
@@ -76,14 +74,11 @@ $(dwbw): $(dwbw_OBJECTS)
 
 clean:
 	rm -f $(dw) $(dw_OBJECTS)
-	rm -f $(dwtm) $(dwtm_OBJECTS)
 	rm -f $(dwbw) $(dwbw_OBJECTS)
 
 install:
 	# Binaries
 	cp bin/dw_bw $(DESTDIR)/dw_bw
-	cp bin/dw_tiffmax $(DESTDIR)/dw_tiffmax
-	cp src/deconwolf_batch.py $(DESTDIR)/dw_batch
 	cp bin/dw $(DESTDIR)/dw
 	cp src/dw_guide.py $(DESTDIR)/dw_guide
 	chmod +x $(DESTDIR)/dw_guide
@@ -94,7 +89,6 @@ install:
 
 uninstall:
 	rm $(DESTDIR)/dw
-	rm $(DESTDIR)/usr/bin/dw_bw
-	rm $(DESTDIR)/dw_tiffmax
+	rm $(DESTDIR)/dw_bw
 	rm $(DESTDIR)/dw_batch
 	rm $(MANPATH)/dw.1.gz

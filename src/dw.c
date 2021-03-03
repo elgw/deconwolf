@@ -391,8 +391,8 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
   /* Take care of the positional arguments */
   if(optind + 2 != argc)
   {
-      fprintf(stderr, "At least image and PSF has to be specified, hint: try '--help'!\n");
-    exit(1);
+      dw_usage(argc, argv, s);
+      exit(1);
   }
 
   s->imFile = realpath(argv[optind], 0);
@@ -699,15 +699,13 @@ fftwf_complex * initial_guess(const int64_t M, const int64_t N, const int64_t P,
 
 void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opts * s)
 {
-  printf(" Usage:\n");
-  printf("\t$ %s <options> image.tif psf.tif\n", argv[0]);
-  //  printf("or\n");
-  //  printf("\t$ %s --batch <options> image_dir psf_dir\n", argv[0]);
+  printf("usage: %s [<options>] image.tif psf.tif\n", argv[0]);
+
   printf("\n");
   printf(" Options:\n");
   printf(" --version\n\t Show version info\n");
   printf(" --help\n\t Show this measage\n");
-  printf(" --out <file>\n\t Specify output image name\n");
+  printf(" --out file\n\t Specify output image name\n");
   printf(" --iter N\n\t Specify the number of iterations to use (default: %d)\n", s->nIter);
   printf(" --threads N\n\t Specify the number of threads to use\n");
   printf(" --verbose N\n\t Set verbosity level (default: %d)\n", s->verbosity);
@@ -721,8 +719,12 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
   printf(" --bq Q\n\t Set border quality to 0 'worst', 1 'bad', or 2 'normal' which is default\n");
   printf(" --float\n\t Set output format to 32-bit float (default is 16-bit int) and disable scaling\n");
   printf(" --bg l\n\t Set background level, l\n");
-  //  printf(" --batch\n\t Generate a batch file to deconvolve all images in the `image_dir`\n");
   printf("\n");
+  printf("max-projections of tif files can be created with:\n");
+  printf("\t%s maxproj image.tif\n", argv[0]);
+  printf("\tsee %s maxproj --help\n", argv[0]);
+  printf("\n");
+  printf("Web page: https://www.github.com/elgw/deconwolf/\n");
 }
 
 
