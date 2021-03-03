@@ -271,8 +271,11 @@ void readUint16(TIFF * tfile, float * V,
         int ok = TIFFSetDirectory(tfile, dd);
         if(ok == 0)
         {
-            printf("Failed to choose directory %lu\n", dd);
-            printf("Either the file is corrupt or this program has a bug\n");
+            printf("Failed to choose directory %" PRIu64 "\n", dd);
+            printf("Either the file is corrupt or this program has a bug. "
+                   "Please verify with another program that the file is ok before "
+                   "filing a bug report.\n");
+            exit(EXIT_FAILURE);
             fflush(stdout);
         }
         for(int64_t kk=0; kk<nstrips; kk++) {

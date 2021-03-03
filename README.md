@@ -58,10 +58,11 @@ make -B
 sudo make install
 ```
 
-On OSX you will need XCode from the App Store and [brew](https://brew.sh/). After that you need to install
+On OSX you will need XCode from the App Store and [brew](https://brew.sh/). After that you need to install the following packages. Please install them one by one so that you will notice any errors.
 ```
 xcode-select --install
-brew install libopenmpt
+brew install libopenmpt # Not sure if this is needed
+brew install libomp
 brew install libtiff
 brew install fftw
 brew install gsl

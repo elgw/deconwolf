@@ -24,7 +24,7 @@ endif
 
 dw_LIBRARIES =  -lm -lfftw3f -lfftw3f_threads -ltiff
 dwtm_LIBRARIES =  -lm -ltiff -lfftw3f
-dwbw_LIBRARIES = -lm -ltiff -lpthread -ltiff -lfftw3f -lgsl
+dwbw_LIBRARIES = -lm -ltiff -lpthread -ltiff -lfftw3f -lgsl -lgslcblas
 MANPATH=/usr/share/man/man1/
 
 # on MacOS add -Xpreprocessor
