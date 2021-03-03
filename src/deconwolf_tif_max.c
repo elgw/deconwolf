@@ -1,10 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <getopt.h>
-#include "fim.h"
-#include "fim_tiff.h"
-#include "dw_version.h"
+#include "deconwolf_tif_max.h"
 
 #define MODE_MAX 0
 #define MODE_SLICE 1
@@ -16,20 +10,16 @@ typedef struct{
     int overwrite;
 } opts;
 
-
-void usage(__attribute__((unused)) int argc, char ** argv)
+static void usage(__attribute__((unused)) int argc, char ** argv)
 {
-    printf("Make a maximum intensity projection of uint16_t multi-page tiff file\n");
-    printf("Usage: %s input1.tif input2.tif ... \n", argv[0]);
-    printf("Example: %s dw*tif\n", argv[0]);
+    printf("usage: %s [<options>] input1.tif input2.tif ... \n", argv[0]);
     printf("Options:\n");
     printf(" --slice N\n\t Extract slice N\n");
     printf(" --overwrite\n\t Overwrite existing files\n");
-    printf("Part of deconwolf %s", deconwolf_version);
 }
 
 
-void argparsing(int argc, char ** argv, opts * s)
+static void argparsing(int argc, char ** argv, opts * s)
 {
     struct option longopts[] = {
                                  {"help", no_argument, NULL, 'h'},
@@ -58,7 +48,7 @@ void argparsing(int argc, char ** argv, opts * s)
 }
 
 
-int file_exist(char * fname)
+static int file_exist(char * fname)
 {
   if( access( fname, F_OK ) != -1 ) {
     return 1; // File exist
@@ -68,7 +58,15 @@ int file_exist(char * fname)
 }
 
 
+#ifdef STANDALONE
 int main(int argc, char ** argv)
+{
+    return dw_tiff_max(argc, argv);
+}
+#endif
+
+
+int dw_tiff_max(int argc, char ** argv)
 {
 
     opts * s = malloc(sizeof(opts));
@@ -121,5 +119,5 @@ int main(int argc, char ** argv)
     }
     free(outFile);
   }
-
+  return 0;
 }

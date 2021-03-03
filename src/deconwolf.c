@@ -20,6 +20,14 @@
 
 int main(int argc, char ** argv)
 {
+    if(argc > 1)
+    {
+        if(strcmp(argv[1], "maxproj") == 0)
+        {
+            return dw_tiff_max(argc-1, argv+1);
+        }
+    }
+
   dw_opts * s = dw_opts_new(); // Load default settings and initialize
   dw_argparsing(argc, argv, s); // Parse command line
   return dw_run(s); // And go!

@@ -39,6 +39,7 @@
 #include "fim_tiff.h"
 #include "dw_version.h"
 
+#include "deconwolf_tif_max.h"
 
 /* fftw3 wisdom data is stored and loaded from
  * $home/.config/
