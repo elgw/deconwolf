@@ -4,6 +4,7 @@
  - [ ] Get documentation up to date.
 
 ## Maybes
+ - [ ] Wrap malloc to catch allocation errors to the log file.
  - [ ] Provide test data and demos
  - [ ] Decide about default tiling settings based on the PSF.
  - [ ] Demos, for example on the effect of the tiling.
