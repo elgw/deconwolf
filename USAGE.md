@@ -4,11 +4,13 @@ it from a terminal. However, here is also a
 [GUI](https://github.com/elgw/dw_gui) that might be handy.
 
 ## Command line usage:
-To deconvolve an image you need an approximation of the PSF. If you don't
+To deconvolve an image (say `dapi_001.tif`) you need an approximation of
+the PSF. If you don't
 have one you can create one with `dw_bw` that is shipped with deconwolf.
 The basic information that you need to know is
  * The numerical aperture, NA.
- * The refractive index of the immersion, ni. Common media are air (ni = 1) and oil (ni = 1.51) and silicon oil (ni = 1.405).
+ * The refractive index of the immersion, ni. Common media are air (ni = 1)
+   and oil (ni = 1.51) and silicon oil (ni = 1.405).
  * The size of the pixels in the image.
  * The distance between the images/planes in z.
 
@@ -25,7 +27,8 @@ To deconvolve the images, type:
 dw dapi_001.tif PSF_dapi.tif
 ```
 
-that will produce a new image called `dw_dapi_001.tif` along with a log file
+that will produce a new image called `dw_dapi_001.tif` along with
+a log file
 called `dw_dapi_001.tif.log.txt`. Since you deserve better than the
 default settings, see other options:
 
@@ -62,8 +65,12 @@ saturated. The scaling value can be found at the end of the log files.
 
 ## Log files and output
  * The reported error is the mean square error between the input image
-   and the current guess convolved with the PSF.
- * If 16-bit output is used, the scaling is reported in the log file like:
+   and the current guess convolved with the PSF. Please note that deconwolf
+   doesn't know how the deconvolved images should look like so this isn't
+   in any way a measurement of how good image quality you get out of the
+   program.
+ * If the 16-bit output format is used, the scaling is reported in the
+   log file like:
    ```
    $ cat dw_dapi_001.tif.log.txt | grep scaling
    scaling: 0.425100
@@ -83,6 +90,12 @@ saturated. The scaling value can be found at the end of the log files.
    ```
    If it doesn't, chances are that deconwolf run out of memory and crashed.
 
-
 # Notes
- * FFTW is self tuning and will perform some tuning every time it presented for a new problem size. The result of this tuning is called wisdom and is stored in files like `fftw_wisdom_float_threads_16.dat` by deconwolf (in `~/config/deonwolf/`). Do not transfer that file to other machines and expect the tuning to take some time.
+ * FFTW is self tuning and will perform some tuning every time it
+   presented for a new problem size. The result of this tuning is called
+   wisdom and is stored in files like `fftw_wisdom_float_threads_16.dat`
+   by deconwolf in `~/config/deconwolf/`. Those files can in general
+   not be transferred to other machines.
+
+   This self-tuning can take considerable time but should only be needed
+   once per problem size.
