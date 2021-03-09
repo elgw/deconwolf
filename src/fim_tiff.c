@@ -1625,7 +1625,7 @@ int fim_tiff_extract_slice(char * in, char * out, int slice)
 
     if(slice > P)
     {
-        printf("Can't extract slice %d from an image with %lu slices\n", slice, P);
+        printf("Can't extract slice %d from an image with %" PRId64 " slices\n", slice, P);
         return -1;
     }
 
