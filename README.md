@@ -33,8 +33,10 @@ Ensure that the required packages are installed
 
 ``` shell
 sudo apt-get update
-sudo apt-get install fftw3f
-sudo apt-get install fftw3f_threads
+# find out actual names with command like
+# sudo apt-cache search fftw
+sudo apt-get install libfftw3-single3
+sudo apt-get install libfftw3-dev
 sudo apt-get install openmp
 sudo apt-get install tiff-5
 sudo apt-get install libgsl-dev
