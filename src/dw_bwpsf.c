@@ -174,27 +174,35 @@ void usage(__attribute__((unused)) int argc, char ** argv)
     printf(" Options:\n");
     printf(" --version\n\t Show version info and quit.\n");
     printf(" --help\n\t Show this message.\n");
-    printf(" --verbose L\n\t Set verbosity level to L.\n");
+    printf(" --verbose L\n\t Set verbosity level to L.\n"
+        "\t where 0 = quiet, 2 = full\n");
     printf(" --NA\n\t Set numerical aperture.\n");
     printf(" --lambda\n\t Set emission wavelength [nm].\n");
     printf(" --ni\n\t Set refractive index.\n");
     printf(" --threads\n\t Set number of threads.\n");
-    printf(" --resxy\n\t Set pixel size in x-y [nm].\n");
-    printf(" --resz\n\t Set pixel size in z [nm].\n");
-    printf(" --size N \n\t Set output size to N x N x P [pixels].\n");
+    printf(" --resxy\n\t Set lateral pixel size (x-y) [nm].\n");
+    printf(" --resz\n\t Set the axial pixel size in (z) [nm].\n");
+    printf(" --size N \n\t Set output size to N x N x P [pixels].\n"
+        "\t This should be set big enough so that the PSF cone\n"
+        "\t isn't cropped at the first and last slice of the PSF.\n");
     printf(" --nslice P\n\t Set output size to N x N x P [pixels].\n");
-    printf("\t N has to be an odd number.\n");
-    printf(" --quality Q\n\t Sets the integration quality to QxQxM samples per pixel.\n");
+    printf("\t P has to be an odd number. Please not that P should be at\n"
+           "\t least (2Z-1) where Z is the number of slices in the image\n"
+           "\t to be deconvolved\n");
+    printf(" --quality Q\n\t Sets the integration quality to QxQxM samples\n"
+           "\t per pixel.\n");
     printf("\t Q has to be an odd number.\n");
-    printf(" --qualityz R\n\t Sets the integration quality to QxQxR samples per pixel.\n");
+    printf(" --qualityz R\n\t Sets the integration quality to QxQxR \n"
+           "\tsamples per pixel.\n");
     printf("\t R has to be an odd number.\n");
     printf(" --no-fast\n\t Disable Li's fast method for the BW integral.\n");
-    printf("\t About 14x faster for the default PSF size. Not thoroughly tested.\n");
-    printf("\t Possibly unstable for large values of z.\n");
+    printf("\t About 14x faster for the default PSF size. "
+           "\t Not thoroughly tested.\n");
+    printf("\t Possibly unstable for large values of P.\n");
     printf(" --overwrite \n\t Overwrite the target image if it exists.\n");
     //   printf(" --test\n\t Run some tests\n");
-    //   printf(" --complex\n\t Integrate pixels as complex numbers\n");
-    printf("\b");
+    printf("\n");
+    printf("Web page: https://www.github.com/elgw/deconwolf/\n");
     return;
 }
 
