@@ -176,7 +176,7 @@ void usage(__attribute__((unused)) int argc, char ** argv)
     printf(" --help\n\t Show this message.\n");
     printf(" --verbose L\n\t Set verbosity level to L.\n");
     printf(" --NA\n\t Set numerical aperture.\n");
-    printf(" --lamda\n\t Set emission wavelength [nm].\n");
+    printf(" --lambda\n\t Set emission wavelength [nm].\n");
     printf(" --ni\n\t Set refractive index.\n");
     printf(" --threads\n\t Set number of threads.\n");
     printf(" --resxy\n\t Set pixel size in x-y [nm].\n");
