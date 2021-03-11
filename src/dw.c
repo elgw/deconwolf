@@ -1097,6 +1097,8 @@ float * psf_autocrop_byImage(float * psf, int64_t * pM, int64_t * pN, int64_t * 
 
   if(p < popt)
   {
+      fprintf(stdout, ANSI_COLOR_RED "WARNING:" ANSI_COLOR_RESET " The PSF has only %" PRId64
+              " slices, %" PRId64 " would be better.\n", p, popt);
     fprintf(s->log, "WARNING: The PSF has only %" PRId64 " slices, %" PRId64 " would be better.\n", p, popt);
     return psf;
   }
