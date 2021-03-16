@@ -459,7 +459,7 @@ class Menu(object):
 
             key = self.window.getch()
 
-            if key in [curses.KEY_ENTER, ord("\n")]:
+            if key in KEYS_ENTER:
 
                 if self.position == len(self.items) - 1:
                     self.config['write'] = 0
@@ -546,5 +546,3 @@ if __name__ == "__main__":
     g.selectOptions()
 
     g.runConfig()
-
-

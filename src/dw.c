@@ -80,6 +80,7 @@ dw_opts * dw_opts_new(void)
   s->fulldump = 0;
   s->positivity = 1;
   s->bg = 0;
+  s->flatfieldFile = NULL;
   return s;
 }
 
@@ -106,8 +107,10 @@ void dw_opts_free(dw_opts ** sp)
   nullfree(s->psfFile);
   nullfree(s->outFile);
   nullfree(s->logFile);
+  nullfree(s->flatfieldFile);
   nullfree(s->prefix);
   nullfree(s->commandline);
+
   free(s);
 }
 
@@ -117,6 +120,10 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
 
   fprintf(f, "> Settings:\n");
   fprintf(f, "image:  %s\n", s->imFile);
+  if(s->flatfieldFile != NULL)
+  {
+      fprintf(f, "flat field: %s\n", s->flatfieldFile);
+  }
   fprintf(f, "psf:    %s\n", s->psfFile);
   fprintf(f, "output: %s\n", s->outFile);
   fprintf(f, "log file: %s\n", s->logFile);
@@ -287,6 +294,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     { "bq",           required_argument, NULL,   'B' },
     { "float",        no_argument,       NULL,   'F' },
     { "fulldump",     no_argument,       NULL,   'D' },
+    { "flatfield",    required_argument, NULL,   'C' },
     { "experimental1", no_argument, NULL, 'X' },
     { "iterdump", no_argument, NULL, 'i'},
     { "nopos", no_argument, NULL, 'P'},
@@ -295,9 +303,12 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
   };
 
   int ch;
-  while((ch = getopt_long(argc, argv, "iFBvho:n:b:c:p:s:p:TXfDP", longopts, NULL)) != -1)
+  while((ch = getopt_long(argc, argv, "iFBvho:n:b:c:C:p:s:p:TXfDP", longopts, NULL)) != -1)
   {
     switch(ch) {
+    case 'C':
+        s->flatfieldFile = strdup(optarg);
+        break;
     case 'b':
         s->bg = atof(optarg);
         break;
@@ -719,6 +730,9 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
   printf(" --bq Q\n\t Set border quality to 0 'worst', 1 'bad', or 2 'normal' which is default\n");
   printf(" --float\n\t Set output format to 32-bit float (default is 16-bit int) and disable scaling\n");
   printf(" --bg l\n\t Set background level, l\n");
+  printf(" --flatfield image.tif\n\t"
+         " Use a flat field correction image. Deconwolf will divide each plane of the\n\t"
+         " input image, pixel by pixel, by this correction image.\n");
   printf("\n");
   printf("max-projections of tif files can be created with:\n");
   printf("\t%s maxproj image.tif\n", argv[0]);
@@ -1548,6 +1562,31 @@ void tiffErrHandler(const char* module, const char* fmt, va_list ap)
     fprintf(tifflogfile, "\n");
 }
 
+void flatfieldCorrection(dw_opts * s, float * im, int64_t M, int64_t N, int64_t P)
+{
+    printf("Experimental: applying flat field correction using %s\n", s->flatfieldFile);
+    ttags * T = ttags_new();
+    int64_t m = 0, n = 0, p = 0;
+    afloat * C = fim_tiff_read(s->flatfieldFile, T, &m, &n, &p, s->verbosity);
+    ttags_free(&T);
+
+    assert(m == M);
+    assert(n == N);
+    assert(p == 1);
+
+    // TODO:
+    // check that it is positive
+
+    for(int64_t zz = 0; zz<P; zz++)
+    {
+        for(size_t pos = 0; pos < (size_t) M*N; pos++)
+        {
+            im[M*N*zz + pos] /= C[pos];
+        }
+    }
+    free(C);
+}
+
 
 int dw_run(dw_opts * s)
 {
@@ -1712,10 +1751,18 @@ int dw_run(dw_opts * s)
 
   if(tiling)
   {
+      if(s->flatfieldFile != NULL)
+      {
+          printf("Warning: Flat-field correction can't be used in tiled mode\n");
+      }
     deconvolve_tiles(M, N, P, psf, pM, pN, pP, // psf and size
         s);// settings
   } else {
     fim_normalize_sum1(psf, pM, pN, pP);
+    if(s->flatfieldFile != NULL)
+    {
+        flatfieldCorrection(s, im, M, N, P);
+    }
     out = deconvolve_w(im, M, N, P, // input image and size
         psf, pM, pN, pP, // psf and size
         s);// settings

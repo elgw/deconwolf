@@ -61,6 +61,7 @@ typedef struct{
   char * outFile;
   char * logFile;
   char * prefix;
+  char * flatfieldFile;
   FILE * log;
   int tiling_maxSize;
   int tiling_padding;
