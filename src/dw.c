@@ -425,7 +425,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     char * basec = strdup(s->imFile);
     char * dname = dirname(dirc);
     char * bname = basename(basec);
-    s->outFile = malloc(strlen(dname) + strlen(bname) + 10);
+    s->outFile = malloc(strlen(dname) + strlen(bname) + strlen(s->prefix) + 10);
     sprintf(s->outFile, "%s/%s_%s", dname, s->prefix, bname);
     free(dirc);
     free(basec);
@@ -1724,20 +1724,20 @@ int dw_run(dw_opts * s)
     {
       printf("Relaxing the PSF\n");
     }
-    fim_normalize_sum1(psf, pM, pN, pP);
+
     size_t mid = (pM-1)/2 + (pN-1)/2*pM + (pP-1)/2*pM*pN;
-    for(int64_t kk = 0; kk<pM*pN*pP; kk++)
-    {
-        psf[kk] *= (1-s->relax);
-    }
-    printf("mid: %f -> %f\n", psf[mid], psf[mid]+s->relax);
+    //printf("mid: %f -> %f\n", psf[mid], psf[mid]+s->relax);
     psf[mid] += s->relax;
-    double spsf = 0;
-    for(int64_t kk = 0 ; kk<pM*pN*pP; kk++)
+    fim_normalize_sum1(psf, pM, pN, pP);
+    if(s->verbosity > 2)
     {
-        spsf+=psf[kk];
+        double spsf = 0;
+        for(int64_t kk = 0 ; kk<pM*pN*pP; kk++)
+        {
+            spsf+=psf[kk];
+        }
+        printf("Sum of PSF: %f\n", spsf);
     }
-    printf("Sum of PSF: %f\n", spsf);
   }
 
   if(s->verbosity > 0)
