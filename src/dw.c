@@ -92,6 +92,16 @@ void nullfree(void * p)
   }
 }
 
+char * gen_iterdump_name(
+                         __attribute__((unused)) const dw_opts * s,
+                                       int it)
+{
+    // Generate a name for the an iterdump file
+    // at iteration it
+    char * name = malloc(100*sizeof(char));
+    sprintf(name, "itd%05d.tif", it);
+    return name;
+}
 
 static int64_t int64_t_max(int64_t a, int64_t b)
 {
@@ -431,10 +441,13 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     free(basec);
   }
 
+  if(! s->iterdump)
+  {
   if( s->overwrite == 0 && file_exist(s->outFile))
   {
     printf("%s already exist. Doing nothing\n", s->outFile);
     exit(0);
+  }
   }
 
   s->logFile = malloc(strlen(s->outFile) + 10);
@@ -918,10 +931,10 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
 
     if(s->iterdump){
       afloat * temp = fim_subregion(x, wM, wN, wP, M, N, P);
-      char * tempname = malloc(100*sizeof(char));
-      sprintf(tempname, "x_%03d.tif", it);
-      printf(" Writing current guess to %s\n", tempname);
-      fim_tiff_write(tempname, temp, NULL, M, N, P, s->log);
+      char * outname = gen_iterdump_name(s, it);
+      printf(" Writing current guess to %s\n", outname);
+      fim_tiff_write(outname, temp, NULL, M, N, P, s->log);
+      free(outname);
       free(temp);
     }
 
@@ -1792,9 +1805,23 @@ int dw_run(dw_opts * s)
       //    floatimage_normalize(out, M*N*P);
       if(s->outFormat == 32)
       {
-          fim_tiff_write_float(s->outFile, out, T, M, N, P, s->log);
+          if(s->iterdump)
+          {
+              char * outFile = gen_iterdump_name(s, s->nIter);
+              fim_tiff_write_float(outFile, out, T, M, N, P, s->log);
+              free(outFile);
+          } else {
+              fim_tiff_write_float(s->outFile, out, T, M, N, P, s->log);
+          }
       } else {
-          fim_tiff_write(s->outFile, out, T, M, N, P, s->log);
+          if(s->iterdump)
+          {
+              char * outFile = gen_iterdump_name(s, s->nIter);
+              fim_tiff_write(outFile, out, T, M, N, P, s->log);
+              free(outFile);
+          } else {
+              fim_tiff_write(s->outFile, out, T, M, N, P, s->log);
+          }
       }
     }
   }
