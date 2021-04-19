@@ -932,7 +932,7 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
     if(s->iterdump){
       afloat * temp = fim_subregion(x, wM, wN, wP, M, N, P);
       char * outname = gen_iterdump_name(s, it);
-      printf(" Writing current guess to %s\n", outname);
+      //printf(" Writing current guess to %s\n", outname);
       fim_tiff_write(outname, temp, NULL, M, N, P, s->log);
       free(outname);
       free(temp);
