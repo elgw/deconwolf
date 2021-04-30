@@ -844,7 +844,8 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
   fflush(s->log);
 
   fft_train(wM, wN, wP,
-      s->verbosity, s->nThreads);
+            s->verbosity, s->nThreads,
+      s->log);
 
   if(s->verbosity > 0)
   {
@@ -933,7 +934,12 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
       afloat * temp = fim_subregion(x, wM, wN, wP, M, N, P);
       char * outname = gen_iterdump_name(s, it);
       //printf(" Writing current guess to %s\n", outname);
-      fim_tiff_write(outname, temp, NULL, M, N, P, s->log);
+      if(s->outFormat == 32)
+      {
+          fim_tiff_write_float(outname, temp, NULL, M, N, P, s->log);
+      } else {
+          fim_tiff_write(outname, temp, NULL, M, N, P, s->log);
+      }
       free(outname);
       free(temp);
     }
@@ -1758,7 +1764,7 @@ int dw_run(dw_opts * s)
     printf("Output: %s(.log.txt)\n", s->outFile);
   }
 
-  myfftw_start(s->nThreads);
+  myfftw_start(s->nThreads, s->verbosity, s->log);
 
   float * out = NULL;
 
