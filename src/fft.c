@@ -43,6 +43,7 @@ static double timespec_diff(struct timespec* end, struct timespec * start)
 
 
 // FFTW_MEASURE, FFTW_PATIENT or FFTW_EXHAUSTIVE
+//const unsigned int MYPLAN = FFTW_ESTIMATE;
 const unsigned int MYPLAN = FFTW_MEASURE;
 //const unsigned int MYPLAN = FFTW_PATIENT;
 
@@ -457,6 +458,51 @@ void fft_ut_flipall_conj()
     myfftw_stop();
 }
 
+
+double * fft_bench_1d(int64_t from, int64_t to, int niter)
+{
+    assert(to >= from);
+    assert(from > 0);
+    assert(niter > 0);
+
+    struct timespec tictoc_start, tictoc_end;
+
+    double * t = malloc(sizeof(double) * (to + 1 - from));
+    memset(t, 0, sizeof(double)*(to+1-from));
+    for(int kk = 0; kk<niter; kk++)
+    {
+        for(int64_t s = from; s <= to; s++)
+        {
+            float * fft_in = fftwf_malloc(s*sizeof(float));
+            for(int64_t kk = 0; kk<s; kk++)
+            {
+                fft_in[kk] = (float)  ((double) rand() / (double) RAND_MAX);
+            }
+            fftwf_complex * fft_out = fftwf_malloc(s * sizeof(fftwf_complex));
+            fftwf_plan plan = fftwf_plan_dft_r2c_1d(s,
+                                                  fft_in, fft_out,
+                                                  FFTW_ESTIMATE);
+
+            clock_gettime(CLOCK_REALTIME, &tictoc_start);
+            fftwf_execute(plan);
+            clock_gettime(CLOCK_REALTIME, &tictoc_end);
+
+            double took = timespec_diff(&tictoc_end, &tictoc_start);
+
+            if(kk > 0)
+            {
+                t[s-from] += took/(double) niter;
+            }
+
+
+            fftwf_destroy_plan(plan);
+            fftwf_free(fft_out);
+            fftwf_free(fft_in);
+        }
+    }
+    return t;
+}
+
 void fft_ut(void)
 {
     tictoc
@@ -464,5 +510,27 @@ void fft_ut(void)
         fft_ut_wisdom_name();
     fft_ut_flipall_conj();
     toc(fft_ut took)
-        return;
+
+    int64_t from = 1024;
+    int64_t to = 1030;
+    double * t = fft_bench_1d(from, to, 1000);
+    for(int64_t kk = 0; kk<= (to-from); kk++)
+    {
+        printf("Size: %ld, time %e\n", kk+from, t[kk]);
+    }
+    free(t);
+
+    // Typical z-sizes:
+    from = 80;
+    to = 90;
+    t = fft_bench_1d(from, to, 10000);
+    for(int64_t kk = 0; kk<= (to-from); kk++)
+    {
+        printf("Size: %ld, time %e\n", kk+from, t[kk]);
+    }
+    free(t);
+
+    // Free plans etc
+    fftwf_cleanup();
+    return;
 }

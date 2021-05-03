@@ -83,6 +83,8 @@ typedef struct{
   int onetile; // For debugging -- only process the first tile if set
   int experimental1;
   int fulldump; // write also what is outside of the image
+  // How far should bigger image sizes be considered?
+  int lookahead;
 } dw_opts;
 
 dw_opts * dw_opts_new(void);

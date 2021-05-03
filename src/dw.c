@@ -36,17 +36,14 @@
 #include "fim.h"
 #include "fim_tiff.h"
 
-
 #define tictoc struct timespec tictoc_start, tictoc_end;
 #define tic clock_gettime(CLOCK_REALTIME, &tictoc_start);
 #define toc(X) clock_gettime(CLOCK_REALTIME, &tictoc_end); printf(#X); printf(" %f s\n", timespec_diff(&tictoc_end, &tictoc_start)); fflush(stdout);
 
 
 // GLOBALS
-
 // used by tiffErrHandler
 FILE * tifflogfile = NULL; // Set to stdout or a file
-
 // END GLOBALS
 
 //typedef float afloat __attribute__ ((__aligned__(16)));
@@ -81,6 +78,7 @@ dw_opts * dw_opts_new(void)
   s->positivity = 1;
   s->bg = 0;
   s->flatfieldFile = NULL;
+  s->lookahead = 0;
   return s;
 }
 
@@ -120,7 +118,6 @@ void dw_opts_free(dw_opts ** sp)
   nullfree(s->flatfieldFile);
   nullfree(s->prefix);
   nullfree(s->commandline);
-
   free(s);
 }
 
@@ -192,6 +189,8 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
     default:
         ;
   }
+  fprintf(f, "FFT lookahead: %d", s->lookahead);
+
   if(s->onetile == 1)
   {
     fprintf(f, "DEBUG OPTION: ONETILE = TRUE (only first tile will be deconvolved)\n");
@@ -305,6 +304,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     { "float",        no_argument,       NULL,   'F' },
     { "fulldump",     no_argument,       NULL,   'D' },
     { "flatfield",    required_argument, NULL,   'C' },
+    { "lookahead",    required_argument, NULL,   'L' },
     { "experimental1", no_argument, NULL, 'X' },
     { "iterdump", no_argument, NULL, 'i'},
     { "nopos", no_argument, NULL, 'P'},
@@ -313,7 +313,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
   };
 
   int ch;
-  while((ch = getopt_long(argc, argv, "iFBvho:n:b:c:C:p:s:p:TXfDP", longopts, NULL)) != -1)
+  while((ch = getopt_long(argc, argv, "iFBvho:n:b:c:C:p:s:p:TXfDPL", longopts, NULL)) != -1)
   {
     switch(ch) {
     case 'C':
@@ -321,6 +321,9 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         break;
     case 'b':
         s->bg = atof(optarg);
+        break;
+    case 'L':
+        s->lookahead = atoi(optarg);
         break;
     case 'P':
         s->positivity = 0;
@@ -746,6 +749,9 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
   printf(" --flatfield image.tif\n\t"
          " Use a flat field correction image. Deconwolf will divide each plane of the\n\t"
          " input image, pixel by pixel, by this correction image.\n");
+  printf(" --lookahead N\n\t Use a bigger proportion of the PSF and allow the"
+         " job (image+PSF) to be N pixels larger than the --xyfactor suggets if"
+         " helps increasing the computatation speed");
   printf("\n");
   printf("max-projections of tif files can be created with:\n");
   printf("\t%s maxproj image.tif\n", argv[0]);
@@ -813,23 +819,37 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
   int64_t wN = N + pN -1;
   int64_t wP = P + pP -1;
 
-
   if(s->borderQuality == 1)
   {
-  wM = M + (pM+1)/2;
-  wN = N + (pN+1)/2;
-  wP = P + (pP+1)/2;
+      wM = M + (pM+1)/2;
+      wN = N + (pN+1)/2;
+      wP = P + (pP+1)/2;
   }
 
   if(s->borderQuality == 0)
   {
-  wM = int64_t_max(M, pM);
-  wN = int64_t_max(N, pN);
-  wP = int64_t_max(P, pP);
+      wM = int64_t_max(M, pM);
+      wN = int64_t_max(N, pN);
+      wP = int64_t_max(P, pP);
+  }
+
+  if(wP %2 == 1)
+  {
+      /*  The jobb size is not divisable by 2.
+       * potentially it could be faster to extend the job by
+       * one slice in Z, but for some sizes, e.g. 85->86 it gets slower
+       * some benchmarking or prediction should guide this, not just a flag.
+       */
+      if(s->experimental1)
+      {
+          printf("      Adding one extra slice to the job for performance"
+                 " this is still experimental. \n");
+          // One slice of the "job" should be cleared every iterations.
+          wP++;
+      }
   }
 
   size_t wMNP = wM*wN*wP;
-
 
   if(s->verbosity > 0)
   { printf("image: [%" PRId64 "x%" PRId64 "x%" PRId64 "], psf: [%" PRId64 "x%" PRId64 "x%" PRId64 "], job: [%" PRId64 "x%" PRId64 "x%" PRId64 "]\n",
@@ -997,7 +1017,7 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
     x = xp;
     xp = NULL;
 
-    if(s->experimental1 == 1 && (it == round(s->nIter/2)) )
+    if(s->experimental1 == 2 && (it == round(s->nIter/2)) )
     {
       printf("gsmoothing()\n");
       fim_gsmooth(x, wM, wN, wP, 0.5);
@@ -1170,10 +1190,10 @@ float * psf_autocrop_byImage(float * psf, int64_t * pM, int64_t * pN, int64_t * 
 
     if(s->verbosity > 0)
     {
-      fprintf(stdout, "PSF crop [%" PRId64 " x %" PRId64 " x %" PRId64 "] -> [%" PRId64 " x %" PRId64 " x %" PRId64 "]\n",
+      fprintf(stdout, "PSF Z-crop [%" PRId64 " x %" PRId64 " x %" PRId64 "] -> [%" PRId64 " x %" PRId64 " x %" PRId64 "]\n",
           m, n, p, pM[0], pN[0], pP[0]);
     }
-    fprintf(s->log, "PSF crop [%" PRId64 " x %" PRId64 " x %" PRId64 "] -> [%" PRId64 " x %" PRId64 " x %" PRId64 "]\n",
+    fprintf(s->log, "PSF Z-crop [%" PRId64 " x %" PRId64 " x %" PRId64 "] -> [%" PRId64 " x %" PRId64 " x %" PRId64 "]\n",
         m, n, p, pM[0], pN[0], pP[0]);
 
     return psf_cropped;
@@ -1188,6 +1208,10 @@ float * psf_autocrop_XY(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  
                                       __attribute__((unused)) int64_t P, // image size
     dw_opts * s)
 {
+    int64_t m = pM[0];
+    int64_t n = pN[0];
+    int64_t p = pP[0];
+
   // Find the y-z plane with the largest sum
   float maxsum = 0;
   for(int64_t xx = 0; xx<pM[0]; xx++)
@@ -1231,7 +1255,45 @@ float * psf_autocrop_XY(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  
     return psf;
   }
 
-  float * p = fim_get_cuboid(psf, pM[0], pN[0], pP[0],
+  // Benchmark FFTW to figure out a good compromise between cropping
+  // and a size that will be fast for fftw.
+  if(s->lookahead > 0)
+  {
+      fprintf(s->log, "> Testing lookahead up to %d\n", s->lookahead);
+      printf("Suggested PSF size: %" PRId64 "\n", pM[0] - 2*first);
+      int64_t imsize = M + (pM[0]-1) - 2*first;
+      int64_t imsize_max = M + (pM[0]-1);
+      printf("Gives images size: %" PRId64 " -- %" PRId64 "\n", imsize, imsize_max);
+      if(imsize_max - imsize > s->lookahead)
+      {
+          imsize_max = imsize+s->lookahead;
+      }
+      printf("lookahead gives: images size: %" PRId64 " -- %" PRId64 "\n", imsize, imsize_max);
+
+      double * times = fft_bench_1d(imsize, imsize_max, 100);
+      int bestAdd = 0;
+      double bestTime = INFINITY;
+      for(int kk = imsize; kk<= imsize_max; kk+=2)
+      {
+          if(times[kk-imsize] < bestTime)
+          {
+              bestTime = times[kk-imsize];
+              bestAdd = (kk-imsize)/2;
+          }
+          printf("job x-size: %d: %f\n", kk, times[kk-imsize]);
+      }
+      fflush(stdout);
+      double gain = times[0]/bestTime;
+      fprintf(s->log, "Lookahead gain: %f\n", gain);
+      if(s->verbosity > 1)
+      {
+          printf("Lookahead gain: %f\n", gain);
+      }
+      free(times);
+      first = first-bestAdd;
+  }
+
+  float * crop = fim_get_cuboid(psf, pM[0], pN[0], pP[0],
       first, pM[0] - first -1,
       first, pN[0] - first -1,
       0, pP[0]-1);
@@ -1240,11 +1302,14 @@ float * psf_autocrop_XY(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  
 
   if(s->verbosity > 0)
   {
-    printf("PSF X-crop: Removing %" PRId64 " planes in XY\n", first);
+      fprintf(stdout, "PSF XY-crop [%" PRId64 " x %" PRId64 " x %" PRId64 "] -> [%" PRId64 " x %" PRId64 " x %" PRId64 "]\n",
+              m, n, p, pM[0], pN[0], pP[0]);
   }
+  fprintf(s->log, "PSF XY-crop [%" PRId64 " x %" PRId64 " x %" PRId64 "] -> [%" PRId64 " x %" PRId64 " x %" PRId64 "]\n",
+          m, n, p, pM[0], pN[0], pP[0]);
 
   free(psf);
-  return p;
+  return crop;
 }
 
 float * psf_autocrop(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  // psf and size

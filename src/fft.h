@@ -18,6 +18,7 @@
 #define fft_h
 
 #include <fftw3.h>
+#include <stdint.h>
 
 // Call this before any other commands
 // log can be NULL
@@ -53,5 +54,9 @@ void fft_train(size_t M, size_t N, size_t P,
     FILE * log);
 
 void fft_ut(void);
+
+// Benchmark 1D ffts of size from, from+1, ... to
+// return time for each size
+double * fft_bench_1d(uint64_t from, uint64_t to, int niter);
 
 #endif
