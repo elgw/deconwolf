@@ -2,16 +2,18 @@
 im1=Bars-G10-P15-stack.tif
 im2=Bars-G10-P30-stack.tif
 psf=PSF-Bars-stack.tif
+iter=50
+threads=8
 
 # Normal settings
-dw --float --overwrite --iter 40 --prefix dw40 $im1 $psf
-dw --float --overwrite --iter 40 --prefix dw40 $im2 $psf 
+dw --threads $threads --float --overwrite --iter $iter --prefix dw$iter $im1 $psf
+dw --threads $threads  --float --overwrite --iter $iter --prefix dw$iter $im2 $psf 
 
 # bq  0
-dw --float --overwrite --iter 40 --bq 0 --prefix dw40.bq0 $im1 $psf 
-dw --float --overwrite --iter 40 --bq 0 --prefix dw40.bq0 $im2 $psf 
+dw --threads $threads  --float --overwrite --iter $iter --bq 0 --prefix dw${iter}.bq0 $im1 $psf 
+dw --threads $threads  --float --overwrite --iter $iter --bq 0 --prefix dw${iter}.bq0 $im2 $psf 
 
 # bq1
-dw --float --overwrite --iter 40 --bq 1 --prefix dw40.bq1 $im1 $psf 
-dw --float --overwrite --iter 40 --bq 1 --prefix dw40.bq1 $im2 $psf 
+dw --threads $threads  --float --overwrite --iter $iter --bq 1 --prefix dw${iter}.bq1 $im1 $psf 
+dw --threads $threads  --float --overwrite --iter $iter --bq 1 --prefix dw${iter}.bq1 $im2 $psf 
 

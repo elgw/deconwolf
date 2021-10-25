@@ -731,7 +731,7 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
   printf("\n");
   printf(" Options:\n");
   printf(" --version\n\t Show version info\n");
-  printf(" --help\n\t Show this measage\n");
+  printf(" --help\n\t Show this message\n");
   printf(" --out file\n\t Specify output image name\n");
   printf(" --iter N\n\t Specify the number of iterations to use (default: %d)\n", s->nIter);
   printf(" --threads N\n\t Specify the number of threads to use\n");
@@ -749,9 +749,9 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
   printf(" --flatfield image.tif\n\t"
          " Use a flat field correction image. Deconwolf will divide each plane of the\n\t"
          " input image, pixel by pixel, by this correction image.\n");
-  printf(" --lookahead N\n\t Use a bigger proportion of the PSF and allow the"
-         " job (image+PSF) to be N pixels larger than the --xyfactor suggets if"
-         " helps increasing the computatation speed");
+  printf(" --lookahead N"
+         "\n\t Try to do a speed-for-memory trade off by using a N pixels larger"
+         "\n\t job size that is better suited for FFT.\n");
   printf("\n");
   printf("max-projections of tif files can be created with:\n");
   printf("\t%s maxproj image.tif\n", argv[0]);

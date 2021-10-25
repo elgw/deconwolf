@@ -7,25 +7,25 @@ files(end).Tag = 'Synthetic SNR15';
 files(end+1).Name = 'Bars-G10-P30-stack.tif';
 files(end).Tag = 'Synthetic SNR30';
 
-files(end+1).Name = 'dw40_Bars-G10-P15-stack.tif';
+files(end+1).Name = 'dw50_Bars-G10-P15-stack.tif';
 files(end).Tag = 'dw SNR15';
-files(end+1).Name = 'dw40_Bars-G10-P30-stack.tif';
+files(end+1).Name = 'dw50_Bars-G10-P30-stack.tif';
 files(end).Tag = 'dw SNR30';
 
-files(end+1).Name = 'dw40.bq1_Bars-G10-P15-stack.tif';
-files(end).Tag = 'dw40.bq1 SNR15';
-files(end+1).Name = 'dw40.bq1_Bars-G10-P30-stack.tif';
-files(end).Tag = 'dw40.bq1 SNR30';
+files(end+1).Name = 'dw50.bq1_Bars-G10-P15-stack.tif';
+files(end).Tag = 'dw50.bq1 SNR15';
+files(end+1).Name = 'dw50.bq1_Bars-G10-P30-stack.tif';
+files(end).Tag = 'dw50.bq1 SNR30';
 
-files(end+1).Name = 'dw40.bq0_Bars-G10-P15-stack.tif';
-files(end).Tag = 'dw40.bq0 SNR15';
-files(end+1).Name = 'dw40.bq0_Bars-G10-P30-stack.tif';
-files(end).Tag = 'dw40.bq0 SNR30';
+files(end+1).Name = 'dw50.bq0_Bars-G10-P15-stack.tif';
+files(end).Tag = 'dw50.bq0 SNR15';
+files(end+1).Name = 'dw50.bq0_Bars-G10-P30-stack.tif';
+files(end).Tag = 'dw50.bq0 SNR30';
 
-files(end+1).Name = 'P15_deconvolution_lab40.tif';
-files(end).Tag = 'dvl2 SNR15';
-files(end+1).Name = 'P30_deconvolution_lab40.tif';
-files(end).Tag = 'dvl2 SNR30';
+files(end+1).Name = 'P15_deconvolution_lab50.tif';
+files(end).Tag = 'DL2RL50 SNR15';
+files(end+1).Name = 'P30_deconvolution_lab50.tif';
+files(end).Tag = 'DL2RL50 SNR30';
 
 % We don't scale the reference image
 Iref = df_readTif('Bars-stack.tif');
@@ -47,7 +47,7 @@ end
 tab = struct2table(files);
 % writetable(tab, 'tab.csv')
 % save as table circumvent whimsical rounding
-df_writeTable(tab, 'tab.csv');
+df_writeTable(tab, 'bars50tab.csv');
 end
 
 

@@ -20,6 +20,7 @@ ifeq ($(DEBUG),1)
 else
 #CFLAGS +=  -g -O2 -ftree-vectorize -Wno-unknown-pragmas -flto
 CFLAGS +=  -O3 -Wno-unknown-pragmas -flto -DNDEBUG
+#-fno-math-errno no relevant performance gain
 endif
 
 dw_LIBRARIES =  -lm -lfftw3f -lfftw3f_threads -ltiff
