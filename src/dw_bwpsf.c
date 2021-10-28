@@ -19,9 +19,11 @@
  * Use dynamic integration, at least in x-y
 */
 
+
+
 #include "dw_bwpsf.h"
 #include "li.c"
-
+#include "bw_int1_gsl.c"
 // j0f, i.e., the float version of j0 is not available on mac
 #ifdef __APPLE__
 #define j0f j0
@@ -48,22 +50,25 @@ void bw_conf_printf(FILE * out, bw_conf * conf)
     fprintf(out, "Overwrite: %d\n", conf->overwrite);
     fprintf(out, "File: %s\n", conf->outFile);
     fprintf(out, "Log: %s\n", conf->logFile);
-    if(conf->complexPixel)
-    {
-        fprintf(out, "Complex pixel integration enabled -- not recommended.\n");
-    }
 
-
-        fprintf(out, "Pixel integration: %dx%dx%d samples per pixel\n",
-                conf->Simpson, conf->Simpson, conf->Simpson_z);
+    fprintf(out, "Pixel integration: %dx%dx%d samples per pixel\n",
+            conf->Simpson, conf->Simpson, conf->Simpson_z);
 
     fprintf(out, "Oversampling of radial profile: %d X\n", conf->oversampling_R);
-    if(conf->fast_li)
+
+    if(conf->mode_int1 == MODE_INT1_LI)
     {
-        fprintf(out, "Li's fast method: enabled\n");
-    } else {
-        fprintf(out, "Li's fast method: disabled\n");
+        fprintf(out, "1D Integral: Li's fast method enabled\n");
     }
+    if(conf->mode_int1 == MODE_INT1_PG)
+    {
+        fprintf(out, "1D Integral: PSFGenerator clone\n");
+    }
+    if(conf->mode_int1 == MODE_INT1_GSL)
+    {
+        fprintf(out, "1D Integral: gsl_integration_qag\n");
+    }
+
 
     // Show theoretical FWHM of the PSF
     // And look at the number of pixels per fwhm
@@ -109,11 +114,10 @@ bw_conf * bw_conf_new()
     conf->logFile = NULL;
     conf->overwrite = 0;
     conf->Simpson = 21;
-    conf->Simpson_z = 1;
+    conf->Simpson_z = 3;
     conf->oversampling_R = 20;
-    conf->fast_li = 1;
+    conf->mode_int1 = MODE_INT1_LI;
     conf->testing = 0;
-    conf->complexPixel = 0;
     return conf;
 }
 
@@ -195,7 +199,9 @@ void usage(__attribute__((unused)) int argc, char ** argv)
     printf(" --qualityz R\n\t Sets the integration quality to QxQxR \n"
            "\tsamples per pixel.\n");
     printf("\t R has to be an odd number.\n");
-    printf(" --no-fast\n\t Disable Li's fast method for the BW integral.\n");
+    printf(" --1d-li\n\t Use Li's method for the BW integral.\n");
+    printf(" --1d-gsl\n\t Use GSL for the BW integral.\n");
+    printf(" --1d-pg\n\t Use something similar to the PSFGenerator for the BW integral.\n");
     printf("\t About 14x faster for the default PSF size. "
            "\t Not thoroughly tested.\n");
     printf("\t Possibly unstable for large values of P.\n");
@@ -234,24 +240,28 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
          { "nslice",       required_argument, NULL, 'P'},
          { "quality",      required_argument, NULL, 'q'},
          { "qualityz",      required_argument, NULL, 'Z'},
-         { "no-fast",         no_argument,       NULL, 'f'},
+         { "1d-li",         no_argument,       NULL, 'f'},
+         { "1d-gsl",         no_argument,       NULL, 'g'},
+         { "1d-pg",           no_argument,       NULL, 'G'},
          { "testing",       no_argument, NULL, 'T'},
-         { "complex",       no_argument, NULL, 'c'},
          { NULL,           0,                 NULL,  0 }
         };
     int Pset = 0;
     int ch;
-    while((ch = getopt_long(argc, argv, "fq:vho:t:p:w:n:i:x:z:N:P:l:TcZ:", longopts, NULL)) != -1)
+    while((ch = getopt_long(argc, argv, "fqGvho:t:p:w:n:i:x:z:N:P:l:TZ:", longopts, NULL)) != -1)
     {
         switch(ch) {
-        case 'c':
-            s->complexPixel = 1;
-            break;
         case 'T':
             s->testing = 1;
             break;
         case 'f':
-            s->fast_li = 0;
+            s->mode_int1 = MODE_INT1_LI;
+            break;
+        case 'g':
+            s->mode_int1 = MODE_INT1_GSL;
+            break;
+        case 'G':
+            s->mode_int1 = MODE_INT1_PG;
             break;
         case 'q':
             s->Simpson = atoi(optarg);
@@ -456,7 +466,7 @@ float complex integrand(float rho, float r, float z, bw_conf * conf) {
     // j0 has smaller errors but I don't think that we need that precision.
     // j0f is much faster
 
-    #if 0
+#if 0
     // This is how it looks in the Java code
     float BesselValue = j0f(k0 * conf->NA * r * rho);
     // Optical path difference
@@ -493,7 +503,9 @@ double complex calculate(float r, float defocus, bw_conf * conf) {
     double del = 1.0/N; // sub-interval length
 
     // Initial 3-point estimation
+    //printf("r = %f, defocus = %f\n", r, defocus);
     complex float sumOddIndex = integrand(0.5, r, defocus, conf);
+    //printf("Initial: %f, %fi\n", creal(sumOddIndex), cimag(sumOddIndex) );
     complex float sumEvenIndex = 0;
     complex float valueX0 = integrand(0.0, r, defocus, conf);
     float complex  valueXn = integrand(1.0, r, defocus, conf);
@@ -504,7 +516,7 @@ double complex calculate(float r, float defocus, bw_conf * conf) {
     // (almost) double the number of points until desired precision
     size_t k = 0; // number of consecutive successful approximations
     size_t iteration = 1;
-    size_t max_iterations = 16;
+    size_t max_iterations = 15;
 
     while (k < conf->K && iteration <= max_iterations) {
         iteration++;
@@ -554,10 +566,10 @@ double complex calculate(float r, float defocus, bw_conf * conf) {
 
 double simp1_weight(size_t k, size_t N)
 {
-    // Weights for 1D-Simpson
-    // [1, 4, 1] N=3
-    // [1, 4, 2, 4, 1] N=5
-    // [1, 4, 2, 4, 2, 5, 1] N=7, ...
+    /* Weights for 1D-Simpson
+     * [1, 4, 1] N=3
+     * [1, 4, 2, 4, 1] N=5
+     * [1, 4, 2, 4, 2, 4, 1] N=7, */
     assert(N%2 == 1);
     if(k == 0 || k == N-1)
         return 1.0;
@@ -566,41 +578,17 @@ double simp1_weight(size_t k, size_t N)
     return 4.0;
 }
 
-
-double complex simp2_complex(int OVER_SAMPLING, double xc, double yc, double complex * H, double * R, double x0, double x1, double y0, double y1, int N)
+double simp2(int OVER_SAMPLING,
+             double xc, double yc,
+             double * H, double * R,
+             double x0, double x1,
+             double y0, double y1, int N)
 {
 
-    double dx = (x1-x0)/(double) N;
-    double dy = (y1-y0)/(double) N;
-    double complex v = 0;
-    size_t sW = 0;
-    for(int kk = 0; kk<N; kk++)
-    {
-        double wx = simp1_weight(kk, N);
-        for(int ll = 0; ll<N; ll++)
-        {
-            double wy = simp1_weight(ll, N);
-            double w = wx*wy;
-            double x = x0+kk*dx;
-            double y = y0+kk*dy;
-            double r = sqrt(pow(x-xc, 2) + pow(y-yc, 2));
-            int index = (int) floor(r*OVER_SAMPLING);
-            sW+=w;
-            v+=w*(H[index] + (H[index+1] - H[index]) * (r-R[index]));
-        }
-    }
-    v = v/sW; // Pretty sure we don't need to count them ...
-
-    return v;
-}
-
-double simp2(int OVER_SAMPLING, double xc, double yc, double * H, double * R, double x0, double x1, double y0, double y1, int N)
-{
-
-    double dx = (x1-x0)/(double) N;
-    double dy = (y1-y0)/(double) N;
+    double dx = (x1-x0)/(double) (N-1);
+    double dy = (y1-y0)/(double) (N-1);
     double v = 0;
-    size_t sW = 0;
+    size_t sW = 0; /* Sum of weights */
     for(int kk = 0; kk<N; kk++)
     {
         double wx = simp1_weight(kk, N);
@@ -609,14 +597,17 @@ double simp2(int OVER_SAMPLING, double xc, double yc, double * H, double * R, do
             double wy = simp1_weight(ll, N);
             double w = wx*wy;
             double x = x0+kk*dx;
-            double y = y0+kk*dy;
+            double y = y0+ll*dy;
             double r = sqrt(pow(x-xc, 2) + pow(y-yc, 2));
             int index = (int) floor(r*OVER_SAMPLING);
+
             sW+=w;
+            //double ival = (H[index] + (H[index+1] - H[index]) * (r-R[index]));
+            //printf("%f: %f, %f r=%f, ival=%f\n", w, x, y, r, ival);
             v+=w*(H[index] + (H[index+1] - H[index]) * (r-R[index]));
         }
     }
-    v = v/sW; // Pretty sure we don't need to count them ...
+    v = v/sW;
 
     return v;
 }
@@ -638,8 +629,7 @@ void BW_slice(float * V, float z, bw_conf * conf)
     size_t nr = maxRadius*conf->oversampling_R;
     double * r = malloc(nr * sizeof(double));
 
-    // We will have a real and a complex profile
-    double complex * hComplex = malloc(nr * sizeof(complex double));
+    // abs(x)^2
     double * hReal = malloc(nr * sizeof(double));
 
     /* Calculate the radial profile
@@ -651,13 +641,12 @@ void BW_slice(float * V, float z, bw_conf * conf)
     }
 
 
-    // Radial profile using Simpsons's integral
-    if(conf->fast_li == 0)
+    /* Calculate 1D integral using something similar to the PSFGenerator */
+    if(conf->mode_int1 == MODE_INT1_PG)
     {
         int NS = conf->Simpson_z;
         for (size_t n = 0; n < nr; n++) {
             hReal[n] = 0;
-            hComplex[n] = 0;
 
             double complex now_complex = 0;
             double now_real = 0;
@@ -670,6 +659,7 @@ void BW_slice(float * V, float z, bw_conf * conf)
                 //printf("zs=%f ", zs);
                 double w = simp1_weight(kk, NS);
                 sW += w;
+                //                printf("r[%zu] = %f, resLateral=%f, zs=%f", n, r[n], conf->resLateral, zs);
                 double complex value = calculate(r[n] * conf->resLateral, zs, conf);
                 now_complex += w*value;
                 now_real += w*cabs2(value);
@@ -679,17 +669,15 @@ void BW_slice(float * V, float z, bw_conf * conf)
             //printf("sW = %f\n", sW);
 
             hReal[n] = now_real/sW;
-            hComplex[n] = now_complex/sW;
         }
     }
 
-    // Radial profile using Bessel series
-    if(conf->fast_li == 1) // Using Li
+    /* 1D integral using Bessel series, li */
+    if(conf->mode_int1 == MODE_INT1_LI)
     {
         int NS = conf->Simpson_z;
         // NS = 1; Just for testing
         memset(hReal, 0, nr*sizeof(double));
-        memset(hComplex, 0, nr*sizeof(complex double));
 
 
         double dz = 0;
@@ -710,7 +698,6 @@ void BW_slice(float * V, float z, bw_conf * conf)
             {
                 complex double v = li_calc(L, r[n]*conf->resLateral);
                 hReal[n] += w*cabs2(v);
-                hComplex[n] += w*v;
             }
             li_free(&L);
         }
@@ -721,21 +708,58 @@ void BW_slice(float * V, float z, bw_conf * conf)
         for(size_t n = 0; n < nr; n++)
         {
             hReal[n]/=wtot;
-            hComplex[n]/=wtot;
         }
     }
 
-    if(0){
-    for(int kk = 0; kk<10; kk++)
+    /* 1D integral using GSL */
+    if(conf->mode_int1 == MODE_INT1_GSL)
     {
-        printf("r=%f, hReal = %e, cabs2(hComplex) = %e\n", r[kk], hReal[kk], cabs2(hComplex[kk]));
-    }
-    exit(1);
+        struct my_params gsl_params;
+        gsl_params.ncalls = 0;
+        gsl_params.NA = conf->NA;
+        gsl_params.ni = conf->ni;
+
+        gsl_params.lambda = conf->lambda;
+        gsl_params.ninterval = 10000;
+        gsl_integration_workspace * gsl_workspace =
+            gsl_integration_workspace_alloc(gsl_params.ninterval);
+
+        int NS = conf->Simpson_z;
+        memset(hReal, 0, nr*sizeof(double));
+
+        double dz = 0;
+        if(NS > 1) {
+            dz = (conf->resAxial)/(NS-1);
+        }
+
+        /* Trapezoid integration over Z */
+        for(int kk = 0; kk < NS; kk++)
+        {
+            double zs = z + kk*dz - (NS-1)/2*dz;
+            // printf("zs = %f\n", zs);
+            gsl_params.defocus = zs;
+
+            for(size_t n = 0; n < nr; n++) // over r
+            {
+                gsl_params.r = r[n]*conf->resLateral;
+                double value = integrate_bw_gsl(&gsl_params, gsl_workspace);
+                double trapw = 1; /* Trapezoid weight */
+                if(kk == 0 || kk + 1 == NS)
+                {
+                    trapw = 0.5;
+                }
+                hReal[n] += trapw/(double) NS * value;
+            }
+
+        }
+        gsl_integration_workspace_free(gsl_workspace);
     }
 
     assert(r[0] == 0);
 
-    // For each pixel in the quadrant
+    /*
+     * For each pixel in the quadrant integrate over x and y
+     */
     for (int x = 0; 2*x <= conf->M; x++) {
         for (int y = 0; 2*y <= conf->N; y++) {
 
@@ -743,32 +767,14 @@ void BW_slice(float * V, float z, bw_conf * conf)
             double rPixel = sqrt(pow((double) x - x0, 2) + pow((double) y - y0, 2));
             double pIntensity = 0;
 
-            // Pixel integration by Real scalars
-            if(conf->complexPixel == 0)
-            {
-                double v = 0;
-                if(conf->Simpson > 0)
-                {
-                    v = simp2(OVER_SAMPLING, x0, y0, hReal, r, x - 0.5, x + 0.5, y - 0.5, y + 0.5, conf->Simpson);
-                }
-                else
-                {
-                    // Index of nearest coordinate from below (replace by pixel integration)
-                    size_t index = (int) floor(rPixel * OVER_SAMPLING);
-                    assert(index < nr);
-                    // Interpolated value.
-                    v = hReal[index] + (hReal[index + 1] - hReal[index]) * (rPixel - r[index]) * OVER_SAMPLING;
-                }
-                pIntensity = v;
-            }
-
-            // Pixel integration by Complex numbers
-            if(conf->complexPixel == 1)
-            {
-                complex double v = 0;
+            // Pixel integration
+            double v = 0;
             if(conf->Simpson > 0)
             {
-                v = simp2_complex(OVER_SAMPLING, x0, y0, hComplex, r, x - 0.5, x + 0.5, y - 0.5, y + 0.5, conf->Simpson);
+                v = simp2(OVER_SAMPLING,
+                          x0, y0, hReal, r,
+                          x - 0.5, x + 0.5,
+                          y - 0.5, y + 0.5, conf->Simpson);
             }
             else
             {
@@ -776,10 +782,10 @@ void BW_slice(float * V, float z, bw_conf * conf)
                 size_t index = (int) floor(rPixel * OVER_SAMPLING);
                 assert(index < nr);
                 // Interpolated value.
-                v = hComplex[index] + (hComplex[index + 1] - hComplex[index]) * (rPixel - r[index]) * OVER_SAMPLING;
+                v = hReal[index] + (hReal[index + 1] - hReal[index]) * (rPixel - r[index]) * OVER_SAMPLING;
             }
-            pIntensity = cabs2(v);
-            }
+            pIntensity = v;
+
 
             // Use symmetry to fill the output image plane
             int xf = conf->M-x-1;
@@ -797,7 +803,6 @@ void BW_slice(float * V, float z, bw_conf * conf)
 
     free(r);
     free(hReal);
-    free(hComplex);
     return;
 }
 

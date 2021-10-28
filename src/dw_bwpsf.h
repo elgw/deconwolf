@@ -38,6 +38,13 @@
 #include "fim_tiff.h"
 #include "dw_version.h"
 
+#include <gsl/gsl_integration.h>
+
+/* Mode for calculating the 1D integral */
+#define MODE_INT1_LI 0
+#define MODE_INT1_PG 0
+#define MODE_INT1_GSL 0
+
 typedef struct {
     int verbose;
     int overwrite;
@@ -61,9 +68,8 @@ typedef struct {
     // Integration options
     int Simpson; // Use this number of points for Simpson integration
     int Simpson_z; // Number of points in Z
-    int fast_li; // Use Li's method for the integral
+    int mode_int1; /* How to calculate the 1D integral */
     int oversampling_R; // Oversampling in radial direction
-    int complexPixel; // Integrate pixels as complex?
 
     float * V; // output image
     // shape of output image
