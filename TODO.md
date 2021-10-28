@@ -1,9 +1,13 @@
 # Todo
 ## Top priority
- - [ ] Crash-safe writing of output images, write to temporary file and move when write is complete to avoid bad luck.
+ - [ ] Crash-safe writing of output images, write to temporary file and
+       move when write is complete to avoid bad luck.
  - [ ] Get documentation up to date.
+ - [ ] Set default PSF size in `dw_bw` based on the fwhm of the PSF.
 
-## Maybes
+## Nice to have
+ - [ ] Adjust the PSF cropping so that the working image size has at least
+       one power of two. Or even better use `nextfastfft` from [LFAT](https://ltfat.github.io/notes/ltfatnote017.pdf), [code](https://github.com/ltfat/ltfat/blob/master/fourier/nextfastfft.m)
  - [ ] Wrap malloc to catch allocation errors to the log file.
  - [ ] Provide test data and demos
  - [ ] Decide about default tiling settings based on the PSF.
@@ -11,10 +15,14 @@
  - [ ] Include normal `Richardson-Lucy`
  - [ ] Make `FFTW_ESTIMATE` an option.
  - [ ] Double check the tiling weights using gradients and other patterns.
- - [ ] Give some love to deconwolf_batch.py (tiff vs tif, help mapping channels, install systemwide, etc)
  - [ ] Add information on the input image to the log -- especially detect saturated pixels.
  - [ ] Make sure that something that makes sense happens when a Pyramidal tif is supplied.
+
+## Maybes
  - [ ] Figure out if there are any performance benefits by buildin fftw3 from source for `-march=native`.
+ - [ ] Try the FFTW interface to
+       [cuFFT](https://docs.nvidia.com/cuda/cufft/index.html#fftw-supported-interface)
+
 
 ## Done:
  - [x] Write down the image scaling to the log files.

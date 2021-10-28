@@ -26,7 +26,7 @@ deconwolf from the source code, instructions follows below.
 
 ## Building and installing
 Deconwolf runs on 64-bit machines with x86_64 architecture, it has been built
-and installed on Ubuntu 20.04 and macOS Big Sur.
+and installed on Ubuntu 20.04 and macOS Big Sur. I've collected instruction for other systems [here](INSTALL.md)
 
 ### Ubuntu 20.04
 Ensure that the required packages are installed
