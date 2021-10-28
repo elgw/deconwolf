@@ -1,5 +1,0 @@
-dw --iter 50 --float --overwrite --prefix dw50 sdots.tif psf.tif
-dw --iter 100 --float --overwrite --prefix dw100 sdots.tif psf.tif
-dw --iter 150 --float --overwrite --prefix dw150 sdots.tif psf.tif
-dw --iter 200 --float --overwrite --prefix dw200 sdots.tif psf.tif
-
