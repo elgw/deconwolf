@@ -1,3 +1,4 @@
+/* Original repo: born_wolf_numeric */
 struct my_params {
     double NA;
     double ni;
@@ -87,19 +88,22 @@ double my_f_z(double z, void * p)
 
 double integrate_bw_gsl_z(struct my_params * params, gsl_integration_workspace * workspace1, gsl_integration_workspace * workspaceZ)
 {
-/* Note: division by dz at the end, i.e. returns the average */
+/* Integration of the BW integral over a range of z (constant r)
+ * Note: division by dz at the end, i.e. returns the average */
+
     gsl_function fun;
     fun.function = &my_f_z;
     fun.params = params;
 
     double result = 0;
     double abserr = 0;
-    double epsabs = 1e-6; /* 1e-9 would not work ... */
+    double epsabs = 1e-6; /* ... */
     double epsrel = 1e-8;
     size_t limit = params->ninterval;
     int key = GSL_INTEG_GAUSS15; /* Default in MATLAB */
     params->workspace1 = workspace1;
-    int status = gsl_integration_qag(&fun, params->z0, params->z1,
+    /* We ignore the status from gsl_integration_qag */
+    gsl_integration_qag(&fun, params->z0, params->z1,
                         epsabs, epsrel,
                         limit, key, workspaceZ,
                         &result, &abserr);

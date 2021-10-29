@@ -41,9 +41,10 @@
 #include <gsl/gsl_integration.h>
 
 /* Mode for calculating the 1D integral */
-#define MODE_INT1_LI 0
-#define MODE_INT1_PG 0
 #define MODE_INT1_GSL 0
+#define MODE_INT1_LI 1
+#define MODE_INT1_PG 2
+
 
 typedef struct {
     int verbose;
@@ -66,8 +67,8 @@ typedef struct {
     float resAxial; // pixel size in z
 
     // Integration options
-    int Simpson; // Use this number of points for Simpson integration
-    int Simpson_z; // Number of points in Z
+    int samples_xy;
+    int samples_z; // Number of points in Z
     int mode_int1; /* How to calculate the 1D integral */
     int oversampling_R; // Oversampling in radial direction
 

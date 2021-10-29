@@ -81,8 +81,6 @@ install:
 	# Binaries
 	cp bin/dw_bw $(DESTDIR)/dw_bw
 	cp bin/dw $(DESTDIR)/dw
-	cp src/dw_guide.py $(DESTDIR)/dw_guide
-	chmod +x $(DESTDIR)/dw_guide
 	# Man pages
 	cp doc/deconwolf.1 .
 	gzip deconwolf.1

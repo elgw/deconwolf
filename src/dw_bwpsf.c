@@ -74,21 +74,30 @@ void bw_conf_printf(FILE * out, bw_conf * conf)
     fprintf(out, "Log: %s\n", conf->logFile);
 
     fprintf(out, "Pixel integration: %dx%dx%d samples per pixel\n",
-            conf->Simpson, conf->Simpson, conf->Simpson_z);
+            conf->samples_xy, conf->samples_xy, conf->samples_z);
 
     fprintf(out, "Oversampling of radial profile: %d X\n", conf->oversampling_R);
 
     if(conf->mode_int1 == MODE_INT1_LI)
     {
-        fprintf(out, "1D Integral: Li's fast method enabled\n");
+        fprintf(out, "BW Integral: Li's fast method enabled\n");
     }
     if(conf->mode_int1 == MODE_INT1_PG)
     {
-        fprintf(out, "1D Integral: PSFGenerator clone\n");
+        fprintf(out, "BW Integral: PSFGenerator clone\n");
     }
     if(conf->mode_int1 == MODE_INT1_GSL)
     {
-        fprintf(out, "1D Integral: gsl_integration_qag\n");
+        fprintf(out, "BW Integral: gsl_integration_qag\n");
+    }
+    /* How Z is handled */
+    if((conf->mode_int1 == MODE_INT1_LI) | (conf->mode_int1 == MODE_INT1_PG))
+    {
+        fprintf(out, "Z Integral: Trapetzoid using %d samples\n", conf->samples_z);
+    }
+    if(conf->mode_int1 == MODE_INT1_GSL)
+    {
+        fprintf(out, "Z integral: gsl_integration_qag\n");
     }
 
 
@@ -128,17 +137,18 @@ bw_conf * bw_conf_new()
     conf->P = 181; // Does only need to be 2*size(I,3)+1
     conf->resAxial = 300;
     conf->resLateral = 130;
-    conf->nThreads = 4;
+    conf->nThreads = 8;
     conf->V = NULL;
     conf->verbose = 1;
     conf->V = NULL;
     conf->outFile = NULL;
     conf->logFile = NULL;
     conf->overwrite = 0;
-    conf->Simpson = 21;
-    conf->Simpson_z = 3;
+    conf->samples_xy = 7;
+    conf->samples_z = conf->samples_xy;
+    /* Expose from CLI? */
     conf->oversampling_R = 20;
-    conf->mode_int1 = MODE_INT1_LI;
+    conf->mode_int1 = MODE_INT1_GSL;
     conf->testing = 0;
     return conf;
 }
@@ -192,22 +202,18 @@ void bw_version(FILE* f)
     fprintf(f, "deconwolf: '%s' PID: %d\n", deconwolf_version, (int) getpid());
 }
 
-void usage(__attribute__((unused)) int argc, char ** argv)
+void usage(__attribute__((unused)) int argc, char ** argv, bw_conf * s)
 {
     printf("Usage:\n");
-    printf("\t$ %s <options> psf.tif \n", argv[0]);
+    printf("\t%s <options> psf.tif \n", argv[0]);
     printf("\n");
-    printf(" Options:\n");
-    printf(" --version\n\t Show version info and quit.\n");
-    printf(" --help\n\t Show this message.\n");
-    printf(" --verbose L\n\t Set verbosity level to L.\n"
-        "\t where 0 = quiet, 2 = full\n");
+    printf("Required parameters:\n");
     printf(" --NA\n\t Set numerical aperture.\n");
     printf(" --lambda\n\t Set emission wavelength [nm].\n");
     printf(" --ni\n\t Set refractive index.\n");
-    printf(" --threads\n\t Set number of threads.\n");
     printf(" --resxy\n\t Set lateral pixel size (x-y) [nm].\n");
     printf(" --resz\n\t Set the axial pixel size in (z) [nm].\n");
+    printf("Optional:\n");
     printf(" --size N \n\t Set output size to N x N x P [pixels].\n"
         "\t This should be set big enough so that the PSF cone\n"
         "\t isn't cropped at the first and last slice of the PSF.\n");
@@ -215,19 +221,41 @@ void usage(__attribute__((unused)) int argc, char ** argv)
     printf("\t P has to be an odd number. Please not that P should be at\n"
            "\t least (2Z-1) where Z is the number of slices in the image\n"
            "\t to be deconvolved\n");
-    printf(" --quality Q\n\t Sets the integration quality to QxQxM samples\n"
-           "\t per pixel.\n");
+    printf(" --threads\n\t Set number of threads. Currently set to %d\n", s->nThreads);
+    printf("Optional, related to quality\n");
+    printf(" --samples Q\n\t Sets the samples to QxQxQ for pixel integration. "
+           "Default: %d\n", s->samples_xy);
     printf("\t Q has to be an odd number.\n");
-    printf(" --qualityz R\n\t Sets the integration quality to QxQxR \n"
-           "\tsamples per pixel.\n");
-    printf("\t R has to be an odd number.\n");
-    printf(" --1d-li\n\t Use Li's method for the BW integral.\n");
-    printf(" --1d-gsl\n\t Use GSL for the BW integral.\n");
-    printf(" --1d-pg\n\t Use something similar to the PSFGenerator for the BW integral.\n");
-    printf("\t About 14x faster for the default PSF size. "
+    printf("\t Unless --li or --pg, integration over Z is done to machine precision\n");
+    printf(" --li\n\t Use Li's method for the BW integral.\n");
+    printf("\t About 14x faster for the default PSF size.\n"
            "\t Not thoroughly tested.\n");
-    printf("\t Possibly unstable for large values of P.\n");
+    printf("\t Possibly unstable for large large PSFs.");
+    if(s->mode_int1 == MODE_INT1_LI)
+    {
+        printf(" Default.");
+    }
+    printf("\n");
+    printf(" --gsl\n\t Use GSL for the BW integral as well as the integration over z.");
+    if(s->mode_int1 == MODE_INT1_GSL)
+    {
+        printf(" Default.");
+    }
+    printf("\n");
+    printf(" --pg\n"
+           "\t Use something similar to the PSFGenerator for the BW integral. Will be removed in future versions");
+    if(s->mode_int1 == MODE_INT1_PG)
+    {
+        printf(" Default.");
+    }
+    printf("\n");
+
+    printf("Other options:\n");
     printf(" --overwrite \n\t Overwrite the target image if it exists.\n");
+    printf(" --version\n\t Show version info and quit.\n");
+    printf(" --help\n\t Show this message.\n");
+    printf(" --verbose L\n\t Set verbosity level to L.\n"
+           "\t where 0 = quiet, 2 = full\n");
     //   printf(" --test\n\t Run some tests\n");
     printf("\n");
     printf("Web page: https://www.github.com/elgw/deconwolf/\n");
@@ -236,10 +264,13 @@ void usage(__attribute__((unused)) int argc, char ** argv)
 
 void bw_argparsing(int argc, char ** argv, bw_conf * s)
 {
+    bw_conf * defaults = malloc(sizeof(bw_conf));
+    memcpy(defaults, s, sizeof(bw_conf));
+
     if(argc < 2)
     {
         // Well it could run with the defaults but that does not make sense
-        usage(argc, argv);
+        usage(argc, argv, defaults);
         exit(-1);
     }
 
@@ -260,17 +291,16 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
          { "resz",         required_argument, NULL, 'z'},
          { "size",         required_argument, NULL, 'N'},
          { "nslice",       required_argument, NULL, 'P'},
-         { "quality",      required_argument, NULL, 'q'},
-         { "qualityz",      required_argument, NULL, 'Z'},
-         { "1d-li",         no_argument,       NULL, 'f'},
-         { "1d-gsl",         no_argument,       NULL, 'g'},
-         { "1d-pg",           no_argument,       NULL, 'G'},
+         { "samples",      required_argument, NULL, 'q'},
+         { "li",         no_argument,       NULL, 'f'},
+         { "gsl",         no_argument,       NULL, 'g'},
+         { "pg",           no_argument,       NULL, 'G'},
          { "testing",       no_argument, NULL, 'T'},
          { NULL,           0,                 NULL,  0 }
         };
     int Pset = 0;
     int ch;
-    while((ch = getopt_long(argc, argv, "fqGvho:t:p:w:n:i:x:z:N:P:l:TZ:", longopts, NULL)) != -1)
+    while((ch = getopt_long(argc, argv, "fqGvho:t:p:w:n:i:x:z:N:P:l:T", longopts, NULL)) != -1)
     {
         switch(ch) {
         case 'T':
@@ -286,17 +316,15 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
             s->mode_int1 = MODE_INT1_PG;
             break;
         case 'q':
-            s->Simpson = atoi(optarg);
-            break;
-        case 'Z':
-            s->Simpson_z = atoi(optarg);
+            s->samples_xy = atoi(optarg);
+            s->samples_z = atoi(optarg);
             break;
         case 'v':
             bw_version(stdout);
             exit(0);
             break;
         case 'h':
-            usage(argc, argv);
+            usage(argc, argv, defaults);
             exit(0);
         case 'o':
             s->outFile = malloc(strlen(optarg) + 1);
@@ -334,8 +362,13 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
             s->P = atoi(optarg);
             Pset = 1;
             break;
+        default:
+            exit(EXIT_FAILURE);
+            break;
         }
     }
+
+    free(defaults);
 
     if(s->lambda < 50)
     {
@@ -349,9 +382,9 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
         exit(-1);
     }
 
-    if(s->Simpson % 2 == 0)
+    if(s->samples_xy % 2 == 0)
     {
-        fprintf(stderr, "The number of integration points (per dimension) has to be odd\n");
+        fprintf(stderr, "The number of integration points in x-y (per dimension) has to be odd\n");
         exit(-1);
     }
 
@@ -674,7 +707,7 @@ void BW_slice(float * V, float z, bw_conf * conf)
     /* Calculate 1D integral using something similar to the PSFGenerator */
     if(conf->mode_int1 == MODE_INT1_PG)
     {
-        int NS = conf->Simpson_z;
+        int NS = conf->samples_z;
         for (size_t n = 0; n < nr; n++) {
             hReal[n] = 0;
 
@@ -705,7 +738,7 @@ void BW_slice(float * V, float z, bw_conf * conf)
     /* 1D integral using Bessel series, li */
     if(conf->mode_int1 == MODE_INT1_LI)
     {
-        int NS = conf->Simpson_z;
+        int NS = conf->samples_z;
         // NS = 1; Just for testing
         memset(hReal, 0, nr*sizeof(double));
 
@@ -790,12 +823,12 @@ void BW_slice(float * V, float z, bw_conf * conf)
 
             // Pixel integration
             double v = 0;
-            if(conf->Simpson > 0)
+            if(conf->samples_xy > 0)
             {
                 v = simp2(OVER_SAMPLING,
                           x0, y0, hReal, r,
                           x - 0.5, x + 0.5,
-                          y - 0.5, y + 0.5, conf->Simpson);
+                          y - 0.5, y + 0.5, conf->samples_xy);
             }
             else
             {
