@@ -6,6 +6,10 @@ struct my_params {
     double lambda;
     size_t ncalls; /* Counting the number of function calls */
     size_t ninterval;      /* Max number of sub-intervals */
+    /* For integration over z */
+    gsl_integration_workspace * workspace1;
+    double z0;
+    double z1;
 };
 
 double my_f_real(double rho, void * p)
@@ -47,7 +51,7 @@ double integrate_bw_gsl(struct my_params * params, gsl_integration_workspace * w
     double result_imag = 0;
     double abserr_imag = 0;
 
-    double epsabs = 1e-6; /* 1e-9 would not work ... */
+    double epsabs = 1e-8; /* 1e-9 would not work ... */
     double epsrel = 1e-8;
     size_t limit = params->ninterval;
     int key = GSL_INTEG_GAUSS15; /* Default in MATLAB */
@@ -68,4 +72,36 @@ double integrate_bw_gsl(struct my_params * params, gsl_integration_workspace * w
     }
     double result = pow(result_real, 2) + pow(result_imag, 2);
     return result;
+}
+
+double my_f_z(double z, void * p)
+{
+    /* Function to be integrated over z */
+    struct my_params * params = (struct my_params *) p;
+    params->defocus = z;
+    double v = integrate_bw_gsl(params, params->workspace1);
+    //printf("z=%f, v=%f\n", z, v);
+    return v;
+}
+
+
+double integrate_bw_gsl_z(struct my_params * params, gsl_integration_workspace * workspace1, gsl_integration_workspace * workspaceZ)
+{
+/* Note: division by dz at the end, i.e. returns the average */
+    gsl_function fun;
+    fun.function = &my_f_z;
+    fun.params = params;
+
+    double result = 0;
+    double abserr = 0;
+    double epsabs = 1e-6; /* 1e-9 would not work ... */
+    double epsrel = 1e-8;
+    size_t limit = params->ninterval;
+    int key = GSL_INTEG_GAUSS15; /* Default in MATLAB */
+    params->workspace1 = workspace1;
+    int status = gsl_integration_qag(&fun, params->z0, params->z1,
+                        epsabs, epsrel,
+                        limit, key, workspaceZ,
+                        &result, &abserr);
+    return result/(params->z1-params->z0);
 }

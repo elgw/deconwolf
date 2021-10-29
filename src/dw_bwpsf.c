@@ -29,8 +29,30 @@
 #define j0f j0
 #endif
 
-
 pthread_mutex_t stdout_mutex;
+
+
+void dw_bw_gsl_err_handler(const char * reason,
+                           const char * file,
+                           int line,
+                           int gsl_errno)
+{
+    /* The model oscillate heavily when far from the origin.
+     * We use high precision when possible and accept that the
+     * numerical integration sometimes can't reach that.
+     */
+    if(gsl_errno == GSL_EROUND)
+    {
+        return;
+    }
+
+    printf("An unexpected error happened and dw_bw can't continue. Please file a bug report\n");
+    printf("Reason: %s\n", reason);
+    printf("File: %s\n", file);
+    printf("Line: %d\n", line);
+    printf("gsl_errno: %d\n", gsl_errno);
+    exit(EXIT_FAILURE);
+}
 
 void bw_conf_printf(FILE * out, bw_conf * conf)
 {
@@ -578,6 +600,13 @@ double simp1_weight(size_t k, size_t N)
     return 4.0;
 }
 
+/* OVER_SAMPLING: Number of radial samples per dx
+ *  xc, yc
+ *
+ * x0, x1, y0, y1 : integration region given in _pixels_
+ * N: number of integration points per dimension
+ */
+
 double simp2(int OVER_SAMPLING,
              double xc, double yc,
              double * H, double * R,
@@ -596,15 +625,16 @@ double simp2(int OVER_SAMPLING,
         {
             double wy = simp1_weight(ll, N);
             double w = wx*wy;
-            double x = x0+kk*dx;
-            double y = y0+ll*dy;
+            double x = x0+(double) kk*dx;
+            double y = y0+(double) ll*dy;
             double r = sqrt(pow(x-xc, 2) + pow(y-yc, 2));
             int index = (int) floor(r*OVER_SAMPLING);
+            double blend = (r-R[index])*OVER_SAMPLING;
 
             sW+=w;
-            //double ival = (H[index] + (H[index+1] - H[index]) * (r-R[index]));
-            //printf("%f: %f, %f r=%f, ival=%f\n", w, x, y, r, ival);
-            v+=w*(H[index] + (H[index+1] - H[index]) * (r-R[index]));
+            double ival = (H[index] + (H[index+1] - H[index]) * blend);
+            // printf("w=%f: x=%f, y=%f r=%f, ival=%f, index = %d, blend = %f\n", w, x, y, r, ival, index, blend);
+            v+=w*ival;
         }
     }
     v = v/sW;
@@ -624,7 +654,7 @@ void BW_slice(float * V, float z, bw_conf * conf)
     double y0 = (conf->N - 1) / 2.0;
 
     int maxRadius = (int) round(sqrt(pow(conf->M - x0, 2) + pow(conf->N - y0, 2))) + 1;
-    int OVER_SAMPLING = 10;
+    int OVER_SAMPLING = 11;
 
     size_t nr = maxRadius*conf->oversampling_R;
     double * r = malloc(nr * sizeof(double));
@@ -711,7 +741,8 @@ void BW_slice(float * V, float z, bw_conf * conf)
         }
     }
 
-    /* 1D integral using GSL */
+
+    /* BW integral and Z integral by GSL */
     if(conf->mode_int1 == MODE_INT1_GSL)
     {
         struct my_params gsl_params;
@@ -721,38 +752,27 @@ void BW_slice(float * V, float z, bw_conf * conf)
 
         gsl_params.lambda = conf->lambda;
         gsl_params.ninterval = 10000;
-        gsl_integration_workspace * gsl_workspace =
+        gsl_integration_workspace * gsl_workspace1 =
+            gsl_integration_workspace_alloc(gsl_params.ninterval);
+        gsl_integration_workspace * gsl_workspaceZ =
             gsl_integration_workspace_alloc(gsl_params.ninterval);
 
-        int NS = conf->Simpson_z;
-        memset(hReal, 0, nr*sizeof(double));
+        /* Integration over Z for a equidistant set of radii*/
+        gsl_params.z0 = z - conf->resAxial / 2.0;
+        gsl_params.z1 = z + conf->resAxial / 2.0;
+        //printf("Integration over z: [%f, %f]\n", gsl_params.z0, gsl_params.z1);
 
-        double dz = 0;
-        if(NS > 1) {
-            dz = (conf->resAxial)/(NS-1);
-        }
-
-        /* Trapezoid integration over Z */
-        for(int kk = 0; kk < NS; kk++)
+        for(size_t n = 0; n < nr; n++) // over r
         {
-            double zs = z + kk*dz - (NS-1)/2*dz;
-            // printf("zs = %f\n", zs);
-            gsl_params.defocus = zs;
-
-            for(size_t n = 0; n < nr; n++) // over r
-            {
-                gsl_params.r = r[n]*conf->resLateral;
-                double value = integrate_bw_gsl(&gsl_params, gsl_workspace);
-                double trapw = 1; /* Trapezoid weight */
-                if(kk == 0 || kk + 1 == NS)
-                {
-                    trapw = 0.5;
-                }
-                hReal[n] += trapw/(double) NS * value;
-            }
-
+            gsl_params.r = r[n]*conf->resLateral;
+            double value = integrate_bw_gsl_z(&gsl_params,
+                                              gsl_workspace1, gsl_workspaceZ);
+            hReal[n] = value;
+            //printf("r = %f -> %f\n", gsl_params.r, value); /* Looks ok */
         }
-        gsl_integration_workspace_free(gsl_workspace);
+
+        gsl_integration_workspace_free(gsl_workspace1);
+        gsl_integration_workspace_free(gsl_workspaceZ);
     }
 
     assert(r[0] == 0);
@@ -760,6 +780,7 @@ void BW_slice(float * V, float z, bw_conf * conf)
     /*
      * For each pixel in the quadrant integrate over x and y
      */
+
     for (int x = 0; 2*x <= conf->M; x++) {
         for (int y = 0; 2*y <= conf->N; y++) {
 
@@ -883,7 +904,17 @@ int main(int argc, char ** argv)
         unit_tests(conf);
         exit(0);
     }
+
+    /* Turn off error handling in GSL. Otherwise GSL will close the program
+     * if the tolerances can't be achieved. We set it back later on.
+     * Ideally we should have a custom error handler that simply ignores
+     * GSL_EROUND */
+    gsl_error_handler_t * old_handler = gsl_set_error_handler(dw_bw_gsl_err_handler);
+
+    /* Do the calculations */
     BW(conf);
+
+    gsl_set_error_handler(old_handler);
 
     // Write to disk
     if(conf->verbose > 0) {
