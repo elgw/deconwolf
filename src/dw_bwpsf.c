@@ -16,7 +16,7 @@
 
 /*
  * TODO:
- * Use dynamic integration, at least in x-y
+ * Use something better than linear interpolation for r
 */
 
 
@@ -147,7 +147,7 @@ bw_conf * bw_conf_new()
     conf->samples_xy = 7;
     conf->samples_z = conf->samples_xy;
     /* Expose from CLI? */
-    conf->oversampling_R = 20;
+    conf->oversampling_R = 21;
     conf->mode_int1 = MODE_INT1_GSL;
     conf->testing = 0;
     return conf;
@@ -687,7 +687,7 @@ void BW_slice(float * V, float z, bw_conf * conf)
     double y0 = (conf->N - 1) / 2.0;
 
     int maxRadius = (int) round(sqrt(pow(conf->M - x0, 2) + pow(conf->N - y0, 2))) + 1;
-    int OVER_SAMPLING = 11;
+    int OVER_SAMPLING = conf->oversampling_R;
 
     size_t nr = maxRadius*conf->oversampling_R;
     double * r = malloc(nr * sizeof(double));
