@@ -16,7 +16,7 @@
 
 /*
  * TODO:
- * Use something better than linear interpolation for r
+ * - tidy up a little :)
 */
 
 
