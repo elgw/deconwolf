@@ -146,7 +146,7 @@ bw_conf * bw_conf_new()
     conf->outFile = NULL;
     conf->logFile = NULL;
     conf->overwrite = 0;
-    conf->samples_xy = 7;
+    conf->samples_xy = 11;
     conf->samples_z = conf->samples_xy;
     /* Expose from CLI? */
     conf->oversampling_R = 15;
@@ -697,7 +697,7 @@ void BW_slice(float * V, float z, bw_conf * conf)
     int maxRadius = (int) ceil(fabs(conf->M - x0))+1;
     int OVER_SAMPLING = conf->oversampling_R;
 
-    size_t nr = maxRadius*conf->oversampling_R;
+    size_t nr = (maxRadius+1)*conf->oversampling_R+2;
     double * r = malloc(nr * sizeof(double));
 
     // abs(x)^2
@@ -833,7 +833,7 @@ void BW_slice(float * V, float z, bw_conf * conf)
             /* Pixel integration */
             assert(conf->samples_xy > 0);
 
-            if(rPixel <= maxRadius)
+            if(rPixel < maxRadius)
             {
                 pIntensity = simp2(OVER_SAMPLING,
                                    x0, y0, hReal, r,

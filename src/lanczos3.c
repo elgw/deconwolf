@@ -63,5 +63,13 @@ double lanczos3(double * v, size_t nV, double x)
     {
         y += v[n+kk]*lanczos3_weight((double) kk - d);
     }
-    return y;
+
+    /* Lanczos-3 can produce negative output when all input points
+     * are positive. We don't want that.*/
+    if(y > 0)
+    {
+        return y;
+    } else {
+        return 0;
+    }
 }
