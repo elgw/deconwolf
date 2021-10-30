@@ -24,6 +24,8 @@
 #include "dw_bwpsf.h"
 #include "li.c"
 #include "bw_int1_gsl.c"
+#include "lanczos3.c"
+
 // j0f, i.e., the float version of j0 is not available on mac
 #ifdef __APPLE__
 #define j0f j0
@@ -147,7 +149,7 @@ bw_conf * bw_conf_new()
     conf->samples_xy = 7;
     conf->samples_z = conf->samples_xy;
     /* Expose from CLI? */
-    conf->oversampling_R = 21;
+    conf->oversampling_R = 15;
     conf->mode_int1 = MODE_INT1_GSL;
     conf->testing = 0;
     return conf;
@@ -665,9 +667,14 @@ double simp2(int OVER_SAMPLING,
             double blend = (r-R[index])*OVER_SAMPLING;
 
             sW+=w;
-            double ival = (H[index] + (H[index+1] - H[index]) * blend);
+            //double ival = (H[index] + (H[index+1] - H[index]) * blend);
             // printf("w=%f: x=%f, y=%f r=%f, ival=%f, index = %d, blend = %f\n", w, x, y, r, ival, index, blend);
-            v+=w*ival;
+
+            double ival_l3 = lanczos3(H, 10000, r*(double) OVER_SAMPLING);
+            //printf("Linear/Lanczos3: %f %f %e\n", ival, ival_l3, fabs(ival-ival_l3));
+
+            //v+=w*ival;
+            v+=w*ival_l3;
         }
     }
     v = v/sW;
@@ -686,7 +693,8 @@ void BW_slice(float * V, float z, bw_conf * conf)
     double x0 = (conf->M - 1) / 2.0;
     double y0 = (conf->N - 1) / 2.0;
 
-    int maxRadius = (int) round(sqrt(pow(conf->M - x0, 2) + pow(conf->N - y0, 2))) + 1;
+    //int maxRadius = (int) round(sqrt(pow(conf->M - x0, 2) + pow(conf->N - y0, 2))) + 1;
+    int maxRadius = (int) ceil(fabs(conf->M - x0))+1;
     int OVER_SAMPLING = conf->oversampling_R;
 
     size_t nr = maxRadius*conf->oversampling_R;
@@ -818,27 +826,22 @@ void BW_slice(float * V, float z, bw_conf * conf)
         for (int y = 0; 2*y <= conf->N; y++) {
 
             // radius of the current pixel in units of [pixels]
-            double rPixel = sqrt(pow((double) x - x0, 2) + pow((double) y - y0, 2));
+            double rPixel = sqrt( pow((double) x - x0, 2)
+                                  + pow((double) y - y0, 2));
             double pIntensity = 0;
 
-            // Pixel integration
-            double v = 0;
-            if(conf->samples_xy > 0)
+            /* Pixel integration */
+            assert(conf->samples_xy > 0);
+
+            if(rPixel <= maxRadius)
             {
-                v = simp2(OVER_SAMPLING,
-                          x0, y0, hReal, r,
-                          x - 0.5, x + 0.5,
-                          y - 0.5, y + 0.5, conf->samples_xy);
+                pIntensity = simp2(OVER_SAMPLING,
+                                   x0, y0, hReal, r,
+                                   x - 0.5, x + 0.5,
+                                   y - 0.5, y + 0.5, conf->samples_xy);
+            } else {
+                pIntensity = 0;
             }
-            else
-            {
-                // Index of nearest coordinate from below (replace by pixel integration)
-                size_t index = (int) floor(rPixel * OVER_SAMPLING);
-                assert(index < nr);
-                // Interpolated value.
-                v = hReal[index] + (hReal[index + 1] - hReal[index]) * (rPixel - r[index]) * OVER_SAMPLING;
-            }
-            pIntensity = v;
 
 
             // Use symmetry to fill the output image plane

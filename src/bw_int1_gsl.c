@@ -52,8 +52,8 @@ double integrate_bw_gsl(struct my_params * params, gsl_integration_workspace * w
     double result_imag = 0;
     double abserr_imag = 0;
 
-    double epsabs = 1e-8; /* 1e-9 would not work ... */
-    double epsrel = 1e-8;
+    double epsabs = 1e-6; /* 1e-9 would not work ... */
+    double epsrel = 1e-7;
     size_t limit = params->ninterval;
     int key = GSL_INTEG_GAUSS15; /* Default in MATLAB */
     gsl_integration_qag(&fun, 0, 1,
@@ -98,7 +98,7 @@ double integrate_bw_gsl_z(struct my_params * params, gsl_integration_workspace *
     double result = 0;
     double abserr = 0;
     double epsabs = 1e-6; /* ... */
-    double epsrel = 1e-8;
+    double epsrel = 1e-7;
     size_t limit = params->ninterval;
     int key = GSL_INTEG_GAUSS15; /* Default in MATLAB */
     params->workspace1 = workspace1;
