@@ -19,10 +19,9 @@ double my_f_real(double rho, void * p)
     params->ncalls++;
     double k0 = 2.0 * M_PI / params->lambda;
     double q = params->NA / params->ni;
-    double bessel = j0f(k0*q*params->r*rho);
-    double OPD = pow(q,2)*params->defocus*pow(rho, 2) / 2.0;
+    double bessel = j0f(k0*q*params->r*rho); // PSFGenerator web
+    double OPD = pow(q,2)*params->defocus*pow(rho, 2) / 2.0; // PSFGenerator web
     double W = k0*OPD;
-
     return bessel*cos(W)*rho;
 }
 
@@ -35,7 +34,6 @@ double my_f_imag(double rho, void * p)
     double bessel = j0f(k0*q*params->r*rho);
     double OPD = pow(q,2)*params->defocus*pow(rho, 2) / 2.0;
     double W = k0*OPD;
-
     return -bessel*sin(W)*rho;
 }
 
