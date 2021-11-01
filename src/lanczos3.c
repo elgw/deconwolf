@@ -18,7 +18,7 @@ static double lanczos3_weight(double x)
 }
 
 
-double lanczos3(double * v, size_t nV, double x)
+double lanczos3(const double * v, size_t nV, double x)
 {
     /*
      * Lanczos-3 interpolation of v at floating point indices
@@ -34,6 +34,12 @@ double lanczos3(double * v, size_t nV, double x)
     /* Can handled by some other boundary condition or
      * interpolation method */
     assert( (size_t) n+2 < nV);
+
+    if((size_t) n+3 >= nV)
+    {
+        printf("Can't interpolate x=%f in a %zu vector", x, nV);
+        exit(EXIT_FAILURE);
+    }
 
     /* Distance to integer index before x */
     double d = x - (double) n;

@@ -19,11 +19,9 @@
  * - tidy up a little :)
 */
 
-
-
 #include "dw_bwpsf.h"
 #include "li.c"
-#include "bw_int1_gsl.c"
+#include "bw_gsl.h"
 #include "lanczos3.c"
 
 // j0f, i.e., the float version of j0 is not available on mac
@@ -32,6 +30,7 @@
 #endif
 
 pthread_mutex_t stdout_mutex;
+pthread_mutex_t logfile_mutex;
 
 
 void dw_bw_gsl_err_handler(const char * reason,
@@ -145,6 +144,7 @@ bw_conf * bw_conf_new()
     conf->V = NULL;
     conf->outFile = NULL;
     conf->logFile = NULL;
+    conf->log = NULL;
     conf->overwrite = 0;
     conf->samples_xy = 11;
     conf->samples_z = conf->samples_xy;
@@ -153,6 +153,21 @@ bw_conf * bw_conf_new()
     conf->mode_int1 = MODE_INT1_GSL;
     conf->testing = 0;
     return conf;
+}
+
+void bw_conf_free(bw_conf ** _conf)
+{
+    bw_conf * conf = *_conf;
+    if(conf->log != NULL)
+    {
+        fclose(conf->log);
+    }
+    free(conf->outFile);
+    free(conf->logFile);
+    free(conf->cmd);
+    free(conf);
+    _conf = NULL;
+    return;
 }
 
 static double timespec_diff(struct timespec* end, struct timespec * start)
@@ -229,10 +244,9 @@ void usage(__attribute__((unused)) int argc, char ** argv, bw_conf * s)
            "Default: %d\n", s->samples_xy);
     printf("\t Q has to be an odd number.\n");
     printf("\t Unless --li or --pg, integration over Z is done to machine precision\n");
-    printf(" --li\n\t Use Li's method for the BW integral.\n");
-    printf("\t About 14x faster for the default PSF size.\n"
-           "\t Not thoroughly tested.\n");
-    printf("\t Possibly unstable for large large PSFs.");
+    printf(" --li\n\t Use Li's method (our implementation) for the BW integral.\n");
+    printf("\t About 4x faster for the default PSF size although "
+           "not thoroughly tested.\n");
     if(s->mode_int1 == MODE_INT1_LI)
     {
         printf(" Default.");
@@ -644,7 +658,8 @@ double simp1_weight(size_t k, size_t N)
 
 double simp2(int OVER_SAMPLING,
              double xc, double yc,
-             double * H, double * R,
+             const double * H,
+             __attribute__((unused))  const double * R, size_t nR,
              double x0, double x1,
              double y0, double y1, int N)
 {
@@ -663,14 +678,14 @@ double simp2(int OVER_SAMPLING,
             double x = x0+(double) kk*dx;
             double y = y0+(double) ll*dy;
             double r = sqrt(pow(x-xc, 2) + pow(y-yc, 2));
-            int index = (int) floor(r*OVER_SAMPLING);
-            double blend = (r-R[index])*OVER_SAMPLING;
+            //int index = (int) floor(r*OVER_SAMPLING);
+            //double blend = (r-R[index])*OVER_SAMPLING;
 
             sW+=w;
             //double ival = (H[index] + (H[index+1] - H[index]) * blend);
             // printf("w=%f: x=%f, y=%f r=%f, ival=%f, index = %d, blend = %f\n", w, x, y, r, ival, index, blend);
 
-            double ival_l3 = lanczos3(H, 10000, r*(double) OVER_SAMPLING);
+            double ival_l3 = lanczos3(H, nR, r*(double) OVER_SAMPLING);
             //printf("Linear/Lanczos3: %f %f %e\n", ival, ival_l3, fabs(ival-ival_l3));
 
             //v+=w*ival;
@@ -693,8 +708,8 @@ void BW_slice(float * V, float z, bw_conf * conf)
     double x0 = (conf->M - 1) / 2.0;
     double y0 = (conf->N - 1) / 2.0;
 
-    //int maxRadius = (int) round(sqrt(pow(conf->M - x0, 2) + pow(conf->N - y0, 2))) + 1;
-    int maxRadius = (int) ceil(fabs(conf->M - x0))+1;
+    int maxRadius = (int) round(sqrt(pow(conf->M - x0, 2) + pow(conf->N - y0, 2))) + 1;
+    //int maxRadius = (int) ceil(fabs(conf->M - x0))+1;
     int OVER_SAMPLING = conf->oversampling_R;
 
     size_t nr = (maxRadius+1)*conf->oversampling_R+2;
@@ -786,36 +801,30 @@ void BW_slice(float * V, float z, bw_conf * conf)
     /* BW integral and Z integral by GSL */
     if(conf->mode_int1 == MODE_INT1_GSL)
     {
-        struct my_params gsl_params;
-        gsl_params.ncalls = 0;
-        gsl_params.NA = conf->NA;
-        gsl_params.ni = conf->ni;
-
-        gsl_params.lambda = conf->lambda;
-        gsl_params.ninterval = 10000;
-        gsl_integration_workspace * gsl_workspace1 =
-            gsl_integration_workspace_alloc(gsl_params.ninterval);
-        gsl_integration_workspace * gsl_workspaceZ =
-            gsl_integration_workspace_alloc(gsl_params.ninterval);
-
-        /* Integration over Z for a equidistant set of radii*/
-        gsl_params.z0 = z - conf->resAxial / 2.0;
-        gsl_params.z1 = z + conf->resAxial / 2.0;
-        //printf("Integration over z: [%f, %f]\n", gsl_params.z0, gsl_params.z1);
-
-        for(size_t n = 0; n < nr; n++) // over r
+        bw_gsl_conf_t * bw_gsl_conf = bw_gsl_new(100000);
+        bw_gsl_conf->NA = conf->NA;
+        bw_gsl_conf->ni = conf->ni;
+        bw_gsl_conf->lambda = conf->lambda;
+        if(z == 0) /* Only write from the thread that processes z==0 */
         {
-            gsl_params.r = r[n]*conf->resLateral;
-            double value = integrate_bw_gsl_z(&gsl_params,
-                                              gsl_workspace1, gsl_workspaceZ);
-            hReal[n] = value;
-            //printf("r = %f -> %f\n", gsl_params.r, value); /* Looks ok */
+            pthread_mutex_lock(&logfile_mutex);
+            fprintf(conf->log, "Settings for BW integration over Z:\n");
+            bw_gsl_fprint(conf->log, bw_gsl_conf);
+            pthread_mutex_unlock(&logfile_mutex);
         }
 
-        gsl_integration_workspace_free(gsl_workspace1);
-        gsl_integration_workspace_free(gsl_workspaceZ);
-    }
+        /* Integration over Z for a equidistant set of radii */
+        double z0 = z - conf->resAxial / 2.0;
+        double z1 = z + conf->resAxial / 2.0;
 
+        for(size_t n = 0; n < nr; n++)
+        {
+            double radius = r[n]*conf->resLateral;
+            double value  = bw_gsl_integrate_z(bw_gsl_conf, radius, z0, z1);
+            hReal[n] = value;
+        }
+        bw_gsl_free(bw_gsl_conf);
+    }
     assert(r[0] == 0);
 
     /*
@@ -836,7 +845,8 @@ void BW_slice(float * V, float z, bw_conf * conf)
             if(rPixel < maxRadius)
             {
                 pIntensity = simp2(OVER_SAMPLING,
-                                   x0, y0, hReal, r,
+                                   x0, y0,
+                                   hReal, r, nr,
                                    x - 0.5, x + 0.5,
                                    y - 0.5, y + 0.5, conf->samples_xy);
             } else {
@@ -911,13 +921,13 @@ int main(int argc, char ** argv)
     struct timespec tstart, tend;
     clock_gettime(CLOCK_REALTIME, &tstart);
 
-    // Use defaults
     bw_conf * conf = bw_conf_new();
     bw_argparsing(argc, argv, conf);
 
     if( conf->overwrite == 0 && file_exist(conf->outFile))
     {
         printf("%s already exist. Doing nothing\n", conf->outFile);
+        bw_conf_free(&conf);
         return EXIT_SUCCESS;
     }
 
@@ -976,11 +986,8 @@ int main(int argc, char ** argv)
 
     // Clean up
     free(conf->V);
-    fclose(conf->log);
-    free(conf->outFile);
-    free(conf->logFile);
-    free(conf->cmd);
-    free(conf);
+    bw_conf_free(&conf);
+
 
     return EXIT_SUCCESS;
 }

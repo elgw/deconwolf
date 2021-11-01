@@ -85,6 +85,8 @@ typedef struct {
     int testing;
 } bw_conf;
 
+bw_conf * bw_conf_new(void);
+void bw_conf_free(bw_conf ** conf);
 void bw_conf_printf(FILE * out, bw_conf * conf);
 void BW_slice(float * , float z, bw_conf * conf);
 void bw_argparsing(int , char ** , bw_conf * conf);
