@@ -55,7 +55,7 @@ dw = bin/dw
 dw_OBJECTS = fim.o tiling.o fft.o fim_tiff.o dw.o deconwolf.o deconwolf_tif_max.o
 
 dwbw = bin/dw_bw
-dwbw_OBJECTS = fim.o fim_tiff.o dw_bwpsf.o bw_gsl.o
+dwbw_OBJECTS = fim.o fim_tiff.o dw_bwpsf.o bw_gsl.o lanczos3.o
 
 # dwtm = bin/dw_tiffmax
 # dwtm_OBJECTS = fim.o fim_tiff.o deconwolf_tif_max.o

@@ -20,9 +20,8 @@
 */
 
 #include "dw_bwpsf.h"
-#include "li.c"
-#include "bw_gsl.h"
-#include "lanczos3.c"
+
+
 
 // j0f, i.e., the float version of j0 is not available on mac
 #ifdef __APPLE__
@@ -133,7 +132,7 @@ bw_conf * bw_conf_new()
     conf->overwrite = 0;
 
     /* Expose from CLI? */
-    conf->oversampling_R = 15;
+    conf->oversampling_R = 17;
     conf->mode_bw = MODE_BW_GSL;
     conf->testing = 0;
 
@@ -285,7 +284,7 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
 
     struct option longopts[] =
         {
-            { "epsabs",     no_argument,       NULL,   'a'},
+            { "epsabs",     required_argument, NULL,   'a'},
             { "li",         no_argument,       NULL,   'f'},
             { "gsl",        no_argument,       NULL,   'g'},
             { "help",       no_argument,       NULL,   'h'},
@@ -293,7 +292,7 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
             { "lambda",     required_argument, NULL,   'l'},
             { "NA",         required_argument, NULL,   'n'},
             { "verbose",    required_argument, NULL,   'p'},
-            { "epsrel",     no_argument,       NULL,   'r'},
+            { "epsrel",     required_argument, NULL,   'r'},
             { "threads",    required_argument, NULL,   't'},
             { "version",    no_argument,       NULL,   'v'},
             { "overwrite",  no_argument,       NULL,   'w'},
@@ -515,36 +514,26 @@ void BW(bw_conf * conf)
     size_t MN = M*N;
 
     int nThreads = conf->nThreads;
+    pthread_t * threads = malloc(nThreads*sizeof(pthread_t));
+    bw_conf ** confs = malloc(nThreads*sizeof(bw_conf*));
 
-    if(nThreads == 1)
+    for(int kk = 0; kk<nThreads; kk++)
     {
-        for (int z = 0; z <= (P-1)/2; z++) {
-            float defocus = conf->resAxial * (z - (P - 1.0) / 2.0);
-            printf("P = %d, z = %d, defocus = %f\n", P, z, defocus);
-            BW_slice(conf->V + z*M*N, defocus, conf);
-        }
-    } else {
-        pthread_t * threads = malloc(nThreads*sizeof(pthread_t));
-        bw_conf ** confs = malloc(nThreads*sizeof(bw_conf*));
-
-        for(int kk = 0; kk<nThreads; kk++)
-        {
-            confs[kk] = (bw_conf*) malloc(sizeof(bw_conf));
-            memcpy(confs[kk], conf, sizeof(bw_conf));
-            confs[kk]->thread = kk;
-            pthread_create(&threads[kk], NULL, BW_thread, (void *) confs[kk]);
-        }
-
-        for(int kk = 0; kk<nThreads; kk++)
-        {
-            pthread_join(threads[kk], NULL);
-            free(confs[kk]);
-        }
-        free(confs);
-        free(threads);
+        confs[kk] = (bw_conf*) malloc(sizeof(bw_conf));
+        memcpy(confs[kk], conf, sizeof(bw_conf));
+        confs[kk]->thread = kk;
+        pthread_create(&threads[kk], NULL, BW_thread, (void *) confs[kk]);
     }
 
-    // symmetry in Z
+    for(int kk = 0; kk<nThreads; kk++)
+    {
+        pthread_join(threads[kk], NULL);
+        free(confs[kk]);
+    }
+    free(confs);
+    free(threads);
+
+    /* symmetry in Z */
     for(int z = 0; z<(P-1)/2; z++)
     {
         memcpy(V+(P-z-1)*MN, V+z*MN, MN*sizeof(float));
@@ -557,7 +546,7 @@ double pixelpointfun(double y, void * _conf)
     pixely_t * iconf = (pixely_t *) _conf;
     double r2 = pow(iconf->x, 2) + pow(y, 2);
     double r = 0;
-    if(fabs(r2) > 1e-9)
+    if(fabs(r2) > 1e-10)
     {
         r = sqrt(r2);
     }

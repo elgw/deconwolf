@@ -35,10 +35,13 @@
 #include <time.h>
 #include <wchar.h>
 #include <locale.h>
+#include <gsl/gsl_integration.h>
+
 #include "fim_tiff.h"
 #include "dw_version.h"
-
-#include <gsl/gsl_integration.h>
+#include "lanczos3.h"
+#include "li.c"
+#include "bw_gsl.h"
 
 /* Mode for calculating the 1D integral */
 #define MODE_BW_GSL 0
