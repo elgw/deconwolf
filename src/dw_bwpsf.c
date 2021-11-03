@@ -16,19 +16,43 @@
 
 /*
  * TODO:
- * Use dynamic integration, at least in x-y
+ * - tidy up a little :)
 */
 
 #include "dw_bwpsf.h"
-#include "li.c"
+
+
 
 // j0f, i.e., the float version of j0 is not available on mac
 #ifdef __APPLE__
 #define j0f j0
 #endif
 
-
 pthread_mutex_t stdout_mutex;
+pthread_mutex_t logfile_mutex;
+
+
+void dw_bw_gsl_err_handler(const char * reason,
+                           const char * file,
+                           int line,
+                           int gsl_errno)
+{
+    /* The model oscillate heavily when far from the origin.
+     * We use high precision when possible and accept that the
+     * numerical integration sometimes can't reach that.
+     */
+    if(gsl_errno == GSL_EROUND)
+    {
+        return;
+    }
+
+    printf("An unexpected error happened and dw_bw can't continue. Please file a bug report\n");
+    printf("Reason: %s\n", reason);
+    printf("File: %s\n", file);
+    printf("Line: %d\n", line);
+    printf("gsl_errno: %d\n", gsl_errno);
+    exit(EXIT_FAILURE);
+}
 
 void bw_conf_printf(FILE * out, bw_conf * conf)
 {
@@ -39,7 +63,6 @@ void bw_conf_printf(FILE * out, bw_conf * conf)
     fprintf(out, "lambda = %.2f nm\n", conf->lambda);
     fprintf(out, "NA = %f\n", conf->NA);
     fprintf(out, "ni = %f\n", conf->ni);
-    fprintf(out, "TOL = %f\n", conf->TOL);
     fprintf(out, "resLateral = %.2f nm\n", conf->resLateral);
     fprintf(out, "resAxial = %.2f nm\n", conf->resAxial);
     fprintf(out, "out size: [%d x %d x %d] pixels\n", conf->M, conf->N, conf->P);
@@ -48,22 +71,19 @@ void bw_conf_printf(FILE * out, bw_conf * conf)
     fprintf(out, "Overwrite: %d\n", conf->overwrite);
     fprintf(out, "File: %s\n", conf->outFile);
     fprintf(out, "Log: %s\n", conf->logFile);
-    if(conf->complexPixel)
-    {
-        fprintf(out, "Complex pixel integration enabled -- not recommended.\n");
-    }
-
-
-        fprintf(out, "Pixel integration: %dx%dx%d samples per pixel\n",
-                conf->Simpson, conf->Simpson, conf->Simpson_z);
 
     fprintf(out, "Oversampling of radial profile: %d X\n", conf->oversampling_R);
-    if(conf->fast_li)
+
+    if(conf->mode_bw == MODE_BW_LI)
     {
-        fprintf(out, "Li's fast method: enabled\n");
-    } else {
-        fprintf(out, "Li's fast method: disabled\n");
+        fprintf(out, "BW Integral: Li's fast method enabled\n");
     }
+    if(conf->mode_bw == MODE_BW_GSL)
+    {
+        fprintf(out, "BW Integral: gsl_integration_qag\n");
+    }
+    fprintf(out, "epsabs: %e\n", conf->epsabs);
+    fprintf(out, "epsrel: %e\n", conf->epsrel);
 
     // Show theoretical FWHM of the PSF
     // And look at the number of pixels per fwhm
@@ -91,30 +111,53 @@ void bw_conf_printf(FILE * out, bw_conf * conf)
 bw_conf * bw_conf_new()
 {
     bw_conf * conf = malloc(sizeof(bw_conf));
+    /* Physical settings */
     conf->lambda = 600;
     conf->NA = 1.45;
     conf->ni = 1.515;
-    conf->TOL = 1e-1;
-    conf->K = 9; // corresponding to "best" in PSFGenerator
+    conf->resAxial = 300;
+    conf->resLateral = 130;
+    /* Output image Settings*/
     conf->M = 181;
     conf->N = 181;
     conf->P = 181; // Does only need to be 2*size(I,3)+1
-    conf->resAxial = 300;
-    conf->resLateral = 130;
-    conf->nThreads = 4;
+
+    conf->nThreads = 8;
     conf->V = NULL;
     conf->verbose = 1;
     conf->V = NULL;
     conf->outFile = NULL;
     conf->logFile = NULL;
+    conf->log = NULL;
     conf->overwrite = 0;
-    conf->Simpson = 21;
-    conf->Simpson_z = 1;
-    conf->oversampling_R = 20;
-    conf->fast_li = 1;
+
+    /* Expose from CLI? */
+    conf->oversampling_R = 17;
+    conf->mode_bw = MODE_BW_GSL;
     conf->testing = 0;
-    conf->complexPixel = 0;
+
+    /* For XY integration */
+    conf->epsabs = 1e-6;
+    conf->epsrel = 1e-6;
+    conf->limit = 10000;
+    conf->key = 1;
+
     return conf;
+}
+
+void bw_conf_free(bw_conf ** _conf)
+{
+    bw_conf * conf = *_conf;
+    if(conf->log != NULL)
+    {
+        fclose(conf->log);
+    }
+    free(conf->outFile);
+    free(conf->logFile);
+    free(conf->cmd);
+    free(conf);
+    _conf = NULL;
+    return;
 }
 
 static double timespec_diff(struct timespec* end, struct timespec * start)
@@ -166,22 +209,18 @@ void bw_version(FILE* f)
     fprintf(f, "deconwolf: '%s' PID: %d\n", deconwolf_version, (int) getpid());
 }
 
-void usage(__attribute__((unused)) int argc, char ** argv)
+void usage(__attribute__((unused)) int argc, char ** argv, bw_conf * s)
 {
     printf("Usage:\n");
-    printf("\t$ %s <options> psf.tif \n", argv[0]);
+    printf("\t%s <options> psf.tif \n", argv[0]);
     printf("\n");
-    printf(" Options:\n");
-    printf(" --version\n\t Show version info and quit.\n");
-    printf(" --help\n\t Show this message.\n");
-    printf(" --verbose L\n\t Set verbosity level to L.\n"
-        "\t where 0 = quiet, 2 = full\n");
+    printf("Required parameters:\n");
     printf(" --NA\n\t Set numerical aperture.\n");
     printf(" --lambda\n\t Set emission wavelength [nm].\n");
     printf(" --ni\n\t Set refractive index.\n");
-    printf(" --threads\n\t Set number of threads.\n");
     printf(" --resxy\n\t Set lateral pixel size (x-y) [nm].\n");
     printf(" --resz\n\t Set the axial pixel size in (z) [nm].\n");
+    printf("Optional:\n");
     printf(" --size N \n\t Set output size to N x N x P [pixels].\n"
         "\t This should be set big enough so that the PSF cone\n"
         "\t isn't cropped at the first and last slice of the PSF.\n");
@@ -189,17 +228,34 @@ void usage(__attribute__((unused)) int argc, char ** argv)
     printf("\t P has to be an odd number. Please not that P should be at\n"
            "\t least (2Z-1) where Z is the number of slices in the image\n"
            "\t to be deconvolved\n");
-    printf(" --quality Q\n\t Sets the integration quality to QxQxM samples\n"
-           "\t per pixel.\n");
+    printf(" --threads\n\t Set number of threads. Currently set to %d\n", s->nThreads);
     printf("\t Q has to be an odd number.\n");
-    printf(" --qualityz R\n\t Sets the integration quality to QxQxR \n"
-           "\tsamples per pixel.\n");
-    printf("\t R has to be an odd number.\n");
-    printf(" --no-fast\n\t Disable Li's fast method for the BW integral.\n");
-    printf("\t About 14x faster for the default PSF size. "
-           "\t Not thoroughly tested.\n");
-    printf("\t Possibly unstable for large values of P.\n");
+    printf("\t Unless --li or --pg, integration over Z is done to machine precision\n");
+    printf(" --li\n\t Use Li's method (our implementation) for the BW integral.\n");
+    printf("\t About 4x faster for the default PSF size although "
+           "not thoroughly tested.\n");
+    if(s->mode_bw == MODE_BW_LI)
+    {
+        printf(" Default.");
+    }
+    printf("\n");
+    printf(" --gsl\n\t Use GSL for the BW integral as well as the integration over z.");
+    if(s->mode_bw == MODE_BW_GSL)
+    {
+        printf(" Default.");
+    }
+    printf("\n");
+    printf(" --epsabs \n\t Set absolute error tolerance for the integration. Default: %e\n",
+           s->epsabs);
+    printf(" --epsrel \n\t Set relative error tolerance for the integration. Default: %e\n",
+           s->epsrel);
+
+    printf("Other options:\n");
     printf(" --overwrite \n\t Overwrite the target image if it exists.\n");
+    printf(" --version\n\t Show version info and quit.\n");
+    printf(" --help\n\t Show this message.\n");
+    printf(" --verbose L\n\t Set verbosity level to L.\n"
+           "\t where 0 = quiet, 2 = full\n");
     //   printf(" --test\n\t Run some tests\n");
     printf("\n");
     printf("Web page: https://www.github.com/elgw/deconwolf/\n");
@@ -208,91 +264,98 @@ void usage(__attribute__((unused)) int argc, char ** argv)
 
 void bw_argparsing(int argc, char ** argv, bw_conf * s)
 {
+    bw_conf * defaults = malloc(sizeof(bw_conf));
+    memcpy(defaults, s, sizeof(bw_conf));
+
     if(argc < 2)
     {
         // Well it could run with the defaults but that does not make sense
-        usage(argc, argv);
+        usage(argc, argv, defaults);
         exit(-1);
     }
 
     getCmdLine(argc, argv, s);
 
+    int gotna = 0;
+    int gotlambda = 0;
+    int gotni = 0;
+    int gotdx = 0;
+    int gotdz = 0;
+
     struct option longopts[] =
         {
-         { "version",      no_argument,       NULL, 'v'},
-         { "help",         no_argument,       NULL, 'h'},
-         // Settings
-         { "lambda",       required_argument, NULL, 'l'},
-         { "threads",      required_argument, NULL, 't'},
-         { "verbose",      required_argument, NULL, 'p'},
-         { "overwrite",    no_argument,       NULL, 'w'},
-         { "NA",           required_argument, NULL, 'n'},
-         { "ni",           required_argument, NULL, 'i'},
-         { "resxy",        required_argument, NULL, 'x'},
-         { "resz",         required_argument, NULL, 'z'},
-         { "size",         required_argument, NULL, 'N'},
-         { "nslice",       required_argument, NULL, 'P'},
-         { "quality",      required_argument, NULL, 'q'},
-         { "qualityz",      required_argument, NULL, 'Z'},
-         { "no-fast",         no_argument,       NULL, 'f'},
-         { "testing",       no_argument, NULL, 'T'},
-         { "complex",       no_argument, NULL, 'c'},
-         { NULL,           0,                 NULL,  0 }
+            { "epsabs",     required_argument, NULL,   'a'},
+            { "li",         no_argument,       NULL,   'f'},
+            { "gsl",        no_argument,       NULL,   'g'},
+            { "help",       no_argument,       NULL,   'h'},
+            { "ni",         required_argument, NULL,   'i'},
+            { "lambda",     required_argument, NULL,   'l'},
+            { "NA",         required_argument, NULL,   'n'},
+            { "verbose",    required_argument, NULL,   'p'},
+            { "epsrel",     required_argument, NULL,   'r'},
+            { "threads",    required_argument, NULL,   't'},
+            { "version",    no_argument,       NULL,   'v'},
+            { "overwrite",  no_argument,       NULL,   'w'},
+            { "resxy",      required_argument, NULL,   'x'},
+            { "resz",       required_argument, NULL,   'z'},
+            { "size",       required_argument, NULL,   'N'},
+            { "nslice",     required_argument, NULL,   'P'},
+            { "testing",    no_argument,       NULL,   'T'},
+            { NULL,         0,                 NULL,    0 }
         };
     int Pset = 0;
     int ch;
-    while((ch = getopt_long(argc, argv, "fq:vho:t:p:w:n:i:x:z:N:P:l:TcZ:", longopts, NULL)) != -1)
+
+    while((ch = getopt_long(argc, argv, "a:fghi:l:n:p:r:t:vwx:z:N:P:T", longopts, NULL)) != -1)
     {
         switch(ch) {
-        case 'c':
-            s->complexPixel = 1;
-            break;
-        case 'T':
-            s->testing = 1;
+        case 'a':
+            s->epsabs = atof(optarg);
             break;
         case 'f':
-            s->fast_li = 0;
+            s->mode_bw = MODE_BW_LI;
             break;
-        case 'q':
-            s->Simpson = atoi(optarg);
+        case 'g':
+            s->mode_bw = MODE_BW_GSL;
             break;
-        case 'Z':
-            s->Simpson_z = atoi(optarg);
+        case 'h':
+            usage(argc, argv, defaults);
+            exit(0);
+        case 'i':
+            s->ni = atof(optarg);
+            gotni = 1;
+            break;
+        case 'l':
+            s->lambda = atof(optarg);
+            gotlambda = 1;
+            break;
+        case 'n':
+            s->NA = atof(optarg);
+            gotna = 1;
+            break;
+        case 'p':
+            s->verbose = atoi(optarg);
+            break;
+        case 'r':
+            s->epsrel = atof(optarg);
+            break;
+        case 't':
+            s->nThreads = atoi(optarg);
             break;
         case 'v':
             bw_version(stdout);
             exit(0);
             break;
-        case 'h':
-            usage(argc, argv);
-            exit(0);
-        case 'o':
-            s->outFile = malloc(strlen(optarg) + 1);
-            sprintf(s->outFile, "%s", optarg);
-            break;
-        case 't':
-            s->nThreads = atoi(optarg);
-            break;
-        case 'p':
-            s->verbose = atoi(optarg);
-            break;
         case 'w':
             s->overwrite = 1;
             break;
-        case 'n':
-            s->NA = atof(optarg);
-            break;
-        case 'i':
-            s->ni = atof(optarg);
-            break;
         case 'x':
             s->resLateral = atof(optarg);
+            gotdx = 1;
             break;
         case 'z':
             s->resAxial = atof(optarg);
-            break;
-        case 'l':
-            s->lambda = atof(optarg);
+            gotdz = 1;
             break;
         case 'N':
             s->M = atoi(optarg);
@@ -302,7 +365,46 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
             s->P = atoi(optarg);
             Pset = 1;
             break;
+        case 'T':
+            s->testing = 1;
+            break;
+        default:
+            exit(EXIT_FAILURE);
+            break;
         }
+    }
+
+    free(defaults);
+
+    int stay = 1;
+    if(gotna == 0)
+    {
+        printf("Numerical Aperture (--NA) not specified\n");
+        stay = 0;
+    }
+    if(gotlambda == 0)
+    {
+        printf("Wave Length (--lambda) not specified\n");
+        stay = 0;
+    }
+    if(gotni == 0)
+    {
+        printf("Refractive index (--ni) not specified\n");
+        stay = 0;
+    }
+    if(gotdx == 0)
+    {
+        printf("Laterial pixel size not specified (--resxy) not specified\n");
+        stay = 0;
+    }
+    if(gotdz == 0)
+    {
+        printf("Axial distance between planes not specified (--resz) not specified\n");
+        stay = 0;
+    }
+    if(stay == 0)
+    {
+        exit(EXIT_FAILURE);
     }
 
     if(s->lambda < 50)
@@ -311,15 +413,9 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
         exit(-1);
     }
 
-    if(s->lambda > 10000)
+    if(s->lambda > 2000)
     {
-        fprintf(stderr, "Error lambda can be at most 1000 nm\n");
-        exit(-1);
-    }
-
-    if(s->Simpson % 2 == 0)
-    {
-        fprintf(stderr, "The number of integration points (per dimension) has to be odd\n");
+        fprintf(stderr, "Error lambda can be at most 2000 nm\n");
         exit(-1);
     }
 
@@ -392,10 +488,16 @@ void * BW_thread(void * data)
     int P = conf->P;
     size_t MN = M*N;
 
+    conf->wspx = gsl_integration_workspace_alloc(conf->limit);
+    conf->wspy = gsl_integration_workspace_alloc(conf->limit);
+
     for (int z = conf->thread; z <= (P-1)/2; z+=conf->nThreads) {
         float defocus = conf->resAxial * (z - (P - 1.0) / 2.0);
         BW_slice(V + z*MN, defocus, conf);
     }
+
+    gsl_integration_workspace_free(conf->wspx);
+    gsl_integration_workspace_free(conf->wspy);
     return NULL;
 }
 
@@ -412,152 +514,107 @@ void BW(bw_conf * conf)
     size_t MN = M*N;
 
     int nThreads = conf->nThreads;
+    pthread_t * threads = malloc(nThreads*sizeof(pthread_t));
+    bw_conf ** confs = malloc(nThreads*sizeof(bw_conf*));
 
-    if(nThreads == 1)
+    for(int kk = 0; kk<nThreads; kk++)
     {
-        for (int z = 0; z <= (P-1)/2; z++) {
-            float defocus = conf->resAxial * (z - (P - 1.0) / 2.0);
-            printf("P = %d, z = %d, defocus = %f\n", P, z, defocus);
-            BW_slice(conf->V + z*M*N, defocus, conf);
-        }
-    } else {
-        pthread_t * threads = malloc(nThreads*sizeof(pthread_t));
-        bw_conf ** confs = malloc(nThreads*sizeof(bw_conf*));
-
-        for(int kk = 0; kk<nThreads; kk++)
-        {
-            confs[kk] = (bw_conf*) malloc(sizeof(bw_conf));
-            memcpy(confs[kk], conf, sizeof(bw_conf));
-            confs[kk]->thread = kk;
-            pthread_create(&threads[kk], NULL, BW_thread, (void *) confs[kk]);
-        }
-
-        for(int kk = 0; kk<nThreads; kk++)
-        {
-            pthread_join(threads[kk], NULL);
-            free(confs[kk]);
-        }
-        free(confs);
-        free(threads);
+        confs[kk] = (bw_conf*) malloc(sizeof(bw_conf));
+        memcpy(confs[kk], conf, sizeof(bw_conf));
+        confs[kk]->thread = kk;
+        pthread_create(&threads[kk], NULL, BW_thread, (void *) confs[kk]);
     }
 
-    // symmetry in Z
+    for(int kk = 0; kk<nThreads; kk++)
+    {
+        pthread_join(threads[kk], NULL);
+        free(confs[kk]);
+    }
+    free(confs);
+    free(threads);
+
+    /* symmetry in Z */
     for(int z = 0; z<(P-1)/2; z++)
     {
         memcpy(V+(P-z-1)*MN, V+z*MN, MN*sizeof(float));
     }
 }
 
-
-float complex integrand(float rho, float r, float z, bw_conf * conf) {
-     assert(rho<=1); assert(rho>=0);
-
-    float k0 = 2.0 * M_PI / conf->lambda;
-    // j0 has smaller errors but I don't think that we need that precision.
-    // j0f is much faster
-
-    #if 0
-    // This is how it looks in the Java code
-    float BesselValue = j0f(k0 * conf->NA * r * rho);
-    // Optical path difference
-    float OPD = pow(conf->NA,2) * z * pow(rho,2) / (2.0 * conf->ni);
-#endif
-
-    // This is how it looks on their web page
-    // as well as in Optics by Born and Wolf,
-    // p. 437 (section 8.8), 6th edition.
-    // "Three-dimensional light distribution near focus"
-    float q = conf->NA / conf->ni;
-    float BesselValue = j0f(k0 * q * r * rho);
-    float OPD = pow(q,2) * z * pow(rho,2) / (2.0);
-
-    // Phase aberrations.
-    float W = k0 * OPD;
-    //printf("k0=%e, OPD=%e, W=%e\n", k0, OPD, W);
-    float complex y = BesselValue*cos(W)*rho - I*BesselValue*sin(W)*rho;
-    return y;
-}
-
-
-double complex calculate(float r, float defocus, bw_conf * conf) {
-    // Simpson approximation for the Kirchhoff diffraction integral
-
-    float curDifference = conf->TOL; // Stopping criterion
-
-    complex float value = 0;
-    float curI = 0.0;
-    float prevI = 0.0;
-
-    // Initialization of the Simpson sum (first iteration)
-    int64_t N = 2; // number of sub-intervals
-    double del = 1.0/N; // sub-interval length
-
-    // Initial 3-point estimation
-    complex float sumOddIndex = integrand(0.5, r, defocus, conf);
-    complex float sumEvenIndex = 0;
-    complex float valueX0 = integrand(0.0, r, defocus, conf);
-    float complex  valueXn = integrand(1.0, r, defocus, conf);
-    double complex sum = valueX0 + 2*sumEvenIndex + 4*sumOddIndex + valueXn;
-    curI = cabs2(sum) * pow(del,2);
-    prevI = curI;
-
-    // (almost) double the number of points until desired precision
-    size_t k = 0; // number of consecutive successful approximations
-    size_t iteration = 1;
-    size_t max_iterations = 16;
-
-    while (k < conf->K && iteration <= max_iterations) {
-        iteration++;
-        N *= 2;
-        del /= 2;
-
-        sumEvenIndex = sumEvenIndex + sumOddIndex;
-        sumOddIndex = 0 + I*0;
-
-        for (int64_t n = 1; n < N; n = n + 2) {
-            double rho = n * del;
-            value = integrand(rho, r, defocus, conf);
-            sumOddIndex += value;
-        }
-
-        sum = valueX0 + 2*sumEvenIndex + 4*sumOddIndex + valueXn;
-        //printf("N=%ld, sum=%f %fi\n", N, creal(sum), cimag(sum));
-
-        curI = cabs2(sum) * pow(del, 2);
-
-        // Relative error between consecutive approximations
-        if (prevI == 0.0)
-        {
-            curDifference = fabs((prevI - curI) / 1E-5);
-        } else {
-            curDifference = fabs((prevI - curI) / curI);
-        }
-        if (curDifference <= conf->TOL)
-        {
-            k++;
-        } else {
-            k = 0;
-        }
-
-        // This gives a quick finish for close-to-zero pixels
-        // the relative error is not that interesting for those
-        if(fabs(curI-prevI) < 1e-12)
-        { break; }
-
-        prevI = curI;
+double pixelpointfun(double y, void * _conf)
+{
+    /* interpolate radial profile at (x,y) */
+    pixely_t * iconf = (pixely_t *) _conf;
+    double r2 = pow(iconf->x, 2) + pow(y, 2);
+    double r = 0;
+    if(fabs(r2) > 1e-10)
+    {
+        r = sqrt(r2);
     }
 
-    //printf("Final: N=%ld, sum=%f %fi, ZW=%ld\n", N, creal(sum), cimag(sum), (N-1)*2+2);
-    return sum/((double) (N)*3.0);
+    double res = lanczos3(iconf->radprofile,
+                              iconf->nr,
+                              r*(double) iconf->radsample);
+    return res;
 }
 
+double pixelyfun(double x, void *_conf)
+{
+    pixely_t * iconf = (pixely_t *) _conf;
+    //printf("pixelyfun: iconf->nr = %zu, iconf->radsample=%d\n", iconf->nr, iconf->radsample);
+    iconf->x = x;
+
+    gsl_function fun;
+    fun.function = &pixelpointfun;
+    fun.params = iconf;
+    double result = 0;
+    double abserr = 0;
+    //printf("y0=%f, y1=%f\n", iconf->y0, iconf->y1);
+    gsl_integration_qag(&fun, iconf->y0, iconf->y1,
+                        iconf->conf->epsabs, iconf->conf->epsrel,
+                        iconf->conf->limit, iconf->conf->key, iconf->conf->wspy,
+                        &result, &abserr);
+
+    return result;
+}
+
+double integrate_pixel(bw_conf * conf,
+                       double * radprofile, size_t nr, int radsample,
+                             double x0, double x1,
+                       double y0, double y1)
+{
+    gsl_function fun;
+    fun.function = &pixelyfun;
+
+    pixely_t iconf;
+    iconf.radprofile = radprofile;
+    iconf.nr = nr;
+    iconf.radsample = radsample;
+    iconf.y0 = y0;
+    iconf.y1 = y1;
+    iconf.conf = conf;
+    //printf("intgrate_pixel: iconf->nr = %zu, iconf->radsample=%d\n", iconf.nr, iconf.radsample);
+
+    fun.params = &iconf;
+
+    double result = 0;
+    double abserr = 0;
+
+    //printf("x0=%f, x1=%f, y0=%f, y1=%f, epsabs=%e, epsrel=%e key=%d\n", x0, x1, y0, y1, conf->epsabs, conf->epsrel, conf->key);
+
+    gsl_integration_qag(&fun, x0, x1,
+                        conf->epsabs, conf->epsrel,
+                        conf->limit, conf->key, conf->wspx,
+                        &result, &abserr);
+
+    return result/((x1-x0)*(y1-y0));
+}
 
 double simp1_weight(size_t k, size_t N)
 {
-    // Weights for 1D-Simpson
-    // [1, 4, 1] N=3
-    // [1, 4, 2, 4, 1] N=5
-    // [1, 4, 2, 4, 2, 5, 1] N=7, ...
+    /* Weights for 1D-Simpson
+     * [1, 4, 1] N=3
+     * [1, 4, 2, 4, 1] N=5
+     * [1, 4, 2, 4, 2, 4, 1] N=7, */
     assert(N%2 == 1);
     if(k == 0 || k == N-1)
         return 1.0;
@@ -566,41 +623,25 @@ double simp1_weight(size_t k, size_t N)
     return 4.0;
 }
 
+/* radnsamples: Number of radial samples per dx
+ *  xc, yc
+ *
+ * x0, x1, y0, y1 : integration region given in _pixels_
+ * N: number of integration points per dimension
+ */
 
-double complex simp2_complex(int OVER_SAMPLING, double xc, double yc, double complex * H, double * R, double x0, double x1, double y0, double y1, int N)
+double simp2(int radnsamples,
+             double xc, double yc,
+             const double * H,
+             __attribute__((unused))  const double * R, size_t nR,
+             double x0, double x1,
+             double y0, double y1, int N)
 {
 
-    double dx = (x1-x0)/(double) N;
-    double dy = (y1-y0)/(double) N;
-    double complex v = 0;
-    size_t sW = 0;
-    for(int kk = 0; kk<N; kk++)
-    {
-        double wx = simp1_weight(kk, N);
-        for(int ll = 0; ll<N; ll++)
-        {
-            double wy = simp1_weight(ll, N);
-            double w = wx*wy;
-            double x = x0+kk*dx;
-            double y = y0+kk*dy;
-            double r = sqrt(pow(x-xc, 2) + pow(y-yc, 2));
-            int index = (int) floor(r*OVER_SAMPLING);
-            sW+=w;
-            v+=w*(H[index] + (H[index+1] - H[index]) * (r-R[index]));
-        }
-    }
-    v = v/sW; // Pretty sure we don't need to count them ...
-
-    return v;
-}
-
-double simp2(int OVER_SAMPLING, double xc, double yc, double * H, double * R, double x0, double x1, double y0, double y1, int N)
-{
-
-    double dx = (x1-x0)/(double) N;
-    double dy = (y1-y0)/(double) N;
+    double dx = (x1-x0)/(double) (N-1);
+    double dy = (y1-y0)/(double) (N-1);
     double v = 0;
-    size_t sW = 0;
+    size_t sW = 0; /* Sum of weights */
     for(int kk = 0; kk<N; kk++)
     {
         double wx = simp1_weight(kk, N);
@@ -608,240 +649,148 @@ double simp2(int OVER_SAMPLING, double xc, double yc, double * H, double * R, do
         {
             double wy = simp1_weight(ll, N);
             double w = wx*wy;
-            double x = x0+kk*dx;
-            double y = y0+kk*dy;
+            double x = x0+(double) kk*dx;
+            double y = y0+(double) ll*dy;
             double r = sqrt(pow(x-xc, 2) + pow(y-yc, 2));
-            int index = (int) floor(r*OVER_SAMPLING);
+            //int index = (int) floor(r*radnsamples);
+            //double blend = (r-R[index])*radnsamples;
+
             sW+=w;
-            v+=w*(H[index] + (H[index+1] - H[index]) * (r-R[index]));
+            //double ival = (H[index] + (H[index+1] - H[index]) * blend);
+            // printf("w=%f: x=%f, y=%f r=%f, ival=%f, index = %d, blend = %f\n", w, x, y, r, ival, index, blend);
+
+            double ival_l3 = lanczos3(H, nR, r*(double) radnsamples);
+            //printf("Linear/Lanczos3: %f %f %e\n", ival, ival_l3, fabs(ival-ival_l3));
+
+            //v+=w*ival;
+            v+=w*ival_l3;
         }
     }
-    v = v/sW; // Pretty sure we don't need to count them ...
+    v = v/sW;
 
     return v;
 }
-
 
 void BW_slice(float * V, float z, bw_conf * conf)
 {
-    // Calculate the PSF for a single plane/slice
-    //printf("z = %e\n", z);
+    /* Calculate the PSF for a single plane/slice
+     * V is a pointer to the _slice_ not the whole volume
+     * This function is called from different threads with
+     * a copy of the initial conf
+     */
 
-    // V is a pointer to the _slice_ not the whole volume
-    // The center of the image in units of [pixels]
+    /* The center of the image in units of [pixels] */
     double x0 = (conf->M - 1) / 2.0;
     double y0 = (conf->N - 1) / 2.0;
 
-    int maxRadius = (int) round(sqrt(pow(conf->M - x0, 2) + pow(conf->N - y0, 2))) + 1;
-    int OVER_SAMPLING = 10;
+    /* The bw integral will be sampled up to radmax,
+     * with radnsamples samples per pixel
+     */
+    int radmax = (int) round(sqrt(pow(conf->M - x0, 2) + pow(conf->N - y0, 2))) + 1;
+    int radnsamples = conf->oversampling_R;
 
-    size_t nr = maxRadius*conf->oversampling_R;
+    size_t nr = (radmax+1)*conf->oversampling_R+2;
     double * r = malloc(nr * sizeof(double));
 
-    // We will have a real and a complex profile
-    double complex * hComplex = malloc(nr * sizeof(complex double));
-    double * hReal = malloc(nr * sizeof(double));
+    // abs(x)^2
+    double * radprofile = malloc(nr * sizeof(double));
 
     /* Calculate the radial profile
        possibly by integrating over Z */
 
     for(size_t n = 0; n < nr; n++)
     {
-        r[n] = ((double) n) / ((double) OVER_SAMPLING);
+        r[n] = ((double) n) / ((double) radnsamples);
     }
 
-
-    // Radial profile using Simpsons's integral
-    if(conf->fast_li == 0)
+    /* 1D integral using Bessel series, li */
+    if(conf->mode_bw == MODE_BW_LI)
     {
-        int NS = conf->Simpson_z;
-        for (size_t n = 0; n < nr; n++) {
-            hReal[n] = 0;
-            hComplex[n] = 0;
-
-            double complex now_complex = 0;
-            double now_real = 0;
-
-            double dz = (conf->resAxial)/(NS-1);
-            double sW = 0;
-            for(int kk = 0; kk < NS; kk++)
-            {
-                double zs = z + kk*dz -(NS-1)/2*dz;
-                //printf("zs=%f ", zs);
-                double w = simp1_weight(kk, NS);
-                sW += w;
-                double complex value = calculate(r[n] * conf->resLateral, zs, conf);
-                now_complex += w*value;
-                now_real += w*cabs2(value);
-
-                //printf("(%f %fi)\n", creal(value), cimag(value));
-            }
-            //printf("sW = %f\n", sW);
-
-            hReal[n] = now_real/sW;
-            hComplex[n] = now_complex/sW;
-        }
-    }
-
-    // Radial profile using Bessel series
-    if(conf->fast_li == 1) // Using Li
-    {
-        int NS = conf->Simpson_z;
-        // NS = 1; Just for testing
-        memset(hReal, 0, nr*sizeof(double));
-        memset(hComplex, 0, nr*sizeof(complex double));
-
-
-        double dz = 0;
-        if(NS > 1) {
-            dz = (conf->resAxial)/(NS-1);
-        }
-
-        for(int kk = 0; kk < NS; kk++) // Over z
+        li_conf * L = li_new(z);
+        L->lambda = conf->lambda;
+        L->NA = conf->NA;
+        L->ni = conf->ni;
+        for(size_t n = 0; n < nr; n++) // over r
         {
-            double zs = z + kk*dz - (NS-1)/2*dz;
-            double w = simp1_weight(kk, NS);
-            //printf("z = %e, dz = %e, zs = %e\n", z, dz, zs); fflush(stdout);
-            li_conf * L = li_new(zs);
-            L->lambda = conf->lambda;
-            L->NA = conf->NA;
-            L->ni = conf->ni;
-            for(size_t n = 0; n < nr; n++) // over r
-            {
-                complex double v = li_calc(L, r[n]*conf->resLateral);
-                hReal[n] += w*cabs2(v);
-                hComplex[n] += w*v;
-            }
-            li_free(&L);
+            complex double v = li_calc(L, r[n]*conf->resLateral);
+            radprofile[n] = cabs2(v);
         }
-        double wtot = 0;
-        for(int kk = 0; kk < NS; kk++)
-            wtot += simp1_weight(kk, NS);
+        li_free(&L);
+    }
 
+
+    /* BW integral by GSL */
+    if(conf->mode_bw == MODE_BW_GSL)
+    {
+        bw_gsl_conf_t * bw_gsl_conf = bw_gsl_new(conf->limit);
+        bw_gsl_conf->NA = conf->NA;
+        bw_gsl_conf->ni = conf->ni;
+        bw_gsl_conf->epsabs = conf->epsabs;
+        bw_gsl_conf->epsrel = conf->epsrel;
+        bw_gsl_conf->lambda = conf->lambda;
+        if(z == 0) /* Only write from the thread that processes z==0 */
+        {
+            pthread_mutex_lock(&logfile_mutex);
+            fprintf(conf->log, "Settings for BW integration over Z:\n");
+            bw_gsl_fprint(conf->log, bw_gsl_conf);
+            pthread_mutex_unlock(&logfile_mutex);
+        }
+
+        /* Integrate bw for a equidistant set of radii */
         for(size_t n = 0; n < nr; n++)
         {
-            hReal[n]/=wtot;
-            hComplex[n]/=wtot;
+            double radius = r[n]*conf->resLateral;
+            //double value  = bw_gsl_integrate_z(bw_gsl_conf, radius, z0, z1);
+            double value = bw_gsl_integrate(bw_gsl_conf, radius, z);
+            radprofile[n] = value;
         }
+        bw_gsl_free(bw_gsl_conf);
     }
-
-    if(0){
-    for(int kk = 0; kk<10; kk++)
-    {
-        printf("r=%f, hReal = %e, cabs2(hComplex) = %e\n", r[kk], hReal[kk], cabs2(hComplex[kk]));
-    }
-    exit(1);
-    }
-
     assert(r[0] == 0);
 
-    // For each pixel in the quadrant
+    /*
+     * For each pixel in the quadrant integrate over x and y
+     */
+
     for (int x = 0; 2*x <= conf->M; x++) {
         for (int y = 0; 2*y <= conf->N; y++) {
 
-            // radius of the current pixel in units of [pixels]
-            double rPixel = sqrt(pow((double) x - x0, 2) + pow((double) y - y0, 2));
+            /* radius of the current pixel in units of [pixels] */
+            double rPixel = sqrt( pow((double) x - x0, 2)
+                                  + pow((double) y - y0, 2));
+
+
+            /* Pixel integration */
             double pIntensity = 0;
-
-            // Pixel integration by Real scalars
-            if(conf->complexPixel == 0)
+            if(rPixel < radmax)
             {
-                double v = 0;
-                if(conf->Simpson > 0)
-                {
-                    v = simp2(OVER_SAMPLING, x0, y0, hReal, r, x - 0.5, x + 0.5, y - 0.5, y + 0.5, conf->Simpson);
-                }
-                else
-                {
-                    // Index of nearest coordinate from below (replace by pixel integration)
-                    size_t index = (int) floor(rPixel * OVER_SAMPLING);
-                    assert(index < nr);
-                    // Interpolated value.
-                    v = hReal[index] + (hReal[index + 1] - hReal[index]) * (rPixel - r[index]) * OVER_SAMPLING;
-                }
-                pIntensity = v;
+                pIntensity = integrate_pixel(conf, radprofile, nr, radnsamples,
+                                             x - 0.5 - x0, x + 0.5 - x0,
+                                             y - 0.5 - y0, y + 0.5 - y0);
             }
 
-            // Pixel integration by Complex numbers
-            if(conf->complexPixel == 1)
-            {
-                complex double v = 0;
-            if(conf->Simpson > 0)
-            {
-                v = simp2_complex(OVER_SAMPLING, x0, y0, hComplex, r, x - 0.5, x + 0.5, y - 0.5, y + 0.5, conf->Simpson);
-            }
-            else
-            {
-                // Index of nearest coordinate from below (replace by pixel integration)
-                size_t index = (int) floor(rPixel * OVER_SAMPLING);
-                assert(index < nr);
-                // Interpolated value.
-                v = hComplex[index] + (hComplex[index + 1] - hComplex[index]) * (rPixel - r[index]) * OVER_SAMPLING;
-            }
-            pIntensity = cabs2(v);
-            }
-
-            // Use symmetry to fill the output image plane
+            /* Use symmetry to fill the output image plane */
             int xf = conf->M-x-1;
             int yf = conf->N-y-1;
             V[x + conf->M * y] = pIntensity;
             V[y + conf->M * x] = pIntensity;
             V[xf + conf->M * y] = pIntensity;
-            //      V[yf + conf->M * x] = v;
             V[x + conf->M * yf] = pIntensity;
-            //      V[y + conf->M * xf] = v;
             V[xf + conf->M * yf] = pIntensity;
             V[yf + conf->M * xf] = pIntensity;
         }
     }
 
     free(r);
-    free(hReal);
-    free(hComplex);
+    free(radprofile);
     return;
 }
 
 void unit_tests(bw_conf * conf)
 {
-    printf("Values of PG-integrand for different values of rho\n");
-    double r = 0; double z = 0;
-    printf("r = %f, z = %f, NA=%f, ni=%f, lambda=%f nm\n", r, z, conf->NA, conf->ni, conf->lambda);
-    for(double rho = 0; rho<=1; rho+=0.1)
-    {
-        double complex value = integrand(rho, r, z, conf);
-        printf("rho=%f, %f %fi\n", rho, creal(value), cimag(value));
-    }
-
-    r = 130; z = 130;
-    printf("r = %f, z = %f, NA=%f, ni=%f, lambda=%f nm\n", r, z, conf->NA, conf->ni, conf->lambda);
-    for(double rho = 0; rho<=1; rho+=0.1)
-    {
-        double complex value = integrand(rho, r, z, conf);
-        printf("rho=%f, %f %fi\n", rho, creal(value), cimag(value));
-    }
-
-    z = 0;
-    li_conf * L = li_new(z);
-    L->lambda = conf->lambda;
-    L->NA = conf->NA;
-    L->ni = conf->ni;
-
-    li_show(L);
-    assert(L != NULL);
-
-    for(double r = 0; r<500; r+=130)
-    {
-        double complex v = li_calc(L, r);
-        double vreal = pow(creal(v),2) + pow(cimag(v),2);
-        printf("PSF(r=%f, z=%f) = (%f %fi) %f dV\n", r, z, creal(v), cimag(v), vreal);
-        double complex v2 = calculate(r, z, conf);
-        double vreal2 = pow(creal(v2),2) + pow(cimag(v2),2);
-        printf("PG(r=%f, z=%f) = (%f %fi) %f dV\n", r, z, creal(v2), cimag(v2), vreal2);
-    }
-
-    L = li_free(&L);
-    assert(L == NULL);
-
+    printf("No unit tests to run\n");
+    bw_conf_printf(stdout, conf);
+    return;
 }
 
 int main(int argc, char ** argv)
@@ -849,13 +798,13 @@ int main(int argc, char ** argv)
     struct timespec tstart, tend;
     clock_gettime(CLOCK_REALTIME, &tstart);
 
-    // Use defaults
     bw_conf * conf = bw_conf_new();
     bw_argparsing(argc, argv, conf);
 
     if( conf->overwrite == 0 && file_exist(conf->outFile))
     {
         printf("%s already exist. Doing nothing\n", conf->outFile);
+        bw_conf_free(&conf);
         return EXIT_SUCCESS;
     }
 
@@ -872,18 +821,27 @@ int main(int argc, char ** argv)
     fprint_time(conf->log);
     bw_conf_printf(conf->log, conf);
 
-    // Run
+    /* run */
     if(conf->testing)
     {
         unit_tests(conf);
         exit(0);
     }
+
+    /* Turn off error handling in GSL. Otherwise GSL will close the program
+     * if the tolerances can't be achieved. We set it back later on.
+     * Ideally we should have a custom error handler that simply ignores
+     * GSL_EROUND */
+    gsl_error_handler_t * old_handler = gsl_set_error_handler(dw_bw_gsl_err_handler);
+
+    /* Do the calculations */
     BW(conf);
 
-    // Write to disk
+    gsl_set_error_handler(old_handler);
+
+    /* Write to disk  */
     if(conf->verbose > 0) {
         printf("Writing as 32-bit floats to %s\n", conf->outFile);
-
     }
 
     ttags * T = ttags_new();
@@ -902,13 +860,9 @@ int main(int argc, char ** argv)
     fprintf(conf->log, "Took: %f s\n", timespec_diff(&tend, &tstart));
     fprintf(conf->log, "done!\n");
 
-    // Clean up
+    /* Clean up */
     free(conf->V);
-    fclose(conf->log);
-    free(conf->outFile);
-    free(conf->logFile);
-    free(conf->cmd);
-    free(conf);
+    bw_conf_free(&conf);
 
     return EXIT_SUCCESS;
 }

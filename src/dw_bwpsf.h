@@ -35,8 +35,17 @@
 #include <time.h>
 #include <wchar.h>
 #include <locale.h>
+#include <gsl/gsl_integration.h>
+
 #include "fim_tiff.h"
 #include "dw_version.h"
+#include "lanczos3.h"
+#include "li.c"
+#include "bw_gsl.h"
+
+/* Mode for calculating the 1D integral */
+#define MODE_BW_GSL 0
+#define MODE_BW_LI 1
 
 typedef struct {
     int verbose;
@@ -47,23 +56,22 @@ typedef struct {
     char * logFile;
     FILE * log;
 
-    // Settings for 'calculate'
-    size_t K; // stop at this number of successful iterations
-    float TOL; // Defines a successful iteration
-
-    // Physical parameters
+    /* Physical parameters */
     float lambda; // Emission maxima
     float NA; // Numerical aperture of lens
     float ni;
     float resLateral; // pixel size in x and y
     float resAxial; // pixel size in z
 
-    // Integration options
-    int Simpson; // Use this number of points for Simpson integration
-    int Simpson_z; // Number of points in Z
-    int fast_li; // Use Li's method for the integral
+    /* Integration options */
+    int mode_bw; /* How to calculate the 1D integral */
     int oversampling_R; // Oversampling in radial direction
-    int complexPixel; // Integrate pixels as complex?
+    double epsabs;
+    double epsrel;
+    size_t limit;
+    int key;
+    gsl_integration_workspace *wspx;
+    gsl_integration_workspace *wspy;
 
     float * V; // output image
     // shape of output image
@@ -78,6 +86,8 @@ typedef struct {
     int testing;
 } bw_conf;
 
+bw_conf * bw_conf_new(void);
+void bw_conf_free(bw_conf ** conf);
 void bw_conf_printf(FILE * out, bw_conf * conf);
 void BW_slice(float * , float z, bw_conf * conf);
 void bw_argparsing(int , char ** , bw_conf * conf);
@@ -90,6 +100,18 @@ void BW(bw_conf * conf);
 
 // Get the command line options
 void getCmdLine(int argc, char ** argv, bw_conf * s);
+
+
+/* Integration over pixel */
+typedef struct {
+    bw_conf * conf;
+    double * radprofile;
+    size_t nr;
+    int radsample;
+    double y0;
+    double y1;
+    double x;
+} pixely_t;
 
 
 #define ANSI_COLOR_RED     "\x1b[31m"

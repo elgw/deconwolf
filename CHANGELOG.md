@@ -1,34 +1,5 @@
-# CHANGELOG
-
-### 2020-12-21 v0.0.12
- * Redirected warnings and errors from the tiff library to the log file.
- * Carries over ImageJ metadata from input image to output image.
- * Using the method by Li to speed up the PSF calculations.
- * Changed the "error= ..." during iterations for "MSE = ..." (there was a user that mailed me and asked if there was a problem!).
-
-### 2020-11-10 v0.0.9
- * Updated the PSF generator to use Simpson's rule with 9x9 valuations in X-Y per pixel. This should produce more accurate PSF's when the pixel size is large. It is future work to also integrate in Z.
- * Fixed some bugs/issues related to vector aliasing that caused dw to crash when compiled with the `O3` flag.
- * General cleanup including warning free compilation.
-
-### 2020-06-09 v0.0.6
- * Added the binary `dw_bw` which generates PSFs according to the Born-Wolf model. It is based on, and compared to [https://github.com/Biomedical-Imaging-Group/PSFGenerator/blob/master/src/psf/bornwolf/KirchhoffDiffractionSimpson.java](https://github.com/Biomedical-Imaging-Group/PSFGenerator/blob/master/src/psf/bornwolf/KirchhoffDiffractionSimpson.java)
-
-### 2020-06-05 v0.0.5
- * Changing name of the main binary to `dw` and prefixing the utility binaries with `dw_`.
- * Does not load the full images neither for reading or writing in tiling mode.
- * Added the binary `dw_tiffmax` for fast maximum intensity projections.
-
-### 2020-05-17 v0.0.3
- * Further memory savings
- * Everything in the main loop is parallelized with OpenMP
- * Automatic cropping of redundant layers of the PSF, controlled by the `--xyfactor` setting.
- * Less clutter in the output to the terminal.
-
-### 2020-05-13 v0.0.2
- * Memory savings of about 20%
- * Refactorization
- * Added the `--relax` flag in order to scale the central value of the PSF.
-
-### 2020-05-12 v0.0.1
- * First release!
+ - v. 0.0.17
+   - Fixed some bugs in the PSF generation code that did affect the accuracy
+     of the pixels in the PSF.
+   - Stared to use GSL for numerical integration. It remains to change the
+     double integral over x-y into something more dynamic.

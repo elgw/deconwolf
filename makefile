@@ -55,7 +55,7 @@ dw = bin/dw
 dw_OBJECTS = fim.o tiling.o fft.o fim_tiff.o dw.o deconwolf.o deconwolf_tif_max.o
 
 dwbw = bin/dw_bw
-dwbw_OBJECTS = fim.o fim_tiff.o dw_bwpsf.o
+dwbw_OBJECTS = fim.o fim_tiff.o dw_bwpsf.o bw_gsl.o lanczos3.o
 
 # dwtm = bin/dw_tiffmax
 # dwtm_OBJECTS = fim.o fim_tiff.o deconwolf_tif_max.o
@@ -81,8 +81,6 @@ install:
 	# Binaries
 	cp bin/dw_bw $(DESTDIR)/dw_bw
 	cp bin/dw $(DESTDIR)/dw
-	cp src/dw_guide.py $(DESTDIR)/dw_guide
-	chmod +x $(DESTDIR)/dw_guide
 	# Man pages
 	cp doc/deconwolf.1 .
 	gzip deconwolf.1
