@@ -83,6 +83,8 @@ void bw_conf_printf(FILE * out, bw_conf * conf)
     {
         fprintf(out, "BW Integral: gsl_integration_qag\n");
     }
+    fprintf(out, "epsabs: %e\n", conf->epsabs);
+    fprintf(out, "epsrel: %e\n", conf->epsrel);
 
     // Show theoretical FWHM of the PSF
     // And look at the number of pixels per fwhm
@@ -244,6 +246,10 @@ void usage(__attribute__((unused)) int argc, char ** argv, bw_conf * s)
         printf(" Default.");
     }
     printf("\n");
+    printf(" --epsabs \n\t Set absolute error tolerance for the integration. Default: %e\n",
+           s->epsabs);
+    printf(" --epsrel \n\t Set relative error tolerance for the integration. Default: %e\n",
+           s->epsrel);
 
     printf("Other options:\n");
     printf(" --overwrite \n\t Overwrite the target image if it exists.\n");
@@ -271,30 +277,42 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
 
     getCmdLine(argc, argv, s);
 
+    int gotna = 0;
+    int gotlambda = 0;
+    int gotni = 0;
+    int gotdx = 0;
+    int gotdz = 0;
+
     struct option longopts[] =
         {
-         { "li",         no_argument,       NULL, 'f'},
-         { "gsl",        no_argument,       NULL, 'g'},
-         { "help",       no_argument,       NULL, 'h'},
-         { "ni",         required_argument, NULL, 'i'},
-         { "lambda",     required_argument, NULL, 'l'},
-         { "NA",         required_argument, NULL, 'n'},
-         { "verbose",    required_argument, NULL, 'p'},
-         { "threads",    required_argument, NULL, 't'},
-         { "version",    no_argument,       NULL, 'v'},
-         { "overwrite",  no_argument,       NULL, 'w'},
-         { "resxy",      required_argument, NULL, 'x'},
-         { "resz",       required_argument, NULL, 'z'},
-         { "size",       required_argument, NULL, 'N'},
-         { "nslice",     required_argument, NULL, 'P'},
-         { "testing",    no_argument,       NULL, 'T'},
-         { NULL,         0,                 NULL,  0 }
+            { "epsabs",     no_argument,       NULL,   'a'},
+            { "li",         no_argument,       NULL,   'f'},
+            { "gsl",        no_argument,       NULL,   'g'},
+            { "help",       no_argument,       NULL,   'h'},
+            { "ni",         required_argument, NULL,   'i'},
+            { "lambda",     required_argument, NULL,   'l'},
+            { "NA",         required_argument, NULL,   'n'},
+            { "verbose",    required_argument, NULL,   'p'},
+            { "epsrel",     no_argument,       NULL,   'r'},
+            { "threads",    required_argument, NULL,   't'},
+            { "version",    no_argument,       NULL,   'v'},
+            { "overwrite",  no_argument,       NULL,   'w'},
+            { "resxy",      required_argument, NULL,   'x'},
+            { "resz",       required_argument, NULL,   'z'},
+            { "size",       required_argument, NULL,   'N'},
+            { "nslice",     required_argument, NULL,   'P'},
+            { "testing",    no_argument,       NULL,   'T'},
+            { NULL,         0,                 NULL,    0 }
         };
     int Pset = 0;
     int ch;
-    while((ch = getopt_long(argc, argv, "fghi:l:n:p:t:vwx:z:N:P:T", longopts, NULL)) != -1)
+
+    while((ch = getopt_long(argc, argv, "a:fghi:l:n:p:r:t:vwx:z:N:P:T", longopts, NULL)) != -1)
     {
         switch(ch) {
+        case 'a':
+            s->epsabs = atof(optarg);
+            break;
         case 'f':
             s->mode_bw = MODE_BW_LI;
             break;
@@ -306,15 +324,21 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
             exit(0);
         case 'i':
             s->ni = atof(optarg);
+            gotni = 1;
             break;
         case 'l':
             s->lambda = atof(optarg);
+            gotlambda = 1;
             break;
         case 'n':
             s->NA = atof(optarg);
+            gotna = 1;
             break;
         case 'p':
             s->verbose = atoi(optarg);
+            break;
+        case 'r':
+            s->epsrel = atof(optarg);
             break;
         case 't':
             s->nThreads = atoi(optarg);
@@ -328,9 +352,11 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
             break;
         case 'x':
             s->resLateral = atof(optarg);
+            gotdx = 1;
             break;
         case 'z':
             s->resAxial = atof(optarg);
+            gotdz = 1;
             break;
         case 'N':
             s->M = atoi(optarg);
@@ -350,6 +376,37 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
     }
 
     free(defaults);
+
+    int stay = 1;
+    if(gotna == 0)
+    {
+        printf("Numerical Aperture (--NA) not specified\n");
+        stay = 0;
+    }
+    if(gotlambda == 0)
+    {
+        printf("Wave Length (--lambda) not specified\n");
+        stay = 0;
+    }
+    if(gotni == 0)
+    {
+        printf("Refractive index (--ni) not specified\n");
+        stay = 0;
+    }
+    if(gotdx == 0)
+    {
+        printf("Laterial pixel size not specified (--resxy) not specified\n");
+        stay = 0;
+    }
+    if(gotdz == 0)
+    {
+        printf("Axial distance between planes not specified (--resz) not specified\n");
+        stay = 0;
+    }
+    if(stay == 0)
+    {
+        exit(EXIT_FAILURE);
+    }
 
     if(s->lambda < 50)
     {
@@ -676,9 +733,11 @@ void BW_slice(float * V, float z, bw_conf * conf)
     /* BW integral by GSL */
     if(conf->mode_bw == MODE_BW_GSL)
     {
-        bw_gsl_conf_t * bw_gsl_conf = bw_gsl_new(100000);
+        bw_gsl_conf_t * bw_gsl_conf = bw_gsl_new(conf->limit);
         bw_gsl_conf->NA = conf->NA;
         bw_gsl_conf->ni = conf->ni;
+        bw_gsl_conf->epsabs = conf->epsabs;
+        bw_gsl_conf->epsrel = conf->epsrel;
         bw_gsl_conf->lambda = conf->lambda;
         if(z == 0) /* Only write from the thread that processes z==0 */
         {
