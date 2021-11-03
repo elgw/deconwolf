@@ -41,10 +41,8 @@
 #include <gsl/gsl_integration.h>
 
 /* Mode for calculating the 1D integral */
-#define MODE_INT1_GSL 0
-#define MODE_INT1_LI 1
-#define MODE_INT1_PG 2
-
+#define MODE_BW_GSL 0
+#define MODE_BW_LI 1
 
 typedef struct {
     int verbose;
@@ -55,22 +53,22 @@ typedef struct {
     char * logFile;
     FILE * log;
 
-    // Settings for 'calculate'
-    size_t K; // stop at this number of successful iterations
-    float TOL; // Defines a successful iteration
-
-    // Physical parameters
+    /* Physical parameters */
     float lambda; // Emission maxima
     float NA; // Numerical aperture of lens
     float ni;
     float resLateral; // pixel size in x and y
     float resAxial; // pixel size in z
 
-    // Integration options
-    int samples_xy;
-    int samples_z; // Number of points in Z
-    int mode_int1; /* How to calculate the 1D integral */
+    /* Integration options */
+    int mode_bw; /* How to calculate the 1D integral */
     int oversampling_R; // Oversampling in radial direction
+    double epsabs;
+    double epsrel;
+    size_t limit;
+    int key;
+    gsl_integration_workspace *wspx;
+    gsl_integration_workspace *wspy;
 
     float * V; // output image
     // shape of output image
@@ -99,6 +97,18 @@ void BW(bw_conf * conf);
 
 // Get the command line options
 void getCmdLine(int argc, char ** argv, bw_conf * s);
+
+
+/* Integration over pixel */
+typedef struct {
+    bw_conf * conf;
+    double * radprofile;
+    size_t nr;
+    int radsample;
+    double y0;
+    double y1;
+    double x;
+} pixely_t;
 
 
 #define ANSI_COLOR_RED     "\x1b[31m"
