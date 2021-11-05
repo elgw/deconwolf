@@ -68,20 +68,35 @@ sudo make install
 ```
 
 ## Resources and references
+Dependencies:
  * [fftw3 documentation](http://www.fftw.org/fftw3_doc/).
  * [libtiff repository](https://gitlab.com/libtiff/libtiff)
+ * [lib gsl](https://www.gnu.org/software/gsl/)
 
-The algoritm is based on these papers:
+The deconvolution algorithm is based on these papers:
 
  * Richardson, William Hadley (1972). "Bayesian-Based Iterative Method of Image
    Restoration". JOSA. 62 (1): 55–59. [doi](https://doi.org/10.1364/JOSA.62.000055)
  * Lucy, L. B. (1974). "An iterative technique for the rectification of observed
    distributions". Astronomical Journal. 79 (6): 745–754. [doi](https://doi.org/10.1086%2F111605)
  * Biggs, D.S.C. “Acceleration of Iterative Image Restoration Algorithms.”
-   Applied Optics. Vol. 36. Number 8, 1997, pp. 1766–1775.
+   Applied Optics. Vol. 36. Number 8, 1997, pp. 1766–1775. [doi(https://doi.org/10.1364/AO.36.001766)
  * M. Bertero and P. Boccacci, A simple method for the reduction of boundary
    effects in the Richardson-Lucy approach to image deconvolution,
-A&A 437, 369-374 (2005), [doi](https://doi.org/10.1051/0004-6361:20052717)
+   A&A 437, 369-374 (2005), [doi](https://doi.org/10.1051/0004-6361:20052717)
  * Lee, Ji-Yeon & Lee, Nam-Yong. (2014). Cause Analysis and Removal of Boundary
    Artifacts in Image Deconvolution. Journal of Korea Multimedia Society. 17.
    838-848. [doi](https://doi.org/10.9717/kmms.2014.17.7.838).
+
+The PSF generation is based on these:
+ * Max Born. Principles of optics : electromagnetic theory of propagation, interference,
+   and diffraction of light. Cambridge: Cambridge University Press, 2019. isbn: 978-1-108-47743-7.
+
+ * F. Aguet. “Super-Resolution Fluorescence Microscopy Based on Physical
+   Models”. EPFL Thesis no. 4418 (2009), 209 p. Swiss Federal Institute of
+   Technology Lausanne (EPFL), May 2009 [url](http://bigwww.epfl.ch/publications/aguet0903.html)
+
+*  The `--li` option uses:
+   Jizhou Li, Feng Xue, and Thierry Blu. “Fast and accurate three-dimensional
+   point spread function computation for fluorescence microscopy”. In: Journal
+   of the Optical Society of America A 34.6 (May 2017), p. 1029. [doi](https://doi.org/10.1364/josaa.34001029)
