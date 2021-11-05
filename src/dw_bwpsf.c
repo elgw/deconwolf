@@ -16,21 +16,15 @@
 
 /*
  * TODO:
- * - tidy up a little :)
+ * - tidy up!
 */
 
 #include "dw_bwpsf.h"
 
-
-
-// j0f, i.e., the float version of j0 is not available on mac
-#ifdef __APPLE__
-#define j0f j0
-#endif
-
 pthread_mutex_t stdout_mutex;
 pthread_mutex_t logfile_mutex;
 
+int GLOB_N_GSL_EROUND = 0; /* Counter for GSL_EROUND */
 
 void dw_bw_gsl_err_handler(const char * reason,
                            const char * file,
@@ -41,8 +35,10 @@ void dw_bw_gsl_err_handler(const char * reason,
      * We use high precision when possible and accept that the
      * numerical integration sometimes can't reach that.
      */
+
     if(gsl_errno == GSL_EROUND)
     {
+        GLOB_N_GSL_EROUND++;
         return;
     }
 
@@ -111,12 +107,14 @@ void bw_conf_printf(FILE * out, bw_conf * conf)
 bw_conf * bw_conf_new()
 {
     bw_conf * conf = malloc(sizeof(bw_conf));
+
     /* Physical settings */
     conf->lambda = 600;
     conf->NA = 1.45;
     conf->ni = 1.515;
     conf->resAxial = 300;
     conf->resLateral = 130;
+
     /* Output image Settings*/
     conf->M = 181;
     conf->N = 181;
@@ -130,17 +128,18 @@ bw_conf * bw_conf_new()
     conf->logFile = NULL;
     conf->log = NULL;
     conf->overwrite = 0;
-
-    /* Expose from CLI? */
-    conf->oversampling_R = 17;
-    conf->mode_bw = MODE_BW_GSL;
     conf->testing = 0;
 
+    /* BW integration */
+    conf->oversampling_R = 19; /* Expose from CLI? */
+    conf->mode_bw = MODE_BW_GSL;
+
     /* For XY integration */
-    conf->epsabs = 1e-6;
+    conf->epsabs = 1e-6; /* As good as we can get without any GSL_EROUND */
     conf->epsrel = 1e-6;
-    conf->limit = 10000;
     conf->key = 1;
+    /* For XY integration and BW integration */
+    conf->limit = 10000000;
 
     return conf;
 }
@@ -830,14 +829,21 @@ int main(int argc, char ** argv)
 
     /* Turn off error handling in GSL. Otherwise GSL will close the program
      * if the tolerances can't be achieved. We set it back later on.
-     * Ideally we should have a custom error handler that simply ignores
-     * GSL_EROUND */
-    gsl_error_handler_t * old_handler = gsl_set_error_handler(dw_bw_gsl_err_handler);
+     */
+
+    gsl_error_handler_t * old_handler =
+        gsl_set_error_handler(dw_bw_gsl_err_handler); /* ignore GSL_EROUND */
 
     /* Do the calculations */
     BW(conf);
 
     gsl_set_error_handler(old_handler);
+    if(GLOB_N_GSL_EROUND > 0)
+    {
+        printf("Warning: GSL_EROUND was raised %d times\n", GLOB_N_GSL_EROUND);
+        printf("         i.e. \"roundoff error prevents tolerance from being achieved\"\n");
+        fprintf(conf->log, "GSL_EROUND was raised %d times\n", GLOB_N_GSL_EROUND);
+    }
 
     /* Write to disk  */
     if(conf->verbose > 0) {
