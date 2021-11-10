@@ -586,7 +586,7 @@ int fim_tiff_from_raw(const char * fName, // Name of tiff file to be written
     size_t bytesPerSample = sizeof(uint16_t);
     char formatString[4] = "w";
     size_t MNP = (size_t) M * (size_t) N * (size_t ) P;
-    if(MNP*sizeof(uint16) >= pow(2, 32))
+    if(MNP*sizeof(uint16_t) >= pow(2, 32))
     {
         sprintf(formatString, "w8\n");
         printf("WARNING: File is > 2 GB, using BigTIFF format\n");
@@ -690,7 +690,7 @@ int fim_tiff_write_float(const char * fName, const afloat * V,
     fprintf(fout, "scaling: 1\n");
     size_t bytesPerSample = sizeof(float);
     char formatString[4] = "w";
-    if(M*N*P*sizeof(uint16) >= pow(2, 32))
+    if(M*N*P*sizeof(uint16_t) >= pow(2, 32))
     {
         sprintf(formatString, "w8\n");
         fprintf(fout, "WARNING: File is > 2 GB, using BigTIFF format\n");
@@ -792,7 +792,7 @@ int fim_tiff_write(const char * fName, const afloat * V,
 
     size_t bytesPerSample = sizeof(uint16_t);
     char formatString[4] = "w";
-    if(M*N*P*sizeof(uint16) >= pow(2, 32))
+    if(M*N*P*sizeof(uint16_t) >= pow(2, 32))
     {
         sprintf(formatString, "w8\n");
         fprintf(fout, "WARNING: File is > 2 GB, using BigTIFF format\n");
