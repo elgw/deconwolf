@@ -1,12 +1,14 @@
 # Usage
 Deconwolf has a command line interface (CLI), i.e., you would typically run
 it from a terminal. However, here is also a
-[GUI](https://github.com/elgw/dw_gui) that might be handy.
+[GUI](https://github.com/elgw/deconwolf-gui) that might be handy.
 
 ## Command line usage:
 To deconvolve an image (say `dapi_001.tif`) you need an approximation of
-the PSF. If you don't
-have one you can create one with `dw_bw` that is shipped with deconwolf.
+the PSF of your particular microscope. If you don't
+have one you can create one according to the Born-Wolf model
+with `dw_bw` that is shipped with deconwolf.
+
 The basic information that you need to know is
  * The numerical aperture, NA.
  * The refractive index of the immersion, ni. Common media are air (ni = 1)
@@ -21,7 +23,7 @@ distance between planes = 250 nm, generate a PSF (`PSF_DAPI.tif`) with:
 dw_bw --resxy 130 --resz 250 --lambda 461 --NA 1.45 --ni 1.515 PSF_DAPI.tif
 ```
 
-To deconvolve the images, type:
+To deconvolve the image, type:
 
 ``` shell
 dw dapi_001.tif PSF_dapi.tif
@@ -38,19 +40,19 @@ dw --help
 ```
 
 Please note that deconwolf requires that the pixel size is the same for
-both the PSF and the input image and does not read that from any metadata.
+both the PSF and the input image and does not attempt to metadata from the
+tif files.
 
 ## Test data
-No special test data has been prepared, but you can get some images from the [DeconvolutionLab2](http://bigwww.epfl.ch/deconvolution/deconvolutionlab2/) web page.
+No special test data has been prepared, but you can get some images from the [DeconvolutionLab2](http://bigwww.epfl.ch/deconvolution/deconvolutionlab2/) web page. Please note that in some cases the PSFs do not contain enough z-planes.
 
 ## Memory considerations
-The peak memory usage is written at the end of the log file. If you have 16 GB of RAM, images up to [1024x1024x60] pixels should work without tiling.
+The peak memory usage is written at the end of the log file. If you have 16
+GB of RAM, images up to [1024x1024x60] pixels should work without tiling.
 
 ## PSF considerations
 deconwolf requires that the PSF is centered, i.e.,
 that the largest value is in the middle.
-Consequently it prefers PFSs that
-have an odd size in each dimension.
 If you generate the PSF with some
 other program you might have to center it first.
 
