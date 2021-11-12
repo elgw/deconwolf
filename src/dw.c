@@ -912,7 +912,10 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
   for(size_t kk = 0; kk<wMNP; kk++)
   {
     if(P1[kk] < sigma)
-    { P1[kk] = 0; } else { P1[kk] = 1/P1[kk]; }
+    {
+        P1[kk] = 0;
+    } else {
+        P1[kk] = 1/P1[kk]; }
   }
   afloat * W = P1;
   //writetif("W.tif", W, wM, wN, wP);
@@ -943,8 +946,6 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
 
   afloat * gm = fim_zeros(wMNP);
   afloat * g = fim_zeros(wMNP);
-
-
 
   int it = 0;
   while(it<nIter)
