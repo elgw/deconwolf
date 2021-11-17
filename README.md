@@ -4,6 +4,7 @@
    * [Linux](#linux)
    * [macOS](#osx)
    * [Windows 10](#win10)
+ * [Usage](#use)
  * [References](#ref)
 
 `deconwolf` is a program for deconvolution of 3-D fluorescent wide-field
@@ -24,7 +25,7 @@ image stacks:
 Except for this README there is also a short [manual](USAGE.md),
 a [CHANGELOG](CHANGELOG.md) and a [TODO](TODO.md) list.
 
-Does does not:
+Deconwolf does not:
  - Have a full-featured Graphical User Interface (GUI), however, if you
    like to click buttons there is a limited
    [GUI](https://github.com/elgw/deconwolf-gui).
@@ -138,6 +139,25 @@ libwebp-7.dll  libwinpthread-1.dll libzstd.dll        zlib1.dll
 
 At least one person has build deconwolf using Windows Subsystem for Linux but
 beware, there might be some [performance penalty](https://www.phoronix.com/scan.php?page=article&item=wsl-wsl2-tr3970x&num=1).
+
+<a name="usage">
+
+## Usage
+At the moment the documentation is limited. For available options, please see
+
+``` shell
+dw --help
+dw_bw --help
+```
+
+There is a minimal example:
+
+``` shell
+# generate PSF.tif
+dw_bw --resxy 130 --resz 250 --NA 1.46 --ni 1.518 --lambda 460 PSF.tiff
+# Deconvolve image.tiff -> dw_image.tiff
+dw --iter 50 image.tiff PSF.tiff
+```
 
 <a name="ref">
 
