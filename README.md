@@ -8,7 +8,7 @@ image stacks:
    tiling. That makes it possible to deconvolve large images on small machines.
  - It can make use of all precious cores of your "big" machine since the
    critical parts run on separate threads (as many as you would like).
- - Deconwolf is tiny! It could even fit on a floppy drive (if you are fortunate
+ - Deconwolf is tiny! The binaries could even fit on a floppy drive (if you are fortunate
    enough to own one of those antiquities).
 
 Except for this README there is also a short [manual](USAGE.md),
@@ -26,7 +26,7 @@ deconwolf from the source code, instructions follows below.
 
 ## Building and installing
 Deconwolf runs on 64-bit machines with x86_64 architecture, it has been built
-and installed on Ubuntu 20.04 and macOS Big Sur. I've collected instruction for other systems [here](INSTALL.md)
+and installed on Ubuntu 20.04 and macOS Big Sur and Windows 10. I've collected instruction for other systems [here](INSTALL.md)
 
 ### Ubuntu 20.04
 Ensure that the required packages are installed
@@ -65,6 +65,49 @@ To build and install:
 ``` shell
 make -B
 sudo make install
+```
+
+# Windows 10
+Follow all steps of the [msys2](https://www.msys2.org/) installation guide,
+then install the dependencies in the 'MSYS2 MinGW 64-bit` terminal:
+
+``` shell
+pacman -S mingw-w64-x86_64-fftw
+pacman -S mingw-w64-x86_64-libtiff
+pacman -S mingw-w64-x86_64-msmpi
+pacman -S mingw-w64-cross-winpthreads-git
+pacman -S git
+```
+
+Then get deconwolf and build:
+``` shell
+git clone https://www.github.com/elgw/deconwolf
+cd deconwolf
+make WINDOWS=1 -B
+```
+
+binaries will end up in the `bin` sub folder. All dependencies (DLLs) can be
+found in `/mingw64/bin/` under the directory where msys64 is installed. To use
+deconwolf outside of msys2 you will need to copy the binaries and the dll files
+to the same folder. Relevant DLLs:
+
+```
+libdeflate.dll
+libfftw3f-3.dll
+libgcc_s_seh-1.dll
+libgomp-1.dll
+libgsl-25.dll
+libgslcblas-0.dll
+libjbig-0.dll
+libjpeg-8.dll
+libLerc.dll
+liblzma-5.dll
+libstdc++-6.dll
+libtiff-5.dll
+libwebp-7.dll
+libwinpthread-1.dll
+libzstd.dll
+zlib1.dll
 ```
 
 ## Resources and references

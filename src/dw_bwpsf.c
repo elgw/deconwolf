@@ -473,6 +473,7 @@ void * BW_thread(void * data)
     // Entry point for pthread_create
     bw_conf * conf = (bw_conf *) data;
 
+
     if(conf->verbose > 3)
     {
         pthread_mutex_lock(&stdout_mutex);
@@ -480,6 +481,7 @@ void * BW_thread(void * data)
         bw_conf_printf(stdout, conf);
         pthread_mutex_unlock(&stdout_mutex);
     }
+
 
     float * V = conf->V;
     int M = conf->M;
@@ -516,6 +518,12 @@ void BW(bw_conf * conf)
     pthread_t * threads = malloc(nThreads*sizeof(pthread_t));
     bw_conf ** confs = malloc(nThreads*sizeof(bw_conf*));
 
+
+    /* Single threaded at the moment */
+    conf->nThreads = 1;
+    conf->thread = 0;
+    BW_thread((void*) conf);
+
     for(int kk = 0; kk<nThreads; kk++)
     {
         confs[kk] = (bw_conf*) malloc(sizeof(bw_conf));
@@ -529,6 +537,8 @@ void BW(bw_conf * conf)
         pthread_join(threads[kk], NULL);
         free(confs[kk]);
     }
+
+
     free(confs);
     free(threads);
 
@@ -727,6 +737,8 @@ void BW_slice(float * V, float z, bw_conf * conf)
         bw_gsl_conf->epsabs = conf->epsabs;
         bw_gsl_conf->epsrel = conf->epsrel;
         bw_gsl_conf->lambda = conf->lambda;
+
+
         if(z == 0) /* Only write from the thread that processes z==0 */
         {
             pthread_mutex_lock(&logfile_mutex);
@@ -734,6 +746,7 @@ void BW_slice(float * V, float z, bw_conf * conf)
             bw_gsl_fprint(conf->log, bw_gsl_conf);
             pthread_mutex_unlock(&logfile_mutex);
         }
+
 
         /* Integrate bw for a equidistant set of radii */
         for(size_t n = 0; n < nr; n++)

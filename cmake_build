@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# only for Linux/Unix
+
+# cmake -S src/ -B build/ -DCMAKE_BUILD_TYPE=RELEASE
+cmake -S src/ -B build/ -DCMAKE_BUILD_TYPE=DEBUG
+cmake --build build/ --verbose

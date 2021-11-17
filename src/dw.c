@@ -231,22 +231,30 @@ void dw_fprint_info(FILE * f, dw_opts * s)
 #ifdef GIT_VERSION
   fprintf(f, "GIT_VERSION: '%s'\n", GIT_VERSION);
 #endif
+
 #ifdef CC_VERSION
   fprintf(f, "COMPILER: '%s'\n", CC_VERSION);
 #endif
+
   fprintf(f, "BUILD_DATE: '%s'\n'", __DATE__);
   fprintf(f, "FFTW: '%s'\n", fftwf_version);
   fprintf(f, "TIFF: '%s'\n", TIFFGetVersion());
+
+#ifndef WINDOWS
   char * user = getenv("USER");
   if(user != NULL)
   { fprintf(f, "USER: '%s'\n", user); }
+#endif
 
+#ifndef WINDOWS
   char * hname = malloc(1024*sizeof(char));
   if(gethostname(hname, 1023) == 0)
   {
     fprintf(f, "HOSTNAME: '%s'\n", hname);
     free(hname);
   }
+#endif
+
 #ifdef _OPENMP
   fprintf(f, "OpenMP: YES\n");
 #endif
@@ -419,13 +427,25 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
       exit(1);
   }
 
+  #ifdef WINDOWS
+  /* TODO, see GetFullPathNameA in fileapi.h */
+  s->imFile = strdup(argv[optind]);
+  #else
   s->imFile = realpath(argv[optind], 0);
+  #endif
+
   if(s->imFile == NULL)
   {
       fprintf(stderr, "ERROR: Can't read %s\n", argv[optind]);
     exit(1);
   }
+
+  #ifdef WINDOWS
+  s->psfFile = strdup(argv[++optind]);
+  #else
   s->psfFile = realpath(argv[++optind], 0);
+  #endif
+
   if(s->psfFile == NULL)
   {
       fprintf(stderr, "ERROR: Can't read %s\n", argv[optind]);
@@ -480,6 +500,13 @@ void fsetzeros(const char * fname, size_t N)
   fclose(fid);
   free(buffer);
 }
+
+#ifdef WINDOWS
+size_t get_peakMemoryKB(void)
+{
+    return 0;
+}
+#else
 
 #ifdef __APPLE__
 size_t get_peakMemoryKB(void)
@@ -540,6 +567,7 @@ size_t get_peakMemoryKB(void)
   free(peakline);
   return peakMemoryKB;
 }
+#endif
 #endif
 
 void fprint_peakMemory(FILE * fout)
@@ -983,7 +1011,7 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
     putdot(s);
 
     xp = xm;
-    free(xp);
+    fftwf_free(xp);
     double err = iter(
         &xp, // xp is updated to the next guess
         im,
@@ -1123,7 +1151,7 @@ float * psf_autocrop_centerZ(float * psf, int64_t * pM, int64_t * pN, int64_t * 
 
   float * psf_cropped = fim_get_cuboid(psf, m, n, p,
       m0, m1, n0, n1, p0, p1);
-  free(psf);
+  fftwf_free(psf);
   pP[0] = p1-p0+1;
   return psf_cropped;
 
@@ -1183,7 +1211,7 @@ float * psf_autocrop_byImage(float * psf, int64_t * pM, int64_t * pN, int64_t * 
     }
     float * psf_cropped = fim_get_cuboid(psf, m, n, p,
         m0, m1, n0, n1, p0, p1);
-    free(psf);
+    fftwf_free(psf);
 
     pM[0] = m1-m0+1;
     pN[0] = n1-n0+1;
@@ -1309,7 +1337,7 @@ float * psf_autocrop_XY(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  
   fprintf(s->log, "PSF XY-crop [%" PRId64 " x %" PRId64 " x %" PRId64 "] -> [%" PRId64 " x %" PRId64 " x %" PRId64 "]\n",
           m, n, p, pM[0], pN[0], pP[0]);
 
-  free(psf);
+  fftwf_free(psf);
   return crop;
 }
 
@@ -1741,6 +1769,10 @@ int dw_run(dw_opts * s)
     }
 
     im = fim_tiff_read(s->imFile, T, &M, &N, &P, s->verbosity);
+    if(s->verbosity > 4)
+    {
+        printf("Done reading\n"); fflush(stdout);
+    }
     if(fim_min(im, M*N*P) < 0)
     {
       printf("min value of the image is %f, shifting to 0\n", fim_min(im, M*N*P));
@@ -1912,7 +1944,7 @@ int dw_run(dw_opts * s)
   clock_gettime(CLOCK_REALTIME, &tend);
   fprintf(s->log, "Took: %f s\n", timespec_diff(&tend, &tstart));
   dcw_close_log(s);
-  dw_opts_free(&s);
+
   if(s->verbosity > 1) fprint_peakMemory(NULL);
 
   if(s->verbosity > 0)
@@ -1927,7 +1959,7 @@ int dw_run(dw_opts * s)
       stdout = fdopen(0, "w");
       */
   }
-
+  dw_opts_free(&s);
 
   return 0;
 }

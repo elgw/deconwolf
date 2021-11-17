@@ -29,10 +29,24 @@
 //typedef float afloat __attribute__ ((__aligned__(16)));
 typedef float afloat;
 
+#ifdef WINDOWS
+#include <direct.h>
+#include <sysinfoapi.h>
+/* Not tested but it compiles */
+int clock_gettime(int a , struct timespec *spec)      //C-file part
+{  __int64 wintime; GetSystemTimeAsFileTime((FILETIME*)&wintime);
+    wintime      -=116444736000000000;  //1jan1601 to 1jan1970
+    spec->tv_sec  =wintime / 10000000;           //seconds
+    spec->tv_nsec =wintime % 10000000 *100;      //nano-seconds
+    return 0;
+}
+#endif
 
 #define tictoc struct timespec tictoc_start, tictoc_end;
 #define tic clock_gettime(CLOCK_REALTIME, &tictoc_start);
 #define toc(X) clock_gettime(CLOCK_REALTIME, &tictoc_end); printf(#X); printf(" %f s\n", timespec_diff(&tictoc_end, &tictoc_start));
+
+
 
 static double timespec_diff(struct timespec* end, struct timespec * start)
 {
@@ -78,10 +92,17 @@ static int ensuredir(char * dir)
         return 0;
     }
 
+#ifdef WINDOWS
+    if(_mkdir(dir) == ENOENT)
+    {
+        return 0;
+    }
+#else
     if(mkdir(dir, 0700) == 0)
     {
         return 0;
     }
+#endif
 
     return 1;
 }
