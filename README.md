@@ -2,7 +2,7 @@
 
  * [Build and Install](#install)
    * [Linux](#linux)
-   * [OsX](#osx)
+   * [macOS](#osx)
    * [Windows 10](#win10)
  * [References](#ref)
 
@@ -35,7 +35,7 @@ deconwolf from the source code, instructions follows below.
 ## Build and install
 Deconwolf runs on 64-bit machines with x86_64 architecture, it has been built
 and installed on Ubuntu 20.04 and macOS Big Sur and Windows 10.
-Instruction for other systems will be collected [here](INSTALL.md). Go directly to [Windows 10](#win10), [Linux](#linux) or [OsX](#osx).
+Instruction for other systems will be collected [here](INSTALL.md). Go directly to [Windows 10](#win10), [Linux](#linux) or [macOS](#osx).
 
 <a name="deps">
 
@@ -125,10 +125,10 @@ deconwolf outside of msys2 you will need to copy the binaries and the following
 DLL files to the same folder.
 
 ```
-libdeflate.dll  libfftw3f-3.dll      libgcc_s_seh-1.dll  libgomp-1.dll
-libgsl-25.dll   libgslcblas-0.dll    libjbig-0.dll       libjpeg-8.dll
-libLerc.dll     liblzma-5.dll        libstdc++-6.dll     libtiff-5.dll
-libwebp-7.dll   libwinpthread-1.dll  libzstd.dll         zlib1.dll
+libdeflate.dll libfftw3f-3.dll     libgcc_s_seh-1.dll libgomp-1.dll
+libgsl-25.dll  libgslcblas-0.dll   libjbig-0.dll      libjpeg-8.dll
+libLerc.dll    liblzma-5.dll       libstdc++-6.dll    libtiff-5.dll
+libwebp-7.dll  libwinpthread-1.dll libzstd.dll        zlib1.dll
 ```
 
 At least one person has build deconwolf using Windows Subsystem for Linux but
@@ -141,27 +141,36 @@ beware, there might be some [performance penalty](https://www.phoronix.com/scan.
 The deconvolution algorithm is based on these papers:
 
  * Richardson, William Hadley (1972). "Bayesian-Based Iterative Method of Image
-   Restoration". JOSA. 62 (1): 55–59. [doi](https://doi.org/10.1364/JOSA.62.000055)
+   Restoration". JOSA. 62 (1): 55–59.
+   [doi](https://doi.org/10.1364/JOSA.62.000055)
  * Lucy, L. B. (1974). "An iterative technique for the rectification of observed
-   distributions". Astronomical Journal. 79 (6): 745–754. [doi](https://doi.org/10.1086%2F111605)
+   distributions". Astronomical Journal. 79 (6): 745–754.
+   [doi](https://doi.org/10.1086%2F111605)
  * Biggs, D.S.C. “Acceleration of Iterative Image Restoration Algorithms.”
-   Applied Optics. Vol. 36. Number 8, 1997, pp. 1766–1775. [doi(https://doi.org/10.1364/AO.36.001766)
+   Applied Optics. Vol. 36. Number 8, 1997, pp. 1766–1775.
+   [doi](https://doi.org/10.1364/AO.36.001766)
  * M. Bertero and P. Boccacci, A simple method for the reduction of boundary
    effects in the Richardson-Lucy approach to image deconvolution,
-   A&A 437, 369-374 (2005), [doi](https://doi.org/10.1051/0004-6361:20052717)
+   A&A 437, 369-374 (2005).
+   [doi](https://doi.org/10.1051/0004-6361:20052717)
  * Lee, Ji-Yeon & Lee, Nam-Yong. (2014). Cause Analysis and Removal of Boundary
    Artifacts in Image Deconvolution. Journal of Korea Multimedia Society. 17.
-   838-848. [doi](https://doi.org/10.9717/kmms.2014.17.7.838).
+   838-848.
+   [doi](https://doi.org/10.9717/kmms.2014.17.7.838).
 
 The PSF generation is based on these:
+
  * Max Born. Principles of optics : electromagnetic theory of propagation, interference,
-   and diffraction of light. Cambridge: Cambridge University Press, 2019. isbn: 978-1-108-47743-7.
+   and diffraction of light. Cambridge: Cambridge University Press, 2019.
+   ISBN: 978-1-108-47743-7.
 
  * F. Aguet. “Super-Resolution Fluorescence Microscopy Based on Physical
    Models”. EPFL Thesis no. 4418 (2009), 209 p. Swiss Federal Institute of
-   Technology Lausanne (EPFL), May 2009 [url](http://bigwww.epfl.ch/publications/aguet0903.html)
+   Technology Lausanne (EPFL), May 2009
+   [url](http://bigwww.epfl.ch/publications/aguet0903.html)
 
-*  The `--li` option uses:
+ * The `--li` option uses:
    Jizhou Li, Feng Xue, and Thierry Blu. “Fast and accurate three-dimensional
    point spread function computation for fluorescence microscopy”. In: Journal
-   of the Optical Society of America A 34.6 (May 2017), p. 1029. [doi](https://doi.org/10.1364/josaa.34001029)
+   of the Optical Society of America A 34.6 (May 2017), p. 1029.
+   [doi](https://doi.org/10.1364/josaa.34001029)
