@@ -18,17 +18,15 @@
  * radial (r) position. This piece of code uses the method described in [1] to
  * speed up the calculations of the integral.
  *
- * The method is less accurate than computing the integral using standard
- * numerical integration but should be good enough in most cases.
+ * The accuracy depends on the number of sample points and the choice of basis
+ * functions. More sample points and basis functions needed for large r and z.
  *
- * It seems like the method is less accurate for large values of z.
+ * For usage, see the 'main' function in this file.
  *
- * For usage, see the main function in this file.
- *
- * 1] Jizhou Li, Feng Xue, and Thierry Blu, "Fast and accurate three-dimensional
- * point spread function computation for fluorescence microscopy,"
- * J. Opt. Soc. Am. A 34, 1029-1034 (2017)
- * https://doi.org/10.1364/JOSAA.34.001029
+ * [1] Jizhou Li, Feng Xue & Thierry Blu, "Fast and accurate three-dimensional
+ *     point spread function computation for fluorescence microscopy,"
+ *     J. Opt. Soc. Am. A 34, 1029-1034 (2017)
+ *     https://doi.org/10.1364/JOSAA.34.001029
  *
  * TODO:
  * - Add an option to check the reconstruction error in debug mode.
@@ -52,27 +50,31 @@
 
 typedef struct
 {
-    // Public, can be set between li_new and the first call to li_calc
-    double lambda; // wave length of light
-    double NA; // numerical aperture
-    double ni; // refractive index
-    int M; // Number of sample points in the integral
-    int N; // Number of coefficients in the series expansion
+    /* Public, can be set between li_new and the first call to li_calc */
+    double lambda; /* wave length of light */
+    double NA; /* numerical aperture */
+    double ni; /* refractive index */
+    int M; /* Number of sample points in the integral */
+    int N; /* Number of coefficients in the series expansion */
 
-    // Internal
-    double z; // Axial position
-    // Pre-calculated data
-    int new; // Indicates if the arrays below are calculated or not
-    double * Z; // N scaling values for the Bessel functions
-    double * j0Z; // Pre computed Bessel values
-    double * j1Z; // Pre computed bessel values
-    double * Creal; // Real part of the coefficients
-    double * Cimag; // complex part of the coefficients
+    /* Internal */
+    double z; /* Axial position */
+    /* Pre-calculated data */
+    int new; /* Indicates if the arrays below are calculated or not */
+    double * Z; /* N scaling values for the Bessel functions */
+    double * j0Z; /* Pre computed Bessel values */
+    double * j1Z; /*/ Pre computed bessel values */
+    double * Creal; /* Real part of the coefficients */
+    double * Cimag; /* complex part of the coefficients */
 } li_conf;
 
-void li_show(li_conf * L);
+
 li_conf * li_new(double z);
+
 li_conf * li_free(li_conf ** LP);
+
 double complex li_calc(li_conf * L, const double r);
+
+void li_show(li_conf * L);
 
 #endif
