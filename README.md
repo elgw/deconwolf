@@ -68,6 +68,8 @@ sudo make install
 ```
 
 # Windows 10
+
+The simplest way to build native windows binaries seems to be using msys2.
 Follow all steps of the [msys2](https://www.msys2.org/) installation guide,
 then install the dependencies in the 'MSYS2 MinGW 64-bit` terminal:
 
@@ -80,6 +82,7 @@ pacman -S git
 ```
 
 Then get deconwolf and build:
+
 ``` shell
 git clone https://www.github.com/elgw/deconwolf
 cd deconwolf
@@ -88,27 +91,18 @@ make WINDOWS=1 -B
 
 binaries will end up in the `bin` sub folder. All dependencies (DLLs) can be
 found in `/mingw64/bin/` under the directory where msys64 is installed. To use
-deconwolf outside of msys2 you will need to copy the binaries and the dll files
-to the same folder. Relevant DLLs:
+deconwolf outside of msys2 you will need to copy the binaries and the following
+DLL files to the same folder.
 
 ```
-libdeflate.dll
-libfftw3f-3.dll
-libgcc_s_seh-1.dll
-libgomp-1.dll
-libgsl-25.dll
-libgslcblas-0.dll
-libjbig-0.dll
-libjpeg-8.dll
-libLerc.dll
-liblzma-5.dll
-libstdc++-6.dll
-libtiff-5.dll
-libwebp-7.dll
-libwinpthread-1.dll
-libzstd.dll
-zlib1.dll
+libdeflate.dll  libfftw3f-3.dll      libgcc_s_seh-1.dll  libgomp-1.dll
+libgsl-25.dll   libgslcblas-0.dll    libjbig-0.dll       libjpeg-8.dll
+libLerc.dll     liblzma-5.dll        libstdc++-6.dll     libtiff-5.dll
+libwebp-7.dll   libwinpthread-1.dll  libzstd.dll         zlib1.dll
 ```
+
+At least one person has build deconwolf using Windows Subsystem for Linux but
+beware, there might be some [performance penalty](https://www.phoronix.com/scan.php?page=article&item=wsl-wsl2-tr3970x&num=1).
 
 ## Resources and references
 Dependencies:
