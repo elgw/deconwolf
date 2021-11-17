@@ -22,9 +22,9 @@ images:
  - It is shipped with program to generate Point Spread Functions (PSFs)
    according to the Born and Wolf model. It is the only one we know of that
    actually integrate the PSF over each pixel.
- - Fully open source and we embrace [contributions](CONTRIBUTING.md)
+ - Fully open source. And we embrace [contributions and suggestions](CONTRIBUTING.md).
 
-Except for this README there is also a short [manual](USAGE.md),
+Except for this README there is also a short [usage guide](USAGE.md),
 a [CHANGELOG](CHANGELOG.md) and a [TODO](TODO.md) list.
 
 Deconwolf does not:
@@ -144,22 +144,24 @@ beware, there might be some [performance penalty](https://www.phoronix.com/scan.
 
 <a name="use" />
 
-## Usage
-At the moment the documentation is limited. For available options, please see
-
-``` shell
-dw --help
-dw_bw --help
-```
-
-There is a minimal example:
-
+## Minimal usage example
+To generate a parametric PSF and deconvolve an image, all you need is something
+like this:
 ``` shell
 # generate PSF.tif
 dw_bw --resxy 130 --resz 250 --NA 1.46 --ni 1.518 --lambda 460 PSF.tiff
 # Deconvolve image.tiff -> dw_image.tiff
 dw --iter 50 image.tiff PSF.tiff
 ```
+For available options, please see
+
+``` shell
+dw --help
+dw_bw --help
+```
+
+At the moment the documentation is limited, but there is a short
+[usage guide](USAGE.md).
 
 <a name="bugs" />
 
