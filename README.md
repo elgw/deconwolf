@@ -5,10 +5,11 @@
    * [macOS](#osx)
    * [Windows 10](#win10)
  * [Usage](#use)
+   * [Bugs](#bugs)
  * [References](#ref)
 
-`deconwolf` is a program for deconvolution of 3-D fluorescent wide-field
-image stacks:
+**deconwolf** is a program for 3-D deconvolution of fluorescent wide-field
+images:
  - The deconvolved images shows very mild boundary effects which means that you
    can crop and deconvolve small regions of interest.
  - RAM usage can be reduced at the cost of slightly longer computation times by
@@ -21,6 +22,7 @@ image stacks:
  - It is shipped with program to generate Point Spread Functions (PSFs)
    according to the Born and Wolf model. It is the only one we know of that
    actually integrate the PSF over each pixel.
+ - Fully open source and we embrace [contributions](CONTRIBUTING.md)
 
 Except for this README there is also a short [manual](USAGE.md),
 a [CHANGELOG](CHANGELOG.md) and a [TODO](TODO.md) list.
@@ -36,14 +38,14 @@ Deconwolf does not:
 At the moment we don't provide pre-built packages. You will have to build
 deconwolf from the source code, instructions follows below.
 
-<a name="install"/>
+<a name="install" />
 
 ## Build and install
 Deconwolf runs on 64-bit machines with x86_64 architecture, it has been built
 and installed on Ubuntu 20.04 and macOS Big Sur and Windows 10.
 Instruction for other systems will be collected [here](INSTALL.md). Go directly to [Windows 10](#win10), [Linux](#linux) or [macOS](#osx).
 
-<a name="deps">
+<a name="deps" />
 
 ### Dependencies
 Deconwolf uses:
@@ -58,7 +60,7 @@ Deconwolf uses:
 If these libraries are available for your platform, chances are that that it can
 be built.
 
-<a name="linux"/>
+<a name="linux" />
 
 ### Ubuntu 20.04
 Ensure that the required packages are installed
@@ -80,7 +82,7 @@ make -B
 sudo make install
 ```
 
-<a name="osx"/>
+<a name="osx" />
 
 ### macOS Big Sur
 You will need XCode from the App Store and [brew](https://brew.sh/).
@@ -101,7 +103,7 @@ make -B
 sudo make install
 ```
 
-<a name="win10"/>
+<a name="win10" />
 
 ### Windows 10
 
@@ -140,7 +142,7 @@ libwebp-7.dll  libwinpthread-1.dll libzstd.dll        zlib1.dll
 At least one person has build deconwolf using Windows Subsystem for Linux but
 beware, there might be some [performance penalty](https://www.phoronix.com/scan.php?page=article&item=wsl-wsl2-tr3970x&num=1).
 
-<a name="usage">
+<a name="use" />
 
 ## Usage
 At the moment the documentation is limited. For available options, please see
@@ -159,7 +161,14 @@ dw_bw --resxy 130 --resz 250 --NA 1.46 --ni 1.518 --lambda 460 PSF.tiff
 dw --iter 50 image.tiff PSF.tiff
 ```
 
-<a name="ref">
+<a name="bugs" />
+
+### Bugs
+
+Please open a [new ticket](https://github.com/elgw/deconwolf/issues) if you
+have any issues with the program.
+
+<a name="ref" />
 
 ## References
 
