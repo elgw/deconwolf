@@ -1,5 +1,7 @@
  * [Build and Install](#install)
-   * [windows 10](#win10)
+   * [Linux](#linux)
+   * [OsX](#osx)
+   * [Windows 10](#win10)
 
 # deconwolf
 
@@ -28,9 +30,12 @@ At the moment no pre-built packages are maintained so you will have to build
 deconwolf from the source code, instructions follows below.
 
 <a name="install"/>
+
 ## Build and install
 Deconwolf runs on 64-bit machines with x86_64 architecture, it has been built
 and installed on Ubuntu 20.04 and macOS Big Sur and Windows 10. I've collected instruction for other systems [here](INSTALL.md)
+
+<a name="linux"/>
 
 ### Ubuntu 20.04
 Ensure that the required packages are installed
@@ -51,6 +56,8 @@ To build and install:
 make -B
 sudo make install
 ```
+
+<a name="osx"/>
 
 ### macOS Big Sur
 You will need XCode from the App Store and [brew](https://brew.sh/).
