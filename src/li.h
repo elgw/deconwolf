@@ -57,17 +57,16 @@ typedef struct
     int M; /* Number of sample points in the integral */
     int N; /* Number of coefficients in the series expansion */
 
-    /* Internal */
+    /* Internal, don't fiddle */
     double z; /* Axial position */
     /* Pre-calculated data */
     int new; /* Indicates if the arrays below are calculated or not */
     double * Z; /* N scaling values for the Bessel functions */
     double * j0Z; /* Pre computed Bessel values */
-    double * j1Z; /*/ Pre computed bessel values */
+    double * j1Z; /* Pre computed bessel values */
     double * Creal; /* Real part of the coefficients */
     double * Cimag; /* complex part of the coefficients */
 } li_conf;
-
 
 li_conf * li_new(double z);
 

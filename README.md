@@ -1,3 +1,6 @@
+ * [Build and Install](#install)
+   * [windows 10](#win10)
+
 # deconwolf
 
 `deconwolf` is a program for deconvolution of 3-D fluorescent wide-field
@@ -24,7 +27,8 @@ Does does not:
 At the moment no pre-built packages are maintained so you will have to build
 deconwolf from the source code, instructions follows below.
 
-## Building and installing
+<a name="install"/>
+## Build and install
 Deconwolf runs on 64-bit machines with x86_64 architecture, it has been built
 and installed on Ubuntu 20.04 and macOS Big Sur and Windows 10. I've collected instruction for other systems [here](INSTALL.md)
 
@@ -67,7 +71,8 @@ make -B
 sudo make install
 ```
 
-# Windows 10
+<a name="win10"/>
+### Windows 10
 
 The simplest way to build native windows binaries seems to be using msys2.
 Follow all steps of the [msys2](https://www.msys2.org/) installation guide,

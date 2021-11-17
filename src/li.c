@@ -80,10 +80,8 @@ double complex li_calc(li_conf * L, const double r)
 
     if(L->new == 1)
     {
-
         L->N = 6+ceil(fabs(beta));
         L->M = 2*L->N;
-
 
         gsl_vector * Z = gsl_vector_calloc(L->N);
         L->Z = malloc(L->N*sizeof(double));
