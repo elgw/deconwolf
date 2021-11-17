@@ -14,58 +14,7 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* Calculates the value of a Born-Wolf PSF at a point specified by axial (z) and
- * radial (r) position. This piece of code uses the method described in [1] to
- * speed up the calculations of the integral.
- *
- * The method is less accurate than computing the integral using standard
- * numerical integration but should be good enough in most cases.
- *
- * It seems like the method is less accurate for large values of z.
- *
- * For usage, see the main function in this file.
- *
- * 1] Jizhou Li, Feng Xue, and Thierry Blu, "Fast and accurate three-dimensional
- * point spread function computation for fluorescence microscopy,"
- * J. Opt. Soc. Am. A 34, 1029-1034 (2017)
- * https://doi.org/10.1364/JOSAA.34.001029
- *
- * TODO:
- * - Add an option to check the reconstruction error in debug mode.
- * - Consider j0f and j1f (the single precision counterparts to j0 and j1)
- *   for some extra speed.
- */
-
-#include <stdlib.h>
-#include <stdio.h>
-#include <math.h>
-#include <assert.h>
-#include <string.h>
-#include <complex.h>
-#include <gsl/gsl_matrix.h>
-#include <gsl/gsl_permutation.h>
-#include <gsl/gsl_linalg.h>
-#include <gsl/gsl_blas.h>
-
-typedef struct
-{
-    // Public, can be set between li_new and the first call to li_calc
-    double lambda; // wave length of light
-    double NA; // numerical aperture
-    double ni; // refractive index
-    int M; // Number of sample points in the integral
-    int N; // Number of coefficients in the series expansion
-
-    // Internal
-    double z; // Axial position
-    // Pre-calculated data
-    int new; // Indicates if the arrays below are calculated or not
-    double * Z; // N scaling values for the Bessel functions
-    double * j0Z; // Pre computed Bessel values
-    double * j1Z; // Pre computed bessel values
-    double * Creal; // Real part of the coefficients
-    double * Cimag; // complex part of the coefficients
-} li_conf;
+#include "li.h"
 
 void li_show(li_conf * L)
 {
@@ -80,17 +29,17 @@ li_conf * li_new(double z)
 {
     li_conf * L = malloc(sizeof(li_conf));
 
-    // These can be changed by the user
+    /* These can be changed by the user */
     L->z = z;
     L->lambda = 461;
     L->NA = 1.45;
     L->ni = 1.512;
 
-    // Values below should not be set/changed by the user
-    // In the original paper N = 100, and M = 1000;
+    /* Values below should not be set/changed by the user
+     * In the original paper N = 100, and M = 1000; */
 
-    L->N = 0; // Dynamic -- this is set at the first call
-    L->M = 0; // Dynamic -- this is set at the first call
+    L->N = 0; /* Dynamic -- this is set at the first call */
+    L->M = 0; /* Dynamic -- this is set at the first call */
 
     L->new = 1;
     L->Z = NULL;
@@ -121,11 +70,11 @@ li_conf * li_free(li_conf ** LP)
 double complex li_calc(li_conf * L, const double r)
 {
 
-    // Most likely wrong if ni != 1
-    //const double alpha = 2*M_PI/L->lambda*L->NA*r;
-    //const double beta = 2*M_PI/L->lambda*pow(L->NA,2)/(2*L->ni)*L->z;
+    /* Most likely wrong if ni != 1
+     * const double alpha = 2*M_PI/L->lambda*L->NA*r;
+     * const double beta = 2*M_PI/L->lambda*pow(L->NA,2)/(2*L->ni)*L->z; */
 
-    // Updated 2020-12-01
+    /* Updated 2020-12-01 */
     const double alpha = (2.0*M_PI/L->lambda)*L->NA/L->ni*r;
     const double beta =  (2.0*M_PI/L->lambda)*pow(L->NA/L->ni,2)/2.0*L->z;
 
@@ -141,9 +90,9 @@ double complex li_calc(li_conf * L, const double r)
         gsl_vector * Freal = gsl_vector_calloc(L->M);
         gsl_vector * Fimag = gsl_vector_calloc(L->M);
 
-        //
-        // Set the scaling coefficients (\sigma)
-        //
+        /*
+         * Set the scaling coefficients (\sigma)
+         */
 
 
         /* This is the version from the paper
@@ -167,9 +116,9 @@ double complex li_calc(li_conf * L, const double r)
 
         memcpy(L->Z, Z->data, L->N*sizeof(double));
 
-        //
-        // Sample the function to expand as a series
-        //
+        /*
+         * Sample the function to expand as a series
+         */
 
         double delta = 1.0/(L->M-1.0);
         for(int kk = 0; kk < L->M; kk++)
@@ -181,9 +130,9 @@ double complex li_calc(li_conf * L, const double r)
 
         gsl_matrix * B = gsl_matrix_calloc(L->M, L->N);
 
-        //
-        // Sample the Bessel functions
-        //
+        /*
+         * Sample the Bessel functions
+         */
 
         for(int cc = 0; cc<L->M; cc++)
         {
@@ -193,9 +142,9 @@ double complex li_calc(li_conf * L, const double r)
             }
         }
 
-        //
-        // Find the coefficients
-        //
+        /*
+         * Find the coefficients
+         */
 
         gsl_vector * Creal = gsl_vector_calloc(L->N);
         gsl_vector * Cimag = gsl_vector_calloc(L->N);
@@ -234,9 +183,10 @@ double complex li_calc(li_conf * L, const double r)
         gsl_vector_free(Z);
     }
 
-    //
-    // Calculate the value of the integral
-    //
+    /*
+     * Calculate the value of the integral
+     */
+
     double vreal = 0;
     double vcomp = 0;
 
@@ -260,7 +210,7 @@ double complex li_calc(li_conf * L, const double r)
 #ifdef LI_TEST
 int main(int argc, char ** argv)
 {
-    // Here is an example of how to use this "class"
+    /* Here is an example of how to use this "class" */
 
     /* Create a new configuration, L, use defaults
        and initialize it for z = 0 nm. */
@@ -275,8 +225,6 @@ int main(int argc, char ** argv)
         double complex v = li_calc(L, r);
         double vreal = pow(creal(v),2) + pow(cimag(v),2);
         printf("LI(r=%f, z=%f) = (%f %fi) %f dV\n", r, L->z, creal(v), cimag(v), vreal);
-
-
     }
 
     L = li_free(&L);

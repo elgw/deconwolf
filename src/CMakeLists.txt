@@ -26,7 +26,8 @@ add_executable(dwbw
   fim.c
   fft.c
   fim_tiff.c
-  bw_gsl.c)
+  bw_gsl.c
+  li.c)
 
 if(${WINDOWS})
   set(CMAKE_C_FLAGS "-DWINDOWS -Wall -Wextra -g")

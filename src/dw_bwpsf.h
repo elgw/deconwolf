@@ -17,8 +17,8 @@
 
 /* This programs calculate Points Spread Functions for deconvolution of
  * wide field microscopy images (stacks).
- * Inspiration:
- *  https://github.com/Biomedical-Imaging-Group/PSFGenerator/tree/master/src/psf/bornwolf
+ * Original implementation:
+ * https://github.com/Biomedical-Imaging-Group/PSFGenerator/tree/master/src/psf/bornwolf
  */
 
 #ifndef dw_bwpsf_h
@@ -40,7 +40,7 @@
 #include "fim_tiff.h"
 #include "dw_version.h"
 #include "lanczos3.h"
-#include "li.c"
+#include "li.h"
 #include "bw_gsl.h"
 
 /* Mode for calculating the 1D integral */
