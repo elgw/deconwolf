@@ -1,9 +1,10 @@
+# deconwolf
+
  * [Build and Install](#install)
    * [Linux](#linux)
    * [OsX](#osx)
    * [Windows 10](#win10)
-
-# deconwolf
+ * [References](#ref)
 
 `deconwolf` is a program for deconvolution of 3-D fluorescent wide-field
 image stacks:
@@ -33,7 +34,23 @@ deconwolf from the source code, instructions follows below.
 
 ## Build and install
 Deconwolf runs on 64-bit machines with x86_64 architecture, it has been built
-and installed on Ubuntu 20.04 and macOS Big Sur and Windows 10. I've collected instruction for other systems [here](INSTALL.md)
+and installed on Ubuntu 20.04 and macOS Big Sur and Windows 10.
+Instruction for other systems will be collected [here](INSTALL.md). Go directly to [Windows 10](#win10), [Linux](#linux) or [OsX](#osx).
+
+<a name="deps">
+
+### Dependencies
+Deconwolf uses:
+
+ * [FFTW](http://www.fftw.org/fftw3_doc/) for Fourier Transforms.
+ * [libtiff](https://gitlab.com/libtiff/libtiff) to read and write TIFF files.
+ * [GNU Scientific Library](https://www.gnu.org/software/gsl/) for
+   integration and special functions.
+ * [OpenMP](https://www.openmp.org/) for _automatic_ parallelization of code.
+ * [POSIX Threads](https://en.wikipedia.org/wiki/Pthreads) for explicit paralellization.
+
+If these libraries are available for your platform, chances are that that it can
+be built.
 
 <a name="linux"/>
 
@@ -79,6 +96,7 @@ sudo make install
 ```
 
 <a name="win10"/>
+
 ### Windows 10
 
 The simplest way to build native windows binaries seems to be using msys2.
@@ -116,11 +134,9 @@ libwebp-7.dll   libwinpthread-1.dll  libzstd.dll         zlib1.dll
 At least one person has build deconwolf using Windows Subsystem for Linux but
 beware, there might be some [performance penalty](https://www.phoronix.com/scan.php?page=article&item=wsl-wsl2-tr3970x&num=1).
 
-## Resources and references
-Dependencies:
- * [fftw3 documentation](http://www.fftw.org/fftw3_doc/).
- * [libtiff repository](https://gitlab.com/libtiff/libtiff)
- * [lib gsl](https://www.gnu.org/software/gsl/)
+<a name="ref">
+
+## References
 
 The deconvolution algorithm is based on these papers:
 
