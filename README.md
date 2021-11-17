@@ -14,20 +14,25 @@ image stacks:
    tiling. That makes it possible to deconvolve large images on small machines.
  - It can make use of all precious cores of your "big" machine since the
    critical parts run on separate threads (as many as you would like).
- - Deconwolf is tiny! The binaries could even fit on a floppy drive (if you are fortunate
+ - Deconwolf is tiny! The binaries could even fit on a floppy drive
+   (if you are fortunate
    enough to own one of those antiquities).
+ - It is shipped with program to generate Point Spread Functions (PSFs)
+   according to the Born and Wolf model. It is the only one we know of that
+   actually integrate the PSF over each pixel.
 
 Except for this README there is also a short [manual](USAGE.md),
 a [CHANGELOG](CHANGELOG.md) and a [TODO](TODO.md) list.
 
 Does does not:
  - Have a full-featured Graphical User Interface (GUI), however, if you
- like to click buttons there is a tiny [GUI](https://github.com/elgw/dw_gui).
+   like to click buttons there is a limited
+   [GUI](https://github.com/elgw/deconwolf-gui).
  - Show your images, for that, try [ImageJ](https://imagej.net/Welcome)
  - Diagnose your imaging system.
  - Estimate your PSF based on real images.
 
-At the moment no pre-built packages are maintained so you will have to build
+At the moment we don't provide pre-built packages. You will have to build
 deconwolf from the source code, instructions follows below.
 
 <a name="install"/>
