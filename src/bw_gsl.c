@@ -80,9 +80,12 @@ static double my_f_real(double rho, void * p)
     bw_gsl_conf_t * params = (bw_gsl_conf_t *) p;
     params->ncalls++;
     double k0 = 2.0 * M_PI / params->lambda;
-    double q = params->NA / params->ni;
-    double bessel = j0f(k0*q*params->r*rho);
-    double OPD = pow(q,2)*params->z*pow(rho, 2) / 2.0;
+
+    double NA = params->NA;
+    double ni = params->ni;
+    double bessel = j0f(k0*NA*params->r*rho);
+    // double OPD = pow(q,2)*params->z*pow(rho, 2) / 2.0; // old
+    double OPD = pow(NA,2)*params->z*pow(rho, 2) / 2.0/ni; // new
     double W = k0*OPD;
 
     return bessel*cos(W)*rho;
@@ -94,9 +97,12 @@ static double my_f_imag(double rho, void * p)
     bw_gsl_conf_t * params = (bw_gsl_conf_t *) p;
     params->ncalls++;
     double k0 = 2.0 * M_PI / params->lambda;
-    double q = params->NA / params->ni;
-    double bessel = j0f(k0*q*params->r*rho);
-    double OPD = pow(q,2)*params->z*pow(rho, 2) / 2.0;
+    //double q = params->NA / params->ni;
+    double NA = params->NA;
+    double ni = params->ni;
+    double bessel = j0f(k0*NA*params->r*rho);
+    // double OPD = pow(q,2)*params->z*pow(rho, 2) / 2.0; // old
+    double OPD = pow(NA,2)*params->z*pow(rho, 2) / 2.0/ni; // new
     double W = k0*OPD;
     return -bessel*sin(W)*rho;
 }

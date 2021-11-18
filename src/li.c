@@ -70,13 +70,12 @@ li_conf * li_free(li_conf ** LP)
 double complex li_calc(li_conf * L, const double r)
 {
 
-    /* Most likely wrong if ni != 1
-     * const double alpha = 2*M_PI/L->lambda*L->NA*r;
-     * const double beta = 2*M_PI/L->lambda*pow(L->NA,2)/(2*L->ni)*L->z; */
+    /* Updated 2021-11-18 */
+    const double alpha = 2*M_PI/L->lambda*L->NA*r;
+    const double beta = 2*M_PI/L->lambda*pow(L->NA,2)/(2*L->ni)*L->z;
 
-    /* Updated 2020-12-01 */
-    const double alpha = (2.0*M_PI/L->lambda)*L->NA/L->ni*r;
-    const double beta =  (2.0*M_PI/L->lambda)*pow(L->NA/L->ni,2)/2.0*L->z;
+    // const double alpha = (2.0*M_PI/L->lambda)*L->NA/L->ni*r;
+    // const double beta =  (2.0*M_PI/L->lambda)*pow(L->NA/L->ni,2)/2.0*L->z;
 
     if(L->new == 1)
     {

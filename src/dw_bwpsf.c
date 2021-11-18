@@ -83,11 +83,13 @@ void bw_conf_printf(FILE * out, bw_conf * conf)
 
     // Show theoretical FWHM of the PSF
     // And look at the number of pixels per fwhm
-    double fwhm_r = 1.616340*conf->lambda/M_PI*conf->ni/conf->NA;
-    double fwhm_z = 2*2.783115/M_PI*pow(conf->ni/conf->NA, 2)*conf->lambda;
+    double fwhm_r = 1.616340*conf->lambda/M_PI/conf->NA;
+    double fwhm_z = 2*2.783115/M_PI*conf->ni/pow(conf->NA, 2)*conf->lambda;
+
     fprintf(out, "FWHM_r (lateral plane) %.2f nm\n", fwhm_r);
+    fprintf(out, "Resolution_r = %.2f nm\n", 0.61*conf->NA / conf->ni);
     double qlateral = fwhm_r/conf->resLateral;
-    fprintf(out, "FWHM_r / resLateral = %.2f\n", qlateral);
+    fprintf(out, "FWHM_r / dr = %.2f\n", qlateral);
     if(qlateral < 2)
     {
         fprintf(out,"! Warning: This is suboptimal, aim for at least 2\n");
@@ -95,7 +97,7 @@ void bw_conf_printf(FILE * out, bw_conf * conf)
 
     fprintf(out, "FWHM_z (axial direction) %.2f nm\n", fwhm_z);
     double qaxial = fwhm_z/conf->resAxial;
-    fprintf(out, "FWHM_z / resAxial = %.2f\n", qaxial);
+    fprintf(out, "FWHM_z / dz = %.2f\n", qaxial);
     if(qaxial < 2)
     {
         fprintf(out,"! Warning: This is suboptimal, aim for at least 2\n");
