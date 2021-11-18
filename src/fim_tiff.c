@@ -97,7 +97,7 @@ void floatimage_normalize(afloat * restrict I, const size_t N)
     int ok = 1;
     for(size_t kk=0; kk<N; kk++)
     {
-        if(~isfinite(I[kk]))
+        if(!isfinite(I[kk]))
         {
             I[kk] = 0;
             ok = 0;
@@ -249,7 +249,7 @@ void readUint16_sub(TIFF * tfile, afloat * V,
 
 
 void readUint16(TIFF * tfile, float * V,
-                const uint32_t ssize,
+                const tsize_t ssize,
                 const uint32_t ndirs,
                 const uint32_t nstrips,
                 const uint32_t perDirectory
@@ -262,7 +262,7 @@ void readUint16(TIFF * tfile, float * V,
 
     if(buf == NULL)
     {
-        printf("Failed to allocate %u bytes of memory!", ssize);
+        printf("Failed to allocate %ld bytes of memory!", ssize);
         fflush(stdout);
         return;
     }
@@ -283,7 +283,7 @@ void readUint16(TIFF * tfile, float * V,
             tsize_t read = TIFFReadEncodedStrip(tfile,
                                                 (tstrip_t) strip, // Strip number
                                                 (tdata_t) buf, // target
-                                                (tsize_t) - 1); // The entire strip
+                                                ssize); // The entire strip
             if(read == -1)
             {
                 printf("Failed to read from tif file\n");
@@ -586,7 +586,7 @@ int fim_tiff_from_raw(const char * fName, // Name of tiff file to be written
     size_t bytesPerSample = sizeof(uint16_t);
     char formatString[4] = "w";
     size_t MNP = (size_t) M * (size_t) N * (size_t ) P;
-    if(MNP*sizeof(uint16) >= pow(2, 32))
+    if(MNP*sizeof(uint16_t) >= pow(2, 32))
     {
         sprintf(formatString, "w8\n");
         printf("WARNING: File is > 2 GB, using BigTIFF format\n");
@@ -690,7 +690,7 @@ int fim_tiff_write_float(const char * fName, const afloat * V,
     fprintf(fout, "scaling: 1\n");
     size_t bytesPerSample = sizeof(float);
     char formatString[4] = "w";
-    if(M*N*P*sizeof(uint16) >= pow(2, 32))
+    if(M*N*P*sizeof(uint16_t) >= pow(2, 32))
     {
         sprintf(formatString, "w8\n");
         fprintf(fout, "WARNING: File is > 2 GB, using BigTIFF format\n");
@@ -792,7 +792,7 @@ int fim_tiff_write(const char * fName, const afloat * V,
 
     size_t bytesPerSample = sizeof(uint16_t);
     char formatString[4] = "w";
-    if(M*N*P*sizeof(uint16) >= pow(2, 32))
+    if(M*N*P*sizeof(uint16_t) >= pow(2, 32))
     {
         sprintf(formatString, "w8\n");
         fprintf(fout, "WARNING: File is > 2 GB, using BigTIFF format\n");
@@ -1287,6 +1287,7 @@ afloat * fim_tiff_read_sub(const char * fName,
     }
 
     V = fftwf_malloc(nel*sizeof(float));
+    assert(V != NULL);
     memset(V, 0, nel*sizeof(float));
 
     if(isFloat)

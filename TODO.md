@@ -12,7 +12,8 @@
  - [ ] Provide test data and demos
  - [ ] Decide about default tiling settings based on the PSF.
  - [ ] Demos, for example on the effect of the tiling.
- - [ ] Include normal `Richardson-Lucy`
+ - [ ] Include the "normal" `Richardson-Lucy` deconvolution method.
+ - [ ] Implement the Gibson-Lanni PSF model.
  - [ ] Make `FFTW_ESTIMATE` an option.
  - [ ] Double check the tiling weights using gradients and other patterns.
  - [ ] Add information on the input image to the log -- especially detect saturated pixels.

@@ -1,33 +1,18 @@
 .\" Convert with groff:
 .\" groff -m man -T xhtml deconwolf.man1 > deconwolf_man.html
 
-.Dd May 27, 2020
+.Dd Nov 12, 2021
 .Dt DECONWOLF 1
 .Sh NAME
 .Nm deconwolf
 .Nd Deconvolve wide-field microscopy images
-.Sh SYNOPSIS
-.Sy dw
-.Op Fl Fl threads Ar nThreads
-.Op Fl Fl iter Ar nIterations
-.Op Fl Fl help
-.Op Fl Fl overwrite
-.Op Fl Fl test
-.Op Fl Fl version
-.Op Fl Fl out Ar outFile
-.Op Fl Fl verbose Ar verbosity
-.Op Fl Fl tilesize Ar tilesize
-.Op Fl Fl tilepad Ar tilepad
-.Op Fl Fl prefix Ar prefixStr
-.Op Fl Fl relax Ar relax_float
-.Op Fl Fl xyfactor Ar F
-.Ar image.tif
-.Ar psf.tif
-.Ys
 .Sh DESCRIPTION
-.Nm DECONWOLF 
-is used to deconvolve 3D stacks using a user-provided point spread function.
+.Nm DECONWOLF
+is an open source software that provides two binaries:
+.Nm dw
+to deconvolve wide field images, and
+.Nm dw_bw
+to generate point spread functions according to the Born-Wolf model.
 .Sh NOTES
-.Nm DECONWOLF does not care about the pixel sizes that are specified in the tiff files. I.e. it does not rescale the images and leaves the responsibility to the user of using a matching pair of image and PSF with the same pixel size.
-.Sh EXAMPLES
-
+.Nm Web page
+http://www.elgw/deconwolf/

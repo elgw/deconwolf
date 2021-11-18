@@ -67,4 +67,8 @@ double bw_gsl_integrate_xy(bw_gsl_conf_t *,
                            double y0, double y1,
                            double z);
 
+#ifdef WINDOWS
+#define j0f j0
+#endif
+
 #endif

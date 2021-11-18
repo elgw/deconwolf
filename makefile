@@ -23,7 +23,7 @@ CFLAGS +=  -O3 -Wno-unknown-pragmas -flto -DNDEBUG
 #-fno-math-errno no relevant performance gain
 endif
 
-dw_LIBRARIES =  -lm -lfftw3f -lfftw3f_threads -ltiff
+dw_LIBRARIES =  -lm -lfftw3f -ltiff
 dwtm_LIBRARIES =  -lm -ltiff -lfftw3f
 dwbw_LIBRARIES = -lm -ltiff -lpthread -ltiff -lfftw3f -lgsl -lgslcblas
 MANPATH=/usr/share/man/man1/
@@ -32,11 +32,16 @@ MANPATH=/usr/share/man/man1/
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
     CFLAGS +=
+    dw_LIBRARIES += -lfftw3f_threads
 endif
 ifeq ($(UNAME_S),Darwin)
     CFLAGS += -Xpreprocessor
-    dw_LIBRARIES += -lomp
+    dw_LIBRARIES += -lomp -lfftw3f_threads
     MANPATH=/usr/local/share/man/man1
+endif
+
+ifeq ($(WINDOWS),1)
+	CFLAGS += -DWINDOWS
 endif
 
 OMP?=1
@@ -55,7 +60,7 @@ dw = bin/dw
 dw_OBJECTS = fim.o tiling.o fft.o fim_tiff.o dw.o deconwolf.o deconwolf_tif_max.o
 
 dwbw = bin/dw_bw
-dwbw_OBJECTS = fim.o fim_tiff.o dw_bwpsf.o bw_gsl.o lanczos3.o
+dwbw_OBJECTS = fim.o fim_tiff.o dw_bwpsf.o bw_gsl.o lanczos3.o li.o
 
 # dwtm = bin/dw_tiffmax
 # dwtm_OBJECTS = fim.o fim_tiff.o deconwolf_tif_max.o
