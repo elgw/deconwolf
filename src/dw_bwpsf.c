@@ -231,7 +231,7 @@ void usage(__attribute__((unused)) int argc, char ** argv, bw_conf * s)
            "\t to be deconvolved\n");
     printf(" --threads\n\t Set number of threads. Currently set to %d\n", s->nThreads);
     printf("\t Q has to be an odd number.\n");
-    printf("\t Unless --li or --pg, integration over Z is done to machine precision\n");
+
     printf(" --li\n\t Use Li's method (our implementation) for the BW integral.\n");
     printf("\t About 4x faster for the default PSF size although "
            "not thoroughly tested.\n");
@@ -240,7 +240,7 @@ void usage(__attribute__((unused)) int argc, char ** argv, bw_conf * s)
         printf(" Default.");
     }
     printf("\n");
-    printf(" --gsl\n\t Use GSL for the BW integral as well as the integration over z.");
+    printf(" --gsl\n\t Use GSL for the BW integral as well as the integration over pixels.");
     if(s->mode_bw == MODE_BW_GSL)
     {
         printf(" Default.");
