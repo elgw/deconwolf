@@ -221,6 +221,7 @@ void usage(__attribute__((unused)) int argc, char ** argv, bw_conf * s)
     printf(" --ni\n\t Set refractive index for the immersion (also used for coverslip and sample).\n");
     printf(" --resxy\n\t Set lateral pixel size (x-y) [nm].\n");
     printf(" --resz\n\t Set the axial pixel size in (z) [nm].\n");
+    printf("\n");
     printf("Optional:\n");
     printf(" --size N \n\t Set output size to N x N x P [pixels].\n"
         "\t This should be set big enough so that the PSF cone\n"
@@ -234,7 +235,7 @@ void usage(__attribute__((unused)) int argc, char ** argv, bw_conf * s)
 
     printf(" --li\n\t Use Li's method (our implementation) for the BW integral.\n");
     printf("\t About 2x faster for the default PSF size. "
-           "Not thoroughly tested.\n");
+           "Not thoroughly tested.");
     if(s->mode_bw == MODE_BW_LI)
     {
         printf(" Default.");
@@ -251,7 +252,6 @@ void usage(__attribute__((unused)) int argc, char ** argv, bw_conf * s)
     printf(" --epsrel \n\t Set relative error tolerance for the integration. Default: %e\n",
            s->epsrel);
 
-    printf("Other options:\n");
     printf(" --overwrite \n\t Overwrite the target image if it exists.\n");
     printf(" --version\n\t Show version info and quit.\n");
     printf(" --help\n\t Show this message.\n");
