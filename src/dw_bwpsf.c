@@ -218,7 +218,7 @@ void usage(__attribute__((unused)) int argc, char ** argv, bw_conf * s)
     printf("Required parameters:\n");
     printf(" --NA\n\t Set numerical aperture.\n");
     printf(" --lambda\n\t Set emission wavelength [nm].\n");
-    printf(" --ni\n\t Set refractive index.\n");
+    printf(" --ni\n\t Set refractive index for the immersion (also used for coverslip and sample).\n");
     printf(" --resxy\n\t Set lateral pixel size (x-y) [nm].\n");
     printf(" --resz\n\t Set the axial pixel size in (z) [nm].\n");
     printf("Optional:\n");
@@ -233,8 +233,8 @@ void usage(__attribute__((unused)) int argc, char ** argv, bw_conf * s)
     printf("\t Q has to be an odd number.\n");
 
     printf(" --li\n\t Use Li's method (our implementation) for the BW integral.\n");
-    printf("\t About 4x faster for the default PSF size although "
-           "not thoroughly tested.\n");
+    printf("\t About 2x faster for the default PSF size. "
+           "Not thoroughly tested.\n");
     if(s->mode_bw == MODE_BW_LI)
     {
         printf(" Default.");
