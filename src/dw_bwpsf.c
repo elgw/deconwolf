@@ -534,7 +534,7 @@ void BW(bw_conf * conf)
         confs[kk] = (bw_conf*) malloc(sizeof(bw_conf));
         memcpy(confs[kk], conf, sizeof(bw_conf));
         confs[kk]->thread = kk;
-        printf("Creating thread %d\n", kk);
+        // printf("Creating thread %d\n", kk);
         pthread_create(&threads[kk], NULL, BW_thread, (void *) confs[kk]);
     }
 
@@ -773,7 +773,7 @@ void BW_slice(float * V, float z, bw_conf * conf)
      * For each pixel in the quadrant integrate over x and y
      */
 
-    printf("!\n");
+    //printf("!\n");
     for (int x = 0; 2*x <= conf->M; x++) {
         for (int y = x; 2*y <= conf->N; y++) {
 
@@ -786,9 +786,9 @@ void BW_slice(float * V, float z, bw_conf * conf)
             double pIntensity = 0;
             if(rPixel < radmax)
             {
-                printf("x=%d, y=%d, [%f, %f]x[%f, %f]x%f\n", x, y,
-                       (double) x - 0.5 - x0, (double) x + 0.5 - x0,
-                       (double) y - 0.5 - y0, (double) y + 0.5 - y0,z );
+                //printf("x=%d, y=%d, [%f, %f]x[%f, %f]x%f\n", x, y,
+                //       (double) x - 0.5 - x0, (double) x + 0.5 - x0,
+                //       (double) y - 0.5 - y0, (double) y + 0.5 - y0,z );
 
                 pIntensity = integrate_pixel(conf, radprofile, nr, radnsamples,
                                              (double) x - 0.5 - x0, (double) x + 0.5 - x0,
@@ -880,7 +880,7 @@ int main(int argc, char ** argv)
 
     /* Write to disk  */
     if(conf->verbose > 0) {
-        printf("Writing as 32-bit floats to %s\n", conf->outFile);
+        printf("Writing '%s' (32-bit float)\n", conf->outFile);
     }
 
     ttags * T = ttags_new();

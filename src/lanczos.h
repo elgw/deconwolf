@@ -13,6 +13,8 @@
  * assumes that x >= 0 and that x+3 < nV
  */
 double lanczos3(const double * v, size_t nV, double x);
+
+/* Lanczos-5 interpolation. */
 double lanczos5(const double * v, size_t nV, double x);
 
 
