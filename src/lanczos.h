@@ -17,5 +17,8 @@ double lanczos3(const double * v, size_t nV, double x);
 /* Lanczos-5 interpolation. */
 double lanczos5(const double * v, size_t nV, double x);
 
+/* Lanczos-7 interpolation. */
+double lanczos7(const double * v, size_t nV, double x);
+
 
 #endif

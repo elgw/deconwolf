@@ -133,7 +133,7 @@ bw_conf * bw_conf_new()
     conf->testing = 0;
 
     /* BW integration */
-    conf->oversampling_R = 19; /* Expose from CLI? */
+    conf->oversampling_R = 17; /* Expose from CLI? */
     conf->mode_bw = MODE_BW_GSL;
 
     /* For XY integration */
@@ -625,68 +625,6 @@ double integrate_pixel(bw_conf * conf,
                         &result, &abserr);
 
     return result/((x1-x0)*(y1-y0));
-}
-
-double simp1_weight(size_t k, size_t N)
-{
-    /* Weights for 1D-Simpson
-     * [1, 4, 1] N=3
-     * [1, 4, 2, 4, 1] N=5
-     * [1, 4, 2, 4, 2, 4, 1] N=7, */
-    assert(N%2 == 1);
-    if(k == 0 || k == N-1)
-        return 1.0;
-    if(k%2 == 0)
-        return 2.0;
-    return 4.0;
-}
-
-/* radnsamples: Number of radial samples per dx
- *  xc, yc
- *
- * x0, x1, y0, y1 : integration region given in _pixels_
- * N: number of integration points per dimension
- */
-
-double simp2(int radnsamples,
-             double xc, double yc,
-             const double * H,
-             __attribute__((unused))  const double * R, size_t nR,
-             double x0, double x1,
-             double y0, double y1, int N)
-{
-
-    double dx = (x1-x0)/(double) (N-1);
-    double dy = (y1-y0)/(double) (N-1);
-    double v = 0;
-    size_t sW = 0; /* Sum of weights */
-    for(int kk = 0; kk<N; kk++)
-    {
-        double wx = simp1_weight(kk, N);
-        for(int ll = 0; ll<N; ll++)
-        {
-            double wy = simp1_weight(ll, N);
-            double w = wx*wy;
-            double x = x0+(double) kk*dx;
-            double y = y0+(double) ll*dy;
-            double r = sqrt(pow(x-xc, 2) + pow(y-yc, 2));
-            //int index = (int) floor(r*radnsamples);
-            //double blend = (r-R[index])*radnsamples;
-
-            sW+=w;
-            //double ival = (H[index] + (H[index+1] - H[index]) * blend);
-            // printf("w=%f: x=%f, y=%f r=%f, ival=%f, index = %d, blend = %f\n", w, x, y, r, ival, index, blend);
-
-            double ival_l3 = lanczos5(H, nR, r*(double) radnsamples);
-            //printf("Linear/Lanczos3: %f %f %e\n", ival, ival_l3, fabs(ival-ival_l3));
-
-            //v+=w*ival;
-            v+=w*ival_l3;
-        }
-    }
-    v = v/sW;
-
-    return v;
 }
 
 void BW_slice(float * V, float z, bw_conf * conf)
