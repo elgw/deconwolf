@@ -19,6 +19,8 @@
 //typedef float afloat __attribute__ ((__aligned__(16)));
 typedef float afloat;
 
+static float * gaussian_kernel(float sigma, size_t * nK);
+
 
 int fim_maxAtOrigo(const afloat * restrict V, const int64_t M, const int64_t N, const int64_t P)
   /* Check that the MAX of the fim is in the middle
@@ -544,6 +546,26 @@ void fim_ut()
 {
   fim_flipall_ut();
   shift_vector_ut();
+  size_t N = 0;
+  float sigma = 1;
+  float * K = gaussian_kernel(sigma, &N);
+  assert(N>0);
+  printf("gaussian_kernel, sigma=%f\n", sigma);
+  for(size_t kk = 0; kk<N; kk++)
+  {
+      printf("%f ", K[kk]);
+  }
+  printf("\n");
+  free(K);
+  sigma = 0.5;
+  K = gaussian_kernel(sigma, &N);
+  printf("gaussian_kernel, sigma=%f\n", sigma);
+  for(size_t kk = 0; kk<N; kk++)
+  {
+      printf("%f ", K[kk]);
+  }
+  printf("\n");
+  free(K);
 
 }
 
@@ -612,30 +634,60 @@ for(size_t pp = 0; pp<nV; pp++)
   return;
 }
 
+static float * gaussian_kernel(float sigma, size_t * nK)
+{
+    /* A Gaussian kernel */
+
+    /* Determine the size so that most of the signal is captured */
+    int len = 1; /* The total number of elements will be at least 3 */
+    while(erf((len+1.0)/sigma) < 1.0-1e-8)
+    {
+        len++;
+    }
+    int N = 2*len + 1;
+
+    float * K = malloc(N*sizeof(float));
+    float mid = (N-1)/2;
+
+    float s2 = pow(sigma, 2);
+    for(int kk = 0; kk<N; kk++)
+    {
+        float x = (float) kk-mid;
+        K[kk] = exp(-0.5*pow(x,2)/s2);
+    }
+
+/* Normalize the sum to 1 */
+    float sum = 0;
+    for(int kk = 0; kk<N; kk++)
+        sum+=K[kk];
+
+    for(int kk = 0; kk<N; kk++)
+        K[kk]/=sum;
+
+    nK[0] = N;
+    return K;
+}
+
 void fim_gsmooth(float * restrict V, size_t M, size_t N, size_t P, float sigma)
 {
+    /* Convolve V by an isotropic Gaussian
+     * implemented as a separated convolution. */
+
     if(sigma < 0)
     {
         printf("fim_gsmooth sigma=%f does not make sense.", sigma);
     }
 
   size_t nW = max_size_t(M, max_size_t(N, P));
-  printf("gsmooth: M: %zu, N: %zu, P: %zu, nW: %zu\n", M, N, P, nW); fflush(stdout);
-  // Temporary storage
+  printf("fim_gsmooth: M: %zu, N: %zu, P: %zu, nW: %zu\n", M, N, P, nW); fflush(stdout);
+
+  /* Temporary storage/buffer for conv1 */
 float * W = malloc(nW*sizeof(float));
 
-// Create a kernel -- todo: use sigma
-size_t nK = 7;
-float * K = malloc(nK*sizeof(float));
-K[0] = 0.001; K[1] = 0.096; K[2] = 0.2054; K[3] = 0.5698; K[4] = K[2]; K[5] = K[1]; K[6] = K[0];
-
-// Normalize the kernel
-float sum = 0;
-for(size_t kk = 0; kk<nK; kk++)
-  sum+=K[kk];
-
-for(size_t kk = 0; kk<nK; kk++)
-  K[kk]/=sum;
+/* Create a kernel  */
+size_t nK = 0;
+float * K = gaussian_kernel(sigma, &nK);
+assert(nK > 0);
 
 // X
 for(size_t pp = 0; pp < P; pp++)

@@ -76,9 +76,10 @@ dw_opts * dw_opts_new(void)
   s->experimental1 = 0;
   s->fulldump = 0;
   s->positivity = 1;
-  s->bg = 0;
+  s->bg = 1e-5; /* Should be strictly positive or pixels will be freezed */
   s->flatfieldFile = NULL;
   s->lookahead = 0;
+  s->psigma = 0;
   return s;
 }
 
@@ -145,6 +146,10 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
       break;
     case DW_METHOD_ID:
       fprintf(f, "method: Identity\n");
+  }
+  if(s->psigma > 0)
+  {
+      fprintf(f, "pre-filtering enabled, sigma = %f\n", s->psigma);
   }
   if(s->overwrite == 1)
   { fprintf(f, "overwrite: YES\n"); } else
@@ -302,6 +307,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     { "test",        no_argument,        NULL,   't' },
     { "tilesize",    required_argument,  NULL,   's' },
     { "tilepad",     required_argument,  NULL,   'p' },
+    { "psigma",      required_argument,  NULL,   'Q' },
     { "overwrite",   no_argument,        NULL,   'w' },
     { "prefix",       required_argument, NULL,   'f' },
     { "method",       required_argument, NULL,   'm' },
@@ -321,7 +327,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
   };
 
   int ch;
-  while((ch = getopt_long(argc, argv, "iFBvho:n:b:c:C:p:s:p:TXfDPL", longopts, NULL)) != -1)
+  while((ch = getopt_long(argc, argv, "iFBvho:n:b:c:C:p:s:p:TXfDPQL", longopts, NULL)) != -1)
   {
     switch(ch) {
     case 'C':
@@ -336,6 +342,9 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     case 'P':
         s->positivity = 0;
         printf("Turning off positivity constraint!\n");
+        break;
+    case 'Q':
+        s->psigma = atof(optarg);
         break;
     case 'D':
         s->fulldump = 1;
@@ -612,6 +621,9 @@ float getError(const afloat * restrict y, const afloat * restrict g,
     const int64_t M, const int64_t N, const int64_t P,
     const int64_t wM, const int64_t wN, const int64_t wP)
 {
+    /* Mean squared error between the input, y, and the forward propagated
+     * current guess */
+
     if(M > wM || N > wN || P > wP)
     {
         fprintf(stderr, "Something is funky with the dimensions of the images.\n");
@@ -646,30 +658,37 @@ void putdot(const dw_opts *s)
     return;
 }
 
-float getError_ref(float * y, float * g, int64_t M, int64_t N, int64_t P, int64_t wM, int64_t wN, int64_t wP)
+float getError_ref(const float * restrict y,
+                   const float * restrict g,
+                   int64_t M, int64_t N, int64_t P,
+                   int64_t wM, int64_t wN, int64_t wP)
 {
-
+    /* Note: this is just for comparison with getError, not used
+     * in production
+     **/
     if(M > wM || N > wN || P > wP)
     {
         fprintf(stderr, "Something is funky with the dimensions of the images.\n");
         exit(-1);
     }
 
-  double e = 0;
-  for(int64_t a = 0; a<M; a++)
-  {
-    for(int64_t b = 0; b<N; b++)
+
+    double e = 0;
+    for(int64_t c = 0; c<P; c++)
     {
-      for(int64_t c = 0; c<P; c++)
-      {
-        double yval = y[a + b*wM + c*wM*wN];
-        double gval = g[a + b*M + c * M*N];
-        e+=pow(yval-gval, 2);
-      }
+        for(int64_t b = 0; b<N; b++)
+        {
+            for(int64_t a = 0; a<M; a++)
+            {
+                double yval = y[a + b*wM + c*wM*wN];
+                double gval = g[a + b*M + c * M*N];
+                e+=pow(yval-gval, 2);
+            }
+        }
     }
-  }
-  e/=(M*N*P);
-  return (float) e;
+
+    e/=(M*N*P);
+    return (float) e;
 }
 
 
@@ -678,7 +697,7 @@ float iter(
     const float * restrict im, // Input image
     fftwf_complex * restrict cK, // fft(psf)
     afloat * restrict f, // Current guess
-    afloat * restrict W, // Weights
+    afloat * restrict W, // Bertero Weights
     const int64_t wM, const int64_t wN, const int64_t wP, // expanded size
     const int64_t M, const int64_t N, const int64_t P, // input image size
     __attribute__((unused)) const dw_opts * s)
@@ -691,8 +710,9 @@ float iter(
   putdot(s);
   afloat * y = fft_convolve_cc_f2(cK, F, wM, wN, wP); // F is freed
   float error = getError(y, im, M, N, P, wM, wN, wP);
+  putdot(s);
 
-
+  const double mindiv = 1e-8; // Before 2021.11.24: 1e-6
 #pragma omp parallel for
   for(size_t cc =0; cc < (size_t) wP; cc++){
       for(size_t bb = 0; bb < (size_t) wN; bb++){
@@ -701,8 +721,9 @@ float iter(
         size_t imidx = aa + bb*M + cc*M*N;
         if(aa < (size_t) M && bb < (size_t) N && cc < (size_t) P)
         {
-          y[yidx] < 1e-6 ? y[yidx] = 1e-6 : 0;
-          y[yidx]=im[imidx]/y[yidx];
+            /* abs and sign */
+            fabs(y[yidx]) < mindiv ? y[yidx] = copysign(mindiv, y[yidx]) : 0;
+          y[yidx] = im[imidx]/y[yidx];
         } else {
           y[yidx]=0;
         }
@@ -714,7 +735,8 @@ float iter(
   fftwf_free(y);
 
   afloat * x = fft_convolve_cc_conj_f2(cK, F_sn, wM, wN, wP);
-  putdot(s);
+
+  /* Eq. 18 in Bertero */
 #pragma omp parallel for
   for(size_t cc = 0; cc<wMNP; cc++)
   { x[cc] *= f[cc]*W[cc]; }
@@ -770,7 +792,7 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
   printf(" --prefix str\n\t Set the prefix of the output files (default: '%s')\n", s->prefix);
   printf(" --overwrite\n\t Allows deconwolf to overwrite already existing output files\n");
   printf(" --relax F\n\t Multiply the central pixel of the PSF by F. (F>1 relaxation)\n");
-  printf(" --xyfactor F\n\t Discard outer planes of the PSF with sum < F of the central\n");
+  printf(" --xyfactor F\n\t Discard outer planes of the PSF with sum < F of the central. Use 0 for no cropping.\n");
   printf(" --bq Q\n\t Set border quality to 0 'worst', 1 'bad', or 2 'normal' which is default\n");
   printf(" --float\n\t Set output format to 32-bit float (default is 16-bit int) and disable scaling\n");
   printf(" --bg l\n\t Set background level, l\n");
@@ -789,8 +811,11 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
 }
 
 
-float update_alpha(const afloat * restrict g, const afloat * restrict gm, const size_t wMNP)
+float biggs_alpha(const afloat * restrict g,
+                   const afloat * restrict gm,
+                   const size_t wMNP)
 {
+    /* Biggs, eq. 18 */
   double ggm = 0;
   double gmgm = 0;
 
@@ -801,9 +826,12 @@ float update_alpha(const afloat * restrict g, const afloat * restrict gm, const 
     gmgm += pow(gm[kk], 2);
   }
 
-  float alpha = ggm/(gmgm+1e-7);
-  alpha < 0 ? alpha = 0 : 0;
-  alpha > 1 ? alpha = 1 : 0;
+  // float alpha = sqrt(ggm/(gmgm+1e-7)); /* Biggs. Too agressive? */
+  float alpha = ggm/(gmgm+1e-7); /* DW standard */
+  // float alpha = pow(ggm/(gmgm+1e-7), 2); /* Softer ... */
+
+  alpha <= 0 ? alpha = 1e-5 : 0;
+  alpha >= 1 ? alpha = 1-1e-5 : 0;
 
   return alpha;
 }
@@ -811,7 +839,7 @@ float update_alpha(const afloat * restrict g, const afloat * restrict gm, const 
 
 
 float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, const int64_t P,
-    const afloat * restrict psf, const int64_t pM, const int64_t pN, const int64_t pP,
+    afloat * restrict psf, const int64_t pM, const int64_t pN, const int64_t pP,
     dw_opts * s)
 {
 
@@ -820,6 +848,7 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
    * with settings in s
    *
    * Returns a [M x N x P] float image
+   * frees psf
    * */
 
   if(s->verbosity > 1)
@@ -840,9 +869,10 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
     return NULL;
   }
 
-  // This is the dimensions that we will work with
-  // called M1 M2 M3 in the MATLAB code
-  // Default border quality when s->borderQuality == 2
+  /* This is the work dimensions, i.e., dimensions
+   * that will be used for all FFTs
+   */
+
   int64_t wM = M + pM -1;
   int64_t wN = N + pN -1;
   int64_t wP = P + pP -1;
@@ -877,6 +907,7 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
       }
   }
 
+  /* Total number of pixels */
   size_t wMNP = wM*wN*wP;
 
   if(s->verbosity > 0)
@@ -887,13 +918,15 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
   {
     printf("Estimated peak memory usage: %.1f GB\n", wMNP*35.0/1e9);
   }
-  fprintf(s->log, "image: [%" PRId64 "x%" PRId64 "x%" PRId64 "]\npsf: [%" PRId64 "x%" PRId64 "x%" PRId64 "]\njob: [%" PRId64 "x%" PRId64 "x%" PRId64 "] (%zu voxels)\n",
-      M, N, P, pM, pN, pP, wM, wN, wP, wMNP);
+  fprintf(s->log, "image: [%" PRId64 "x%" PRId64 "x%" PRId64 "]\n"
+          "psf: [%" PRId64 "x%" PRId64 "x%" PRId64 "]\n"
+          "job: [%" PRId64 "x%" PRId64 "x%" PRId64 "] (%zu voxels)\n",
+          M, N, P, pM, pN, pP, wM, wN, wP, wMNP);
   fflush(s->log);
 
   fft_train(wM, wN, wP,
             s->verbosity, s->nThreads,
-      s->log);
+            s->log);
 
   if(s->verbosity > 0)
   {
@@ -903,8 +936,20 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
   // cK : "full size" fft of the PSF
   afloat * Z = fftwf_malloc(wMNP*sizeof(float));
   memset(Z, 0, wMNP*sizeof(float));
-  fim_insert(Z, wM, wN, wP, psf, pM, pN, pP);
+  /* Insert the psf into the bigger Z */
+  fim_insert(Z, wM, wN, wP,
+             psf, pM, pN, pP);
+  free(psf);
+
+
   fim_circshift(Z, wM, wN, wP, -(pM-1)/2, -(pN-1)/2, -(pP-1)/2);
+
+  if(s->fulldump)
+  {
+      printf("Dumping to fullPSF.tif\n");
+      fim_tiff_write_float("fullPSF.tif", Z, NULL, wM, wN, wP, stdout);
+  }
+
   fftwf_complex * cK = fft(Z, wM, wN, wP);
   //fim_tiff_write("Z.tif", Z, wM, wN, wP);
   fftwf_free(Z);
@@ -935,15 +980,17 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
 
   putdot(s);
 
-  float sigma = 0.001;
+  /* Sigma in Bertero's paper, introduced for Eq. 17 */
+  float sigma = 0.01; // Until 2021.11.25 used 0.001
 #pragma omp parallel for
   for(size_t kk = 0; kk<wMNP; kk++)
   {
-    if(P1[kk] < sigma)
-    {
-        P1[kk] = 0;
-    } else {
-        P1[kk] = 1/P1[kk]; }
+      if(P1[kk] > sigma)
+      {
+          P1[kk] = 1/P1[kk];
+      } else {
+          P1[kk] = 0;
+      }
   }
   afloat * W = P1;
   //writetif("W.tif", W, wM, wN, wP);
@@ -997,14 +1044,19 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
     for(size_t kk = 0; kk<wMNP; kk++)
     {
         y[kk] = x[kk] + alpha*(x[kk]-xm[kk]);
-        // a priori information: only positive values
     }
+
+
+    /* Enforce a priori information about the lowest possible value */
     if(s->positivity)
     {
 #pragma omp parallel for
         for(size_t kk = 0; kk<wMNP; kk++)
         {
-            y[kk] < s->bg ? y[kk] = s->bg : 0;
+            if(y[kk] < s->bg)
+            {
+                y[kk] = s->bg;
+            }
         }
     }
 
@@ -1027,19 +1079,22 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
     if(s->verbosity > 0){
         printf("\r                                             ");
         printf("\rIteration %3d/%3d, MSE=%e ", it+1, nIter, err);
-      fflush(stdout);
+        fflush(stdout);
     }
 
     if(s->log != NULL)
-    { fprintf(s->log, "Iteration %d/%d, MSE=%e\n", it+1, nIter, err); fflush(s->log); }
+    {
+        fprintf(s->log, "Iteration %d/%d, MSE=%e\n", it+1, nIter, err);
+        fflush(s->log);
+    }
 
     afloat * swap = g;
     g = gm; gm = swap;
 
     fim_minus(g, xp, y, wMNP); // g = xp - y
 
-    if(it > 0) {
-      alpha = update_alpha(g, gm, wMNP);
+    if(it > 0) { /* 20211127 'it > 0' */
+      alpha = biggs_alpha(g, gm, wMNP);
     }
 
     xm = x;
@@ -1275,7 +1330,7 @@ float * psf_autocrop_XY(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  
     }
   }
 
-  if(first == 0)
+  if(first < 1)
   {
     if(s->verbosity > 1)
     {
@@ -1540,8 +1595,8 @@ void timings()
 
     // ---
     tic
-    temp = update_alpha(V, A, M*N*P);
-  toc(update_alpha)
+    temp = biggs_alpha(V, A, M*N*P);
+  toc(biggs_alpha)
     V[0]+= temp;
 
   // ---
@@ -1700,6 +1755,20 @@ void flatfieldCorrection(dw_opts * s, float * im, int64_t M, int64_t N, int64_t 
     free(C);
 }
 
+
+void prefilter(dw_opts * s,
+               float * im, int64_t M, int64_t N, int64_t P,
+               float * psf, int64_t pM, int64_t pN, int64_t pP)
+{
+
+    if(s->psigma <= 0)
+    {
+        return;
+    }
+    fim_gsmooth(im, M, N, P, s->psigma);
+    fim_gsmooth(psf, pM, pN, pP, s->psigma);
+    return;
+}
 
 int dw_run(dw_opts * s)
 {
@@ -1880,9 +1949,15 @@ int dw_run(dw_opts * s)
     {
         flatfieldCorrection(s, im, M, N, P);
     }
+
+    /* Pre filter by psigma */
+    prefilter(s, im, M, N, P, psf, pM, pN, pP);
+
+    /* Note: psf is freed */
     out = deconvolve_w(im, M, N, P, // input image and size
         psf, pM, pN, pP, // psf and size
         s);// settings
+    psf = NULL;
   }
 
   if(tiling == 0)
@@ -1936,7 +2011,7 @@ int dw_run(dw_opts * s)
   {
     printf("Finalizing "); fflush(stdout);
   }
-  free(psf);
+
   if(out != NULL) free(out);
   myfftw_stop();
 

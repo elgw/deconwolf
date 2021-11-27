@@ -80,6 +80,12 @@ typedef struct{
   int borderQuality;
   int outFormat; // 16 (=16 bit int) or 32 (=32 bit float)
 
+  /* sigma of Gaussian used for pre filtering of the image and the PSF
+   * this was found beneficial a paper by Van Kempen
+   *  https://doi.org/10.1046/j.1365-2818.1997.d01-629.x
+   * Not used if psigma <= 0 */
+  double psigma;
+
   int onetile; // For debugging -- only process the first tile if set
   int experimental1;
   int fulldump; // write also what is outside of the image
