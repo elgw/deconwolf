@@ -128,11 +128,29 @@ float fim_min(const afloat * A, size_t N)
   return amin;
 }
 
+void fim_div(afloat * restrict  A,
+               const afloat * restrict B,
+               const afloat * restrict C,
+               const size_t N)
+/* A = B/C */
+{
+    size_t kk = 0;
+
+#pragma omp parallel for
+    for(kk = 0; kk<N; kk++)
+    {
+        A[kk] = B[kk]/C[kk];
+    }
+    return;
+}
+
+
+
 void fim_minus(afloat * restrict  A,
     const afloat * restrict B,
     const afloat * restrict C,
     const size_t N)
-  // A = B - C
+/* A = B - C */
 {
   size_t kk = 0;
 
@@ -143,6 +161,7 @@ void fim_minus(afloat * restrict  A,
   }
   return;
 }
+
 
 float fim_max(const afloat * A, size_t N)
 {

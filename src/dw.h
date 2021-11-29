@@ -103,6 +103,7 @@ typedef struct{
   int fulldump; /* write also what is outside of the image */
   /* How far should bigger image sizes be considered? */
   int lookahead;
+  int eve; /* Use Exponential vector extrapolation */
 } dw_opts;
 
 dw_opts * dw_opts_new(void);
@@ -120,6 +121,14 @@ int  dw_run(dw_opts *);
 float biggs_alpha(const afloat * restrict g,
                   const afloat * restrict gm,
                   const size_t wMNP, int mode);
+
+/* Exponential vector extrapolation (eve) alpha */
+float biggs_alpha_eve(const afloat * restrict Xk,
+                      const afloat * restrict Xkm1,
+                      const afloat * restrict Ukm1,
+                      const afloat * restrict Ukm2,
+                  const size_t wMNP);
+
 
 /* Autocrop the PSF by:
  * 1/ Cropping if the size is larger than needed by the image.
