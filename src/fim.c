@@ -107,8 +107,11 @@ float fim_sum(const afloat * restrict A, size_t N)
 {
   double sum = 0;
 #pragma omp parallel for reduction(+:sum)
-  for(size_t kk = 0; kk<N; kk++)
-    sum+=(double) A[kk];
+      for(size_t kk = 0; kk<N; kk++)
+      {
+          sum+=(double) A[kk];
+      }
+
   return (float) sum;
 }
 
@@ -422,12 +425,12 @@ void fim_circshift(afloat * restrict A,
 {
 
   const size_t bsize = fmax(fmax(M, N), P);
-#pragma omp parallel
+//#pragma omp parallel
   {
     afloat * restrict buf = malloc(bsize*sizeof(float));
 
     // Dimension 1
-#pragma omp for
+//#pragma omp for
     for(int64_t cc = 0; cc<P; cc++)
     {
       for(int64_t bb = 0; bb<N; bb++)
@@ -438,7 +441,7 @@ void fim_circshift(afloat * restrict A,
     }
 
     // Dimension 2
-#pragma omp for
+//#pragma omp for
     for(int64_t cc = 0; cc<P; cc++)
     {
       for(int64_t aa = 0; aa<M; aa++)
@@ -449,7 +452,7 @@ void fim_circshift(afloat * restrict A,
     }
 
     // Dimension 3
-#pragma omp for
+//#pragma omp for
     for(int64_t bb = 0; bb<N; bb++)
     {
       for(int64_t aa = 0; aa<M; aa++)

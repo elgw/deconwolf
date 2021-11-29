@@ -20,10 +20,10 @@
 #include <fftw3.h>
 #include <stdint.h>
 
-// Call this before any other commands
-// log can be NULL
+/* Call this before any other commands
+ * log can be NULL */
 void myfftw_start(int nThreads, int verbosity, FILE * log);
-// Call this when you are done.
+/* Call this when you are done. */
 void myfftw_stop(void);
 
 void dim3_real_float_inverse(fftwf_complex * in, float * out,
@@ -39,24 +39,25 @@ void fft_mul(fftwf_complex * restrict C,
     fftwf_complex * restrict B,
     const size_t n1, const size_t n2, const size_t n3);
 
-// Y = ifft(A*B)
+/* Y = ifft(A*B) */
 float * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B, int M, int N, int P);
-// Y = ifff(conj(A)*B))
+/* Y = ifff(conj(A)*B)) */
 float * fft_convolve_cc_conj(fftwf_complex * A, fftwf_complex * B, int M, int N, int P);
 
-// Highly specialised versions where the second argument is freed
+/* Highly specialised versions where the second argument is freed */
 float * fft_convolve_cc_f2(fftwf_complex * A, fftwf_complex * B, int M, int N, int P);
 float * fft_convolve_cc_conj_f2(fftwf_complex * A, fftwf_complex * B, int M, int N, int P);
 
-// Generate FFTW plans for the specified size
+/* Generate FFTW plans for the specified size */
 void fft_train(size_t M, size_t N, size_t P,
                int verbosity, int nThreads,
     FILE * log);
 
 void fft_ut(void);
 
-// Benchmark 1D ffts of size from, from+1, ... to
-// return time for each size
+/* Benchmark 1D ffts of size from, from+1, ... to
+ * return time for each size
+ */
 double * fft_bench_1d(uint64_t from, uint64_t to, int niter);
 
 #endif

@@ -330,6 +330,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     { "overwrite",   no_argument,        NULL,   'w' },
     { "prefix",       required_argument, NULL,   'f' },
     { "method",       required_argument, NULL,   'm' },
+    { "eve", no_argument, NULL, 'E'},
     { "relax",        required_argument, NULL,   'r' },
     { "xyfactor",     required_argument, NULL,   'x' },
     { "onetile",      no_argument,       NULL,   'T' },
@@ -343,7 +344,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     { "niterdump",     required_argument, NULL,   'I'},
     { "nopos", no_argument, NULL, 'P'},
     { "bg", required_argument, NULL, 'b'},
-    { "eve", no_argument, NULL, 'E'},
+
     { NULL,           0,                 NULL,   0   }
   };
 
@@ -848,25 +849,6 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
 }
 
 
-/* Exponential vector extrapolation (eve) alpha */
-float biggs_alpha_eve(const afloat * restrict Xk,
-                      const afloat * restrict Xkm1,
-                      const afloat * restrict Ukm1,
-                      const afloat * restrict Ukm2,
-                      const size_t wMNP)
-{
-    double numerator = 0;
-    double denominator = 0;
-
-    for(size_t kk = 0; kk<wMNP; kk++)
-    {
-        numerator += Xk[kk]*log(Ukm1[kk])*Xk[kk]*log(Ukm2[kk]);
-        denominator += Xkm1[kk]*log(Ukm2[kk])*Xkm1[kk]*log(Ukm2[kk]);
-    }
-
-    double alpha = numerator / denominator;
-    return (float) alpha;
-}
 
 
 float biggs_alpha(const afloat * restrict g,
@@ -908,6 +890,7 @@ float biggs_alpha(const afloat * restrict g,
 }
 
 #include "deconvolve_eve.c"
+
 
 float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, const int64_t P,
     afloat * restrict psf, const int64_t pM, const int64_t pN, const int64_t pP,
@@ -1998,7 +1981,7 @@ int dw_run(dw_opts * s)
   // Possibly the PSF will be cropped even more per tile later on
 
   fim_normalize_sum1(psf, pM, pN, pP);
-  if(0)
+  if(1)
   {
   psf = psf_autocrop(psf, &pM, &pN, &pP,
       M, N, P, s);
@@ -2055,10 +2038,18 @@ int dw_run(dw_opts * s)
     /* Pre filter by psigma */
     prefilter(s, im, M, N, P, psf, pM, pN, pP);
 
-    /* Note: psf is freed */
+    /* Note: psf is freed bu the deconvolve_* functions*/
+    if(s->eve == 1)
+    {
+        printf("EVE enabled\n");
+        out = deconvolve_eve(im, M, N, P, // input image and size
+                           psf, pM, pN, pP, // psf and size
+                           s);// settings
+    } else {
     out = deconvolve_w(im, M, N, P, // input image and size
         psf, pM, pN, pP, // psf and size
         s);// settings
+    }
     psf = NULL;
   }
 
