@@ -127,12 +127,20 @@ void shift_vector_buf(float * restrict V,
     const int64_t N,
     int64_t k, float * restrict buffer);
 
-void fim_mult_scalar(float * , size_t N, float x);
+/* Multiply a float array of size N by x */
+void fim_mult_scalar(float * fim, size_t N, float x);
 
 void fim_ut(void);
 
+/* Gaussian smoothing, normalized at edges */
 void fim_gsmooth(float * restrict V, size_t M, size_t N, size_t P, float sigma);
 
+/* Arg max: find coordinates of largest element
+* If more than one maxima, return the first found
+*/
+void fim_argmax(const float * fim,
+                size_t M, size_t N, size_t P,
+                int64_t * _aM, int64_t *_aN, int64_t *_aP);
 
 
 #endif

@@ -8,6 +8,11 @@
      https://doi.org/10.1046/j.1365-2818.1997.d01-629.x
    - Changing the non-negative condition to strictly positive in order for
      pixel not to get stuck at 0.
+   - Adding the option to turn off Biggs acceleration, i.e. run normal
+     Richardson-Lucy with --biggs 0. Also introduced a few acceleration
+     alternatives.
+   - Will load PSFs that don't have an odd number of elements.
+
 
 - v. 0.0.19
     - Using lanczos5 instead of lanczos3 for the PSF generation. As a result

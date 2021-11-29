@@ -53,6 +53,8 @@
 #define DW_METHOD_RL 1
 #define DW_METHOD_ID 2
 
+typedef float afloat;
+
 typedef struct{
   int nThreads;
   int nIter;
@@ -71,8 +73,17 @@ typedef struct{
   fftwf_plan fft_plan;
   fftwf_plan ifft_plan;
   int iterdump; // Dump each iteration to file ...
+
   float relax;
-  float bg; // Background level, 0 by default
+  float bg; /* Background level, 0 by default */
+
+  /* How aggressive should the Biggs acceleration be.
+  *  0 = off,
+  *  1 = low/default, safe for most images
+  *  2 = intermediate
+  *  3 = full, according to the paper
+  */
+  int biggs;
 
   int positivity; // Positivity constraint
   float xycropfactor; // discard outer slices that are less than this of the central one
@@ -86,10 +97,11 @@ typedef struct{
    * Not used if psigma <= 0 */
   double psigma;
 
-  int onetile; // For debugging -- only process the first tile if set
+  /* Debug/dev options */
+  int onetile; /* For debugging -- only process the first tile if set */
   int experimental1;
-  int fulldump; // write also what is outside of the image
-  // How far should bigger image sizes be considered?
+  int fulldump; /* write also what is outside of the image */
+  /* How far should bigger image sizes be considered? */
   int lookahead;
 } dw_opts;
 
@@ -103,6 +115,11 @@ void dw_fprint_info(FILE * f, dw_opts * s);
 void dw_unittests();
 
 int  dw_run(dw_opts *);
+
+/* Determine Biggs' acceleration parameter alpha  */
+float biggs_alpha(const afloat * restrict g,
+                  const afloat * restrict gm,
+                  const size_t wMNP, int mode);
 
 /* Autocrop the PSF by:
  * 1/ Cropping if the size is larger than needed by the image.

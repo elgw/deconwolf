@@ -46,8 +46,8 @@
 FILE * tifflogfile = NULL; // Set to stdout or a file
 // END GLOBALS
 
-//typedef float afloat __attribute__ ((__aligned__(16)));
-typedef float afloat;
+
+
 
 dw_opts * dw_opts_new(void)
 {
@@ -80,6 +80,7 @@ dw_opts * dw_opts_new(void)
   s->flatfieldFile = NULL;
   s->lookahead = 0;
   s->psigma = 0;
+  s->biggs = 1;
   return s;
 }
 
@@ -139,6 +140,22 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
   fprintf(f, "nThreads: %d\n", s->nThreads);
   fprintf(f, "verbosity: %d\n", s->verbosity);
   fprintf(f, "background level: %f\n", s->bg);
+  switch(s->biggs)
+  {
+  case 0:
+      fprintf(f, "Biggs acceleration: OFF\n");
+      break;
+  case 1:
+      fprintf(f, "Biggs acceleration: Low\n");
+      break;
+  case 2:
+      fprintf(f, "Biggs acceleration: Intermediate\n");
+      break;
+  case 3:
+      fprintf(f, "Biggs acceleration: Agressive\n");
+      break;
+  }
+
   switch(s->method)
   {
     case DW_METHOD_RL:
@@ -183,13 +200,13 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
   fprintf(f, "Border Quality: ");
   switch(s->borderQuality){
     case 0:
-      fprintf(f, "0 = worst\n");
+      fprintf(f, "0 No boundary handling\n");
       break;
     case 1:
-      fprintf(f, "1 = low\n");
+      fprintf(f, "1 Somewhere between 0 and 2\n");
       break;
     case 2:
-      fprintf(f, "2 = normal\n");
+      fprintf(f, "2 Minimal boundary artifacts\n");
         break;
     default:
         ;
@@ -302,6 +319,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     { "out",        required_argument, NULL,   'o' },
     // Settings
     { "iter",      required_argument, NULL,   'n' },
+    { "biggs",       required_argument, NULL,  'a'},
     { "threads",      required_argument, NULL,   'c' },
     { "verbose",      required_argument, NULL,   'l' },
     { "test",        no_argument,        NULL,   't' },
@@ -318,18 +336,22 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     { "float",        no_argument,       NULL,   'F' },
     { "fulldump",     no_argument,       NULL,   'D' },
     { "flatfield",    required_argument, NULL,   'C' },
-    { "lookahead",    required_argument, NULL,   'L' },
-    { "experimental1", no_argument, NULL, 'X' },
-    { "iterdump", no_argument, NULL, 'i'},
+    { "lookahead",     required_argument, NULL,   'L' },
+    { "experimental1", no_argument, NULL,        'X' },
+    { "iterdump",      no_argument, NULL,   'i'},
+    { "niterdump",     required_argument, NULL,   'I'},
     { "nopos", no_argument, NULL, 'P'},
     { "bg", required_argument, NULL, 'b'},
     { NULL,           0,                 NULL,   0   }
   };
 
   int ch;
-  while((ch = getopt_long(argc, argv, "iFBvho:n:b:c:C:p:s:p:TXfDPQL", longopts, NULL)) != -1)
+  while((ch = getopt_long(argc, argv, "a:b:c:iBFIvho:n:C:p:s:p:TXfDPQL", longopts, NULL)) != -1)
   {
     switch(ch) {
+    case 'a': /* Accelerations */
+        s->biggs = atoi(optarg);
+        break;
     case 'C':
         s->flatfieldFile = strdup(optarg);
         break;
@@ -375,6 +397,9 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         break;
     case 'i':
         s->iterdump = 1;
+        break;
+    case 'I':
+        s->iterdump = atoi(optarg);
         break;
       case 'l':
         s->verbosity = atoi(optarg);
@@ -427,6 +452,12 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         s->experimental1 = 1;
         break;
     }
+  }
+
+  if((s->biggs < 0) | (s->biggs > 3))
+  {
+      printf("Invalid settings to --biggs, please specify 0, 1, 2 or 3\n");
+      exit(1);
   }
 
   /* Take care of the positional arguments */
@@ -712,7 +743,7 @@ float iter(
   float error = getError(y, im, M, N, P, wM, wN, wP);
   putdot(s);
 
-  const double mindiv = 1e-8; // Before 2021.11.24: 1e-6
+  const double mindiv = 1e-6; // Before 2021.11.24: 1e-6
 #pragma omp parallel for
   for(size_t cc =0; cc < (size_t) wP; cc++){
       for(size_t bb = 0; bb < (size_t) wN; bb++){
@@ -793,9 +824,10 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
   printf(" --overwrite\n\t Allows deconwolf to overwrite already existing output files\n");
   printf(" --relax F\n\t Multiply the central pixel of the PSF by F. (F>1 relaxation)\n");
   printf(" --xyfactor F\n\t Discard outer planes of the PSF with sum < F of the central. Use 0 for no cropping.\n");
-  printf(" --bq Q\n\t Set border quality to 0 'worst', 1 'bad', or 2 'normal' which is default\n");
+  printf(" --bq Q\n\t Set border handling to 0 'none', 1 'compromise', or 2 'normal' which is default\n");
   printf(" --float\n\t Set output format to 32-bit float (default is 16-bit int) and disable scaling\n");
   printf(" --bg l\n\t Set background level, l\n");
+  printf(" --biggs N\n\t Set how agressive the Biggs acceleration should be. 0=off, 1=low/default, 2=intermediate, 3=max\n");
   printf(" --flatfield image.tif\n\t"
          " Use a flat field correction image. Deconwolf will divide each plane of the\n\t"
          " input image, pixel by pixel, by this correction image.\n");
@@ -813,7 +845,7 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
 
 float biggs_alpha(const afloat * restrict g,
                    const afloat * restrict gm,
-                   const size_t wMNP)
+                  const size_t wMNP, int mode)
 {
     /* Biggs, eq. 18 */
   double ggm = 0;
@@ -826,12 +858,25 @@ float biggs_alpha(const afloat * restrict g,
     gmgm += pow(gm[kk], 2);
   }
 
-  // float alpha = sqrt(ggm/(gmgm+1e-7)); /* Biggs. Too agressive? */
-  float alpha = ggm/(gmgm+1e-7); /* DW standard */
-  // float alpha = pow(ggm/(gmgm+1e-7), 2); /* Softer ... */
+  float alpha = 0;
+  switch(mode)
+  {
+  case 1:
+      /* Ok for everything seen so far ... */
+      alpha = pow(ggm/(gmgm+1e-7), 2);
+      break;
+  case 2:
+      /* Ok for most images, problematic for high contrast regions */
+      alpha = ggm/(gmgm+1e-7);
+      break;
+  case 3:
+      /* Used in the paper. Clearly too aggressive. */
+      alpha = sqrt(ggm/(gmgm+1e-7));
+      break;
+  }
 
   alpha <= 0 ? alpha = 1e-5 : 0;
-  alpha >= 1 ? alpha = 1-1e-5 : 0;
+  alpha >= 1 ? alpha = 1.0-1e-5 : 0;
 
   return alpha;
 }
@@ -843,13 +888,15 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
     dw_opts * s)
 {
 
-  /*Deconvolve im [M x N x P]
-   * using psf [pM x pN x pP]
-   * with settings in s
-   *
-   * Returns a [M x N x P] float image
-   * frees psf
-   * */
+    if(s->verbosity > 3)
+    {
+        printf("deconv_w debug info:\n");
+        printf("Will deconvolve an image of size %" PRId64 "x%" PRId64 "x%" PRId64 "\n", M, N, P);
+        printf("Using a PSF of size %" PRId64 "x%" PRId64 "x%" PRId64 "\n", pM, pN, pP);
+        printf("Output will be of size %" PRId64 "x%" PRId64 "x%" PRId64 "\n", M, N, P);
+        printf("psf will be freed\n");
+    }
+
 
   if(s->verbosity > 1)
   {
@@ -865,8 +912,8 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
 
   if(fim_maxAtOrigo(psf, pM, pN, pP) == 0)
   {
-    printf("PSF is not centered!\n");
-    return NULL;
+    printf("deconv_w: PSF is not centered!\n");
+    //return NULL;
   }
 
   /* This is the work dimensions, i.e., dimensions
@@ -939,10 +986,20 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
   /* Insert the psf into the bigger Z */
   fim_insert(Z, wM, wN, wP,
              psf, pM, pN, pP);
+
   free(psf);
 
-
-  fim_circshift(Z, wM, wN, wP, -(pM-1)/2, -(pN-1)/2, -(pP-1)/2);
+  /* Shift the PSF so that the mid is at (0,0,0) */
+  int64_t midM, midN, midP = -1;
+  fim_argmax(Z, wM, wN, wP, &midM, &midN, &midP);
+  //printf("max(PSF) = %f\n", fim_max(Z, wM*wN*wP));
+  //printf("PSF(%ld, %ld, %ld) = %f\n", midM, midN, midP, Z[midM + wM*midN + wM*wN*midP]);
+  fim_circshift(Z, wM, wN, wP, -midM, -midN, -midP);
+  if(Z[0] != fim_max(Z, wM*wN*wP))
+  {
+      printf("Something went wrong here, the max of the PSF is in the wrong place\n");
+      exit(1);
+  }
 
   if(s->fulldump)
   {
@@ -981,15 +1038,26 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
   putdot(s);
 
   /* Sigma in Bertero's paper, introduced for Eq. 17 */
-  float sigma = 0.01; // Until 2021.11.25 used 0.001
-#pragma omp parallel for
-  for(size_t kk = 0; kk<wMNP; kk++)
+  if(s->borderQuality > 0)
   {
-      if(P1[kk] > sigma)
+      float sigma = 0.01; // Until 2021.11.25 used 0.001
+#pragma omp parallel for
+      for(size_t kk = 0; kk<wMNP; kk++)
       {
-          P1[kk] = 1/P1[kk];
-      } else {
-          P1[kk] = 0;
+          if(P1[kk] > sigma)
+          {
+              P1[kk] = 1/P1[kk];
+          } else {
+              P1[kk] = 0;
+          }
+      }
+  }
+  else
+  {
+      /* Bq0: Unit weights. TODO: don't need P1 at all here ... */
+      for(size_t kk = 0; kk<wMNP; kk++)
+      {
+          P1[kk] = 1;
       }
   }
   afloat * W = P1;
@@ -1026,7 +1094,9 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
   while(it<nIter)
   {
 
-    if(s->iterdump){
+    if(s->iterdump > 0){
+        if(it % s->iterdump == 0)
+        {
       afloat * temp = fim_subregion(x, wM, wN, wP, M, N, P);
       char * outname = gen_iterdump_name(s, it);
       //printf(" Writing current guess to %s\n", outname);
@@ -1038,14 +1108,17 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
       }
       free(outname);
       free(temp);
+        }
     }
 
-#pragma omp parallel for
-    for(size_t kk = 0; kk<wMNP; kk++)
+    if(it > 1)
     {
-        y[kk] = x[kk] + alpha*(x[kk]-xm[kk]);
+#pragma omp parallel for
+        for(size_t kk = 0; kk<wMNP; kk++)
+        {
+            y[kk] = x[kk] + alpha*(x[kk]-xm[kk]);
+        }
     }
-
 
     /* Enforce a priori information about the lowest possible value */
     if(s->positivity)
@@ -1058,6 +1131,12 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
                 y[kk] = s->bg;
             }
         }
+    }
+
+    if(s->psigma > 0)
+    {
+        printf("gsmoothing()\n");
+        fim_gsmooth(y, wM, wN, wP, s->psigma);
     }
 
     putdot(s);
@@ -1094,19 +1173,13 @@ float * deconvolve_w(afloat * restrict im, const int64_t M, const int64_t N, con
     fim_minus(g, xp, y, wMNP); // g = xp - y
 
     if(it > 0) { /* 20211127 'it > 0' */
-      alpha = biggs_alpha(g, gm, wMNP);
+        alpha = biggs_alpha(g, gm, wMNP, s->biggs);
     }
 
     xm = x;
     x = xp;
     xp = NULL;
 
-    if(s->experimental1 == 2 && (it == round(s->nIter/2)) )
-    {
-      printf("gsmoothing()\n");
-      fim_gsmooth(x, wM, wN, wP, 0.5);
-      alpha = 0;
-    }
 
 
     it++;
@@ -1595,7 +1668,7 @@ void timings()
 
     // ---
     tic
-    temp = biggs_alpha(V, A, M*N*P);
+      temp = biggs_alpha(V, A, M*N*P, 1);
   toc(biggs_alpha)
     V[0]+= temp;
 
@@ -1887,20 +1960,23 @@ int dw_run(dw_opts * s)
     psf[13] = 1;
   }
 
-  psf = psf_makeOdd(psf, &pM, &pN, &pP);
-  psf = psf_autocrop_centerZ(psf, &pM, &pN, &pP, s);
+  //psf = psf_makeOdd(psf, &pM, &pN, &pP);
+  //psf = psf_autocrop_centerZ(psf, &pM, &pN, &pP, s);
 
   if(fim_maxAtOrigo(psf, pM, pN, pP) == 0)
   {
     printf("PSF is not centered!\n");
-    return -1;
+    // return -1;
   }
 
   // Possibly the PSF will be cropped even more per tile later on
 
   fim_normalize_sum1(psf, pM, pN, pP);
+  if(0)
+  {
   psf = psf_autocrop(psf, &pM, &pN, &pP,
       M, N, P, s);
+  }
 
   if(s->relax > 0)
   {

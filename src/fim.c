@@ -20,7 +20,9 @@
 typedef float afloat;
 
 static float * gaussian_kernel(float sigma, size_t * nK);
-
+static void conv1(float * restrict V, int stride, float * restrict W,
+                  const size_t nV,
+                  const float * restrict K, const size_t nKu);
 
 int fim_maxAtOrigo(const afloat * restrict V, const int64_t M, const int64_t N, const int64_t P)
   /* Check that the MAX of the fim is in the middle
@@ -70,6 +72,37 @@ int fim_maxAtOrigo(const afloat * restrict V, const int64_t M, const int64_t N, 
   return 1;
 }
 
+void fim_argmax(const float * I,
+                size_t M, size_t N, size_t P,
+                int64_t * _aM, int64_t *_aN, int64_t *_aP)
+{
+    float max = I[0];
+    int64_t aM = 0;
+    int64_t aN = 0;
+    int64_t aP = 0;
+    size_t pos = 0;
+    for(size_t pp = 0; pp<P; pp++)
+    {
+        for(size_t nn = 0; nn<N; nn++)
+        {
+            for(size_t mm = 0; mm<M; mm++)
+            {
+                if(I[pos] > max)
+                {
+                    max = I[pos];
+                    aM = mm;
+                    aN = nn;
+                    aP = pp;
+                }
+                pos++;
+            }
+        }
+    }
+    _aM[0] = aM;
+    _aN[0] = aN;
+    _aP[0] = aP;
+}
+
 float fim_sum(const afloat * restrict A, size_t N)
 {
   double sum = 0;
@@ -113,7 +146,7 @@ void fim_minus(afloat * restrict  A,
 
 float fim_max(const afloat * A, size_t N)
 {
-  float amax = -INFINITY;
+  float amax = A[0];
   for(size_t kk = 0; kk<N; kk++)
   {
     if(A[kk] > amax)
@@ -542,6 +575,15 @@ void fim_invert(float * restrict A, size_t N)
 return;
 }
 
+static void show_vec(float * V, int N)
+{
+    for(int kk = 0; kk<N; kk++)
+    {
+        printf("%f ", V[kk]);
+    }
+    printf("\n");
+}
+
 void fim_ut()
 {
   fim_flipall_ut();
@@ -551,20 +593,26 @@ void fim_ut()
   float * K = gaussian_kernel(sigma, &N);
   assert(N>0);
   printf("gaussian_kernel, sigma=%f\n", sigma);
-  for(size_t kk = 0; kk<N; kk++)
-  {
-      printf("%f ", K[kk]);
-  }
-  printf("\n");
+  show_vec(K, N);
   free(K);
   sigma = 0.5;
   K = gaussian_kernel(sigma, &N);
   printf("gaussian_kernel, sigma=%f\n", sigma);
-  for(size_t kk = 0; kk<N; kk++)
+  show_vec(K, N);
+
+  int nV = 10;
+  float * V = malloc(nV*sizeof(float));
+  for(int kk = 0; kk<nV; kk++)
   {
-      printf("%f ", K[kk]);
+      V[kk] = kk;
   }
-  printf("\n");
+  printf("V=");
+  show_vec(V, nV);
+  conv1(V, 1, NULL, nV, K, N);
+  printf("V*K = ");
+  show_vec(V, nV);
+
+  free(V);
   free(K);
 
 }
@@ -585,53 +633,72 @@ static size_t max_size_t(size_t a, size_t b)
   return b;
 }
 
-void conv1(float * restrict V, int stride, float * restrict W,
-    const size_t nV,
-    const float * restrict K, const size_t nKu)
+static void conv1(float * restrict V, int stride, float * restrict W,
+           const size_t nV,
+           const float * restrict K, const size_t nKu)
 {
-  const size_t k2 = (nKu-1)/2;
-  const size_t N = nV;
-  size_t bpos = 0;
-
-  // First part
-  for(size_t vv = 0;vv<k2; vv++)
-  {
-    double acc0 = 0;
-    for(size_t kk = k2-vv; kk<nKu; kk++)
+    /* Normalized convolution
+     * In MATLAB that would be
+     * Y = convn(V, K, 'same') / convn(ones(size(V)), K, 'same')
+     */
+    int Walloc = 0;
+    if(W == NULL)
     {
-        acc0 = acc0 + K[kk]*V[(vv-k2+kk)*stride];
+        W = malloc(nV*sizeof(float));
+        Walloc = 1;
     }
-    W[bpos++] = acc0;
-  }
+    const size_t k2 = (nKu-1)/2;
+    const size_t N = nV;
+    size_t bpos = 0;
 
-  // Central part where K fits completely
-  for(size_t vv = k2 ; vv+k2 < N; vv++)
-  {
-    double acc = 0;
-    for(size_t kk = 0; kk<nKu; kk++)
+    /* Crossing the first edge */
+    for(size_t vv = 0;vv<k2; vv++)
     {
-      acc = acc + K[kk]*V[(vv-k2+kk)*stride];
-     }
-    W[bpos++] = acc;
-  }
-
-  // Last part
-  for(size_t vv = N-k2;vv<N; vv++)
-  {
-    double acc0 = 0;
- for(size_t kk = 0; kk<N-vv+k2; kk++)
-    {
-        acc0 = acc0 + K[kk]*V[(vv-k2+kk)*stride];
+        double acc0 = 0;
+        double kacc = 0;
+        for(size_t kk = k2-vv; kk<nKu; kk++)
+        {
+            acc0 = acc0 + K[kk]*V[(vv-k2+kk)*stride];
+            kacc += K[kk];
+        }
+        W[bpos++] = acc0/kacc;
     }
-    W[bpos++] = acc0;
-  }
 
+    /* Central part where K fits completely */
+    for(size_t vv = k2 ; vv+k2 < N; vv++)
+    {
+        double acc = 0;
+        for(size_t kk = 0; kk<nKu; kk++)
+        {
+            acc = acc + K[kk]*V[(vv-k2+kk)*stride];
+        }
+        W[bpos++] = acc;
+    }
 
-for(size_t pp = 0; pp<nV; pp++)
-{
-  V[pp*stride] = W[pp];
-}
-  return;
+    /* Last part */
+    for(size_t vv = N-k2;vv<N; vv++)
+    {
+        double kacc = 0;
+        double acc0 = 0;
+        for(size_t kk = 0; kk<N-vv+k2; kk++)
+        {
+            acc0 = acc0 + K[kk]*V[(vv-k2+kk)*stride];
+            kacc += K[kk];
+        }
+        W[bpos++] = acc0/kacc;
+    }
+
+    /* Write back */
+    for(size_t pp = 0; pp<nV; pp++)
+    {
+        V[pp*stride] = W[pp];
+    }
+
+    if(Walloc)
+    {
+        free(W);
+    }
+    return;
 }
 
 static float * gaussian_kernel(float sigma, size_t * nK)
