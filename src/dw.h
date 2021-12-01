@@ -67,9 +67,10 @@ typedef struct{
   FILE * log;
   int tiling_maxSize;
   int tiling_padding;
-  int overwrite; // overwrite output tif file?
+  int overwrite; /* overwrite output if exist */
   int method;
   int verbosity;
+  int showTime; /* For dev: show detailed timings */
   fftwf_plan fft_plan;
   fftwf_plan ifft_plan;
   int iterdump; // Dump each iteration to file ...

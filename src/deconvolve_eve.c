@@ -1,6 +1,13 @@
 /* TODO:
- * - Only works with --bq 0
- */
+ * - seems a little slow ...
+*/
+
+static double clockdiff(struct timespec* end, struct timespec * start)
+{
+    double elapsed = (end->tv_sec - start->tv_sec);
+    elapsed += (end->tv_nsec - start->tv_nsec) / 1000000000.0;
+    return elapsed;
+}
 
 /* Exponential vector extrapolation (eve) alpha */
 float biggs_alpha_eve(const afloat * restrict Xk,
@@ -9,15 +16,31 @@ float biggs_alpha_eve(const afloat * restrict Xk,
                       const afloat * restrict Ukm2,
                       const size_t wMNP)
 {
-    double numerator = 0;
-    double denominator = 0;
 
-    for(size_t kk = 0; kk<wMNP; kk++)
+
+    float numerator = 0;
+    float denominator = 0;
+
+    /* The accuracy here might not be very important,
+     * we could use an approximation of the logf
+     * or pre-calculate/interpolate
+     * Also it is probably not necessary to use all pixels here ...
+     * every nth per plane? (ideally not a factor of wM, wN)
+     * random selection (how many)
+     * or sample until convergence if really many pixels?
+     */
+
+#pragma omp parallel for reduction(+:numerator, denominator)
+    for(size_t kk = 0; kk < wMNP; kk++)
     {
         if(Ukm1[kk] > 0 && Ukm2[kk] > 0)
         {
-            numerator += Xk[kk]*logf(Ukm1[kk])*Xk[kk]*logf(Ukm2[kk]);
-            denominator += Xkm1[kk]*logf(Ukm2[kk])*Xkm1[kk]*logf(Ukm2[kk]);
+            float logf_Ukm2_kk = logf(Ukm2[kk]);
+            float logf_Ukm1_kk = logf(Ukm1[kk]);
+            numerator   += Xk[kk]*logf_Ukm1_kk*Xk[kk]*logf_Ukm2_kk;
+            denominator += Xkm1[kk]*logf_Ukm2_kk*Xkm1[kk]*logf_Ukm2_kk;
+            //if(log2(kk) - round(log2(kk)) == 0)
+            //    printf("%zu %f/%f = %f\n", kk, numerator, denominator, numerator/denominator);
         }
     }
 
@@ -301,8 +324,11 @@ float * deconvolve_eve(afloat * restrict im, const int64_t M, const int64_t N, c
             }
         }
 
+        struct timespec tstart, tend;
+        clock_gettime(CLOCK_REALTIME, &tstart);
         if(it > 1)
         {
+            clock_gettime(CLOCK_REALTIME, &tstart);
 #pragma omp parallel for
             for(size_t kk = 0; kk<wMNP; kk++)
             {
@@ -314,7 +340,10 @@ float * deconvolve_eve(afloat * restrict im, const int64_t M, const int64_t N, c
                 }
             }
         }
-
+        clock_gettime(CLOCK_REALTIME, &tend);
+        if(s->showTime){
+            printf("\n--timing powf (alpha = %f): %f\n", alpha, clockdiff(&tend, &tstart));
+        }
         putdot(s);
 
         xp = xm;
@@ -343,8 +372,10 @@ float * deconvolve_eve(afloat * restrict im, const int64_t M, const int64_t N, c
             fflush(s->log);
         }
 
-        afloat * swap = g;
-        g = gm; gm = swap;
+        {
+            afloat * swap = g;
+            g = gm; gm = swap;
+        }
 
         fim_div(g, xp, y, wMNP); // g = xp/y "v"
         for(size_t kk = 0; kk<wMNP; kk++)
@@ -365,9 +396,15 @@ float * deconvolve_eve(afloat * restrict im, const int64_t M, const int64_t N, c
                 }
             }
         }
-        if(it > 0)
+
+        if(it > 1) /* We need three time points to get started */
         {
+            clock_gettime(CLOCK_REALTIME, &tstart);
             alpha = biggs_alpha_eve(xp, x, g, gm, wMNP);
+            clock_gettime(CLOCK_REALTIME, &tend);
+            if(s->showTime){
+                printf("\n--timing alpha: %f\n", clockdiff(&tend, &tstart));
+            }
         }
         if(alpha <= 0)
         {

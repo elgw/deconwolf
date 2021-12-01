@@ -107,10 +107,10 @@ float fim_sum(const afloat * restrict A, size_t N)
 {
   double sum = 0;
 #pragma omp parallel for reduction(+:sum)
-      for(size_t kk = 0; kk<N; kk++)
-      {
-          sum+=(double) A[kk];
-      }
+  for(size_t kk = 0; kk<N; kk++)
+  {
+      sum+=(double) A[kk];
+  }
 
   return (float) sum;
 }

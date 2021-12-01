@@ -62,6 +62,7 @@ dw_opts * dw_opts_new(void)
   sprintf(s->prefix, "dw");
   s->log = NULL;
   s->verbosity = 1;
+  s->showTime = 0;
   s->overwrite = 0;
   s->tiling_maxSize = -1;
   s->tiling_padding = 20;
@@ -314,42 +315,47 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
 
 
   struct option longopts[] = {
-    { "version",     no_argument,       NULL,   'v' },
-    { "help",         no_argument,       NULL,   'h' },
-    // Data
-    { "out",        required_argument, NULL,   'o' },
-    // Settings
-    { "iter",      required_argument, NULL,   'n' },
-    { "biggs",       required_argument, NULL,  'a'},
-    { "threads",      required_argument, NULL,   'c' },
-    { "verbose",      required_argument, NULL,   'l' },
-    { "test",        no_argument,        NULL,   't' },
-    { "tilesize",    required_argument,  NULL,   's' },
-    { "tilepad",     required_argument,  NULL,   'p' },
-    { "psigma",      required_argument,  NULL,   'Q' },
-    { "overwrite",   no_argument,        NULL,   'w' },
-    { "prefix",       required_argument, NULL,   'f' },
-    { "method",       required_argument, NULL,   'm' },
-    { "eve", no_argument, NULL, 'E'},
-    { "relax",        required_argument, NULL,   'r' },
-    { "xyfactor",     required_argument, NULL,   'x' },
-    { "onetile",      no_argument,       NULL,   'T' },
-    { "bq",           required_argument, NULL,   'B' },
-    { "float",        no_argument,       NULL,   'F' },
-    { "fulldump",     no_argument,       NULL,   'D' },
-    { "flatfield",    required_argument, NULL,   'C' },
-    { "lookahead",     required_argument, NULL,   'L' },
-    { "experimental1", no_argument, NULL,        'X' },
-    { "iterdump",      no_argument, NULL,   'i'},
-    { "niterdump",     required_argument, NULL,   'I'},
-    { "nopos", no_argument, NULL, 'P'},
-    { "bg", required_argument, NULL, 'b'},
 
+
+    // Data
+
+    // Settings
+
+    { "biggs",     required_argument, NULL, 'a' },
+    { "bg",        required_argument, NULL, 'b' },
+    { "threads",   required_argument, NULL, 'c' },
+    { "prefix",    required_argument, NULL, 'f' },
+    { "times",     no_argument,       NULL, 'g' },
+    { "help",      no_argument,       NULL, 'h' },
+    { "iterdump",  no_argument,       NULL, 'i' },
+    { "verbose",   required_argument, NULL, 'l' },
+    { "method",    required_argument, NULL, 'm' },
+    { "iter",      required_argument, NULL, 'n' },
+    { "out",       required_argument, NULL, 'o' },
+    { "tilepad",   required_argument, NULL, 'p' },
+    { "relax",     required_argument, NULL, 'r' },
+    { "tilesize",  required_argument, NULL, 's' },
+    { "test",      no_argument,       NULL, 't' },
+    { "version",   no_argument,       NULL, 'v' },
+    { "overwrite", no_argument,       NULL, 'w' },
+    { "xyfactor",  required_argument, NULL, 'x' },
+
+    { "bq",        required_argument, NULL,  'B' },
+    { "flatfield", required_argument, NULL,  'C' },
+    { "fulldump",  no_argument,       NULL,  'D' },
+    { "eve",       no_argument,       NULL,  'E' },
+    { "float",     no_argument,       NULL,  'F' },
+    { "niterdump", required_argument, NULL,  'I' },
+    { "lookahead", required_argument, NULL,  'L' },
+    { "onetile",   no_argument,       NULL,  'T' },
+    { "nopos",     no_argument,       NULL,  'P' },
+    { "psigma",    required_argument, NULL,  'Q' },
+    { "expe1",     no_argument,       NULL,  'X' },
     { NULL,           0,                 NULL,   0   }
   };
 
   int ch;
-  while((ch = getopt_long(argc, argv, "a:b:c:iBFEIvho:n:C:p:s:p:TXfDPQL", longopts, NULL)) != -1)
+  while((ch = getopt_long(argc, argv, "a:b:c:igBFEIvho:n:C:p:s:p:TXfDPQL", longopts, NULL)) != -1)
   {
     switch(ch) {
     case 'a': /* Accelerations */
@@ -363,6 +369,9 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         break;
     case 'E':
         s->eve = 1;
+        break;
+    case 'g':
+        s->showTime = 1;
         break;
     case 'L':
         s->lookahead = atoi(optarg);
@@ -834,6 +843,7 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
   printf(" --float\n\t Set output format to 32-bit float (default is 16-bit int) and disable scaling\n");
   printf(" --bg l\n\t Set background level, l\n");
   printf(" --biggs N\n\t Set how agressive the Biggs acceleration should be. 0=off, 1=low/default, 2=intermediate, 3=max\n");
+  printf(" --eve\n\t Use Biggs Exponential Vector Extrapolation (EVE)\n");
   printf(" --flatfield image.tif\n\t"
          " Use a flat field correction image. Deconwolf will divide each plane of the\n\t"
          " input image, pixel by pixel, by this correction image.\n");
@@ -844,6 +854,7 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
   printf("max-projections of tif files can be created with:\n");
   printf("\t%s maxproj image.tif\n", argv[0]);
   printf("\tsee %s maxproj --help\n", argv[0]);
+
   printf("\n");
   printf("Web page: https://www.github.com/elgw/deconwolf/\n");
 }
@@ -2041,14 +2052,13 @@ int dw_run(dw_opts * s)
     /* Note: psf is freed bu the deconvolve_* functions*/
     if(s->eve == 1)
     {
-        printf("EVE enabled\n");
         out = deconvolve_eve(im, M, N, P, // input image and size
+                             psf, pM, pN, pP, // psf and size
+                             s);// settings
+    } else {
+        out = deconvolve_w(im, M, N, P, // input image and size
                            psf, pM, pN, pP, // psf and size
                            s);// settings
-    } else {
-    out = deconvolve_w(im, M, N, P, // input image and size
-        psf, pM, pN, pP, // psf and size
-        s);// settings
     }
     psf = NULL;
   }

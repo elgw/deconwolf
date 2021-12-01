@@ -12,6 +12,10 @@
      Richardson-Lucy with --biggs 0. Also introduced a few acceleration
      alternatives.
    - Will load PSFs that don't have an odd number of elements.
+   - Added Exponential Vector Extrapolation as the --eve command line switch
+     that might become the default in future version as the results are
+     promising. Generates really low idiv but has higher MSE than the current
+     algorithm.
 
 
 - v. 0.0.19
