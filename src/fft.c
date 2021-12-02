@@ -46,8 +46,6 @@ int clock_gettime(int a , struct timespec *spec)      //C-file part
 #define tic clock_gettime(CLOCK_REALTIME, &tictoc_start);
 #define toc(X) clock_gettime(CLOCK_REALTIME, &tictoc_end); printf(#X); printf(" %f s\n", timespec_diff(&tictoc_end, &tictoc_start));
 
-
-
 static double timespec_diff(struct timespec* end, struct timespec * start)
 {
     double elapsed = (end->tv_sec - start->tv_sec);
@@ -418,7 +416,17 @@ void fft_train(const size_t M, const size_t N, const size_t P, const int verbosi
         { assert(0); }
         else {
             fprintf(log, "Exporting fftw wisdom to %s\n", swf);
-            fftwf_export_wisdom_to_filename(swf);
+            int ret = fftwf_export_wisdom_to_filename(swf);
+            if(verbosity > 0)
+            {
+                if(ret != 0)
+                {
+                    printf("Exported fftw wisdom to %s\n", swf);
+                } else {
+                    printf("ERROR; Failed to write fftw wisdom to %s\n", swf);
+                }
+
+            }
             free(swf);
         }
     }

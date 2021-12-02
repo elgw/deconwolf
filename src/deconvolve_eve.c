@@ -1,5 +1,8 @@
 /* TODO:
- * - seems a little slow ...
+ * - anything that can be done about the slow performance of
+ *   logf and powf?
+ * - Variable re-naming to match that of Biggs theses
+ * - Use malloc with alignment for all code for speed up
 */
 
 static double clockdiff(struct timespec* end, struct timespec * start)
@@ -16,24 +19,19 @@ float biggs_alpha_eve(const afloat * restrict Xk,
                       const afloat * restrict Ukm2,
                       const size_t wMNP)
 {
-
+    /* These calculations take considerable time due to the logf.
+     * Full single precision accuracy is probably not needed,
+     * so we could think of using approximate calculations
+     * or sampling.
+     */
 
     float numerator = 0;
     float denominator = 0;
 
-    /* The accuracy here might not be very important,
-     * we could use an approximation of the logf
-     * or pre-calculate/interpolate
-     * Also it is probably not necessary to use all pixels here ...
-     * every nth per plane? (ideally not a factor of wM, wN)
-     * random selection (how many)
-     * or sample until convergence if really many pixels?
-     */
-
 #pragma omp parallel for reduction(+:numerator, denominator)
     for(size_t kk = 0; kk < wMNP; kk++)
     {
-        if(Ukm1[kk] > 0 && Ukm2[kk] > 0)
+        if(Ukm1[kk] > 0 && Ukm2[kk] > 0) /* Why is U 0 ? */
         {
             float logf_Ukm2_kk = logf(Ukm2[kk]);
             float logf_Ukm1_kk = logf(Ukm1[kk]);
@@ -161,13 +159,14 @@ float * deconvolve_eve(afloat * restrict im, const int64_t M, const int64_t N, c
         //return NULL;
     }
 
-    /* This is the work dimensions, i.e., dimensions
+    /* This is the 'work dimensions', i.e., dimensions
      * that will be used for all FFTs
      */
 
     int64_t wM = M + pM -1;
     int64_t wN = N + pN -1;
     int64_t wP = P + pP -1;
+
 
     if(s->borderQuality == 1)
     {
@@ -335,7 +334,9 @@ float * deconvolve_eve(afloat * restrict im, const int64_t M, const int64_t N, c
                 if(xm[kk] > 1e-5)
                 {
                     y[kk] = x[kk]*powf(x[kk]/xm[kk], alpha);
-                } else {
+                }
+                else
+                {
                     y[kk] = 1e-5;
                 }
             }

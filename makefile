@@ -12,6 +12,9 @@ XFLAGS = -DCC_VERSION=\"$(CC_VERSION)\"
 XFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
 
 CFLAGS = -Wall -Wextra -std=gnu99 -march=native -mtune=native
+# Since we don't check for these errors, see man math_error
+# we can disable this feature
+CFLAGS += -fno-math-errno
 
 DESTDIR?=/usr/local/bin
 DEBUG?=0
