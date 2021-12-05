@@ -1871,13 +1871,15 @@ int dw_run(dw_opts * s)
 
 
 #ifdef _OPENMP
+  #ifndef MKL
   omp_set_num_threads(s->nThreads);
   omp_set_dynamic(1);
+
   if(s->verbosity>3)
   {
        printf("omp_get_max_threads: %d\n", omp_get_max_threads());
   }
-
+  #endif
 #endif
 
   if(s->verbosity > 1)
@@ -2115,7 +2117,7 @@ int dw_run(dw_opts * s)
     printf("Finalizing "); fflush(stdout);
   }
 
-  if(out != NULL) free(out);
+  if(out != NULL) fftwf_free(out);
   myfftw_stop();
 
 

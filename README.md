@@ -72,7 +72,8 @@ sudo apt-get update
 sudo apt-get install libfftw3-single3
 sudo apt-get install libfftw3-dev
 sudo apt-get install openmp
-sudo apt-get install tiff-5
+sudo apt-get install tiff-5     # or possibly the one on the next line
+sudo apt-get install libtiff-dev
 sudo apt-get install libgsl-dev
 ```
 

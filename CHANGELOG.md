@@ -1,22 +1,26 @@
 - v. 0.0.20
+   - Changing acceleration technique to use
+     'exponential vector extrapolation' described in Biggs PhD thesis.
+     Deconvolved images get higher MSE but much lower I-div. This is a
+     huge improvement.
    - '--xyfactor 0' does not crash dw anymore.
    - Frees the PSF as soon as not needed to save some memory.
    - Changing the behavior of the progress dots to appear more linear
      in time
-   - Added the -sigma option to do pre-filtering of the image and psf by
-     a Gaussian kernel. Found to perform really well in
-     https://doi.org/10.1046/j.1365-2818.1997.d01-629.x
    - Changing the non-negative condition to strictly positive in order for
      pixel not to get stuck at 0.
    - Adding the option to turn off Biggs acceleration, i.e. run normal
      Richardson-Lucy with --biggs 0. Also introduced a few acceleration
      alternatives.
    - Will load PSFs that don't have an odd number of elements.
-   - Added Exponential Vector Extrapolation as the --eve command line switch
-     that might become the default in future version as the results are
-     promising. Generates really low idiv but has higher MSE than the current
-     algorithm.
-
+   - Added the -sigma option to do pre-filtering of the image and psf by
+     a Gaussian kernel. Found to perform really well in
+     https://doi.org/10.1046/j.1365-2818.1997.d01-629.x
+     in preliminary tests it doesn't do much good. Why not just downscale the
+     images before deconvolution and then upscale them again if we are not
+     interested in the high-frequency content?
+   - Can be built against MKL (`make MKL=1 ...`), consider that an
+     experimental option. 14 percent faster on a small test image.
 
 - v. 0.0.19
     - Using lanczos5 instead of lanczos3 for the PSF generation. As a result

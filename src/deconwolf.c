@@ -20,6 +20,7 @@
 
 int main(int argc, char ** argv)
 {
+    // setlocale(LC_ALL, NULL);
     if(argc > 1)
     {
         if(strcmp(argv[1], "maxproj") == 0)

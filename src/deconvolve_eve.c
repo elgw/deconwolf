@@ -234,7 +234,7 @@ float * deconvolve_eve(afloat * restrict im, const int64_t M, const int64_t N, c
     /* Insert the psf into the bigger Z */
     fim_insert(Z, wM, wN, wP,
                psf, pM, pN, pP);
-    free(psf);
+    fftwf_free(psf);
 
     /* Shift the PSF so that the mid is at (0,0,0) */
     int64_t midM, midN, midP = -1;

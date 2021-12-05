@@ -21,22 +21,38 @@ DEBUG?=0
 ifeq ($(DEBUG),1)
     CFLAGS += -g3 -DDEBUG
 else
-#CFLAGS +=  -g -O2 -ftree-vectorize -Wno-unknown-pragmas -flto
-CFLAGS +=  -O3 -Wno-unknown-pragmas -flto -DNDEBUG
-#-fno-math-errno no relevant performance gain
+   #CFLAGS +=  -g -O2 -ftree-vectorize -Wno-unknown-pragmas -flto
+   CFLAGS +=  -O3 -Wno-unknown-pragmas -flto -DNDEBUG
+   #-fno-math-errno no relevant performance gain
 endif
 
-dw_LIBRARIES =  -lm -lfftw3f -ltiff
-dwtm_LIBRARIES =  -lm -ltiff -lfftw3f
-dwbw_LIBRARIES = -lm -ltiff -lpthread -ltiff -lfftw3f -lgsl -lgslcblas
+
+dw_LIBRARIES =  -lm -ltiff
+dwtm_LIBRARIES =  -lm -ltiff
+dwbw_LIBRARIES = -lm -ltiff -lpthread -ltiff  -lgsl -lgslcblas
+
+MKL?=0
+ifeq ($(MKL),1)
+CFLAGS += -DMKL
+dw_LIBRARIES += `pkg-config mkl-static-lp64-iomp --cflags --libs`
+dwtm_LIBRARIES += `pkg-config mkl-static-lp64-iomp --cflags --libs`
+dwbw_LIBRARIES += `pkg-config mkl-static-lp64-iomp --cflags --libs`
+else
+dw_LIBRARIES +=  -lfftw3f
+dwtm_LIBRARIES += -ltiff -lfftw3f
+dwbw_LIBRARIES += -lfftw3f
+endif
 MANPATH=/usr/share/man/man1/
 
 # on MacOS add -Xpreprocessor
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
     CFLAGS +=
+ifeq ($(MKL),0)
     dw_LIBRARIES += -lfftw3f_threads
 endif
+endif
+
 ifeq ($(UNAME_S),Darwin)
     CFLAGS += -Xpreprocessor
     dw_LIBRARIES += -lomp -lfftw3f_threads

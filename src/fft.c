@@ -137,6 +137,7 @@ static char * get_swf_file_name(int nThreads)
 
 void myfftw_start(const int nThreads, int verbose, FILE * log)
 {
+
     if(verbose > 1)
     {
         printf("\t using %s with %d threads\n", fftwf_version, nThreads);
