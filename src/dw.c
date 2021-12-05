@@ -261,7 +261,7 @@ void dw_fprint_info(FILE * f, dw_opts * s)
 #endif
 
   fprintf(f, "BUILD_DATE: '%s'\n'", __DATE__);
-  fprintf(f, "FFTW: '%s'\n", fftwf_version);
+  fprintf(f, "FFT Backend: '%s'\n", fftwf_version);
   fprintf(f, "TIFF: '%s'\n", TIFFGetVersion());
 
 #ifndef WINDOWS
