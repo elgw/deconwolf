@@ -13,13 +13,12 @@ sudo apt-get install libtiff-dev
 ```
 
 
-## Using Intel MKL for the FFT
-We've build deconwolf against the Intel MKL library (for the FFT) on Ubuntu,
-although FFTW3 is the default. In initial performance tests MKL is found
-to be faster than FFTW3.
+## FFT Backend -- using MKL
+FFTW3 is the default FFT backend for deconwolf but it is also possible to use
+Intel MKL. This option is only tested on Ubuntu so far.
 
 ### Installation
-Install the required package(s), on Ubuntu:
+Install the required package(s):
 
 ``` shel
 sudo apt install intel-mkl
@@ -30,7 +29,8 @@ Build using
 ``` shell
 make MKL=1 -B
 ```
-that will find the MKL libraries using
+
+Make will find the MKL libraries using
 `pkg-config mkl-static-lp64-seq --cflags --libs`, the procedure
 might be different on other platforms.
 

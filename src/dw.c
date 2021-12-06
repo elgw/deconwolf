@@ -47,8 +47,6 @@ FILE * tifflogfile = NULL; // Set to stdout or a file
 // END GLOBALS
 
 
-
-
 dw_opts * dw_opts_new(void)
 {
   dw_opts * s = malloc(sizeof(dw_opts));
@@ -675,7 +673,7 @@ float getError(const afloat * restrict y, const afloat * restrict g,
         fprintf(stderr, "Something is funky with the dimensions of the images.\n");
         exit(-1);
     }
-  double e = 0;
+  float e = 0;
 #pragma omp parallel for reduction(+: e)
   for(int64_t c = 0; c<P; c++)
   {
@@ -683,15 +681,15 @@ float getError(const afloat * restrict y, const afloat * restrict g,
     {
       for(int64_t a = 0; a<M; a++)
       {
-        double yval = y[a + b*wM + c*wM*wN];
-        double gval = g[a + b*M + c * M*N];
-        e+=pow(yval-gval, 2);
+        float yval = y[a + b*wM + c*wM*wN];
+        float gval = g[a + b*M + c * M*N];
+        e += powf(yval-gval, 2);
       }
     }
   }
 
-  e/=(M*N*P);
-  return (float) e;
+  float mse = e / (float) (M*N*P);
+  return mse;
 }
 
 void putdot(const dw_opts *s)

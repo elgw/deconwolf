@@ -186,6 +186,8 @@ The deconvolution algorithm is based on these papers:
  * Biggs, D.S.C. “Acceleration of Iterative Image Restoration Algorithms.”
    Applied Optics. Vol. 36. Number 8, 1997, pp. 1766–1775.
    [doi](https://doi.org/10.1364/AO.36.001766)
+ * Biggs, D.S.C “Accelerated iterative blind deconvolution”. PhD thesis.
+   University of Auckland, New Zealand, 1998.
  * M. Bertero and P. Boccacci, A simple method for the reduction of boundary
    effects in the Richardson-Lucy approach to image deconvolution,
    A&A 437, 369-374 (2005).

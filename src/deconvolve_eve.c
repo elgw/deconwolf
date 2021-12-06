@@ -37,8 +37,6 @@ float biggs_alpha_eve(const afloat * restrict Xk,
             float logf_Ukm1_kk = logf(Ukm1[kk]);
             numerator   += Xk[kk]*logf_Ukm1_kk*Xk[kk]*logf_Ukm2_kk;
             denominator += Xkm1[kk]*logf_Ukm2_kk*Xkm1[kk]*logf_Ukm2_kk;
-            //if(log2(kk) - round(log2(kk)) == 0)
-            //    printf("%zu %f/%f = %f\n", kk, numerator, denominator, numerator/denominator);
         }
     }
 
@@ -47,8 +45,10 @@ float biggs_alpha_eve(const afloat * restrict Xk,
         printf("Unexpected denominator=0 in biggs_alpha_eve\n");
         return 0;
     }
-    double alpha = numerator / denominator;
-    return (float) alpha;
+    float alpha = numerator / denominator;
+//    alpha < 0 ? alpha = 0 : 0;
+//    alpha > 1 ? alpha = 1 : 0;
+    return alpha;
 }
 
 
@@ -83,6 +83,7 @@ float iter_eve(
   putdot(s);
 
   float error = getError(y, im, M, N, P, wM, wN, wP);
+
 
   const double mindiv = 1e-6;
 #pragma omp parallel for
@@ -125,6 +126,7 @@ float iter_eve(
           x[cc] *= f[cc]*W[cc];
       }
   } else {
+#pragma omp parallel for
       for(size_t cc = 0; cc<wMNP; cc++)
       {
           x[cc] *= f[cc];
@@ -379,13 +381,14 @@ float * deconvolve_eve(afloat * restrict im, const int64_t M, const int64_t N, c
         }
 
         fim_div(g, xp, y, wMNP); // g = xp/y "v"
+        if(1){
         for(size_t kk = 0; kk<wMNP; kk++)
         {
             if(y[kk] == 0)
             {
                 g[kk] = 0;
             }
-        }
+        }}
         if(W != NULL)
         {
             for(size_t kk = 0; kk<wMNP; kk++)
