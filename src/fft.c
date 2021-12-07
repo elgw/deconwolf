@@ -267,7 +267,10 @@ afloat * fft_convolve_cc_conj_f2(fftwf_complex * A, fftwf_complex * B,
 
     size_t n = (M+3)/2*N*P;
     fftwf_complex * C = fftwf_malloc(n*sizeof(fftwf_complex));
+
     fft_mul_conj(C, A, B, M, N, P);
+
+    // fft_mul(C, A, B, M, N, P); /* For symmetric PSFs this would give the same */
     fftwf_free(B);
 
     afloat * out = fftwf_malloc(M*N*P*sizeof(float));
@@ -278,8 +281,9 @@ afloat * fft_convolve_cc_conj_f2(fftwf_complex * A, fftwf_complex * B,
     fftwf_execute(p);
     fftwf_destroy_plan(p);
     fftwf_free(C);
-    const size_t MNP = M*N*P;
-    for(size_t kk = 0; kk<MNP; kk++)
+    const float MNP = M*N*P;
+#pragma omp parallel for
+    for(size_t kk = 0; kk < M*N*P; kk++)
     {
         out[kk]/=(MNP);
     }
@@ -559,6 +563,8 @@ void fft_ut(void)
         printf("Size: %ld, time %e\n", kk+from, t[kk]);
     }
     free(t);
+
+
 
     // Free plans etc
     fftwf_cleanup();

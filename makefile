@@ -33,7 +33,7 @@ dwbw_LIBRARIES = -lm -ltiff -lpthread -ltiff  -lgsl -lgslcblas
 
 MKL?=0
 ifeq ($(MKL),1)
-CFLAGS += -DMKL
+CFLAGS += -DMKL `pkg-config mkl-static-lp64-iomp --cflags`
 dw_LIBRARIES += `pkg-config mkl-static-lp64-iomp --cflags --libs`
 dwtm_LIBRARIES += `pkg-config mkl-static-lp64-iomp --cflags --libs`
 dwbw_LIBRARIES += `pkg-config mkl-static-lp64-iomp --cflags --libs`
@@ -69,6 +69,8 @@ ifeq ($(OMP), 1)
 else
   CFLAGS += -fno-openmp
 endif
+
+
 
 CFLAGS += $(XFLAGS)
 

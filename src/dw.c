@@ -30,6 +30,9 @@
 #ifdef _OPENMP // turned on with -fopenmp
 #include <omp.h>
 #endif
+#ifdef MKL
+#include <mkl.h>
+#endif
 #include "fft.h"
 #include "dw.h"
 #include "tiling.h"
@@ -80,7 +83,7 @@ dw_opts * dw_opts_new(void)
   s->lookahead = 0;
   s->psigma = 0;
   s->biggs = 1;
-  s->eve = 0;
+  s->eve = 1;
   return s;
 }
 
@@ -341,7 +344,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     { "bq",        required_argument, NULL,  'B' },
     { "flatfield", required_argument, NULL,  'C' },
     { "fulldump",  no_argument,       NULL,  'D' },
-    { "eve",       no_argument,       NULL,  'E' },
+    // { "eve",       no_argument,       NULL,  'E' },
     { "float",     no_argument,       NULL,  'F' },
     { "niterdump", required_argument, NULL,  'I' },
     { "lookahead", required_argument, NULL,  'L' },
@@ -353,7 +356,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
   };
 
   int ch;
-  while((ch = getopt_long(argc, argv, "a:b:c:igBFEIvho:n:C:p:s:p:TXfDPQL", longopts, NULL)) != -1)
+  while((ch = getopt_long(argc, argv, "a:b:c:igBEIvho:n:C:p:s:p:TXfDPQL", longopts, NULL)) != -1)
   {
     switch(ch) {
     case 'a': /* Accelerations */
@@ -364,9 +367,6 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         break;
     case 'b':
         s->bg = atof(optarg);
-        break;
-    case 'E':
-        s->eve = 1;
         break;
     case 'g':
         s->showTime = 1;
@@ -464,6 +464,8 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
       case 'X':
         s->experimental1 = 1;
         break;
+    default:
+        exit(EXIT_FAILURE);
     }
   }
 
@@ -1286,7 +1288,7 @@ float * psf_autocrop_centerZ(float * psf, int64_t * pM, int64_t * pN, int64_t * 
   {
     p0--; p1++;
   }
-  if(s->verbosity > 2)
+  if(s->verbosity > 0)
   {
     printf("PSF has %" PRId64 " slices\n", p);
     printf("brightest at plane %" PRId64 "\n", maxp);
@@ -1315,7 +1317,7 @@ float * psf_autocrop_byImage(float * psf, int64_t * pM, int64_t * pN, int64_t * 
   if((p % 2) == 0)
   {
       fprintf(stderr, "Error: The PSF should have odd number of slices\n");
-    exit(1);
+      return psf;
   }
 
   // Optimal size
@@ -1492,7 +1494,7 @@ float * psf_autocrop(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  // 
     dw_opts * s)
 {
   float * p = psf;
-  p = psf_autocrop_centerZ(p, pM, pN, pP, s);
+  // p = psf_autocrop_centerZ(p, pM, pN, pP, s);
   assert(pM[0] > 0);
   // Crop the PSF if it is larger than necessary
   p = psf_autocrop_byImage(p, pM, pN, pP, M, N, P, s);
@@ -1810,8 +1812,6 @@ double get_nbg(float * I, size_t N, float bg)
 }
 
 
-
-
 void tiffErrHandler(const char* module, const char* fmt, va_list ap)
 {
     assert(tifflogfile != NULL);
@@ -1869,8 +1869,11 @@ int dw_run(dw_opts * s)
 
 
 #ifdef _OPENMP
-  #ifndef MKL
+#ifdef MKL
+  mkl_set_num_threads(s->nThreads);
+#else
   omp_set_num_threads(s->nThreads);
+  omp_set_num_threads(1);
   omp_set_dynamic(1);
 
   if(s->verbosity>3)

@@ -35,7 +35,8 @@ float biggs_alpha_eve(const afloat * restrict Xk,
         {
             float logf_Ukm2_kk = logf(Ukm2[kk]);
             float logf_Ukm1_kk = logf(Ukm1[kk]);
-            numerator   += Xk[kk]*logf_Ukm1_kk*Xk[kk]*logf_Ukm2_kk;
+            numerator   += Xk[kk]*logf_Ukm1_kk*Xk[kk]*logf_Ukm2_kk; /* This works best */
+            // numerator   += Xk[kk]*logf_Ukm1_kk*Xkm1[kk]*logf_Ukm2_kk; /* This is according to Biggs ... */
             denominator += Xkm1[kk]*logf_Ukm2_kk*Xkm1[kk]*logf_Ukm2_kk;
         }
     }
@@ -46,8 +47,8 @@ float biggs_alpha_eve(const afloat * restrict Xk,
         return 0;
     }
     float alpha = numerator / denominator;
-//    alpha < 0 ? alpha = 0 : 0;
-//    alpha > 1 ? alpha = 1 : 0;
+    alpha < 0 ? alpha = 0 : 0;
+    alpha > 0.98 ? alpha = 0.98 : 0; /* Slow but good with cap at 0.95 */
     return alpha;
 }
 
@@ -85,7 +86,6 @@ float iter_eve(
   float error = getError(y, im, M, N, P, wM, wN, wP);
 
 
-  const double mindiv = 1e-6;
 #pragma omp parallel for
   for(size_t cc = 0; cc < (size_t) wP; cc++){
       for(size_t bb = 0; bb < (size_t) wN; bb++){
@@ -94,13 +94,11 @@ float iter_eve(
               size_t imidx = aa + bb*M + cc*M*N;
               if(aa < (size_t) M && bb < (size_t) N && cc < (size_t) P)
               {
-                  /* abs and sign */
-                  fabs(y[yidx]) < mindiv ? y[yidx] = copysign(mindiv, y[yidx]) : 0;
-
                   if(y[yidx] > 0)
                   {
                       y[yidx] = im[imidx]/y[yidx];
                   } else {
+                      printf("\n!\n");
                       y[yidx] = s->bg;
                   }
               } else {
@@ -109,7 +107,6 @@ float iter_eve(
           }
       }
   }
-
 
   fftwf_complex * F_sn = fft(y, wM, wN, wP); /* FFT#3 */
   fftwf_free(y);
@@ -184,7 +181,7 @@ float * deconvolve_eve(afloat * restrict im, const int64_t M, const int64_t N, c
         wP = int64_t_max(P, pP);
     }
 
-    if(wP %2 == 1)
+    if(wP % 2 == 1) /* Todo: check if prime instead */
     {
         /*  The jobb size is not divisable by 2.
          * potentially it could be faster to extend the job by
@@ -292,17 +289,19 @@ float * deconvolve_eve(afloat * restrict im, const int64_t M, const int64_t N, c
     float sumg = fim_sum(im, M*N*P);
 
     float alpha = 0;
-    afloat * f = fim_constant(wMNP, sumg/wMNP);
-    afloat * y = fim_copy(f, wMNP);
 
+    afloat * f = fim_constant(wMNP, sumg/wMNP); /* Initial guess */
+    afloat * y = fim_copy(f, wMNP);
     afloat * x1 = fim_copy(f, wMNP);
     afloat * x2 = fim_copy(f, wMNP);
+
     afloat * x = x1;
     afloat * xp = x2;
-    afloat * xm = x2; // fim_copy(f, wMNP);
+    afloat * xm = x2;
 
-    afloat * gm = fim_zeros(wMNP);
+    afloat * gm = fim_zeros(wMNP); /* Previous and current quotient */
     afloat * g = fim_zeros(wMNP);
+    double alpha_last = 0;
 
     int it = 0;
     while(it<nIter)
@@ -327,13 +326,28 @@ float * deconvolve_eve(afloat * restrict im, const int64_t M, const int64_t N, c
 
         struct timespec tstart, tend;
         clock_gettime(CLOCK_REALTIME, &tstart);
-        if(it > 1)
+        if(it >= 2)
         {
+
+            clock_gettime(CLOCK_REALTIME, &tstart);
+            alpha = biggs_alpha_eve(x, xm, g, gm, wMNP);
+            clock_gettime(CLOCK_REALTIME, &tend);
+            if(s->showTime){
+                printf("\n--timing alpha: %f\n", clockdiff(&tend, &tstart));
+            }
+
+            alpha = powf(alpha, 2);
+            if(alpha > alpha_last)
+            {
+                alpha = 0.5*alpha + 0.5*alpha_last;
+            }
+            alpha_last = alpha;
+
             clock_gettime(CLOCK_REALTIME, &tstart);
 #pragma omp parallel for
             for(size_t kk = 0; kk<wMNP; kk++)
             {
-                if(xm[kk] > 1e-5)
+                if(xm[kk] > 0)
                 {
                     y[kk] = x[kk]*powf(x[kk]/xm[kk], alpha);
                 }
@@ -380,7 +394,7 @@ float * deconvolve_eve(afloat * restrict im, const int64_t M, const int64_t N, c
             g = gm; gm = swap;
         }
 
-        fim_div(g, xp, y, wMNP); // g = xp/y "v"
+        fim_div(g, xp, y, wMNP); // g = xp/y "g is Biggs u_k"
         if(1){
         for(size_t kk = 0; kk<wMNP; kk++)
         {
@@ -401,24 +415,6 @@ float * deconvolve_eve(afloat * restrict im, const int64_t M, const int64_t N, c
             }
         }
 
-        if(it > 1) /* We need three time points to get started */
-        {
-            clock_gettime(CLOCK_REALTIME, &tstart);
-            alpha = biggs_alpha_eve(xp, x, g, gm, wMNP);
-            clock_gettime(CLOCK_REALTIME, &tend);
-            if(s->showTime){
-                printf("\n--timing alpha: %f\n", clockdiff(&tend, &tstart));
-            }
-        }
-        if(alpha <= 0)
-        {
-            alpha = 1e-8;
-        }
-        if(alpha >= 1)
-        {
-            alpha = 1.0 -1e-9;
-        }
-        alpha = powf(alpha, 2);
 
         xm = x;
         x = xp;
