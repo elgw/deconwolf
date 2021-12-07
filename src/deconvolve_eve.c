@@ -31,12 +31,11 @@ float biggs_alpha_eve(const afloat * restrict Xk,
 #pragma omp parallel for reduction(+:numerator, denominator)
     for(size_t kk = 0; kk < wMNP; kk++)
     {
-        if(Ukm1[kk] > 0 && Ukm2[kk] > 0) /* Why is U 0 ? */
+        if( (Ukm1[kk] > 0) && (Ukm2[kk] > 0) ) /* Why is U 0 ? */
         {
             float logf_Ukm2_kk = logf(Ukm2[kk]);
             float logf_Ukm1_kk = logf(Ukm1[kk]);
-            numerator   += Xk[kk]*logf_Ukm1_kk*Xk[kk]*logf_Ukm2_kk; /* This works best */
-            // numerator   += Xk[kk]*logf_Ukm1_kk*Xkm1[kk]*logf_Ukm2_kk; /* This is according to Biggs ... */
+            numerator   += Xk[kk]*logf_Ukm1_kk*Xkm1[kk]*logf_Ukm2_kk;
             denominator += Xkm1[kk]*logf_Ukm2_kk*Xkm1[kk]*logf_Ukm2_kk;
         }
     }
@@ -48,7 +47,8 @@ float biggs_alpha_eve(const afloat * restrict Xk,
     }
     float alpha = numerator / denominator;
     alpha < 0 ? alpha = 0 : 0;
-    alpha > 0.98 ? alpha = 0.98 : 0; /* Slow but good with cap at 0.95 */
+    alpha > 1.0 ? alpha = 1.0 : 0;
+    alpha *= 0.95; /* Cap at 0.95 */
     return alpha;
 }
 
@@ -102,7 +102,7 @@ float iter_eve(
                       y[yidx] = s->bg;
                   }
               } else {
-                  y[yidx]=0;
+                  y[yidx]=1e-6;
               }
           }
       }
@@ -250,7 +250,7 @@ float * deconvolve_eve(afloat * restrict im, const int64_t M, const int64_t N, c
     if(s->fulldump)
     {
         printf("Dumping to fullPSF.tif\n");
-        fim_tiff_write_float("fullPSF.tif", Z, NULL, wM, wN, wP, stdout);
+        fim_tiff_write_float("fulldump_PSF.tif", Z, NULL, wM, wN, wP, stdout);
     }
 
     fftwf_complex * fftPSF = fft(Z, wM, wN, wP);
@@ -336,11 +336,13 @@ float * deconvolve_eve(afloat * restrict im, const int64_t M, const int64_t N, c
                 printf("\n--timing alpha: %f\n", clockdiff(&tend, &tstart));
             }
 
-            alpha = powf(alpha, 2);
+            alpha = powf(alpha, 1.1);
+
             if(alpha > alpha_last)
             {
                 alpha = 0.5*alpha + 0.5*alpha_last;
             }
+
             alpha_last = alpha;
 
             clock_gettime(CLOCK_REALTIME, &tstart);
@@ -353,7 +355,7 @@ float * deconvolve_eve(afloat * restrict im, const int64_t M, const int64_t N, c
                 }
                 else
                 {
-                    y[kk] = 1e-5;
+                    y[kk] = 1e-6;
                 }
             }
         }
@@ -395,12 +397,13 @@ float * deconvolve_eve(afloat * restrict im, const int64_t M, const int64_t N, c
         }
 
         fim_div(g, xp, y, wMNP); // g = xp/y "g is Biggs u_k"
+
         if(1){
         for(size_t kk = 0; kk<wMNP; kk++)
         {
             if(y[kk] == 0)
             {
-                g[kk] = 0;
+                g[kk] = xp[kk];
             }
         }}
         if(W != NULL)
@@ -435,7 +438,7 @@ float * deconvolve_eve(afloat * restrict im, const int64_t M, const int64_t N, c
     if(s->fulldump)
     {
         printf("Dumping to fulldump.tif\n");
-        fim_tiff_write("fulldump.tif", x, NULL, wM, wN, wP, stdout);
+        fim_tiff_write("fulldump_x.tif", x, NULL, wM, wN, wP, stdout);
     }
 
     afloat * out = fim_subregion(x, wM, wN, wP, M, N, P);
