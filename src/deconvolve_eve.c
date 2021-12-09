@@ -48,7 +48,7 @@ float biggs_alpha_eve(const afloat * restrict Xk,
     float alpha = numerator / denominator;
     alpha < 0 ? alpha = 0 : 0;
     alpha > 1.0 ? alpha = 1.0 : 0;
-    alpha *= 0.95; /* Cap at 0.95 */
+    alpha *= 0.98; /* Cap at 0.95 */
     return alpha;
 }
 
@@ -263,10 +263,14 @@ float * deconvolve_eve(afloat * restrict im, const int64_t M, const int64_t N, c
     afloat * W = NULL;
     if(s->borderQuality > 0)
     {
+        /* F_one is 1 over the image domain */
         fftwf_complex * F_one = initial_guess(M, N, P, wM, wN, wP);
+        /* Bertero, Eq. 15 */
         W = fft_convolve_cc_conj_f2(fftPSF, F_one, wM, wN, wP);
         F_one = NULL; /* Freed by the call above */
 
+        if(s->borderQuality > 0)
+        {
         /* Sigma in Bertero's paper, introduced for Eq. 17 */
         float sigma = 0.01; // Until 2021.11.25 used 0.001
 #pragma omp parallel for
@@ -279,9 +283,10 @@ float * deconvolve_eve(afloat * restrict im, const int64_t M, const int64_t N, c
                 W[kk] = 0;
             }
         }
-        //printf("max(W) = %f\n", fim_max(W, wM*wN*wP));
-        //fim_tiff_write_float("W.tif", W, NULL, wM, wN, wP, stdout);
+        }
     }
+
+    fulldump(s, W, wM, wN, wP, "W");
 
     putdot(s);
 
@@ -312,13 +317,7 @@ float * deconvolve_eve(afloat * restrict im, const int64_t M, const int64_t N, c
             {
                 afloat * temp = fim_subregion(x, wM, wN, wP, M, N, P);
                 char * outname = gen_iterdump_name(s, it);
-                //printf(" Writing current guess to %s\n", outname);
-                if(s->outFormat == 32)
-                {
-                    fim_tiff_write_float(outname, temp, NULL, M, N, P, s->log);
-                } else {
-                    fim_tiff_write(outname, temp, NULL, M, N, P, s->log);
-                }
+                fulldump(s, temp, M, N, P, outname);
                 free(outname);
                 free(temp);
             }
@@ -326,11 +325,14 @@ float * deconvolve_eve(afloat * restrict im, const int64_t M, const int64_t N, c
 
         struct timespec tstart, tend;
         clock_gettime(CLOCK_REALTIME, &tstart);
-        if(it >= 2)
+        if(it >= 2 && s->biggs > 0)
         {
 
             clock_gettime(CLOCK_REALTIME, &tstart);
+
+
             alpha = biggs_alpha_eve(x, xm, g, gm, wMNP);
+
             clock_gettime(CLOCK_REALTIME, &tend);
             if(s->showTime){
                 printf("\n--timing alpha: %f\n", clockdiff(&tend, &tstart));
@@ -356,6 +358,16 @@ float * deconvolve_eve(afloat * restrict im, const int64_t M, const int64_t N, c
                 else
                 {
                     y[kk] = 1e-6;
+                }
+            }
+        } else {
+            /* Biggs accelaration disabled */
+#pragma omp parallel for
+            for(size_t kk = 0; kk<wMNP; kk++)
+            {
+                if(xm[kk] > 0)
+                {
+                    y[kk] = x[kk];
                 }
             }
         }
@@ -435,12 +447,9 @@ float * deconvolve_eve(afloat * restrict im, const int64_t M, const int64_t N, c
         fftwf_free(W);
     }
 
-    if(s->fulldump)
-    {
-        printf("Dumping to fulldump.tif\n");
-        fim_tiff_write("fulldump_x.tif", x, NULL, wM, wN, wP, stdout);
-    }
+    fulldump(s, x, wM, wN, wP, "fulldump_x.tif");
 
+    /* Extract the observed region from the last iteration */
     afloat * out = fim_subregion(x, wM, wN, wP, M, N, P);
 
     fftwf_free(f);

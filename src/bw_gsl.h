@@ -71,4 +71,8 @@ double bw_gsl_integrate_xy(bw_gsl_conf_t *,
 #define j0f j0
 #endif
 
+#ifdef OSX
+#define j0f j0
+#endif
+
 #endif

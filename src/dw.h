@@ -147,4 +147,9 @@ float * psf_autocrop(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  // 
 #define ANSI_COLOR_CYAN    "\x1b[36m"
 #define ANSI_COLOR_RESET   "\x1b[0m"
 
+
+/* Write A to disk as fulldump_<name>.tif if s->fulldump = 1 */
+void fulldump(dw_opts * s, float * A, size_t M, size_t N, size_t P, char * name);
+
+
 #endif

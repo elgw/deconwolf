@@ -149,14 +149,11 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
       fprintf(f, "Biggs acceleration: OFF\n");
       break;
   case 1:
-      fprintf(f, "Biggs acceleration: Low\n");
+      fprintf(f, "Biggs acceleration: ON\n");
       break;
-  case 2:
-      fprintf(f, "Biggs acceleration: Intermediate\n");
-      break;
-  case 3:
-      fprintf(f, "Biggs acceleration: Agressive\n");
-      break;
+  default:
+      printf("%d is an invalid value for --biggs\n", s->biggs);
+      exit(EXIT_FAILURE);
   }
 
   switch(s->method)
@@ -237,6 +234,23 @@ int file_exist(char * fname)
   } else {
     return 0;
   }
+}
+
+void fulldump(dw_opts * s, float * A, size_t M, size_t N, size_t P, char * name)
+{
+    /* Write A to disk as fulldump_<name>.tif if s->fulldump = 1 */
+    if(s->fulldump != 1)
+    {
+        return;
+    }
+    assert(name != NULL);
+
+    if(A != NULL)
+    {
+        printf("Dumping to %s\n", name);
+        fim_tiff_write_float(name, A, NULL, M, N, P, stdout);
+    }
+    return;
 }
 
 void dw_fprint_info(FILE * f, dw_opts * s)
@@ -662,6 +676,40 @@ float getErrorX(const float * restrict y, const float * restrict g, const int64_
   return (float) e;
 }
 
+
+float getError_idiv(const afloat * restrict y, const afloat * restrict g,
+               const int64_t M, const int64_t N, const int64_t P,
+               const int64_t wM, const int64_t wN, const int64_t wP)
+{
+    /* Csiszar’s I-Divergence between the input, y, and the forward propagated
+     * current guess */
+
+    if(M > wM || N > wN || P > wP)
+    {
+        fprintf(stderr, "Something is funky with the dimensions of the images.\n");
+        exit(-1);
+    }
+    float idiv = 0;
+#pragma omp parallel for reduction(+: idiv)
+    for(int64_t c = 0; c<P; c++)
+    {
+        for(int64_t b = 0; b<N; b++)
+        {
+            for(int64_t a = 0; a<M; a++)
+            {
+                float obs =  y[a + b*wM + c*wM*wN];
+                float est = g[a + b*M + c * M*N];
+                if(est > 0)
+                {
+                    idiv += obs*log(obs/est) - obs + est;
+                }
+            }
+        }
+    }
+
+    float idiv_mean = idiv / (float) (M*N*P);
+    return idiv_mean;
+}
 
 float getError(const afloat * restrict y, const afloat * restrict g,
     const int64_t M, const int64_t N, const int64_t P,
@@ -1305,20 +1353,19 @@ float * psf_autocrop_centerZ(float * psf, int64_t * pM, int64_t * pN, int64_t * 
 
 }
 
-float * psf_autocrop_byImage(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  // psf and size
-    int64_t M, int64_t N, int64_t P, // image size
+float * psf_autocrop_byImage(float * psf,/* psf and size */
+                             int64_t * pM, int64_t * pN, int64_t * pP,
+                             int64_t M, int64_t N, int64_t P, /* image size */
     dw_opts * s)
 {
+
+/* Purpose: Crop the PSF if it is more
+   than 2x the size of the image in any dimension. */
 
   const int64_t m = pM[0];
   const int64_t n = pN[0];
   const int64_t p = pP[0];
 
-  if((p % 2) == 0)
-  {
-      fprintf(stderr, "Error: The PSF should have odd number of slices\n");
-      return psf;
-  }
 
   // Optimal size
   int64_t mopt = (M-1)*2 + 1;
@@ -1332,6 +1379,13 @@ float * psf_autocrop_byImage(float * psf, int64_t * pM, int64_t * pN, int64_t * 
     fprintf(s->log, "WARNING: The PSF has only %" PRId64 " slices, %" PRId64 " would be better.\n", p, popt);
     return psf;
   }
+
+  if((p % 2) == 0)
+  {
+      fprintf(stderr, "Error: The PSF should have odd number of slices\n");
+      fprintf(stderr, "Possibly it will be auto-cropped wrong\n");
+  }
+
 
   if(m > mopt || n > nopt || p > popt)
   {
@@ -1496,7 +1550,7 @@ float * psf_autocrop(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  // 
   float * p = psf;
   // p = psf_autocrop_centerZ(p, pM, pN, pP, s);
   assert(pM[0] > 0);
-  // Crop the PSF if it is larger than necessary
+  /* Crop the PSF if it is larger than necessary */
   p = psf_autocrop_byImage(p, pM, pN, pP, M, N, P, s);
   assert(pM[0] > 0);
   // Crop the PSF by removing outer planes that has very little information

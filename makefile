@@ -54,7 +54,7 @@ endif
 endif
 
 ifeq ($(UNAME_S),Darwin)
-    CFLAGS += -Xpreprocessor
+    CFLAGS += -Xpreprocessor -DOSX
     dw_LIBRARIES += -lomp -lfftw3f_threads
     MANPATH=/usr/local/share/man/man1
 endif
