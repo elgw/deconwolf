@@ -82,10 +82,10 @@ float iter_eve(
   putdot(s);
   afloat * y = fft_convolve_cc_f2(fftPSF, F, wM, wN, wP); /* FFT#2 */
   putdot(s);
-
   float error = getError(y, im, M, N, P, wM, wN, wP);
 
 
+  int y_has_zero = 0;
 #pragma omp parallel for
   for(size_t cc = 0; cc < (size_t) wP; cc++){
       for(size_t bb = 0; bb < (size_t) wN; bb++){
@@ -98,7 +98,7 @@ float iter_eve(
                   {
                       y[yidx] = im[imidx]/y[yidx];
                   } else {
-                      printf("\n!\n");
+                      y_has_zero = 1;
                       y[yidx] = s->bg;
                   }
               } else {
@@ -107,6 +107,14 @@ float iter_eve(
           }
       }
   }
+  if(y_has_zero == 1)
+  {
+      if(s->verbosity > 1)
+      {
+          printf("Zero(s) found in y\n");
+      }
+  }
+
 
   fftwf_complex * F_sn = fft(y, wM, wN, wP); /* FFT#3 */
   fftwf_free(y);
@@ -348,10 +356,11 @@ float * deconvolve_eve(afloat * restrict im, const int64_t M, const int64_t N, c
             alpha_last = alpha;
 
             clock_gettime(CLOCK_REALTIME, &tstart);
+            // printf("Alpha = %f\n", alpha);
 #pragma omp parallel for
             for(size_t kk = 0; kk<wMNP; kk++)
             {
-                if(xm[kk] > 0)
+                if(xm[kk] > 0 && x[kk] > 0)
                 {
                     y[kk] = x[kk]*powf(x[kk]/xm[kk], alpha);
                 }
@@ -393,13 +402,13 @@ float * deconvolve_eve(afloat * restrict im, const int64_t M, const int64_t N, c
 
         if(s->verbosity > 0){
             printf("\r                                             ");
-            printf("\rIteration %3d/%3d, MSE=%e ", it+1, nIter, err);
+            printf("\rIteration %3d/%3d, fMSE=%e ", it+1, nIter, err);
             fflush(stdout);
         }
 
         if(s->log != NULL)
         {
-            fprintf(s->log, "Iteration %d/%d, MSE=%e\n", it+1, nIter, err);
+            fprintf(s->log, "Iteration %d/%d, fMSE=%e\n", it+1, nIter, err);
             fflush(s->log);
         }
 
