@@ -1,15 +1,79 @@
-
-DECONWOLF(1)	       BSD General Commands Manual	    DECONWOLF(1)
+DECONWOLF(1)						    DECONWOLF(1)
 
 NAME
-     deconwolf — Deconvolve wide-field microscopy images
+       deconwolf dw is a tool for deconvolution of wide field microscopy
+       stacks.
 
-DESCRIPTION
-     DECONWOLF is an open source software that provides two binaries: dw
-     to deconvolve wide field images, and dw_bw to generate point spread
-     functions according to the Born-Wolf model.
+SYNOPSIS
+       dw [OPTIONS] file.tif psf.tif
 
-NOTES
-     Web page http://www.elgw/deconwolf/
+OPTIONS
+       --threads t
+	      Set the number of computational threads to use.
 
-			      Nov 12, 2021
+       --out file.tif
+	      Explicitly set the name of the output  file.   By	 default
+	      the name of the input file prefixed by dw_ will be used.
+
+       --prefix str
+	      Set  the	prefix	to  use for the output file.  An extra _
+	      will be appended to the str.
+
+       --iterdump
+	      Save each iteration to disk, not only the final.
+
+       --niterdump n
+	      Save every nth iteration to disk, including the final  im‐
+	      age.
+
+       --iter n
+	      Set the number of iterations.
+
+       --tilesize s
+	      Set the size (axial side length, in pixels) of the largest
+	      portion that can be deconvolved at a time.  E.g., if s  is
+	      2048  any	 image	larger	than 2048 will be deconvolved in
+	      tiles.
+
+       --tilepad p
+	      Set how many pixels the tiles should overlap.
+
+       --overwrite
+	      Overwrite the target if it exists.
+
+       --bq n Border/edge handling.  n=0: no padding.  n=1: a compromise
+	      between memory/speed and quality.	 n=2 default.
+
+       --float
+	      Save  the	 output	 using 32-bit floats, also turns off any
+	      scaling.
+
+       --version, -V
+	      Show version information and quit.
+
+       --help Show a short help message and quit.
+
+       --biggs b
+	      Set b to 0 to turn acceleration off, in that case	 dw  re‐
+	      verts to the standard Richardson-Lucy method.
+
+SEE ALSO
+       dw_bw  for  generation of point spread functions according to the
+       Born-Wolf model..
+
+WEB PAGE
+       <https://github.com/elgw/deconwolf/>
+
+REPORTING BUGS
+       Please report bugs at <https://github.com/elgw/deconwolf/issues/>
+
+COPYRIGHT
+       Copyright © 2022 Erik Wernersson.  License GPLv3+: GNU  GPL  ver‐
+       sion  3	or  later  <https://gnu.org/licenses/gpl.html>.	 This is
+       free software: you are free to change and redistribute it.  There
+       is NO WARRANTY, to the extent permitted by law.
+
+AUTHORS
+       Erik Wernersson.
+
+dw 0.0.20			  2022			    DECONWOLF(1)
