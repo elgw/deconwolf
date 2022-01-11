@@ -1,3 +1,9 @@
+ - [Usage](#usage)
+ - [Question and Answers](#qa)
+
+
+<a name="usage" />
+
 # Usage
 Deconwolf has a command line interface (CLI), i.e., you would typically run
 it from a terminal. However, here is also a
@@ -109,7 +115,9 @@ saturated. The scaling value can be found at the end of the log files.
    This self-tuning can take considerable time but should only be needed
    once per problem size.
 
-# FAQ
+<a name="qa" />
+
+# Questions and Answers
 
 ## How can I prepare tif files for deconwolf?
 Deconwolf only accept tif files with one channel per file. For ND2 files
