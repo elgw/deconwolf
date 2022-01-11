@@ -35,7 +35,8 @@
 
 
 ## Maybes
-- [ ] Figure out if there are any performance benefits by buildin fftw3 from source for **-march=native -mtune=native**.
+
+- [ ] Figure out if there are any performance benefits by buildin fftw3 from source for `-march=native -mtune=native`.
 - [ ] Try the FFTW interface to [cuFFT](https://docs.nvidia.com/cuda/cufft/index.html#fftw-supported-interface)
 
 <a name="done" />
