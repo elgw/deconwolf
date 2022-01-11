@@ -1,9 +1,20 @@
+ - [Prioritized](#prio)
+ - [Nice to have](#nice)
+ - [Maybes](#maybe)
+ - [Done](#done)
+
 # Todo
+
+<a name="prio" />
+
 ## Top priority
  - [ ] Crash-safe writing of output images, write to temporary file and
        move when write is complete to avoid bad luck.
  - [ ] Get documentation up to date.
- - [ ] Set default PSF size in `dw_bw` based on the fwhm of the PSF.
+ - [ ] Set default PSF size in `dw_bw` based on the geometry of the PSF
+       and expected sample thickness.
+
+<a name="nice" />
 
 ## Nice to have
  - [ ] Adjust the PSF cropping so that the working image size has at least
@@ -12,21 +23,26 @@
  - [ ] Provide test data and demos
  - [ ] Decide about default tiling settings based on the PSF.
  - [ ] Demos, for example on the effect of the tiling.
- - [ ] Include the "normal" `Richardson-Lucy` deconvolution method.
  - [ ] Implement the Gibson-Lanni PSF model.
  - [ ] Make `FFTW_ESTIMATE` an option.
  - [ ] Double check the tiling weights using gradients and other patterns.
  - [ ] Add information on the input image to the log -- especially detect saturated pixels.
  - [ ] Make sure that something that makes sense happens when a Pyramidal tif is supplied.
 
+<a name="maybe" />
+
 ## Maybes
  - [ ] Figure out if there are any performance benefits by buildin fftw3 from source for `-march=native -mtune=native`.
  - [ ] Try the FFTW interface to
        [cuFFT](https://docs.nvidia.com/cuda/cufft/index.html#fftw-supported-interface)
- - [ ] Intel Math Kernel Library (MKL) ?
 
+<a name="done" />
 
-## Done:
+## Done
+ - [x] Include the "normal" `Richardson-Lucy` deconvolution method. Kind of
+   in place with the `--biggs 0` options. However some arrays that are not
+   needed without acceleration are still allocated.
+ - [x] Intel Math Kernel Library (MKL).
  - [x] Write down the image scaling to the log files.
  - [x] A higher level interface with facilities for handling and generation of PSFs. -- runPSFGenerator.py
  - [x] *Reuse* more tile sizes in order to keep the number of training sessions low.
