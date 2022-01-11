@@ -57,10 +57,19 @@ and quality. n=2 default.
 : Set b to 0 to turn acceleration off, in that case dw reverts to the standard
 Richardson-Lucy method.
 
+# OUTPUT
+Without specifying the output file name, the output file will
+be prefixed with `dw_`, e.g, if you deconvolve `file.tif`
+the output file will be called `dw_file.tif`. Please pay attention
+to the log file that also will be created (as `dw_file.tif.log.txt`).
+
+Unless **\--float** was specified the output images will be scaled
+to use the full dynamic range of the 16 bit format. The scaling factor
+can be found in the log file.
 
 # SEE ALSO
 **dw_bw** for generation of point spread functions according to
-the Born-Wolf model..
+the Born-Wolf model.
 
 # WEB PAGE
 [https://github.com/elgw/deconwolf/](https://github.com/elgw/deconwolf/)
