@@ -1,12 +1,9 @@
- - [Prioritized](#prio)
+ - [Prioritized](#top-priority)
  - [Nice to have](#nice)
  - [Maybes](#maybe)
  - [Done](#done)
 
 # Todo
-
-<a name="prio" />
-
 
 ## Top priority
 - [ ] Crash-safe writing of output images, write to temporary file and
