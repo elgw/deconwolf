@@ -1,6 +1,6 @@
  - [Prioritized](#top-priority)
- - [Nice to have](#nice)
- - [Maybes](#maybe)
+ - [Nice to have](#nice-to-have)
+ - [Maybe](#maybe)
  - [Done](#done)
 
 # Todo
@@ -11,8 +11,6 @@
 - [ ] Get documentation up to date.
 - [ ] Set default PSF size in `dw_bw` based on the geometry of the PSF
        and expected sample thickness.
-
-<a name="nice" />
 
 
 ## Nice to have
@@ -28,15 +26,11 @@
 - [ ] Add information on the input image to the log -- especially detect saturated pixels.
 - [ ] Make sure that something that makes sense happens when a Pyramidal tif is supplied.
 
-<a name="maybe" />
 
-
-## Maybes
+## Maybe
 
 - [ ] Figure out if there are any performance benefits by buildin fftw3 from source for `-march=native -mtune=native`.
 - [ ] Try the FFTW interface to [cuFFT](https://docs.nvidia.com/cuda/cufft/index.html#fftw-supported-interface)
-
-<a name="done" />
 
 
 ## Done
