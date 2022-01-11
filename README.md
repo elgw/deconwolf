@@ -27,6 +27,10 @@ images:
 Except for this README there is also a short [usage guide](USAGE.md),
 a [CHANGELOG](CHANGELOG.md) and a [TODO](TODO.md) list.
 
+This repository provides two binaries,
+ - `dw` -- for deconvolution, [man page](doc/dw.1.txt)
+ - `dw_bw` -- to create PSFs using the Born-Wolf model [man page](doc/dw_bw.1.txt)
+
 Deconwolf does not:
  - Have a full-featured Graphical User Interface (GUI), however, if you
    like to click buttons there is a limited
@@ -38,9 +42,6 @@ Deconwolf does not:
 At the moment we don't provide pre-built packages. You will have to build
 deconwolf from the source code, instructions follows below.
 
-This repository provides two binaries,
- - `dw` -- for deconvolution, [man page](doc/dw.1.txt)
- - `dw_bw` -- to create PSFs using the Born-Wolf model [man page](doc/dw_bw.1.txt)
 
 <a name="install" />
 
@@ -172,6 +173,7 @@ At the moment the documentation is limited, but there is a short
 
 ### Bugs
 
+Of course, but they can only be fixed when they are known.
 Please open a [new ticket](https://github.com/elgw/deconwolf/issues) if you
 have any issues with the program.
 

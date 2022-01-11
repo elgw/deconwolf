@@ -10,9 +10,10 @@
      pixel not to get stuck at 0.
    - Adding the option to turn off Biggs acceleration, i.e. run normal
      Richardson-Lucy with --biggs 0.
-   - Will load PSFs that don't have an odd number of elements.
-   - Can be built against MKL (`make MKL=1 ...`), consider that an
-     experimental option. 14 percent faster on a small test image. Varied
+   - Will load PSFs that don't have an odd number of pixels in each dimension
+     however that is not recommended.
+   - Can be built against Intel MKL (`make MKL=1 ...`), consider that an
+     experimental option. 14 percent faster on a small test image, varied
      results on larger images.
 
 - v. 0.0.19
