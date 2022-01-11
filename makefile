@@ -108,12 +108,15 @@ install:
 	cp bin/dw_bw $(DESTDIR)/dw_bw
 	cp bin/dw $(DESTDIR)/dw
 	# Man pages
-	cp doc/deconwolf.1 .
-	gzip deconwolf.1
-	mv deconwolf.1.gz $(MANPATH)/dw.1.gz
+	cp doc/dw.1 $(MANPATH)/dw.1
+	cp doc/dw.1 $(MANPATH)/deconwolf.1
+	cp doc/dw_bw.1 $(MANPATH)/dw_bw.1
+
 
 uninstall:
 	rm $(DESTDIR)/dw
 	rm $(DESTDIR)/dw_bw
 	rm $(DESTDIR)/dw_batch
-	rm $(MANPATH)/dw.1.gz
+	rm $(MANPATH)/dw.1
+	rm $(MANPATH)/deconwolf.1
+	rm $(MANPATH)/dw_bw.1

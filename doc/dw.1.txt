@@ -1,0 +1,15 @@
+
+DECONWOLF(1)	       BSD General Commands Manual	    DECONWOLF(1)
+
+NAME
+     deconwolf — Deconvolve wide-field microscopy images
+
+DESCRIPTION
+     DECONWOLF is an open source software that provides two binaries: dw
+     to deconvolve wide field images, and dw_bw to generate point spread
+     functions according to the Born-Wolf model.
+
+NOTES
+     Web page http://www.elgw/deconwolf/
+
+			      Nov 12, 2021

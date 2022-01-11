@@ -38,6 +38,10 @@ Deconwolf does not:
 At the moment we don't provide pre-built packages. You will have to build
 deconwolf from the source code, instructions follows below.
 
+This repository provides two binaries,
+ - `dw` -- for deconvolution, [man page](doc/dw.1.txt)
+ - `dw_bw` -- to create PSFs using the Born-Wolf model [man page](doc/dw_bw.1.txt)
+
 <a name="install" />
 
 ## Build and install
