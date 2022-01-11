@@ -20,7 +20,7 @@
 
 ## Nice to have
 
-- [ ] Adjust the PSF cropping so that the working image size has at least one power of two. Or even better use `nextfastfft` from [LFAT](https://ltfat.github.io/notes/ltfatnote017.pdf), [code](https://github.com/ltfat/ltfat/blob/master/fourier/nextfastfft.m)
+- [ ] Adjust the PSF cropping so that the working image size has at least one power of two. Or even better use **nextfastfft** from [LFAT](https://ltfat.github.io/notes/ltfatnote017.pdf), [code](https://github.com/ltfat/ltfat/blob/master/fourier/nextfastfft.m)
 - [ ] Wrap malloc to catch allocation errors to the log file.
 - [ ] Provide test data and demos
 - [ ] Decide about default tiling settings based on the PSF.
@@ -35,7 +35,7 @@
 
 
 ## Maybes
-- [ ] Figure out if there are any performance benefits by buildin fftw3 from source for `-march=native -mtune=native`.
+- [ ] Figure out if there are any performance benefits by buildin fftw3 from source for **-march=native -mtune=native**.
 - [ ] Try the FFTW interface to [cuFFT](https://docs.nvidia.com/cuda/cufft/index.html#fftw-supported-interface)
 
 <a name="done" />
@@ -43,7 +43,7 @@
 
 ## Done
 
-- [x] Include the "normal" `Richardson-Lucy` deconvolution method. Kind of in place with the `--biggs 0` options. However some arrays that are not needed without acceleration are still allocated.
+- [x] Include the "normal" Richardson-Lucy deconvolution method. Kind of in place with the **--biggs 0** options. However some arrays that are not needed without acceleration are still allocated.
 - [x] Intel Math Kernel Library (MKL).
 - [x] Write down the image scaling to the log files.
 - [x] A higher level interface with facilities for handling and generation of PSFs. -- runPSFGenerator.py
