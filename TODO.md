@@ -7,6 +7,7 @@
 
 <a name="prio" />
 
+
 ## Top priority
 - [ ] Crash-safe writing of output images, write to temporary file and
        move when write is complete to avoid bad luck.
@@ -15,6 +16,7 @@
        and expected sample thickness.
 
 <a name="nice" />
+
 
 ## Nice to have
 
@@ -31,11 +33,13 @@
 
 <a name="maybe" />
 
+
 ## Maybes
 - [ ] Figure out if there are any performance benefits by buildin fftw3 from source for `-march=native -mtune=native`.
 - [ ] Try the FFTW interface to [cuFFT](https://docs.nvidia.com/cuda/cufft/index.html#fftw-supported-interface)
 
 <a name="done" />
+
 
 ## Done
 
@@ -70,6 +74,6 @@
 - [x] Save FFTW wisdom (saved to `./config/deconwolf/`)
 - [x] Identical results to matlab code.
 - [x] Custom TIFF warning handle (not to overflow the console). -- disables messages from libtiff at default verbosity level.
- - [x] Use tif tags to write meta data (also to transfer from input image). -- Transfers some metadata from ImageJ
+- [x] Use tif tags to write meta data (also to transfer from input image). -- Transfers some metadata from ImageJ
 - [x] Flag to save one image after each iteration (to facilitate setting the number of iterations). -- There is now the `--iterdump` option for that.
 - [x] Put some checks to see what arrays are not properly aligned and causes crashes with `-ftree-vectorize` -- Should work now.
