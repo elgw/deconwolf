@@ -1,3 +1,27 @@
+- v. 0.0.20
+   - Changing acceleration technique to use
+     'Exponential Vector Extrapolation' (EVE) described in Biggs PhD thesis.
+     Deconvolved images get higher MSE but much lower I-div.
+   - '--xyfactor 0' does not crash dw anymore.
+   - Frees the PSF as soon as not needed to save some memory.
+   - Changing the behavior of the progress dots to appear more linear
+     in time
+   - Changing the non-negative condition to strictly positive in order for
+     pixel not to get stuck at 0.
+   - Adding the option to turn off Biggs acceleration, i.e. run normal
+     Richardson-Lucy with --biggs 0.
+   - Will load PSFs that don't have an odd number of pixels in each dimension
+     however that is not recommended.
+   - Can be built against Intel MKL (`make MKL=1 ...`), consider that an
+     experimental option. 14 percent faster on a small test image, varied
+     results on larger images.
+
+- v. 0.0.19
+    - Using lanczos5 instead of lanczos3 for the PSF generation. As a result
+      GSL_EROUND is not raised for the test cases.
+    - Faster PSF generation, using more symmetries.
+    - dw_bw can now use more than one thread (wrongly disabled in v 0.0.18).
+
 - v. 0.0.18
     - Provided install instructions for Windows 10.
     - Fixed some mismatching fftwf_malloc/fftwf_free where they were

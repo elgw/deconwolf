@@ -39,7 +39,7 @@
 
 #include "fim_tiff.h"
 #include "dw_version.h"
-#include "lanczos3.h"
+#include "lanczos.h"
 #include "li.h"
 #include "bw_gsl.h"
 

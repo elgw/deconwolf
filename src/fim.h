@@ -28,10 +28,10 @@
 
 #define INLINED inline __attribute__((always_inline))
 
-/* fim : operations on 3D floating point images 
+/* fim : operations on 3D floating point images
  * all allocations are done with fftw3f_malloc (for alignment)
  *
- * functions ending with `_ref` are reference implementations to be compared 
+ * functions ending with `_ref` are reference implementations to be compared
  * tweaked or alternative versions.
  * */
 
@@ -40,11 +40,18 @@ float fim_min(const float * A, size_t N);
 float fim_mean(const float * A, size_t N);
 float fim_max(const float * A, size_t N);
 float fim_sum(const float * restrict A, size_t N);
-void fim_minus(float * restrict  A, 
-    const float * restrict B, 
-    const float * restrict C, 
+/* A = B - C */
+void fim_minus(float * restrict  A,
+    const float * restrict B,
+    const float * restrict C,
     const size_t N);
-  // A = B - C
+
+/* A = B / C */
+void fim_div(float * restrict  A,
+               const float * restrict B,
+               const float * restrict C,
+               const size_t N);
+
 
 void fim_invert(float * restrict A, const size_t N);
 
@@ -60,18 +67,18 @@ void fim_stats(const float * A, size_t N);
 // Print some info about A to stdout
 
 void fim_flipall(float * restrict T, const float * restrict A, const int64_t a1, const int64_t a2, const int64_t a3);
-  /* 
+  /*
    * MATLAB:
    * T = flip(flip(flip(A,1),2),3)*/
 
 
-void fim_insert(float * restrict T, const int64_t t1, const int64_t t2, const int64_t t3, 
+void fim_insert(float * restrict T, const int64_t t1, const int64_t t2, const int64_t t3,
     const float * restrict F, const int64_t f1, const int64_t f2, const int64_t f3);
-  /* Insert F [f1xf2xf3] into T [t1xt2xt3] in the "upper left" corner 
+  /* Insert F [f1xf2xf3] into T [t1xt2xt3] in the "upper left" corner
    * MATLAB:
    * T(1:size(F,1), 1:size(F,2), 1:sizes(F,3) = F;
    * */
-void fim_insert_ref(float * T, int64_t t1, int64_t t2, int64_t t3, 
+void fim_insert_ref(float * T, int64_t t1, int64_t t2, int64_t t3,
     float * F, int64_t f1, int64_t f2, int64_t f3);
 
 float * fim_get_cuboid(float * restrict A, const int64_t M, const int64_t N, const int64_t P,
@@ -99,15 +106,15 @@ float * fim_zeros(const size_t N);
 float * fim_constant(const size_t N, const float value);
   // Allocate and return an array of N floats sets to a constant value
 
-void fim_circshift(float * restrict A, 
-    const int64_t M, const int64_t N, const int64_t P, 
+void fim_circshift(float * restrict A,
+    const int64_t M, const int64_t N, const int64_t P,
     const int64_t sm, const int64_t sn, const int64_t sp);
   /* Shift the image A [MxNxP] by sm, sn, sp in each dimension */
 
-float * fim_expand(const float * restrict in, 
-    const int64_t pM, const int64_t pN, const int64_t pP, 
+float * fim_expand(const float * restrict in,
+    const int64_t pM, const int64_t pN, const int64_t pP,
     const int64_t M, const int64_t N, const int64_t P);
-  /* "expand an image" by making it larger 
+  /* "expand an image" by making it larger
    * pM, ... current size
    * M, Nm ... new size
    * */
@@ -116,21 +123,31 @@ float fim_mse(float * A, float * B, size_t N);
   /* mean( (A(:)-B(:)).^(1/2) )
    */
 
-void shift_vector(float * restrict V, 
-    const int64_t S, 
+void shift_vector(float * restrict V,
+    const int64_t S,
     const int64_t N,
     const int64_t k);
   /* Circular shift of a vector of length N with stride S by step k */
 
-void shift_vector_buf(float * restrict V, 
-    const int64_t S, 
+void shift_vector_buf(float * restrict V,
+    const int64_t S,
     const int64_t N,
     int64_t k, float * restrict buffer);
 
-void fim_mult_scalar(float * , size_t N, float x);
+/* Multiply a float array of size N by x */
+void fim_mult_scalar(float * fim, size_t N, float x);
 
 void fim_ut(void);
 
+/* Gaussian smoothing, normalized at edges */
 void fim_gsmooth(float * restrict V, size_t M, size_t N, size_t P, float sigma);
+
+/* Arg max: find coordinates of largest element
+* If more than one maxima, return the first found
+*/
+void fim_argmax(const float * fim,
+                size_t M, size_t N, size_t P,
+                int64_t * _aM, int64_t *_aN, int64_t *_aP);
+
 
 #endif

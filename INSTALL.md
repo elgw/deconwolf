@@ -11,3 +11,33 @@ sudo apt-get install libgsl-dev
 sudo apt-get install libomp-dev
 sudo apt-get install libtiff-dev
 ```
+
+
+## FFT Backend -- using MKL
+FFTW3 is the default FFT backend for deconwolf but it is also possible to use
+Intel MKL. This option is only tested on Ubuntu so far.
+
+### Installation
+Install the required package(s):
+
+``` shel
+sudo apt install intel-mkl
+```
+
+Build using
+
+``` shell
+make MKL=1 -B
+```
+
+Make will find the MKL libraries using
+`pkg-config mkl-static-lp64-seq --cflags --libs`, the procedure
+might be different on other platforms.
+
+### Usage
+To set the number of threads, set the environmental variable
+`MKL_NUM_THREADS`, for example:
+``` shell
+export MKL_NUM_THREADS=8
+dw ...
+```

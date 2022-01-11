@@ -22,7 +22,7 @@ add_executable(dw
 
 add_executable(dwbw
   dw_bwpsf.c
-  lanczos3.c
+  lanczos.c
   fim.c
   fft.c
   fim_tiff.c

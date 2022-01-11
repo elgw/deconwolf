@@ -133,7 +133,7 @@ bw_conf * bw_conf_new()
     conf->testing = 0;
 
     /* BW integration */
-    conf->oversampling_R = 19; /* Expose from CLI? */
+    conf->oversampling_R = 17; /* Expose from CLI? */
     conf->mode_bw = MODE_BW_GSL;
 
     /* For XY integration */
@@ -218,9 +218,10 @@ void usage(__attribute__((unused)) int argc, char ** argv, bw_conf * s)
     printf("Required parameters:\n");
     printf(" --NA\n\t Set numerical aperture.\n");
     printf(" --lambda\n\t Set emission wavelength [nm].\n");
-    printf(" --ni\n\t Set refractive index.\n");
+    printf(" --ni\n\t Set refractive index for the immersion (also used for coverslip and sample).\n");
     printf(" --resxy\n\t Set lateral pixel size (x-y) [nm].\n");
     printf(" --resz\n\t Set the axial pixel size in (z) [nm].\n");
+    printf("\n");
     printf("Optional:\n");
     printf(" --size N \n\t Set output size to N x N x P [pixels].\n"
         "\t This should be set big enough so that the PSF cone\n"
@@ -231,16 +232,16 @@ void usage(__attribute__((unused)) int argc, char ** argv, bw_conf * s)
            "\t to be deconvolved\n");
     printf(" --threads\n\t Set number of threads. Currently set to %d\n", s->nThreads);
     printf("\t Q has to be an odd number.\n");
-    printf("\t Unless --li or --pg, integration over Z is done to machine precision\n");
+
     printf(" --li\n\t Use Li's method (our implementation) for the BW integral.\n");
-    printf("\t About 4x faster for the default PSF size although "
-           "not thoroughly tested.\n");
+    printf("\t About 2x faster for the default PSF size. "
+           "Not thoroughly tested.");
     if(s->mode_bw == MODE_BW_LI)
     {
         printf(" Default.");
     }
     printf("\n");
-    printf(" --gsl\n\t Use GSL for the BW integral as well as the integration over z.");
+    printf(" --gsl\n\t Use GSL for the BW integral as well as the integration over pixels.");
     if(s->mode_bw == MODE_BW_GSL)
     {
         printf(" Default.");
@@ -251,7 +252,6 @@ void usage(__attribute__((unused)) int argc, char ** argv, bw_conf * s)
     printf(" --epsrel \n\t Set relative error tolerance for the integration. Default: %e\n",
            s->epsrel);
 
-    printf("Other options:\n");
     printf(" --overwrite \n\t Overwrite the target image if it exists.\n");
     printf(" --version\n\t Show version info and quit.\n");
     printf(" --help\n\t Show this message.\n");
@@ -462,6 +462,13 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
 
     s->logFile = malloc(strlen(s->outFile) + 10);
     sprintf(s->logFile, "%s.log.txt", s->outFile);
+
+    /* Not more threads than slices */
+    if(s->nThreads > s->P)
+    {
+        s->nThreads = s->P;
+    }
+
     return;
 }
 
@@ -494,7 +501,9 @@ void * BW_thread(void * data)
     conf->wspx = gsl_integration_workspace_alloc(conf->limit);
     conf->wspy = gsl_integration_workspace_alloc(conf->limit);
 
+
     for (int z = conf->thread; z <= (P-1)/2; z+=conf->nThreads) {
+
         float defocus = conf->resAxial * (z - (P - 1.0) / 2.0);
         BW_slice(V + z*MN, defocus, conf);
     }
@@ -520,17 +529,12 @@ void BW(bw_conf * conf)
     pthread_t * threads = malloc(nThreads*sizeof(pthread_t));
     bw_conf ** confs = malloc(nThreads*sizeof(bw_conf*));
 
-
-    /* Single threaded at the moment */
-    conf->nThreads = 1;
-    conf->thread = 0;
-    BW_thread((void*) conf);
-
     for(int kk = 0; kk<nThreads; kk++)
     {
         confs[kk] = (bw_conf*) malloc(sizeof(bw_conf));
         memcpy(confs[kk], conf, sizeof(bw_conf));
         confs[kk]->thread = kk;
+        // printf("Creating thread %d\n", kk);
         pthread_create(&threads[kk], NULL, BW_thread, (void *) confs[kk]);
     }
 
@@ -562,7 +566,7 @@ double pixelpointfun(double y, void * _conf)
         r = sqrt(r2);
     }
 
-    double res = lanczos3(iconf->radprofile,
+    double res = lanczos5(iconf->radprofile,
                               iconf->nr,
                               r*(double) iconf->radsample);
     return res;
@@ -593,6 +597,9 @@ double integrate_pixel(bw_conf * conf,
                              double x0, double x1,
                        double y0, double y1)
 {
+    assert(x1 > x0);
+    assert(y1 > y0);
+
     gsl_function fun;
     fun.function = &pixelyfun;
 
@@ -620,68 +627,6 @@ double integrate_pixel(bw_conf * conf,
     return result/((x1-x0)*(y1-y0));
 }
 
-double simp1_weight(size_t k, size_t N)
-{
-    /* Weights for 1D-Simpson
-     * [1, 4, 1] N=3
-     * [1, 4, 2, 4, 1] N=5
-     * [1, 4, 2, 4, 2, 4, 1] N=7, */
-    assert(N%2 == 1);
-    if(k == 0 || k == N-1)
-        return 1.0;
-    if(k%2 == 0)
-        return 2.0;
-    return 4.0;
-}
-
-/* radnsamples: Number of radial samples per dx
- *  xc, yc
- *
- * x0, x1, y0, y1 : integration region given in _pixels_
- * N: number of integration points per dimension
- */
-
-double simp2(int radnsamples,
-             double xc, double yc,
-             const double * H,
-             __attribute__((unused))  const double * R, size_t nR,
-             double x0, double x1,
-             double y0, double y1, int N)
-{
-
-    double dx = (x1-x0)/(double) (N-1);
-    double dy = (y1-y0)/(double) (N-1);
-    double v = 0;
-    size_t sW = 0; /* Sum of weights */
-    for(int kk = 0; kk<N; kk++)
-    {
-        double wx = simp1_weight(kk, N);
-        for(int ll = 0; ll<N; ll++)
-        {
-            double wy = simp1_weight(ll, N);
-            double w = wx*wy;
-            double x = x0+(double) kk*dx;
-            double y = y0+(double) ll*dy;
-            double r = sqrt(pow(x-xc, 2) + pow(y-yc, 2));
-            //int index = (int) floor(r*radnsamples);
-            //double blend = (r-R[index])*radnsamples;
-
-            sW+=w;
-            //double ival = (H[index] + (H[index+1] - H[index]) * blend);
-            // printf("w=%f: x=%f, y=%f r=%f, ival=%f, index = %d, blend = %f\n", w, x, y, r, ival, index, blend);
-
-            double ival_l3 = lanczos3(H, nR, r*(double) radnsamples);
-            //printf("Linear/Lanczos3: %f %f %e\n", ival, ival_l3, fabs(ival-ival_l3));
-
-            //v+=w*ival;
-            v+=w*ival_l3;
-        }
-    }
-    v = v/sW;
-
-    return v;
-}
-
 void BW_slice(float * V, float z, bw_conf * conf)
 {
     /* Calculate the PSF for a single plane/slice
@@ -691,8 +636,8 @@ void BW_slice(float * V, float z, bw_conf * conf)
      */
 
     /* The center of the image in units of [pixels] */
-    double x0 = (conf->M - 1) / 2.0;
-    double y0 = (conf->N - 1) / 2.0;
+    double x0 = ((double) conf->M - 1.0) / 2.0;
+    double y0 = ((double) conf->N - 1.0) / 2.0;
 
     /* The bw integral will be sampled up to radmax,
      * with radnsamples samples per pixel
@@ -766,8 +711,9 @@ void BW_slice(float * V, float z, bw_conf * conf)
      * For each pixel in the quadrant integrate over x and y
      */
 
+    //printf("!\n");
     for (int x = 0; 2*x <= conf->M; x++) {
-        for (int y = 0; 2*y <= conf->N; y++) {
+        for (int y = x; 2*y <= conf->N; y++) {
 
             /* radius of the current pixel in units of [pixels] */
             double rPixel = sqrt( pow((double) x - x0, 2)
@@ -778,19 +724,28 @@ void BW_slice(float * V, float z, bw_conf * conf)
             double pIntensity = 0;
             if(rPixel < radmax)
             {
+                //printf("x=%d, y=%d, [%f, %f]x[%f, %f]x%f\n", x, y,
+                //       (double) x - 0.5 - x0, (double) x + 0.5 - x0,
+                //       (double) y - 0.5 - y0, (double) y + 0.5 - y0,z );
+
                 pIntensity = integrate_pixel(conf, radprofile, nr, radnsamples,
-                                             x - 0.5 - x0, x + 0.5 - x0,
-                                             y - 0.5 - y0, y + 0.5 - y0);
+                                             (double) x - 0.5 - x0, (double) x + 0.5 - x0,
+                                             (double) y - 0.5 - y0, (double) y + 0.5 - y0);
             }
 
             /* Use symmetry to fill the output image plane */
             int xf = conf->M-x-1;
             int yf = conf->N-y-1;
             V[x + conf->M * y] = pIntensity;
-            V[y + conf->M * x] = pIntensity;
-            V[xf + conf->M * y] = pIntensity;
             V[x + conf->M * yf] = pIntensity;
+
+            V[y + conf->M * x] = pIntensity;
+            V[y + conf->M * xf] = pIntensity;
+
+            V[xf + conf->M * y] = pIntensity;
             V[xf + conf->M * yf] = pIntensity;
+
+            V[yf + conf->M * x] = pIntensity;
             V[yf + conf->M * xf] = pIntensity;
         }
     }
@@ -834,6 +789,7 @@ int main(int argc, char ** argv)
     }
     fprint_time(conf->log);
     bw_conf_printf(conf->log, conf);
+    fflush(conf->log);
 
     /* run */
     if(conf->testing)
@@ -862,7 +818,7 @@ int main(int argc, char ** argv)
 
     /* Write to disk  */
     if(conf->verbose > 0) {
-        printf("Writing as 32-bit floats to %s\n", conf->outFile);
+        printf("Writing '%s' (32-bit float)\n", conf->outFile);
     }
 
     ttags * T = ttags_new();

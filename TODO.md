@@ -20,9 +20,10 @@
  - [ ] Make sure that something that makes sense happens when a Pyramidal tif is supplied.
 
 ## Maybes
- - [ ] Figure out if there are any performance benefits by buildin fftw3 from source for `-march=native`.
+ - [ ] Figure out if there are any performance benefits by buildin fftw3 from source for `-march=native -mtune=native`.
  - [ ] Try the FFTW interface to
        [cuFFT](https://docs.nvidia.com/cuda/cufft/index.html#fftw-supported-interface)
+ - [ ] Intel Math Kernel Library (MKL) ?
 
 
 ## Done:

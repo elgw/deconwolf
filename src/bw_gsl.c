@@ -83,6 +83,7 @@ static double my_f_real(double rho, void * p)
 
     double NA = params->NA;
     double ni = params->ni;
+
     double bessel = j0f(k0*NA*params->r*rho);
     // double OPD = pow(q,2)*params->z*pow(rho, 2) / 2.0; // old
     double OPD = pow(NA,2)*params->z*pow(rho, 2) / 2.0/ni; // new
@@ -100,6 +101,7 @@ static double my_f_imag(double rho, void * p)
     //double q = params->NA / params->ni;
     double NA = params->NA;
     double ni = params->ni;
+
     double bessel = j0f(k0*NA*params->r*rho);
     // double OPD = pow(q,2)*params->z*pow(rho, 2) / 2.0; // old
     double OPD = pow(NA,2)*params->z*pow(rho, 2) / 2.0/ni; // new
@@ -113,6 +115,16 @@ double bw_gsl_integrate(bw_gsl_conf_t * conf, double r, double z)
 
     conf->r = r;
     conf->z = z;
+
+
+    if(0) {
+        /* Pinhole of 1 Airy Unit */
+        double k0 = 2.0 * M_PI / conf->lambda;
+        if(k0*conf->NA*r > 2.4048)
+            return 0;
+        if(z != 0)
+            return 0;
+    }
 
     double result_real = 0;
     double abserr_real = 0;

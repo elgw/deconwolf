@@ -27,6 +27,10 @@ images:
 Except for this README there is also a short [usage guide](USAGE.md),
 a [CHANGELOG](CHANGELOG.md) and a [TODO](TODO.md) list.
 
+This repository provides two binaries,
+ - `dw` -- for deconvolution, [man page](doc/dw.1.txt)
+ - `dw_bw` -- to create PSFs using the Born-Wolf model [man page](doc/dw_bw.1.txt)
+
 Deconwolf does not:
  - Have a full-featured Graphical User Interface (GUI), however, if you
    like to click buttons there is a limited
@@ -37,6 +41,7 @@ Deconwolf does not:
 
 At the moment we don't provide pre-built packages. You will have to build
 deconwolf from the source code, instructions follows below.
+
 
 <a name="install" />
 
@@ -72,7 +77,8 @@ sudo apt-get update
 sudo apt-get install libfftw3-single3
 sudo apt-get install libfftw3-dev
 sudo apt-get install openmp
-sudo apt-get install tiff-5
+sudo apt-get install tiff-5     # or possibly the one on the next line
+sudo apt-get install libtiff-dev
 sudo apt-get install libgsl-dev
 ```
 
@@ -167,6 +173,7 @@ At the moment the documentation is limited, but there is a short
 
 ### Bugs
 
+Of course, but they can only be fixed when they are known.
 Please open a [new ticket](https://github.com/elgw/deconwolf/issues) if you
 have any issues with the program.
 
@@ -185,6 +192,8 @@ The deconvolution algorithm is based on these papers:
  * Biggs, D.S.C. “Acceleration of Iterative Image Restoration Algorithms.”
    Applied Optics. Vol. 36. Number 8, 1997, pp. 1766–1775.
    [doi](https://doi.org/10.1364/AO.36.001766)
+ * Biggs, D.S.C “Accelerated iterative blind deconvolution”. PhD thesis.
+   University of Auckland, New Zealand, 1998.
  * M. Bertero and P. Boccacci, A simple method for the reduction of boundary
    effects in the Richardson-Lucy approach to image deconvolution,
    A&A 437, 369-374 (2005).
