@@ -26,22 +26,29 @@ dw_bw --resxy 130 --resz 250 --lambda 461 --NA 1.45 --ni 1.515 PSF_DAPI.tif
 To deconvolve the image, type:
 
 ``` shell
-dw dapi_001.tif PSF_dapi.tif
+dw --iter 40 dapi_001.tif PSF_dapi.tif
 ```
 
 that will produce a new image called `dw_dapi_001.tif` along with
 a log file
-called `dw_dapi_001.tif.log.txt`. Since you deserve better than the
+called `dw_dapi_001.tif.log.txt` which in particular say if the output
+image was scaled. Since you deserve better than the
 default settings, see other options:
 
 ``` shell
 dw_bw --help
 dw --help
 ```
+or
+
+``` shell
+man dw
+man dw_bw
+```
 
 Please note that deconwolf requires that the pixel size is the same for
-both the PSF and the input image and does not attempt to metadata from the
-tif files.
+both the PSF and the input image and does not attempt to read any metadata
+from the tif files.
 
 ## Test data
 No special test data has been prepared, but you can get some images from the [DeconvolutionLab2](http://bigwww.epfl.ch/deconvolution/deconvolutionlab2/) web page. Please note that in some cases the PSFs do not contain enough z-planes.
@@ -92,7 +99,7 @@ saturated. The scaling value can be found at the end of the log files.
    ```
    If it doesn't, chances are that deconwolf run out of memory and crashed.
 
-# Notes
+## Notes
  * FFTW is self tuning and will perform some tuning every time it
    presented for a new problem size. The result of this tuning is called
    wisdom and is stored in files like `fftw_wisdom_float_threads_16.dat`
@@ -101,3 +108,45 @@ saturated. The scaling value can be found at the end of the log files.
 
    This self-tuning can take considerable time but should only be needed
    once per problem size.
+
+# FAQ
+
+## How can I prepare tif files for deconwolf?
+Deconwolf only accept tif files with one channel per file. For ND2 files
+check out [randiantkit](https://github.com/ggirelli/radiantkit).
+
+## How do I get metadata from ND2-files?
+You could use the
+[command line tools](https://www.openmicroscopy.org/bio-formats/downloads/) from
+openmicroscopy. Then you could do something like:
+
+```
+$ bftools/showinf -nopix -omexml iAM337_20190830_001.nd2 > omexml
+
+$ cat omexml | grep -B 1 -A 2 dObjectiveNA
+            <OriginalMetadata>
+               <Key>dObjectiveNA</Key>
+               <Value>1.45</Value>
+            </OriginalMetadata>
+
+$ cat omexml | grep EmissionWavelength | grep Channel:0:
+         <Channel Color="-16711681" EmissionWavelength="810.0" EmissionWavelengthUnit="nm" ID="Channel:0:0" Name="ir800" SamplesPerPixel="1">
+         <Channel Color="-2147467009" EmissionWavelength="700.0" EmissionWavelengthUnit="nm" ID="Channel:0:1" Name="a700" SamplesPerPixel="1">
+         <Channel Color="16056319" EmissionWavelength="488.0" EmissionWavelengthUnit="nm" ID="Channel:0:2" Name="a488" SamplesPerPixel="1">
+         <Channel Color="-16776961" EmissionWavelength="695.0" EmissionWavelengthUnit="nm" ID="Channel:0:3" Name="Cy5" SamplesPerPixel="1">
+         <Channel Color="-1241579265" EmissionWavelength="542.0" EmissionWavelengthUnit="nm" ID="Channel:0:4" Name="tmr" SamplesPerPixel="1">
+         <Channel Color="-9109249" EmissionWavelength="590.0" EmissionWavelengthUnit="nm" ID="Channel:0:5" Name="a594" SamplesPerPixel="1">
+         <Channel Color="570490879" EmissionWavelength="432.0" EmissionWavelengthUnit="nm" ID="Channel:0:6" Name="dapi" SamplesPerPixel="1">
+
+$ cat omexml | grep PhysicalSizeZ= | head -n 1
+      <Pixels BigEndian="false" DimensionOrder="XYCZT" ID="Pixels:0" Interleaved="false" PhysicalSizeX="0.129780110998775" PhysicalSizeXUnit="µm" PhysicalSizeY="0.129780110998775" PhysicalSizeYUnit="µm" PhysicalSizeZ="0.2" PhysicalSizeZUnit="µm" SignificantBits="16" SizeC="7" SizeT="1" SizeX="1024" SizeY="1024" SizeZ="81" Type="uint16">
+...
+```
+
+## How can I run deconwolf for many files?
+Either use the [GUI](https://github.com/elgw/deconwolf-gui), or write your own
+script in your favorite language.
+
+## Don't you have more PSF models?
+No, not at this time. Please check out the
+[PSF Generator](http://bigwww.epfl.ch/algorithms/psfgenerator/) from EPFL.

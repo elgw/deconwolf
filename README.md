@@ -17,11 +17,10 @@ images:
  - It can make use of all precious cores of your "big" machine since the
    critical parts run on separate threads (as many as you would like).
  - Deconwolf is tiny! The binaries could even fit on a floppy drive
-   (if you are fortunate
-   enough to own one of those antiquities).
+   (if you are fortunate enough to own one of those antiquities).
  - It is shipped with program to generate Point Spread Functions (PSFs)
-   according to the Born and Wolf model. It is the only one we know of that
-   actually integrate the PSF over each pixel.
+   according to the Born and Wolf model. Our program is the only one we
+   know of that actually integrate the PSF over each pixel.
  - Fully open source. And we embrace [contributions and suggestions](CONTRIBUTING.md).
 
 Except for this README there is also a short [usage guide](USAGE.md),
@@ -38,17 +37,19 @@ Deconwolf does not:
  - Show your images, for that, try [ImageJ](https://imagej.net/Welcome)
  - Diagnose your imaging system.
  - Estimate your PSF based on real images.
+ - If you miss one or more of these features,
+   [Huygens](https://svi.nl/HomePage) might be a better choice for you.
 
 At the moment we don't provide pre-built packages. You will have to build
 deconwolf from the source code, instructions follows below.
-
 
 <a name="install" />
 
 ## Build and install
 Deconwolf runs on 64-bit machines with x86_64 architecture, it has been built
 and installed on Ubuntu 20.04 and macOS Big Sur and Windows 10.
-Instruction for other systems will be collected [here](INSTALL.md). Go directly to [Windows 10](#win10), [Linux](#linux) or [macOS](#osx).
+Instruction for other systems will be collected [here](INSTALL.md).
+Go directly to [Windows 10](#win10), [Linux](#linux) or [macOS](#osx).
 
 <a name="deps" />
 
