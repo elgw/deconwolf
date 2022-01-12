@@ -251,6 +251,7 @@ This is a non-complete list of alternative deconvolution software:
 
 Free and open source:
  - [Deconvolution Lab2](http://bigwww.epfl.ch/deconvolution/deconvolutionlab2/)
- Commercial:
+
+Commercial:
  - [Huygens](https://svi.nl/HomePage)
  - [Microvolution](https://www.microvolution.com/)
