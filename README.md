@@ -3,13 +3,13 @@
  * [Introduction](#Introduction)
  * [Build and Install](#install)
    * [Dependencies](#dependencies)
-   * [Linux](#linux)
-   * [macOS](#osx)
+   * [Ubuntu 20.04](#linux)
+   * [macOS Big Sur](#osx)
    * [Windows 10](#win10)
-   * [FreeBSD](#freebsd)
+   * [FreeBSD 13.0](#freebsd)
  * [Usage](#use)
    * [Bugs](#bugs)
- * [References](#ref)
+ * [References](#references)
 
 ## Introduction
 **deconwolf** is a program for 3-D deconvolution of fluorescent wide-field
@@ -196,15 +196,11 @@ dw_bw --help
 At the moment the documentation is limited, but there is a short
 [usage guide](USAGE.md).
 
-<a name="bugs" />
-
 ### Bugs
 
-Of course, but they can only be fixed when they are known.
+Most likely there are bugs and they can only be fixed when they are known.
 Please open a [new ticket](https://github.com/elgw/deconwolf/issues) if you
 have any issues with the program.
-
-<a name="ref" />
 
 ## References
 
