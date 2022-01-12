@@ -47,7 +47,7 @@ deconwolf from the source code, instructions follows below.
 
 ## Build and install
 Deconwolf runs on 64-bit machines with x86_64 architecture, it has been built
-and installed on Ubuntu 20.04 and macOS Big Sur and Windows 10.
+and installed on Ubuntu 20.04 and macOS Big Sur, Windows 10 and FreeBSD 13.0.
 Instruction for other systems will be collected [here](INSTALL.md).
 Go directly to [Windows 10](#win10), [Linux](#linux) or [macOS](#osx).
 
@@ -69,7 +69,8 @@ be built.
 <a name="linux" />
 
 ### Ubuntu 20.04
-Ensure that the required packages are installed
+
+Install required packages:
 
 ``` shell
 sudo apt-get update
@@ -83,18 +84,20 @@ sudo apt-get install libtiff-dev
 sudo apt-get install libgsl-dev
 ```
 
-To build and install:
+Build and install deconwolf:
 ``` shell
 make -B
 sudo make install
 ```
 
+
 <a name="osx" />
 
 ### macOS Big Sur
-You will need XCode from the App Store and [brew](https://brew.sh/).
 
-First install the required libraries:
+For building you will need XCode from the App Store and [brew](https://brew.sh/).
+
+Then set up XCode and install the required packages:
 ``` shell
 xcode-select --install
 brew install libopenmpt # Not sure if this is needed
@@ -104,7 +107,7 @@ brew install fftw
 brew install gsl
 ```
 
-To build and install:
+Build and install deconwolf
 ``` shell
 make -B
 sudo make install
@@ -148,6 +151,26 @@ libwebp-7.dll  libwinpthread-1.dll libzstd.dll        zlib1.dll
 
 At least one person has build deconwolf using Windows Subsystem for Linux but
 beware, there might be some [performance penalty](https://www.phoronix.com/scan.php?page=article&item=wsl-wsl2-tr3970x&num=1).
+
+
+### FreeBSD
+
+The following packages were required:
+``` shell
+pkg install git
+pkg install gmake
+pkg install fftw3
+pkg install tiff
+pkg install gsl
+pkg install sudo
+```
+
+To build and install deconwolf:
+``` shell
+gmake -f makefile-freebsd
+sudo gmake install
+```
+
 
 <a name="use" />
 

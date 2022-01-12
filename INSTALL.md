@@ -16,17 +16,10 @@ sudo apt-get install libomp-dev
 sudo apt-get install libtiff-dev
 ```
 ## FreeBSD
-Deconwolf has been built on FreeBSD. The makefile does not
-work out of the box and has to changed slightly. At least `pkg-config` has
-to be replaced by `pkgconf` and `gmake`, not `make` should be used.
-
-The following packages were required:
-``` shell
-pkg install gmake
-pkg install fftw3
-pkg install tiff
-pkg install gsl
-```
+Differences to building on Linux.
+ - `pkgconf` replaces `pkg-config`
+ - `gmake` replaces `make`
+ - clang is the default compiler.
 
 ## MKL
 FFTW3 is the default FFT backend for deconwolf but it is also possible to use
