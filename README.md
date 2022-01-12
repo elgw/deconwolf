@@ -4,7 +4,7 @@
  * [Build and Install](#build-and-install)
    * [Dependencies](#dependencies)
    * [Ubuntu 20.04](#ubuntu-2004)
-   * [macOS Big Sur](#maxos-big-sur)
+   * [macOS Big Sur](#macos-big-sur)
    * [Windows 10](#Windows-10)
    * [FreeBSD 13.0](#freebsd)
  * [Usage](#Minimal-Usage-Example)
