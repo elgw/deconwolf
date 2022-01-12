@@ -10,6 +10,7 @@
  * [Usage](#use)
    * [Bugs](#bugs)
  * [References](#references)
+ * [Alternatives](#alternatives)
 
 ## Introduction
 **deconwolf** is a program for 3-D deconvolution of fluorescent wide-field
@@ -27,8 +28,8 @@ images:
    know of that actually integrate the PSF over each pixel.
  - Fully open source. And we embrace [contributions and suggestions](CONTRIBUTING.md).
 
-Except for this README there is also a short [usage guide](USAGE.md),
-a [CHANGELOG](CHANGELOG.md) and a [TODO](TODO.md) list.
+Except for this README.me there is also a short [USAGE.md](USAGE.md),
+a [CHANGELOG.md](CHANGELOG.md) and a [TODO.md](TODO.md).
 
 This repository provides two binaries,
  - `dw` -- for deconvolution, [man page](doc/dw.1.txt)
@@ -42,7 +43,8 @@ Deconwolf does not:
  - Diagnose your imaging system.
  - Estimate your PSF based on real images.
  - If you miss one or more of these features,
-   [Huygens](https://svi.nl/HomePage) might be a better choice for you.
+   or just want something else, there is an (incomplete)
+   list of [alternatives](#aternatives).
 
 At the moment we don't provide pre-built packages. You will have to build
 deconwolf from the source code, instructions follows below.
@@ -242,3 +244,13 @@ The PSF generation is based on these:
    point spread function computation for fluorescence microscopy”. In: Journal
    of the Optical Society of America A 34.6 (May 2017), p. 1029.
    [doi](https://doi.org/10.1364/josaa.34001029)
+
+
+## Alternatives
+This is a non-complete list of alternative deconvolution software:
+
+Free and open source:
+ - [Deconvolution Lab2](http://bigwww.epfl.ch/deconvolution/deconvolutionlab2/)
+ Commercial:
+ - [Huygens](https://svi.nl/HomePage)
+ - [Microvolution](https://www.microvolution.com/)
