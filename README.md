@@ -2,6 +2,7 @@
 
  * [Introduction](#Introduction)
  * [Build and Install](#install)
+   * [Dependencies](#dependencies)
    * [Linux](#linux)
    * [macOS](#osx)
    * [Windows 10](#win10)
@@ -49,12 +50,11 @@ deconwolf from the source code, instructions follows below.
 <a name="install" />
 
 ## Build and install
-Deconwolf runs on 64-bit machines with x86_64 architecture, it has been built
-and installed on Ubuntu 20.04 and macOS Big Sur, Windows 10 and FreeBSD 13.0.
-Instruction for other systems will be collected [here](INSTALL.md).
-Go directly to [Windows 10](#win10), [Linux](#linux) or [macOS](#osx).
+Deconwolf runs on 64-bit machines with x86_64 architecture. Jump directly to
+installation instructions for [Ubuntu](#linux) or [macOS](#osx),
+[Windows 10](#win10) or [FreeBSD 13](#freebsd). Instruction for other
+systems will be collected in [INSTALL.md](INSTALL.md).
 
-<a name="deps" />
 
 ### Dependencies
 Deconwolf uses:
