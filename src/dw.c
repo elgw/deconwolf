@@ -323,6 +323,7 @@ static void getCmdLine(int argc, char ** argv, dw_opts * s)
   //  printf("argc: %d cmd: '%s'\n", argc, s->commandline);
 }
 
+
 void dw_argparsing(int argc, char ** argv, dw_opts * s)
 {
 
@@ -484,7 +485,8 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
   /* Take care of the positional arguments */
   if(optind + 2 != argc)
   {
-      dw_usage(argc, argv, s);
+      printf("Deconwolf: To few input arguments.\n");
+      printf("See `%s --help` or `man dw`.\n", argv[0]);
       exit(1);
   }
 

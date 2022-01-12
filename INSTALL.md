@@ -1,5 +1,9 @@
 # Installation notes
 
+ - [Ubuntu 16.04](#ubuntu-1604)
+ - [FreeBSD](#FreeBSD)
+ - [MKF FFT Backend](#MKL)
+
 ## Ubuntu 16.04
 ``` shell
 sudo apt-get update
@@ -11,9 +15,13 @@ sudo apt-get install libgsl-dev
 sudo apt-get install libomp-dev
 sudo apt-get install libtiff-dev
 ```
+## FreeBSD
+Differences to building on Linux.
+ - `pkgconf` replaces `pkg-config`
+ - `gmake` replaces `make`
+ - clang is the default compiler.
 
-
-## FFT Backend -- using MKL
+## MKL
 FFTW3 is the default FFT backend for deconwolf but it is also possible to use
 Intel MKL. This option is only tested on Ubuntu so far.
 

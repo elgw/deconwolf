@@ -29,7 +29,7 @@ int main(int argc, char ** argv)
         }
     }
 
-  dw_opts * s = dw_opts_new(); // Load default settings and initialize
-  dw_argparsing(argc, argv, s); // Parse command line
-  return dw_run(s); // And go!
+    dw_opts * s = dw_opts_new(); /* Load default settings and initialize */
+    dw_argparsing(argc, argv, s); /* Parse command line */
+    return dw_run(s); /* And do the job */
 }

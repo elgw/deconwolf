@@ -1,13 +1,18 @@
 # deconwolf
 
- * [Build and Install](#install)
-   * [Linux](#linux)
-   * [macOS](#osx)
-   * [Windows 10](#win10)
- * [Usage](#use)
+ * [Introduction](#Introduction)
+ * [Build and Install](#build-and-install)
+   * [Dependencies](#dependencies)
+   * [Ubuntu 20.04](#ubuntu-2004)
+   * [macOS Big Sur](#macos-big-sur)
+   * [Windows 10](#Windows-10)
+   * [FreeBSD 13.0](#freebsd)
+ * [Usage](#Minimal-Usage-Example)
    * [Bugs](#bugs)
- * [References](#ref)
+ * [References](#references)
+ * [Alternatives](#alternatives)
 
+## Introduction
 **deconwolf** is a program for 3-D deconvolution of fluorescent wide-field
 images:
  - The deconvolved images shows very mild boundary effects which means that you
@@ -17,15 +22,14 @@ images:
  - It can make use of all precious cores of your "big" machine since the
    critical parts run on separate threads (as many as you would like).
  - Deconwolf is tiny! The binaries could even fit on a floppy drive
-   (if you are fortunate
-   enough to own one of those antiquities).
+   (if you are fortunate enough to own one of those antiquities).
  - It is shipped with program to generate Point Spread Functions (PSFs)
-   according to the Born and Wolf model. It is the only one we know of that
-   actually integrate the PSF over each pixel.
+   according to the Born and Wolf model. Our program is the only one we
+   know of that actually integrate the PSF over each pixel.
  - Fully open source. And we embrace [contributions and suggestions](CONTRIBUTING.md).
 
-Except for this README there is also a short [usage guide](USAGE.md),
-a [CHANGELOG](CHANGELOG.md) and a [TODO](TODO.md) list.
+Except for this README.me there is also a short [USAGE.md](USAGE.md),
+a [CHANGELOG.md](CHANGELOG.md) and a [TODO.md](TODO.md).
 
 This repository provides two binaries,
  - `dw` -- for deconvolution, [man page](doc/dw.1.txt)
@@ -38,19 +42,20 @@ Deconwolf does not:
  - Show your images, for that, try [ImageJ](https://imagej.net/Welcome)
  - Diagnose your imaging system.
  - Estimate your PSF based on real images.
+ - If you miss one or more of these features,
+   or just want something else, there is an (incomplete)
+   list of [alternatives](#aternatives).
 
 At the moment we don't provide pre-built packages. You will have to build
 deconwolf from the source code, instructions follows below.
 
 
-<a name="install" />
-
 ## Build and install
-Deconwolf runs on 64-bit machines with x86_64 architecture, it has been built
-and installed on Ubuntu 20.04 and macOS Big Sur and Windows 10.
-Instruction for other systems will be collected [here](INSTALL.md). Go directly to [Windows 10](#win10), [Linux](#linux) or [macOS](#osx).
+Deconwolf runs on 64-bit machines with x86_64 architecture. Jump directly to
+installation instructions for [Ubuntu](#linux) or [macOS](#osx),
+[Windows 10](#win10) or [FreeBSD 13](#freebsd). Instruction for other
+systems will be collected in [INSTALL.md](INSTALL.md).
 
-<a name="deps" />
 
 ### Dependencies
 Deconwolf uses:
@@ -65,10 +70,10 @@ Deconwolf uses:
 If these libraries are available for your platform, chances are that that it can
 be built.
 
-<a name="linux" />
 
 ### Ubuntu 20.04
-Ensure that the required packages are installed
+
+Install required packages:
 
 ``` shell
 sudo apt-get update
@@ -82,18 +87,18 @@ sudo apt-get install libtiff-dev
 sudo apt-get install libgsl-dev
 ```
 
-To build and install:
+Build and install deconwolf:
 ``` shell
 make -B
 sudo make install
 ```
 
-<a name="osx" />
 
 ### macOS Big Sur
-You will need XCode from the App Store and [brew](https://brew.sh/).
 
-First install the required libraries:
+For building you will need XCode from the App Store and [brew](https://brew.sh/).
+
+Then set up XCode and install the required packages:
 ``` shell
 xcode-select --install
 brew install libopenmpt # Not sure if this is needed
@@ -103,13 +108,12 @@ brew install fftw
 brew install gsl
 ```
 
-To build and install:
+Build and install deconwolf
 ``` shell
 make -B
 sudo make install
 ```
 
-<a name="win10" />
 
 ### Windows 10
 
@@ -146,9 +150,28 @@ libwebp-7.dll  libwinpthread-1.dll libzstd.dll        zlib1.dll
 ```
 
 At least one person has build deconwolf using Windows Subsystem for Linux but
-beware, there might be some [performance penalty](https://www.phoronix.com/scan.php?page=article&item=wsl-wsl2-tr3970x&num=1).
+beware, there might be a
+[performance penalty](https://www.phoronix.com/scan.php?page=article&item=wsl-wsl2-tr3970x&num=1).
 
-<a name="use" />
+
+### FreeBSD
+
+The following packages were required:
+``` shell
+pkg install git
+pkg install gmake
+pkg install fftw3
+pkg install tiff
+pkg install gsl
+pkg install sudo
+```
+
+To build and install deconwolf:
+``` shell
+gmake -f makefile-freebsd
+sudo gmake install
+```
+
 
 ## Minimal usage example
 To generate a parametric PSF and deconvolve an image, all you need is something
@@ -169,15 +192,13 @@ dw_bw --help
 At the moment the documentation is limited, but there is a short
 [usage guide](USAGE.md).
 
-<a name="bugs" />
 
 ### Bugs
 
-Of course, but they can only be fixed when they are known.
+Most likely there are bugs and they can only be fixed when they are known.
 Please open a [new ticket](https://github.com/elgw/deconwolf/issues) if you
 have any issues with the program.
 
-<a name="ref" />
 
 ## References
 
@@ -219,3 +240,14 @@ The PSF generation is based on these:
    point spread function computation for fluorescence microscopy”. In: Journal
    of the Optical Society of America A 34.6 (May 2017), p. 1029.
    [doi](https://doi.org/10.1364/josaa.34001029)
+
+
+## Alternatives
+This is a non-complete list of alternative deconvolution software:
+
+Free and open source:
+ - [Deconvolution Lab2](http://bigwww.epfl.ch/deconvolution/deconvolutionlab2/)
+
+Commercial:
+ - [Huygens](https://svi.nl/HomePage)
+ - [Microvolution](https://www.microvolution.com/)
