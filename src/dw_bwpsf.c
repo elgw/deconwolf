@@ -270,8 +270,8 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
 
     if(argc < 2)
     {
-        // Well it could run with the defaults but that does not make sense
-        usage(argc, argv, defaults);
+        printf("Deconwolf PSF generator: Too few input arguments.\n");
+        printf("See `%s --help` or 'man dw_bw'\n", argv[0]);
         exit(-1);
     }
 

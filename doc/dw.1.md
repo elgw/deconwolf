@@ -1,4 +1,4 @@
-% DECONWOLF(1) dw 0.0.20
+% DECONWOLF(1) dw 0.0.21
 % Erik Wernersson
 % 2022
 
@@ -6,7 +6,13 @@
 deconwolf **dw** is a tool for deconvolution of wide field microscopy stacks.
 
 # SYNOPSIS
+For deconvolution:
+
 **dw** [*OPTIONS*] file.tif psf.tif
+
+or, for max projections over z:
+
+**dw** maxproj file1.tif file1.tif ...
 
 # OPTIONS
 **\--threads t**
@@ -56,6 +62,21 @@ and quality. n=2 default.
 **\--biggs b**
 : Set b to 0 to turn acceleration off, in that case dw reverts to the standard
 Richardson-Lucy method.
+
+**\--psigma s**
+: Pre-process the image and the PSF by convolving it by a 3-D isotropic
+Gaussian with sigma=s. This acts as a low pass filter.
+Have been found useful for very noisy image.
+
+**maxproj**
+: With *maxproj* as the first argument deconwolf will create max
+projections of all following tif files. Output will be prefixed with `max_`.
+
+# While running
+At normal verbosity deconwolf will put one green dot per FFT. The fMSE value
+reported at each iteration is the Mean Squared Error between the input image
+and the forward projected current guess (i.e. the PSF convoved with the
+current guess).
 
 # OUTPUT
 Without specifying the output file name, the output file will

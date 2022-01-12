@@ -1,13 +1,13 @@
 # deconwolf
 
  * [Introduction](#Introduction)
- * [Build and Install](#install)
+ * [Build and Install](#build-and-install)
    * [Dependencies](#dependencies)
-   * [Ubuntu 20.04](#linux)
-   * [macOS Big Sur](#osx)
-   * [Windows 10](#win10)
+   * [Ubuntu 20.04](#ubuntu-2004)
+   * [macOS Big Sur](#maxos-big-sur)
+   * [Windows 10](#Windows-10)
    * [FreeBSD 13.0](#freebsd)
- * [Usage](#use)
+ * [Usage](#Minimal-Usage-Example)
    * [Bugs](#bugs)
  * [References](#references)
  * [Alternatives](#alternatives)
@@ -49,7 +49,6 @@ Deconwolf does not:
 At the moment we don't provide pre-built packages. You will have to build
 deconwolf from the source code, instructions follows below.
 
-<a name="install" />
 
 ## Build and install
 Deconwolf runs on 64-bit machines with x86_64 architecture. Jump directly to
@@ -71,7 +70,6 @@ Deconwolf uses:
 If these libraries are available for your platform, chances are that that it can
 be built.
 
-<a name="linux" />
 
 ### Ubuntu 20.04
 
@@ -96,8 +94,6 @@ sudo make install
 ```
 
 
-<a name="osx" />
-
 ### macOS Big Sur
 
 For building you will need XCode from the App Store and [brew](https://brew.sh/).
@@ -118,7 +114,6 @@ make -B
 sudo make install
 ```
 
-<a name="win10" />
 
 ### Windows 10
 
@@ -155,7 +150,8 @@ libwebp-7.dll  libwinpthread-1.dll libzstd.dll        zlib1.dll
 ```
 
 At least one person has build deconwolf using Windows Subsystem for Linux but
-beware, there might be some [performance penalty](https://www.phoronix.com/scan.php?page=article&item=wsl-wsl2-tr3970x&num=1).
+beware, there might be a
+[performance penalty](https://www.phoronix.com/scan.php?page=article&item=wsl-wsl2-tr3970x&num=1).
 
 
 ### FreeBSD
@@ -177,8 +173,6 @@ sudo gmake install
 ```
 
 
-<a name="use" />
-
 ## Minimal usage example
 To generate a parametric PSF and deconvolve an image, all you need is something
 like this:
@@ -198,11 +192,13 @@ dw_bw --help
 At the moment the documentation is limited, but there is a short
 [usage guide](USAGE.md).
 
+
 ### Bugs
 
 Most likely there are bugs and they can only be fixed when they are known.
 Please open a [new ticket](https://github.com/elgw/deconwolf/issues) if you
 have any issues with the program.
+
 
 ## References
 

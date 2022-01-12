@@ -1,3 +1,10 @@
+- v. 0.0.21
+   - Updated documentation and man-pages based on markdown files
+     for easier updating.
+   - Provides `makefile-freebsd` for building on FreeBSD 13.0
+   - Changed behavior when too few input arguments are given to
+     only give a two-line message.
+
 - v. 0.0.20
    - Changing acceleration technique to use
      'Exponential Vector Extrapolation' (EVE) described in Biggs PhD thesis.

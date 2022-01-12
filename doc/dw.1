@@ -8,7 +8,13 @@ deconwolf \f[B]dw\f[R] is a tool for deconvolution of wide field
 microscopy stacks.
 .SH SYNOPSIS
 .PP
+For deconvolution:
+.PP
 \f[B]dw\f[R] [\f[I]OPTIONS\f[R]] file.tif psf.tif
+.PP
+or, for max projections over z:
+.PP
+\f[B]dw\f[R] maxproj file1.tif file1.tif \&...
 .SH OPTIONS
 .TP
 \f[B]--threads t\f[R]
@@ -62,6 +68,15 @@ Show a short help message and quit.
 \f[B]--biggs b\f[R]
 Set b to 0 to turn acceleration off, in that case dw reverts to the
 standard Richardson-Lucy method.
+.TP
+\f[B]--psigma s\f[R]
+Pre-filter the image and the PSF by an isotropic Gaussian with sigma=s.
+Have been found useful for very noisy image.
+.TP
+\f[B]maxproj\f[R]
+With \f[I]maxproj\f[R] as the first argument deconwolf will create max
+projections of all following tif files.
+Output will be prefixed with \f[C]max_\f[R].
 .SH OUTPUT
 .PP
 Without specifying the output file name, the output file will be
@@ -76,7 +91,7 @@ The scaling factor can be found in the log file.
 .SH SEE ALSO
 .PP
 \f[B]dw_bw\f[R] for generation of point spread functions according to
-the Born-Wolf model..
+the Born-Wolf model.
 .SH WEB PAGE
 .PP
 <https://github.com/elgw/deconwolf/>
