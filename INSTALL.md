@@ -1,6 +1,6 @@
 # Installation notes
 
- - [Ubuntu 16.04](#ubuntu-16.04)
+ - [Ubuntu 16.04](#ubuntu-1604)
  - [FreeBSD](#FreeBSD)
  - [MKF FFT Backend](#MKL)
 
@@ -16,8 +16,8 @@ sudo apt-get install libomp-dev
 sudo apt-get install libtiff-dev
 ```
 ## FreeBSD
-Deconwolf has been built on FreeBSD. In this case the makefile does not
-work out of the box, but has to changed slightly. At least `pkg-config` has
+Deconwolf has been built on FreeBSD. The makefile does not
+work out of the box and has to changed slightly. At least `pkg-config` has
 to be replaced by `pkgconf` and `gmake`, not `make` should be used.
 
 The following packages were required:
