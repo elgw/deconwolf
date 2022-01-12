@@ -1,13 +1,16 @@
 # deconwolf
 
+ * [Introduction](#Introduction)
  * [Build and Install](#install)
    * [Linux](#linux)
    * [macOS](#osx)
    * [Windows 10](#win10)
+   * [FreeBSD](#freebsd)
  * [Usage](#use)
    * [Bugs](#bugs)
  * [References](#ref)
 
+## Introduction
 **deconwolf** is a program for 3-D deconvolution of fluorescent wide-field
 images:
  - The deconvolved images shows very mild boundary effects which means that you
