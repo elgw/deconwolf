@@ -1376,6 +1376,17 @@ float * deconvolve_eve(afloat * restrict im, const int64_t M, const int64_t N, c
             }
         }
 
+        if(s->bg > 0)
+        {
+#pragma omp parallel for
+            for(size_t kk = 0; kk<wMNP; kk++)
+            {
+                if(xp[kk] < s->bg)
+                {
+                    xp[kk] = s->bg;
+                }
+            }
+        }
 
         xm = x;
         x = xp;
@@ -2133,7 +2144,7 @@ if(0)
     float * dw_im_tile = deconvolve_eve(im_tile, tileM, tileN, tileP, // input image and size
         tpsf, tpM, tpN, tpP, // psf and size
         s);
-    free(im_tile);
+    // free(im_tile);
     tiling_put_tile_raw(T, tt, tfile, dw_im_tile);
     free(dw_im_tile);
     free(tpsf);
