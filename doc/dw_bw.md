@@ -1,4 +1,4 @@
-% DECONWOLF(1) dw_bw 0.0.21
+% DECONWOLF(1) dw_bw ABCDE
 % Erik Wernersson
 % 2022
 

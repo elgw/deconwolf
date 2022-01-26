@@ -2147,7 +2147,7 @@ if(0)
     // free(im_tile);
     tiling_put_tile_raw(T, tt, tfile, dw_im_tile);
     free(dw_im_tile);
-    free(tpsf);
+    // free(tpsf);
   }
   tiling_free(T);
   free(T);

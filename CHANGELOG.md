@@ -1,3 +1,6 @@
+v. 0.0.22
+  - Fixed double free-bug in tiling mode.
+
 - v. 0.0.21
    - Updated documentation and man-pages based on markdown files
      for easier updating.
