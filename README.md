@@ -32,8 +32,8 @@ Except for this README.me there is also a short [USAGE.md](USAGE.md),
 a [CHANGELOG.md](CHANGELOG.md) and a [TODO.md](TODO.md).
 
 This repository provides two binaries,
- - `dw` -- for deconvolution, [man page](doc/dw.1.txt)
- - `dw_bw` -- to create PSFs using the Born-Wolf model [man page](doc/dw_bw.1.txt)
+ - `dw` -- for deconvolution, [man page](doc/dw.txt)
+ - `dw_bw` -- to create PSFs using the Born-Wolf model [man page](doc/dw_bw.txt)
 
 Deconwolf does not:
  - Have a full-featured Graphical User Interface (GUI), however, if you
