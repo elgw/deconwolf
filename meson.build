@@ -100,9 +100,18 @@ if cc.links('int main () { return 0; }', name: '-flto', args: '-flto')
    dw_bw_ldflags += ['-flto']
 endif
 
-omp_deps = dependency('openmp')
-dw_deps += omp_deps
-dw_bw_deps += omp_deps
+omp_deps = dependency('openmp', required : false)
+if omp_deps.found()
+   dw_deps += omp_deps
+   dw_bw_deps += omp_deps
+endif
+
+os = host_machine.system()
+if os == 'darwin'
+   # for OpenMP
+   # installed with brew install libomp
+   dw_cflags += ['-Xpreprocess']
+endif
 
 _program = find_program('git', required:false)
 if _program.found()
