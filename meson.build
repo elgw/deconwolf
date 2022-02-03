@@ -134,7 +134,7 @@ executable('dw', dw_src,
                     dependencies: dw_deps,
                     install: true,
                     c_args: [dw_cflags],
-                    link_args: [dw_bw_ldflags])
+                    link_args: [dw_ldflags])
                     
 executable('dw_bw', dw_bw_src,
                         dependencies : dw_bw_deps,
