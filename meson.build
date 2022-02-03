@@ -117,7 +117,7 @@ _program = find_program('git', required:false)
 if _program.found()
    git_version = run_command(_program, ['log', '--pretty=format:\'%aD:%H\'', '-n', '1']).stdout().strip()
    message('git_version = ' + git_version)
-   dw_cflags += '-DGIT_VERSION=' + git_version
+   dw_cflags += '-DGIT_VERSION="' + git_version + '"'
 else
       dw_cflags += '-DGIT_VERSION=UNKNOWN'
 endif
