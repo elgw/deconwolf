@@ -171,7 +171,23 @@ To build and install deconwolf:
 gmake -f makefile-freebsd
 sudo gmake install
 ```
+## Meson
+deconwolf can also be installed using [meson](https://mesonbuild.com/),
+tested only on Ubuntu
 
+To build and install:
+``` shell
+meson setup builddir --buildtype release
+cd builddir
+meson compile
+meson install # Note: only works if meson was installed by sudo
+```
+
+To uninstall:
+
+``` shell
+sudo ninja -C builddir uninstall
+```
 
 ## Minimal usage example
 To generate a parametric PSF and deconvolve an image, all you need is something

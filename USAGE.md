@@ -158,3 +158,9 @@ script in your favorite language.
 ## Don't you have more PSF models?
 No, not at this time. Please check out the
 [PSF Generator](http://bigwww.epfl.ch/algorithms/psfgenerator/) from EPFL.
+
+
+## Image dimensions seems strange?
+
+
+## Pseudocode for dw

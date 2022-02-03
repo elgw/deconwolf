@@ -1,4 +1,8 @@
-v. 0.0.22
+- v. 0.0.23
+  - Added 'meson.build' files in order for deconwolf to be built by
+    [The Meson Build system](https://mesonbuild.com/).
+
+- v. 0.0.22
   - Fixed double free-bug in tiling mode.
 
 - v. 0.0.21
