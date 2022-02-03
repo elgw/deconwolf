@@ -110,7 +110,7 @@ os = host_machine.system()
 if os == 'darwin'
    # for OpenMP
    # installed with brew install libomp
-   dw_ldflags += ['-Xpreprocess', '-fopenmp']
+   dw_cflags += ['-Xpreprocessor', '-fopenmp']
 endif
 
 _program = find_program('git', required:false)
