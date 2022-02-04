@@ -51,10 +51,15 @@ deconwolf from the source code, instructions follows below.
 
 
 ## Build and install
-Deconwolf runs on 64-bit machines with x86_64 architecture. Jump directly to
+Deconwolf runs on 64-bit machines with x86_64 architecture and require no
+special hardware. Jump directly to
 installation instructions for [Ubuntu](#linux) or [macOS](#osx),
 [Windows 10](#win10) or [FreeBSD 13](#freebsd). Instruction for other
-systems will be collected in [INSTALL.md](INSTALL.md).
+systems will be collected in [INSTALL.md](INSTALL.md). To compile and install
+deconwolf should take less than a minute on any platform with a normal computer.
+However to installation of the dependencies is estimated take up to an hour
+MacOS (due to installing Xcode) and Windows due to the extra work of manually
+copying dependencies. We hope to provide pre-compiled version in the future.
 
 
 ### Dependencies
@@ -204,6 +209,15 @@ For available options, please see
 dw --help
 dw_bw --help
 ```
+
+There is a single nuclei in the `/demo/` folder, to deconvolve just run:
+
+``` shell
+make
+```
+The run time on an AMD 3700x was 38s the first time. The second time you run it fftw
+will already know how to handle this specific image size and the run time was
+17 s on the same machine.
 
 At the moment the documentation is limited, but there is a short
 [usage guide](USAGE.md).
