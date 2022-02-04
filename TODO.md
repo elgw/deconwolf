@@ -6,6 +6,7 @@
 # Todo
 
 ## Top priority
+- [ ] Figure out how to build deconwolf on the new M1 mac models.
 - [ ] Crash-safe writing of output images, write to temporary file and
        move when write is complete to avoid bad luck.
 - [ ] Get documentation up to date.

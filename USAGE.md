@@ -57,7 +57,10 @@ both the PSF and the input image and does not attempt to read any metadata
 from the tif files.
 
 ## Test data
-No special test data has been prepared, but you can get some images from the [DeconvolutionLab2](http://bigwww.epfl.ch/deconvolution/deconvolutionlab2/) web page. Please note that in some cases the PSFs do not contain enough z-planes.
+There is a single nuclei in the `demo` subfolder (descibed in README.md).
+You can get more images from the
+[DeconvolutionLab2](http://bigwww.epfl.ch/deconvolution/deconvolutionlab2/)
+web page. Please note that in some cases the PSFs do not contain enough z-planes.
 
 ## Memory considerations
 The peak memory usage is written at the end of the log file. If you have 16
@@ -68,7 +71,6 @@ deconwolf requires that the PSF is centered, i.e.,
 that the largest value is in the middle.
 If you generate the PSF with some
 other program you might have to center it first.
-
 
 ## Supported image formats
 Currently deconwolf does only support tif images,

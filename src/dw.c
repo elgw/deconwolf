@@ -536,6 +536,13 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
   }
   }
 
+  if(s->nThreads < 1)
+  {
+      printf("Invalid number of threads (%d), "
+             "please verify your command line\n", s->nThreads);
+      exit(EXIT_FAILURE);
+  }
+
   s->logFile = malloc(strlen(s->outFile) + 10);
   sprintf(s->logFile, "%s.log.txt", s->outFile);
 
