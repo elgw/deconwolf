@@ -1,6 +1,14 @@
 - v. 0.0.23
   - Added 'meson.build' files in order for deconwolf to be built by
-    [The Meson Build system](https://mesonbuild.com/).
+    [The Meson Build system](https://mesonbuild.com/), tested to work
+    on both Ubuntu 21.10 and MacOS (on x86_64 hardware).
+  - Added a small test image under `demo/` together with a **makefile**
+    to deconvolve it.
+  - Added [pseudo code](PSEUDOCODE.md) for the binaries hoping to
+    planning to replace this by a properly typeset and more detailed
+    document.
+  - Aborting if the number of threads is set < 1.
+  - The algorithm is still unchanged since v 0.0.20.
 
 - v. 0.0.22
   - Fixed double free-bug in tiling mode.
