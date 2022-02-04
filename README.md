@@ -210,17 +210,19 @@ dw --help
 dw_bw --help
 ```
 
-There is a single nuclei in the `/demo/` folder, to deconvolve just run:
+There is a single nuclei in the `/demo/dapi_001.tif` folder, to deconvolve just run:
 
 ``` shell
+cd demo
 make
+imagej dapi_001.tif dw_dapi_001.tif
 ```
 The run time on an AMD 3700x was 38s the first time. The second time you run it fftw
 will already know how to handle this specific image size and the run time was
 17 s on the same machine.
 
-At the moment the documentation is limited, but there is a short
-[usage guide](USAGE.md).
+For more documentation see the short [usage guide](USAGE.md), and the manual
+pages for both binaries, [man dw](doc/dw.txt) [man dw_bw](doc/dw_bw.txt).
 
 
 ### Bugs
@@ -232,7 +234,10 @@ have any issues with the program.
 
 ## References
 
-The deconvolution algorithm is based on these papers:
+
+There is a [pseudo code](PSEUDOCODE.md) description of what the binaries does.
+
+The deconvolution algorithm is based on the following papers:
 
  * Richardson, William Hadley (1972). "Bayesian-Based Iterative Method of Image
    Restoration". JOSA. 62 (1): 55–59.
@@ -249,10 +254,6 @@ The deconvolution algorithm is based on these papers:
    effects in the Richardson-Lucy approach to image deconvolution,
    A&A 437, 369-374 (2005).
    [doi](https://doi.org/10.1051/0004-6361:20052717)
- * Lee, Ji-Yeon & Lee, Nam-Yong. (2014). Cause Analysis and Removal of Boundary
-   Artifacts in Image Deconvolution. Journal of Korea Multimedia Society. 17.
-   838-848.
-   [doi](https://doi.org/10.9717/kmms.2014.17.7.838).
 
 The PSF generation is based on these:
 
