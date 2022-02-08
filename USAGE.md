@@ -160,3 +160,24 @@ script in your favorite language.
 ## Don't you have more PSF models?
 No, not at this time. Please check out the
 [PSF Generator](http://bigwww.epfl.ch/algorithms/psfgenerator/) from EPFL.
+
+
+## What about image dimensions?
+
+**dw** report image dimensions in the same way as ImageJ (although dw does
+not understand time and channel dimensions). For example the file
+`dapi_001.tif` in the `demo/` folder is reported to have the shape
+**101x201x40** by dw and ImageJ.
+
+Other tools might report it the other way around, for example:
+
+skimage reports the size **40x201x101** by
+``` python
+>>> from skimage import io
+>>> I = io.imread('dapi_001.tif')
+>>> I.shape
+```
+
+In general this is nothing to worry about, see
+[https://en.wikipedia.org/wiki/Row-_and_column-major_order]
+for a discussion around this topic.

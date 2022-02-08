@@ -98,7 +98,6 @@ make -B
 sudo make install
 ```
 
-
 ### macOS Big Sur
 
 For building you will need XCode from the App Store and [brew](https://brew.sh/).
@@ -178,7 +177,7 @@ sudo gmake install
 ```
 ## Meson
 deconwolf can also be installed using [meson](https://mesonbuild.com/),
-tested only on Ubuntu
+tested only Ubuntu and MacOS
 
 To build and install:
 ``` shell

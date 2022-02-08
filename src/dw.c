@@ -2008,6 +2008,7 @@ float * psf_autocrop_XY(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  
       first = first-bestAdd;
   }
 
+  /* Allocated with fftwf */
   float * crop = fim_get_cuboid(psf, pM[0], pN[0], pP[0],
       first, pM[0] - first -1,
       first, pN[0] - first -1,
@@ -2151,7 +2152,7 @@ if(0)
     float * dw_im_tile = deconvolve_eve(im_tile, tileM, tileN, tileP, // input image and size
         tpsf, tpM, tpN, tpP, // psf and size
         s);
-    // free(im_tile);
+    fftwf_free(im_tile);
     tiling_put_tile_raw(T, tt, tfile, dw_im_tile);
     free(dw_im_tile);
     // free(tpsf);
@@ -2580,6 +2581,7 @@ int dw_run(dw_opts * s)
       }
     deconvolve_tiles(M, N, P, psf, pM, pN, pP, // psf and size
         s);// settings
+    fftwf_free(psf);
   } else {
     fim_normalize_sum1(psf, pM, pN, pP);
     if(s->flatfieldFile != NULL)
