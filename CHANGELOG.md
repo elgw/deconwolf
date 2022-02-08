@@ -1,3 +1,8 @@
+- v. 0.0.24
+  - Tested on CentOS, install both with make and meson.
+  - Fixed a memory leak with the **--tilesize** option causing
+    crashed sometimes.
+
 - v. 0.0.23
   - Added 'meson.build' files in order for deconwolf to be built by
     [The Meson Build system](https://mesonbuild.com/), tested to work

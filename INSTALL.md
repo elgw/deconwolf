@@ -1,8 +1,30 @@
 # Installation notes
 
  - [Ubuntu 16.04](#ubuntu-1604)
+ - [CentOS](#CentOS)
  - [FreeBSD](#FreeBSD)
  - [MKF FFT Backend](#MKL)
+
+## CentOS
+Tested on CentOS Linux Release 7.8.2009 (Core).
+
+``` shell
+# Install dependencies
+sudo yum install gcc gsl-devel libtiff-devel fftw-devel
+```
+
+Should work with the
+``` shell
+make
+sudo make install
+```
+
+``` shell
+# To build with meson
+sudo yum python3
+sudo python3 -m pip install meson ninja
+# Then follow the general meson instructions in README.md
+```
 
 ## Ubuntu 16.04
 ``` shell
