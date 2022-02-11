@@ -1,3 +1,7 @@
+- v. 0.0.25
+  - Builds with cuFFT on Linux, use `make CUFFT=1 -B`, requires a CUDA
+  compatible GPU and of course the cuFFT library installed.
+
 - v. 0.0.24
   - Tested on CentOS, install both with make and meson.
   - Fixed a memory leak with the **--tilesize** option causing

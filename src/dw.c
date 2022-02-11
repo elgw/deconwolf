@@ -276,7 +276,11 @@ void dw_fprint_info(FILE * f, dw_opts * s)
 #endif
 
   fprintf(f, "BUILD_DATE: '%s'\n'", __DATE__);
+  #ifdef CUDA
+  fprintf(f, "FFT Backend: 'cuFFT\n");
+  #else
   fprintf(f, "FFT Backend: '%s'\n", fftwf_version);
+  #endif
   fprintf(f, "TIFF: '%s'\n", TIFFGetVersion());
 
 #ifndef WINDOWS

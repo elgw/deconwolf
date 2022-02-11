@@ -135,19 +135,40 @@ static char * get_swf_file_name(int nThreads)
     }
 }
 
+#ifdef CUDA
+void myfftw_start(__attribute__((unused)) const int nThreads,
+                  __attribute__((unused)) int verbose,
+                  __attribute__((unused)) FILE * log)
+{
+    return;
+}
+#endif
+
+#ifndef CUDA
 void myfftw_start(const int nThreads, int verbose, FILE * log)
 {
 
     if(verbose > 1)
     {
+#ifndef CUDA
         printf("\t using %s with %d threads\n", fftwf_version, nThreads);
+#else
+        printf("\t using cuFFT\n");
+#endif
     }
     if(log != NULL)
     {
+#ifndef CUDA
         fprintf(log, "Using %s with %d threads\n", fftwf_version, nThreads);
+#else
+        printf(log, "\t using cuFFT\n");
+#endif
     }
+
     fftwf_init_threads();
     fftwf_plan_with_nthreads(nThreads);
+
+
     char * swf = get_swf_file_name(nThreads);
     assert(swf != NULL);
     if(log != NULL)
@@ -168,10 +189,13 @@ void myfftw_start(const int nThreads, int verbose, FILE * log)
         free(swf);
     }
 }
+#endif
 
 void myfftw_stop(void)
 {
+    #ifndef CUDA
     fftwf_cleanup_threads();
+    #endif
     fftwf_cleanup();
     // Note: wisdom is only exported by fft_train
 }
@@ -281,11 +305,12 @@ afloat * fft_convolve_cc_conj_f2(fftwf_complex * A, fftwf_complex * B,
     fftwf_execute(p);
     fftwf_destroy_plan(p);
     fftwf_free(C);
-    const float MNP = M*N*P;
+    const float MNP_float = (float) M*N*P;
+    const size_t MNP = M*N*P;
 #pragma omp parallel for
-    for(size_t kk = 0; kk < M*N*P; kk++)
+    for(size_t kk = 0; kk < MNP; kk++)
     {
-        out[kk]/=(MNP);
+        out[kk] /= MNP_float;
     }
     return out;
 }
@@ -340,6 +365,19 @@ afloat * fft_convolve_cc_conj(fftwf_complex * A, fftwf_complex * B,
     return out;
 }
 
+#ifdef CUDA
+void fft_train( __attribute__((unused)) const size_t M,
+                __attribute__((unused)) const size_t N,
+                __attribute__((unused)) const size_t P,
+                __attribute__((unused)) const int verbosity,
+                __attribute__((unused)) const int nThreads,
+                __attribute__((unused)) FILE * log)
+{
+    return;
+}
+#endif
+
+#ifndef CUDA
 void fft_train(const size_t M, const size_t N, const size_t P, const int verbosity, const int nThreads,
                FILE * log)
 {
@@ -438,6 +476,7 @@ void fft_train(const size_t M, const size_t N, const size_t P, const int verbosi
 
     return;
 }
+#endif
 
 void fft_ut_wisdom_name(void){
     /* Wisdom file names
@@ -550,7 +589,7 @@ void fft_ut(void)
     double * t = fft_bench_1d(from, to, 1000);
     for(int64_t kk = 0; kk<= (to-from); kk++)
     {
-        printf("Size: %ld, time %e\n", kk+from, t[kk]);
+        printf("Size: %" PRId64 ", time %e\n", kk+from, t[kk]);
     }
     free(t);
 
@@ -560,7 +599,7 @@ void fft_ut(void)
     t = fft_bench_1d(from, to, 10000);
     for(int64_t kk = 0; kk<= (to-from); kk++)
     {
-        printf("Size: %ld, time %e\n", kk+from, t[kk]);
+        printf("Size: %" PRId64 ", time %e\n", kk+from, t[kk]);
     }
     free(t);
 
