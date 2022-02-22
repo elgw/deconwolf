@@ -1,3 +1,8 @@
+# CHANGELOG
+
+- v 0.0.26
+ - **dw maxproj** works with file that are not in the current folder.
+
 - v. 0.0.25
   - Builds with cuFFT on Linux, use `make CUFFT=1 -B`, requires a CUDA
   compatible GPU and of course the cuFFT library installed.
