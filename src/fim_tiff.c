@@ -262,7 +262,7 @@ void readUint16(TIFF * tfile, float * V,
 
     if(buf == NULL)
     {
-        printf("Failed to allocate %ld bytes of memory!", ssize);
+        printf("Failed to allocate %" PRId64 " bytes of memory!", ssize);
         fflush(stdout);
         return;
     }

@@ -97,7 +97,12 @@ int dw_tiff_max(int argc, char ** argv)
     outFile = malloc(strlen(inFile) + 20);
     if(s->mode == MODE_MAX)
     {
-    sprintf(outFile, "max_%s", inFile);
+      char * dname = dirname(inFile);
+      char * fname = basename(inFile);
+      sprintf(outFile, "%s/max_%s", dname, fname);
+      free(dname);
+      free(fname);
+      
     if(s->overwrite == 0 && file_exist(outFile))
     {
       printf("%s exists, skipping.\n", outFile);

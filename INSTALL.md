@@ -1,7 +1,7 @@
 # Installation notes
 
- - [Ubuntu 16.04](#ubuntu-1604)
  - [CentOS](#CentOS)
+ - [Ubuntu 16.04](#ubuntu-1604)
  - [FreeBSD](#FreeBSD)
  - [MKF FFT Backend](#MKL)
 
@@ -21,7 +21,7 @@ sudo make install
 
 ``` shell
 # To build with meson
-sudo yum python3
+sudo yum install python3
 sudo python3 -m pip install meson ninja
 # Then follow the general meson instructions in README.md
 ```

@@ -5,13 +5,20 @@
 # For normal build
 # make -B
 
+UNAME_S := $(shell uname -s)
+$(info Host type: $(UNAME_S))
+
+dw = bin/dw
+dwbw = bin/dw_bw
+
+CFLAGS = -Wall -Wextra -std=gnu99
+
 CC_VERSION = "$(shell gcc --version | head -n 1)"
 GIT_VERSION = "$(shell git log --pretty=format:'%aD:%H' -n 1)"
 
-XFLAGS = -DCC_VERSION=\"$(CC_VERSION)\"
-XFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
+CFLAGS += -DCC_VERSION=\"$(CC_VERSION)\"
+CFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
 
-CFLAGS = -Wall -Wextra -std=gnu99 -march=native -mtune=native
 # Since we don't check for these errors, see man math_error
 # we can disable this feature
 CFLAGS += -fno-math-errno
@@ -26,61 +33,89 @@ else
    #-fno-math-errno no relevant performance gain
 endif
 
-
 dw_LIBRARIES =  -lm -ltiff
 dwtm_LIBRARIES =  -lm -ltiff
-dwbw_LIBRARIES = -lm -ltiff -lpthread -ltiff  -lgsl -lgslcblas
+dwbw_LIBRARIES = -lm -ltiff -lpthread
 
+### GSL
+CFLAGS += `gsl-config --cflags`
+dwbw_LIBRARIES += `gsl-config --libs`
+
+### FFT Backend
+FFTW3=1
 MKL?=0
+CUDA?=0
+
+ifeq ($(MKL), 1)
+dw=bin/dw-mkl
+FFTW3=0
+CUDA=0
+endif
+
+ifeq ($(CUDA), 1)
+dw=bin/dw-cuda
+FFTW3=0
+MKL=0
+endif
+
 ifeq ($(MKL),1)
+$(info FFTW backend: MKL)
 CFLAGS += -DMKL `pkg-config mkl-static-lp64-iomp --cflags`
 dw_LIBRARIES += `pkg-config mkl-static-lp64-iomp --cflags --libs`
-dwtm_LIBRARIES += `pkg-config mkl-static-lp64-iomp --cflags --libs`
 dwbw_LIBRARIES += `pkg-config mkl-static-lp64-iomp --cflags --libs`
+endif
+
+ifeq ($(FFTW3), 1)
+$(info FFTW backend: FFTW3)
+CFLAGS += `pkg-config fftw3 fftw3f --cflags`
+dw_LIBRARIES += `pkg-config fftw3 fftw3f --libs`
+dwbw_LIBRARIES += `pkg-config fftw3 fftw3f --libs`
+ifneq ($(WINDOWS),1)
+dw_LIBRARIES += -lfftw3f_threads
+dwbw_LIBRARIES += -lfftw3f_threads
+endif
+endif
+
+ifeq ($(CUDA),1)
+$(info FFTW backend: CUDA)
+$(info FFT BACKEND: CUDA)
+CUDA_DIR=/usr/local/cuda/
+CFLAGS += -I$(CUDA_DIR)/include/ -L$(CUDA_DIR)/lib64/ -DCUDA
+dw_LIBRARIES +=  -lcufftw
+dwbw_LIBRARIES += -lcufftw
+endif
+
+## OpenMP
+OMP?=1
+ifeq ($(OMP), 1)
+ifeq ($(UNAME_S), Darwin)
+dw_LIBRARIES += -Xpreprocessor -lomp
 else
-dw_LIBRARIES +=  -lfftw3f
-dwtm_LIBRARIES += -ltiff -lfftw3f
-dwbw_LIBRARIES += -lfftw3f
+CFLAGS += -fopenmp
 endif
-MANPATH=/usr/share/man/man1/
-
-# on MacOS add -Xpreprocessor
-UNAME_S := $(shell uname -s)
-ifeq ($(UNAME_S),Linux)
-    CFLAGS +=
-ifeq ($(MKL),0)
-    dw_LIBRARIES += -lfftw3f_threads
-endif
+else
+CFLAGS += -fno-openmp
 endif
 
-ifeq ($(UNAME_S),Darwin)
-    CFLAGS += -Xpreprocessor # -fopenmp should follow directly after this
-    dw_LIBRARIES += -lomp -lfftw3f_threads
-    MANPATH=/usr/local/share/man/man1
+ifneq ($(UNAME_S),Darwin)
+    CFLAGS+=-march=native -mtune=native
 endif
 
 ifeq ($(WINDOWS),1)
 	CFLAGS += -DWINDOWS
 endif
 
-OMP?=1
-ifeq ($(OMP), 1)
-  CFLAGS += -fopenmp
-else
-  CFLAGS += -fno-openmp
+## MANPATH
+MANPATH=/usr/share/man/man1/
+ifeq ($(UNAME_S),Darwin)
+	MANPATH=/usr/local/share/man/man1
 endif
 
-
-
-CFLAGS += $(XFLAGS)
 
 CC = cc $(CFLAGS)
 SRCDIR = src/
 
-dw = bin/dw
 dw_OBJECTS = fim.o tiling.o fft.o fim_tiff.o dw.o deconwolf.o deconwolf_tif_max.o
-
-dwbw = bin/dw_bw
 dwbw_OBJECTS = fim.o fim_tiff.o dw_bwpsf.o bw_gsl.o lanczos.o li.o
 
 # dwtm = bin/dw_tiffmax
