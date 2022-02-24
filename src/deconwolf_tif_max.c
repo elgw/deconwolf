@@ -8,7 +8,23 @@ typedef struct{
     int slice;
     int optpos; // Next argument not consumed by getargs
     int overwrite;
+    int verbose;
 } opts;
+
+opts * opts_new()
+{
+    opts * s = malloc(sizeof(opts));
+
+    s->mode = MODE_MAX;
+    s->overwrite = 0;
+    s->verbose = 1;
+    return s;
+}
+
+void opts_free(opts * s)
+{
+    free(s);
+}
 
 static void usage(__attribute__((unused)) int argc, char ** argv)
 {
@@ -25,9 +41,10 @@ static void argparsing(int argc, char ** argv, opts * s)
                                  {"help", no_argument, NULL, 'h'},
                                  {"slice", required_argument, NULL, 's'},
                                  {"overwrite", no_argument, NULL, 'o'},
+                                 {"verbose", required_argument, NULL, 'v'},
                                  {NULL, 0, NULL, 0}};
     int ch;
-    while((ch = getopt_long(argc, argv, "ohs:", longopts, NULL)) != -1)
+    while((ch = getopt_long(argc, argv, "ohs:v:", longopts, NULL)) != -1)
     {
         switch(ch){
         case 'o':
@@ -40,6 +57,9 @@ static void argparsing(int argc, char ** argv, opts * s)
         case 's':
             s->slice = atoi(optarg);
             s->mode = MODE_SLICE;
+            break;
+        case 'v':
+            s->verbose = atoi(optarg);
             break;
         }
     }
@@ -69,9 +89,7 @@ int main(int argc, char ** argv)
 int dw_tiff_max(int argc, char ** argv)
 {
 
-    opts * s = malloc(sizeof(opts));
-    s->mode = MODE_MAX;
-    s->overwrite = 0;
+    opts * s = opts_new();
 
   if(argc < 2)
   {
@@ -97,13 +115,26 @@ int dw_tiff_max(int argc, char ** argv)
     outFile = malloc(strlen(inFile) + 20);
     if(s->mode == MODE_MAX)
     {
-      char * dname = dirname(inFile);
-      char * fname = basename(inFile);
-      sprintf(outFile, "%s/max_%s", dname, fname);
-      free(dname);
-      free(fname);
-      
-    if(s->overwrite == 0 && file_exist(outFile))
+        char * _dname = strdup(inFile);
+        char * dname = dirname(_dname);
+        char * _fname = strdup(inFile);
+        char * fname = basename(_fname);
+
+        if(s->verbose > 1)
+        {
+            fprintf(stdout, "Input file: %s\n", inFile);
+            fprintf(stdout, "'%s' /  '%s'\n", dname, fname);
+        }
+
+        sprintf(outFile, "%s/max_%s", dname, fname);
+        free(_dname);
+        free(_fname);
+        if(s->verbose > 1)
+        {
+            fprintf(stdout, "Ouput file: %s\n", outFile);
+        }
+
+        if(s->overwrite == 0 && file_exist(outFile))
     {
       printf("%s exists, skipping.\n", outFile);
     } else {
@@ -124,5 +155,6 @@ int dw_tiff_max(int argc, char ** argv)
     }
     free(outFile);
   }
+  opts_free(s);
   return 0;
 }
