@@ -1273,7 +1273,13 @@ float * deconvolve_eve(afloat * restrict im, const int64_t M, const int64_t N, c
             {
                 afloat * temp = fim_subregion(x, wM, wN, wP, M, N, P);
                 char * outname = gen_iterdump_name(s, it);
-                fulldump(s, temp, M, N, P, outname);
+                //fulldump(s, temp, M, N, P, outname);
+                if(s->outFormat == 32)
+                {
+                    fim_tiff_write_float(outname, temp, NULL, M, N, P, s->log);
+                } else {
+                    fim_tiff_write(outname, temp, NULL, M, N, P, s->log);
+                }
                 free(outname);
                 free(temp);
             }

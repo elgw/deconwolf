@@ -1,5 +1,7 @@
 DECONWOLF(1)							  DECONWOLF(1)
 
+
+
 NAME
        deconwolf  dw  is  a  tool  for	deconvolution of wide field microscopy
        stacks.
@@ -35,7 +37,7 @@ OPTIONS
 	      Set the number of iterations.
 
        --tilesize s
-	      Set the size (axial side length, in pixels) of the largest  por‐
+	      Set the size (axial side length, in pixels) of the largest  por-
 	      tion  that can be deconvolved at a time.	E.g., if s is 2048 any
 	      image larger than 2048 will be deconvolved in tiles.
 
@@ -45,7 +47,7 @@ OPTIONS
        --overwrite
 	      Overwrite the target if it exists.
 
-       --bq n Border/edge handling.  n=0: no padding.  n=1: a  compromise  be‐
+       --bq n Border/edge handling.  n=0: no padding.  n=1: a  compromise  be-
 	      tween memory/speed and quality.  n=2 default.
 
        --float
@@ -57,37 +59,37 @@ OPTIONS
        --help Show a short help message and quit.
 
        --biggs b
-	      Set  b to 0 to turn acceleration off, in that case dw reverts to
+	      Set b to 0 to turn acceleration off, in that case dw reverts  to
 	      the standard Richardson-Lucy method.
 
        --psigma s
-	      Pre-process the image and the PSF by convolving it by a 3-D iso‐
-	      tropic  Gaussian	with sigma=s.  This acts as a low pass filter.
+	      Pre-process the image and the PSF by convolving it by a 3-D iso-
+	      tropic Gaussian with sigma=s.  This acts as a low  pass  filter.
 	      Have been found useful for very noisy image.
 
        maxproj
-	      With maxproj as the first argument  deconwolf  will  create  max
+	      With  maxproj  as  the  first argument deconwolf will create max
 	      projections of all following tif files.  Output will be prefixed
 	      with max_.
 
 While running
        At normal verbosity deconwolf will put one green dot per FFT.  The fMSE
-       value  reported at each iteration is the Mean Squared Error between the
-       input image and the forward projected current guess (i.e. the PSF  con‐
+       value reported at each iteration is the Mean Squared Error between  the
+       input  image and the forward projected current guess (i.e. the PSF con-
        voved with the current guess).
 
 OUTPUT
-       Without	specifying  the output file name, the output file will be pre‐
+       Without specifying the output file name, the output file will  be  pre-
        fixed with dw_, e.g, if you deconvolve file.tif the output file will be
-       called  dw_file.tif.   Please  pay  attention to the log file that also
+       called dw_file.tif.  Please pay attention to the  log  file  that  also
        will be created (as dw_file.tif.log.txt).
 
-       Unless --float was specified the output images will be  scaled  to  use
+       Unless  --float	was  specified the output images will be scaled to use
        the full dynamic range of the 16 bit format.  The scaling factor can be
        found in the log file.
 
 SEE ALSO
-       dw_bw for generation of point spread functions according to  the	 Born-
+       dw_bw  for  generation of point spread functions according to the Born-
        Wolf model.
 
 WEB PAGE
@@ -97,12 +99,14 @@ REPORTING BUGS
        Please report bugs at <https://github.com/elgw/deconwolf/issues/>
 
 COPYRIGHT
-       Copyright © 2022 Erik Wernersson.  License GPLv3+: GNU GPL version 3 or
-       later <https://gnu.org/licenses/gpl.html>.  This is free software:  you
-       are  free  to change and redistribute it.  There is NO WARRANTY, to the
-       extent permitted by law.
+       Copyright (C) 2022 Erik Wernersson.  License GPLv3+: GNU GPL version  3
+       or  later  <https://gnu.org/licenses/gpl.html>.	This is free software:
+       you are free to change and redistribute it.  There is NO  WARRANTY,  to
+       the extent permitted by law.
 
 AUTHORS
        Erik Wernersson.
 
-dw 0.0.24			     2022			  DECONWOLF(1)
+
+
+dw				     2022			  DECONWOLF(1)
