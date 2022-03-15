@@ -49,63 +49,78 @@
  * each new dimension.
  */
 
-#define DW_METHOD_W 0
+
+#define DW_METHOD_EVE 0
 #define DW_METHOD_RL 1
 #define DW_METHOD_ID 2
 
 typedef float afloat;
 
-typedef struct{
-  int nThreads;
-  int nIter;
-  char * imFile;
-  char * psfFile;
-  char * outFile;
-  char * logFile;
-  char * prefix;
-  char * flatfieldFile;
-  FILE * log;
-  int tiling_maxSize;
-  int tiling_padding;
-  int overwrite; /* overwrite output if exist */
-  int method;
-  int verbosity;
-  int showTime; /* For dev: show detailed timings */
-  fftwf_plan fft_plan;
-  fftwf_plan ifft_plan;
-  int iterdump; // Dump each iteration to file ...
 
-  float relax;
-  float bg; /* Background level, 0 by default */
+struct _dw_opts; /* Forward declaration */
+typedef struct _dw_opts dw_opts;
 
-  /* How aggressive should the Biggs acceleration be.
-  *  0 = off,
-  *  1 = low/default, safe for most images
-  *  2 = intermediate
-  *  3 = full, according to the paper
-  */
-  int biggs;
+typedef float * (*dw_method) (afloat * restrict im, const int64_t M, const int64_t N, const int64_t P,
+                              afloat * restrict psf, const int64_t pM, const int64_t pN, const int64_t pP,
+                              dw_opts * s);
 
-  int positivity; // Positivity constraint
-  float xycropfactor; // discard outer slices that are less than this of the central one
-  char * commandline;
-  int borderQuality;
-  int outFormat; // 16 (=16 bit int) or 32 (=32 bit float)
+struct _dw_opts{
+    int nThreads;
+    int nIter;
+    char * imFile;
+    char * psfFile;
+    char * outFile;
+    char * logFile;
+    char * prefix;
+    char * flatfieldFile;
+    FILE * log;
+    int tiling_maxSize;
+    int tiling_padding;
+    int overwrite; /* overwrite output if exist */
 
-  /* sigma of Gaussian used for pre filtering of the image and the PSF
-   * this was found beneficial a paper by Van Kempen
-   *  https://doi.org/10.1046/j.1365-2818.1997.d01-629.x
-   * Not used if psigma <= 0 */
-  double psigma;
+    int verbosity;
+    int showTime; /* For dev: show detailed timings */
+    fftwf_plan fft_plan;
+    fftwf_plan ifft_plan;
+    int iterdump; // Dump each iteration to file ...
 
-  /* Debug/dev options */
-  int onetile; /* For debugging -- only process the first tile if set */
-  int experimental1;
-  int fulldump; /* write also what is outside of the image */
-  /* How far should bigger image sizes be considered? */
-  int lookahead;
-  int eve; /* Use Exponential vector extrapolation */
-} dw_opts;
+    float relax;
+    float bg; /* Background level, 0 by default */
+
+    /* Selection of method */
+    int method; /* DW_METHOD_... */
+    dw_method fun; /* Function pointer */
+
+    /* How aggressive should the Biggs acceleration be.
+     *  0 = off,
+     *  1 = low/default, safe for most images
+     *  2 = intermediate
+     *  3 = full, according to the paper
+     */
+
+    int biggs;
+
+    int positivity; // Positivity constraint
+    float xycropfactor; // discard outer slices that are less than this of the central one
+    char * commandline;
+    int borderQuality;
+    int outFormat; // 16 (=16 bit int) or 32 (=32 bit float)
+
+    /* sigma of Gaussian used for pre filtering of the image and the PSF
+     * this was found beneficial a paper by Van Kempen
+     *  https://doi.org/10.1046/j.1365-2818.1997.d01-629.x
+     * Not used if psigma <= 0 */
+    double psigma;
+
+    /* Debug/dev options */
+    int onetile; /* For debugging -- only process the first tile if set */
+    int experimental1;
+    int fulldump; /* write also what is outside of the image */
+    /* How far should bigger image sizes be considered? */
+    int lookahead;
+    int eve; /* Use Exponential vector extrapolation */
+};
+
 
 dw_opts * dw_opts_new(void);
 void dw_argparsing(int argc, char ** argv, dw_opts * s);
@@ -123,25 +138,11 @@ float * deconvolve_ave(afloat * restrict im, const int64_t M, const int64_t N, c
                        afloat * restrict psf, const int64_t pM, const int64_t pN, const int64_t pP,
                        dw_opts * s);
 
+
 /* Determine Biggs' acceleration parameter alpha  */
 float biggs_alpha(const afloat * restrict g,
                   const afloat * restrict gm,
                   const size_t wMNP, int mode);
-
-
-/* Exponential Vector Extrapolation (EVE) */
-float biggs_alpha_eve(const afloat * restrict Xk,
-                      const afloat * restrict Xkm1,
-                      const afloat * restrict Ukm1,
-                      const afloat * restrict Ukm2,
-                      const size_t wMNP);
-
-/* Exponential vector extrapolation (eve) alpha */
-float biggs_alpha_eve(const afloat * restrict Xk,
-                      const afloat * restrict Xkm1,
-                      const afloat * restrict Ukm1,
-                      const afloat * restrict Ukm2,
-                  const size_t wMNP);
 
 
 /* Autocrop the PSF by:
@@ -149,8 +150,8 @@ float biggs_alpha_eve(const afloat * restrict Xk,
  * 2/ Optionally, trim the sides in x and y where the PSF vanishes.
  */
 float * psf_autocrop(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  // psf and size
-    int64_t M, int64_t N, int64_t P, // image size
-    dw_opts * s);
+                     int64_t M, int64_t N, int64_t P, // image size
+                     dw_opts * s);
 
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"
@@ -164,5 +165,36 @@ float * psf_autocrop(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  // 
 /* Write A to disk as fulldump_<name>.tif if s->fulldump = 1 */
 void fulldump(dw_opts * s, float * A, size_t M, size_t N, size_t P, char * name);
 
+/* Mean squared error between the input, y, and the forward propagated
+ * current guess */
+float getError(const afloat * restrict y, const afloat * restrict g,
+               const int64_t M, const int64_t N, const int64_t P,
+               const int64_t wM, const int64_t wN, const int64_t wP);
+
+
+/* Create initial guess: the fft of an image that is 1 in MNP and 0 outside
+ * M, N, P is the dimension of the microscopic image
+ *
+ * Possibly more stable to use the mean of the input image rather than 1
+ */
+fftwf_complex * initial_guess(const int64_t M, const int64_t N, const int64_t P,
+                              const int64_t wM, const int64_t wN, const int64_t wP);
+
+/* Generate a name for the an iterdump file
+   at iteration it */
+char * gen_iterdump_name(
+    __attribute__((unused)) const dw_opts * s,
+    int it);
+
+
+/* UTILS */
+double clockdiff(struct timespec* end, struct timespec * start);
+/* Show a green dot and flush stdout */
+void putdot(const dw_opts *s);
+int64_t int64_t_max(int64_t a, int64_t b);
+
+#include "method_eve.h"
+#include "method_identity.h"
+#include "method_rl.h"
 
 #endif
