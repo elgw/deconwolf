@@ -148,16 +148,16 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
     switch(s->method)
     {
     case DW_METHOD_EVE:
-        fprintf(f, "method: Biggs EVE\n");
+        fprintf(f, "method: Biggs (EVE)\n");
         break;
     case DW_METHOD_AVE:
-        fprintf(f, "method: Biggs and Andrew AVE\n");
+        fprintf(f, "method: Biggs and Andrews (AVE)\n");
         break;
     case DW_METHOD_RL:
-        fprintf(f, "method: Richardson-Lucy\n");
+        fprintf(f, "method: Richardson-Lucy (RL)\n");
         break;
     case DW_METHOD_ID:
-        fprintf(f, "method: Identity (doing nothing)\n");
+        fprintf(f, "method: Identity, doing nothing (ID)\n");
         break;
     }
     if(s->psigma > 0)
