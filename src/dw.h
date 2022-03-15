@@ -49,10 +49,12 @@
  * each new dimension.
  */
 
-
-#define DW_METHOD_EVE 0
-#define DW_METHOD_RL 1
-#define DW_METHOD_ID 2
+typedef enum {
+    DW_METHOD_EVE, /* Biggs Exponential Vector Extrapolation */
+    DW_METHOD_RL, /* Richardson Lucy */
+    DW_METHOD_ID, /* Identity/nothing. For checking image loading/saving. */
+    DW_METHOD_AVE, /* Biggs-Andrews Additive Vector Extrapolation */
+} dw_method;
 
 typedef float afloat;
 
@@ -60,7 +62,7 @@ typedef float afloat;
 struct _dw_opts; /* Forward declaration */
 typedef struct _dw_opts dw_opts;
 
-typedef float * (*dw_method) (afloat * restrict im, const int64_t M, const int64_t N, const int64_t P,
+typedef float * (*dw_function) (afloat * restrict im, const int64_t M, const int64_t N, const int64_t P,
                               afloat * restrict psf, const int64_t pM, const int64_t pN, const int64_t pP,
                               dw_opts * s);
 
@@ -82,14 +84,14 @@ struct _dw_opts{
     int showTime; /* For dev: show detailed timings */
     fftwf_plan fft_plan;
     fftwf_plan ifft_plan;
-    int iterdump; // Dump each iteration to file ...
+    int iterdump; /* Dump each iteration to file */
 
     float relax;
     float bg; /* Background level, 0 by default */
 
     /* Selection of method */
-    int method; /* DW_METHOD_... */
-    dw_method fun; /* Function pointer */
+    dw_method method; /* what algorithm to use */
+    dw_function fun; /* Function pointer */
 
     /* How aggressive should the Biggs acceleration be.
      *  0 = off,
@@ -193,8 +195,10 @@ double clockdiff(struct timespec* end, struct timespec * start);
 void putdot(const dw_opts *s);
 int64_t int64_t_max(int64_t a, int64_t b);
 
+
 #include "method_eve.h"
 #include "method_identity.h"
 #include "method_rl.h"
+#include "method_ave.h"
 
 #endif
