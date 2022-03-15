@@ -59,9 +59,13 @@ and quality. n=2 default.
 **\--help**
 : Show a short help message and quit.
 
-**\--biggs b**
-: Set b to 0 to turn acceleration off, in that case dw reverts to the standard
-Richardson-Lucy method.
+**\--method METHOD**
+: Select what method to use. Valid options are
+ - `id` identity transform, i.e. nothing. Useful to see if images
+   loads, scales and saves correctly.
+ - `rl` classical Richardson-Lucy.
+ - `ave` Additive Vector Extrapolation by Biggs and Andrews.
+ - `eve` Exponential Vector Extrapolation by Biggs.
 
 **\--psigma s**
 : Pre-process the image and the PSF by convolving it by a 3-D isotropic

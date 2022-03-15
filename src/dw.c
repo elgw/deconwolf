@@ -14,30 +14,8 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
-#include <assert.h>
-#include <stdint.h>
-#include <string.h>
-#include <fftw3.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <getopt.h>
-#include <stdlib.h>
-#include <libgen.h>
-#include <time.h>
-#ifdef _OPENMP // turned on with -fopenmp
-#include <omp.h>
-#endif
-#ifdef MKL
-#include <mkl.h>
-#endif
-#include "fft.h"
+
 #include "dw.h"
-#include "tiling.h"
-#include "fim.h"
-#include "fim_tiff.h"
 
 #define tictoc struct timespec tictoc_start, tictoc_end;
 #define tic clock_gettime(CLOCK_REALTIME, &tictoc_start);
@@ -158,6 +136,9 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
         break;
     case DW_METHOD_ID:
         fprintf(f, "method: Identity, doing nothing (ID)\n");
+        break;
+    case DW_METHOD_SHB:
+        fprintf(f, "method: Scaled Heavy Ball (SHB)\n");
         break;
     }
     if(s->psigma > 0)
@@ -473,9 +454,16 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
                  s->fun = &deconvolve_identity;
                  known_method = 1;
              }
+             if(strcmp(optarg, "shb") == 0)
+             {
+                 s->method = DW_METHOD_SHB;
+                 sprintf(s->prefix, "shb");
+                 s->fun = &deconvolve_shb;
+                 known_method = 1;
+             }
              if(known_method == 0)
              {
-                 fprintf(stderr, "--method %s is unknown. Please specify dw, rl or id\n", optarg);
+                 fprintf(stderr, "--method %s is unknown. Please specify ave, eve (default), shb, rl or id\n", optarg);
                  exit(EXIT_FAILURE);
              }
              break;

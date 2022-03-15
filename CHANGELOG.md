@@ -1,5 +1,11 @@
 # CHANGELOG
 
+- v 0.1.0
+  - Reorganization of code with one file per method.
+  - Separate RL implementation for clarity.
+  - The **--method** argument can be used to switch between several
+    methods, see **--help** or the man page.
+
 - v 0.0.26
  - **dw maxproj** works with file that are not in the current folder.
  - Fixed **--iterdump** not always working.

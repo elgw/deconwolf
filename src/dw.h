@@ -17,29 +17,37 @@
 #ifndef deconwolf_h
 #define deconwolf_h
 
+#include <assert.h>
+#include <inttypes.h>
+#include <fftw3.h>
+#include <getopt.h>
+#include <libgen.h>
+#include <locale.h>
+#include <math.h>
+#include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
-#include <assert.h>
-#include <stdint.h>
-#include <inttypes.h>
 #include <string.h>
-#include <fftw3.h>
 #include <sys/types.h>
-#include <unistd.h>
-#include <getopt.h>
-#include <stdlib.h>
-#include <libgen.h>
 #include <time.h>
+#include <unistd.h>
 #include <wchar.h>
-#include <locale.h>
-#include "fft.h"
-#include "tiling.h"
-#include "fim.h"
-#include "fim_tiff.h"
-#include "dw_version.h"
+
+
+#ifdef _OPENMP // turned on with -fopenmp
+#include <omp.h>
+#endif
+#ifdef MKL
+#include <mkl.h>
+#endif
 
 #include "deconwolf_tif_max.h"
+#include "dw_version.h"
+#include "fim.h"
+#include "fim_tiff.h"
+#include "fft.h"
+#include "tiling.h"
 
 /* fftw3 wisdom data is stored and loaded from
  * $home/.config/
@@ -54,6 +62,7 @@ typedef enum {
     DW_METHOD_RL, /* Richardson Lucy */
     DW_METHOD_ID, /* Identity/nothing. For checking image loading/saving. */
     DW_METHOD_AVE, /* Biggs-Andrews Additive Vector Extrapolation */
+    DW_METHOD_SHB, /* Wang and Miller, Scaled Heavy Ball */
 } dw_method;
 
 typedef float afloat;
@@ -200,5 +209,6 @@ int64_t int64_t_max(int64_t a, int64_t b);
 #include "method_identity.h"
 #include "method_rl.h"
 #include "method_ave.h"
+#include "method_shb.h"
 
 #endif

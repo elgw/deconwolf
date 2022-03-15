@@ -11,4 +11,6 @@ all: dw.txt dw_bw.txt
 %.1: %.md
 	pandoc $< -s -t man -o $@
 	echo "VERSION = $(VERSION)"
-	sed -i '' "s/ABCDE/$(VERSION)/g" $@
+	# on MacOS, use:
+	# sed -i '' "s/ABCDE/$(VERSION)/g" $@
+	sed -i "s/ABCDE/$(VERSION)/g" $@
