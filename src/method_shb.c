@@ -216,13 +216,14 @@ float * deconvolve_shb(afloat * restrict im,
             }
         }
 
-        afloat * p = fim_copy(x, wMNP);
+        //afloat * p = fim_copy(x, wMNP);
+        afloat * p = xp; /* We don't need xp more */
 
             /* Eq. 10 in SHB paper */
             alpha = ((float) it-1.0)/((float) it+2.0);
             //alpha /= 1.5;
             alpha < 0 ? alpha = 0: 0;
-            printf("Alpha = %f\n", alpha);
+
 
 
 #pragma omp parallel for
@@ -243,17 +244,18 @@ float * deconvolve_shb(afloat * restrict im,
         putdot(s);
 
 
-        fftwf_free(xp);
+
         double err = iter_shb(
             &xp, // xp is updated to the next guess
             im,
             cK, // FFT of PSF
             p, // Current guess
-            p,
+            //p,
             W, // Weights (to handle boundaries)
             wM, wN, wP, // Expanded size
             M, N, P, // Original size
             s);
+        fftwf_free(p); // i.e. p
 
         if(1){
             /* Swap so that the current is named x */
@@ -261,7 +263,7 @@ float * deconvolve_shb(afloat * restrict im,
             x = xp;
             xp = t;
         }
-        fftwf_free(p);
+        //fftwf_free(p);
         /* Enforce a priori information about the lowest possible value */
         if(s->positivity)
         {
@@ -303,6 +305,11 @@ float * deconvolve_shb(afloat * restrict im,
         xp = t;
     }
 
+    if(xp != NULL)
+    {
+        fftwf_free(xp);
+    }
+
     if(s->verbosity > 0) {
         printf("\n");
     }
@@ -322,10 +329,6 @@ float * deconvolve_shb(afloat * restrict im,
     {
         fftwf_free(x);
     }
-    if(xp != NULL)
-    {
-        fftwf_free(xp);
-    }
 
 
 
@@ -337,7 +340,7 @@ float iter_shb(
     afloat ** xp, // Output, f_(t+1)
     const float * restrict im, // Input image
     fftwf_complex * restrict cK, // fft(psf)
-    afloat * restrict f, // Current guess
+//    afloat * restrict f, // Current guess
     afloat * restrict pk, // p_k, estimation of the gradient
     afloat * restrict W, // Bertero Weights
     const int64_t wM, const int64_t wN, const int64_t wP, // expanded size
@@ -354,7 +357,7 @@ float iter_shb(
     float error = getError(y, im, M, N, P, wM, wN, wP);
     putdot(s);
 
-    const double mindiv = 1e-6; // Before 2021.11.24: 1e-6
+    const double mindiv = 1e-6; /* Smallest allowed divisor */
 #pragma omp parallel for
     for(size_t cc =0; cc < (size_t) wP; cc++){
         for(size_t bb = 0; bb < (size_t) wN; bb++){
@@ -364,7 +367,7 @@ float iter_shb(
                 if(aa < (size_t) M && bb < (size_t) N && cc < (size_t) P)
                 {
                     /* abs and sign */
-                    //fabs(y[yidx]) < mindiv ? y[yidx] = copysign(mindiv, y[yidx]) : 0;
+                    fabs(y[yidx]) < mindiv ? y[yidx] = copysign(mindiv, y[yidx]) : 0;
                     y[yidx] = im[imidx]/y[yidx];
                 } else {
                     y[yidx]=0;
@@ -382,7 +385,7 @@ float iter_shb(
 #pragma omp parallel for
     for(size_t cc = 0; cc<wMNP; cc++)
     {
-        x[cc] *= f[cc]*W[cc];
+        x[cc] *= pk[cc]*W[cc];
     }
 
     xp[0] = x;

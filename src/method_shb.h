@@ -16,7 +16,6 @@ float iter_shb(
     const float * restrict im, // Input image
     fftwf_complex * restrict cK, // fft(psf)
     afloat * restrict pk, // Current guess
-    afloat * restrict p, // p_k
     afloat * restrict W, // Bertero Weights
     const int64_t wM, const int64_t wN, const int64_t wP, // expanded size
     const int64_t M, const int64_t N, const int64_t P, // input image size
