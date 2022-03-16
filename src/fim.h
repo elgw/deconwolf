@@ -87,7 +87,7 @@ float * fim_get_cuboid(float * restrict A, const int64_t M, const int64_t N, con
  * Y = A(m0:m1, n0:n1, p0:p1)
  */
 
-float * fim_subregion(float * restrict A, const int64_t M, const int64_t N, const int64_t P, const int64_t m, const int64_t n, const int64_t p);
+float * fim_subregion(const float * restrict A, const int64_t M, const int64_t N, const int64_t P, const int64_t m, const int64_t n, const int64_t p);
 /* MATLAB:
  * Y = A(1:m, 1:n, 1:p);
  */

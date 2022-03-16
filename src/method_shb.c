@@ -26,6 +26,7 @@ float * deconvolve_shb(afloat * restrict im,
 
     if(s->nIter == 0)
     {
+        fftw_free(psf);
         return fim_copy(im, M*N*P);
     }
 
@@ -149,18 +150,20 @@ float * deconvolve_shb(afloat * restrict im,
        fftwf_free(Zr);
        --> */
 
-    //printf("initial guess\n"); fflush(stdout);
-    fftwf_complex * F_one = initial_guess(M, N, P, wM, wN, wP);
-    afloat * P1 = fft_convolve_cc_conj_f2(cK, F_one, wM, wN, wP); // can't replace this one with cK!
+
+
     //printf("P1\n");
     //fim_stats(P1, pM*pN*pP);
     //  writetif("P1.tif", P1, wM, wN, wP);
 
     putdot(s);
 
+    afloat * W = NULL;
     /* Sigma in Bertero's paper, introduced for Eq. 17 */
     if(s->borderQuality > 0)
     {
+        fftwf_complex * F_one = initial_guess(M, N, P, wM, wN, wP);
+        afloat * P1 = fft_convolve_cc_conj_f2(cK, F_one, wM, wN, wP); // can't replace this one with cK!
         float sigma = 0.01; // Until 2021.11.25 used 0.001
 #pragma omp parallel for
         for(size_t kk = 0; kk<wMNP; kk++)
@@ -172,16 +175,10 @@ float * deconvolve_shb(afloat * restrict im,
                 P1[kk] = 0;
             }
         }
+        W = P1;
     }
-    else
-    {
-        /* Bq0: Unit weights. TODO: don't need P1 at all here ... */
-        for(size_t kk = 0; kk<wMNP; kk++)
-        {
-            P1[kk] = 1;
-        }
-    }
-    afloat * W = P1;
+
+
 
     float sumg = fim_sum(im, M*N*P);
 
@@ -243,8 +240,6 @@ float * deconvolve_shb(afloat * restrict im,
 
         putdot(s);
 
-
-
         double err = iter_shb(
             &xp, // xp is updated to the next guess
             im,
@@ -294,7 +289,7 @@ float * deconvolve_shb(afloat * restrict im,
 
 
 
-
+        benchmark_write(s, it, err, x, M, N, P, wM, wN, wP);
         it++;
     } // End of main loop
 
@@ -314,7 +309,10 @@ float * deconvolve_shb(afloat * restrict im,
         printf("\n");
     }
 
-    fftwf_free(W); // is P1
+    if(W != NULL)
+    {
+        fftwf_free(W); /* Allocated as P1 */
+    }
     fftwf_free(cK);
 
     if(s->fulldump)
@@ -340,7 +338,6 @@ float iter_shb(
     afloat ** xp, // Output, f_(t+1)
     const float * restrict im, // Input image
     fftwf_complex * restrict cK, // fft(psf)
-//    afloat * restrict f, // Current guess
     afloat * restrict pk, // p_k, estimation of the gradient
     afloat * restrict W, // Bertero Weights
     const int64_t wM, const int64_t wN, const int64_t wP, // expanded size
@@ -382,10 +379,19 @@ float iter_shb(
     afloat * x = fft_convolve_cc_conj_f2(cK, Y, wM, wN, wP); // Y is freed
 
     /* Eq. 18 in Bertero */
-#pragma omp parallel for
-    for(size_t cc = 0; cc<wMNP; cc++)
+    if(W != NULL)
     {
-        x[cc] *= pk[cc]*W[cc];
+#pragma omp parallel for
+        for(size_t cc = 0; cc<wMNP; cc++)
+        {
+            x[cc] *= pk[cc]*W[cc];
+        }
+    } else {
+#pragma omp parallel for
+        for(size_t cc = 0; cc<wMNP; cc++)
+        {
+            x[cc] *= pk[cc];
+        }
     }
 
     xp[0] = x;

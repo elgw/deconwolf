@@ -313,7 +313,7 @@ afloat * fim_get_cuboid(afloat * restrict A, const int64_t M, const int64_t N, c
   return C;
 }
 
-afloat * fim_subregion(afloat * restrict A, const int64_t M, const int64_t N, const int64_t P, const int64_t m, const int64_t n, const int64_t p)
+afloat * fim_subregion(const afloat * restrict A, const int64_t M, const int64_t N, const int64_t P, const int64_t m, const int64_t n, const int64_t p)
 {
     ((void) P);
 

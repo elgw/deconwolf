@@ -1,7 +1,7 @@
 #include "method_ave.h"
 
 
-float biggs_alpha(const afloat * restrict g,
+float alpha_ave(const afloat * restrict g,
                   const afloat * restrict gm,
                   const size_t wMNP, int mode)
 {
@@ -40,10 +40,76 @@ float biggs_alpha(const afloat * restrict g,
 }
 
 
+static float iter_ave(
+            afloat ** xp, // Output, f_(t+1)
+            const float * restrict im, // Input image
+            fftwf_complex * restrict cK, // fft(psf)
+            afloat * restrict f, // Current guess
+            afloat * restrict W, // Bertero Weights
+            const int64_t wM, const int64_t wN, const int64_t wP, // expanded size
+            const int64_t M, const int64_t N, const int64_t P, // input image size
+            __attribute__((unused)) const dw_opts * s)
+ {
+     // We could reduce memory even further by using
+     // the allocation for xp
+     const size_t wMNP = wM*wN*wP;
 
-float * deconvolve_ave(afloat * restrict im, const int64_t M, const int64_t N, const int64_t P,
-                        afloat * restrict psf, const int64_t pM, const int64_t pN, const int64_t pP,
-                        dw_opts * s)
+     fftwf_complex * F = fft(f, wM, wN, wP);
+     putdot(s);
+     afloat * y = fft_convolve_cc_f2(cK, F, wM, wN, wP); // F is freed
+     float error = getError(y, im, M, N, P, wM, wN, wP);
+     putdot(s);
+
+     const double mindiv = 1e-6; // Before 2021.11.24: 1e-6
+#pragma omp parallel for
+     for(size_t cc =0; cc < (size_t) wP; cc++){
+         for(size_t bb = 0; bb < (size_t) wN; bb++){
+             for(size_t aa = 0; aa < (size_t) wM; aa++){
+                 size_t yidx = aa + bb*wM + cc*wM*wN;
+                 size_t imidx = aa + bb*M + cc*M*N;
+                 if(aa < (size_t) M && bb < (size_t) N && cc < (size_t) P)
+                 {
+                     /* abs and sign */
+                     fabs(y[yidx]) < mindiv ? y[yidx] = copysign(mindiv, y[yidx]) : 0;
+                     y[yidx] = im[imidx]/y[yidx];
+                 } else {
+                     y[yidx]=0;
+                 }
+             }
+         }
+     }
+
+     fftwf_complex * F_sn = fft(y, wM, wN, wP);
+     fftwf_free(y);
+
+     afloat * x = fft_convolve_cc_conj_f2(cK, F_sn, wM, wN, wP);
+
+     /* Eq. 18 in Bertero */
+     if(W != NULL)
+     {
+#pragma omp parallel for
+         for(size_t cc = 0; cc<wMNP; cc++)
+         {
+             x[cc] *= f[cc]*W[cc];
+         }
+     } else {
+#pragma omp parallel for
+         for(size_t cc = 0; cc<wMNP; cc++)
+         {
+             x[cc] *= f[cc];
+         }
+     }
+
+     xp[0] = x;
+     return error;
+ }
+
+
+float * deconvolve_ave(afloat * restrict im,
+                       const int64_t M, const int64_t N, const int64_t P,
+                       afloat * restrict psf,
+                       const int64_t pM, const int64_t pN, const int64_t pP,
+                       dw_opts * s)
  {
 
      if(s->verbosity > 3)
@@ -63,6 +129,7 @@ float * deconvolve_ave(afloat * restrict im, const int64_t M, const int64_t N, c
 
      if(s->nIter == 0)
      {
+         free(psf);
          return fim_copy(im, M*N*P);
      }
 
@@ -145,7 +212,7 @@ float * deconvolve_ave(afloat * restrict im, const int64_t M, const int64_t N, c
      fim_insert(Z, wM, wN, wP,
                 psf, pM, pN, pP);
 
-     free(psf);
+     fftwf_free(psf);
 
      /* Shift the PSF so that the mid is at (0,0,0) */
      int64_t midM, midN, midP = -1;
@@ -187,38 +254,34 @@ float * deconvolve_ave(afloat * restrict im, const int64_t M, const int64_t N, c
         --> */
 
      //printf("initial guess\n"); fflush(stdout);
-     fftwf_complex * F_one = initial_guess(M, N, P, wM, wN, wP);
-     afloat * P1 = fft_convolve_cc_conj_f2(cK, F_one, wM, wN, wP); // can't replace this one with cK!
-     //printf("P1\n");
-     //fim_stats(P1, pM*pN*pP);
-     //  writetif("P1.tif", P1, wM, wN, wP);
-
-     putdot(s);
-
-     /* Sigma in Bertero's paper, introduced for Eq. 17 */
+     afloat * W = NULL;
      if(s->borderQuality > 0)
      {
-         float sigma = 0.01; // Until 2021.11.25 used 0.001
-#pragma omp parallel for
-         for(size_t kk = 0; kk<wMNP; kk++)
+         fftwf_complex * F_one = initial_guess(M, N, P, wM, wN, wP);
+         afloat * P1 = fft_convolve_cc_conj_f2(cK, F_one, wM, wN, wP); // can't replace this one with cK!
+         //printf("P1\n");
+         //fim_stats(P1, pM*pN*pP);
+         //  writetif("P1.tif", P1, wM, wN, wP);
+
+         putdot(s);
+
+         /* Sigma in Bertero's paper, introduced for Eq. 17 */
+         if(s->borderQuality > 0)
          {
-             if(P1[kk] > sigma)
+             float sigma = 0.01; // Until 2021.11.25 used 0.001
+#pragma omp parallel for
+             for(size_t kk = 0; kk<wMNP; kk++)
              {
-                 P1[kk] = 1/P1[kk];
-             } else {
-                 P1[kk] = 0;
+                 if(P1[kk] > sigma)
+                 {
+                     P1[kk] = 1/P1[kk];
+                 } else {
+                     P1[kk] = 0;
+                 }
              }
          }
+         W = P1;
      }
-     else
-     {
-         /* Bq0: Unit weights. TODO: don't need P1 at all here ... */
-         for(size_t kk = 0; kk<wMNP; kk++)
-         {
-             P1[kk] = 1;
-         }
-     }
-     afloat * W = P1;
      //writetif("W.tif", W, wM, wN, wP);
 
      // Original image -- expanded
@@ -231,7 +294,7 @@ float * deconvolve_ave(afloat * restrict im, const int64_t M, const int64_t N, c
      float sumg = fim_sum(im, M*N*P);
 
      float alpha = 0;
-     afloat * f = fim_constant(wMNP, sumg/wMNP);
+     afloat * f = fim_constant(wMNP, sumg/(float) wMNP);
      afloat * y = fim_copy(f, wMNP);
 
      afloat * x1 = fim_copy(f, wMNP);
@@ -264,13 +327,15 @@ float * deconvolve_ave(afloat * restrict im, const int64_t M, const int64_t N, c
              }
          }
 
-         if(it > 1)
+
+         if(it == 0)
          {
+             memcpy(y, x, wMNP*sizeof(float));
+         } else {
 #pragma omp parallel for
-             for(size_t kk = 0; kk<wMNP; kk++)
-             {
-                 y[kk] = x[kk] + alpha*(x[kk]-xm[kk]);
-             }
+         for(size_t kk = 0; kk<wMNP; kk++)
+         {
+             y[kk] = x[kk] + alpha*(x[kk]-xm[kk]);
          }
 
          /* Enforce a priori information about the lowest possible value */
@@ -285,7 +350,7 @@ float * deconvolve_ave(afloat * restrict im, const int64_t M, const int64_t N, c
                  }
              }
          }
-
+         }
          if(s->psigma > 0)
          {
              printf("gsmoothing()\n");
@@ -296,7 +361,7 @@ float * deconvolve_ave(afloat * restrict im, const int64_t M, const int64_t N, c
 
          xp = xm;
          fftwf_free(xp);
-         double err = iter(
+         double err = iter_ave(
                            &xp, // xp is updated to the next guess
                            im,
                            cK, // FFT of PSF
@@ -326,7 +391,7 @@ float * deconvolve_ave(afloat * restrict im, const int64_t M, const int64_t N, c
          fim_minus(g, xp, y, wMNP); // g = xp - y
 
          if(it > 0) { /* 20211127 'it > 0' */
-             alpha = biggs_alpha(g, gm, wMNP, s->biggs);
+             alpha = alpha_ave(g, gm, wMNP, s->biggs);
          }
 
          xm = x;
@@ -334,7 +399,7 @@ float * deconvolve_ave(afloat * restrict im, const int64_t M, const int64_t N, c
          xp = NULL;
 
 
-
+         benchmark_write(s, it, err, x, M, N, P, wM, wN, wP);
          it++;
      } // End of main loop
 
@@ -343,7 +408,10 @@ float * deconvolve_ave(afloat * restrict im, const int64_t M, const int64_t N, c
          printf("\n");
      }
 
-     fftwf_free(W); // is P1
+     if(W != NULL)
+     {
+         fftwf_free(W); // is P1
+     }
 
      if(s->fulldump)
      {
@@ -373,58 +441,4 @@ float * deconvolve_ave(afloat * restrict im, const int64_t M, const int64_t N, c
      //  { fftwf_free(cKr); }
      fftwf_free(y);
      return out;
- }
-
-
-float iter(
-            afloat ** xp, // Output, f_(t+1)
-            const float * restrict im, // Input image
-            fftwf_complex * restrict cK, // fft(psf)
-            afloat * restrict f, // Current guess
-            afloat * restrict W, // Bertero Weights
-            const int64_t wM, const int64_t wN, const int64_t wP, // expanded size
-            const int64_t M, const int64_t N, const int64_t P, // input image size
-            __attribute__((unused)) const dw_opts * s)
- {
-     // We could reduce memory even further by using
-     // the allocation for xp
-     const size_t wMNP = wM*wN*wP;
-
-     fftwf_complex * F = fft(f, wM, wN, wP);
-     putdot(s);
-     afloat * y = fft_convolve_cc_f2(cK, F, wM, wN, wP); // F is freed
-     float error = getError(y, im, M, N, P, wM, wN, wP);
-     putdot(s);
-
-     const double mindiv = 1e-6; // Before 2021.11.24: 1e-6
-#pragma omp parallel for
-     for(size_t cc =0; cc < (size_t) wP; cc++){
-         for(size_t bb = 0; bb < (size_t) wN; bb++){
-             for(size_t aa = 0; aa < (size_t) wM; aa++){
-                 size_t yidx = aa + bb*wM + cc*wM*wN;
-                 size_t imidx = aa + bb*M + cc*M*N;
-                 if(aa < (size_t) M && bb < (size_t) N && cc < (size_t) P)
-                 {
-                     /* abs and sign */
-                     fabs(y[yidx]) < mindiv ? y[yidx] = copysign(mindiv, y[yidx]) : 0;
-                     y[yidx] = im[imidx]/y[yidx];
-                 } else {
-                     y[yidx]=0;
-                 }
-             }
-         }
-     }
-
-     fftwf_complex * F_sn = fft(y, wM, wN, wP);
-     fftwf_free(y);
-
-     afloat * x = fft_convolve_cc_conj_f2(cK, F_sn, wM, wN, wP);
-
-     /* Eq. 18 in Bertero */
-#pragma omp parallel for
-     for(size_t cc = 0; cc<wMNP; cc++)
-     { x[cc] *= f[cc]*W[cc]; }
-
-     xp[0] = x;
-     return error;
  }

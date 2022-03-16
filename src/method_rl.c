@@ -311,6 +311,7 @@
              }
          }
 
+         benchmark_write(s, it, err, x, M, N, P, wM, wN, wP);
 
          it++;
      } /* End of main loop */

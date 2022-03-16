@@ -5,6 +5,12 @@
   - Separate RL implementation for clarity.
   - The **--method** argument can be used to switch between several
     methods, see **--help** or the man page.
+  - Implements the 'Scaled Heavy Ball'. More
+    memory efficient than eve and about the same speed and image
+    quality. Might become the default method.
+  - OMP is set to use as many cores as FFTW.
+  - Introduces the **--tsv** argument to save information per
+    iteration to a separate tsv file.
 
 - v 0.0.26
  - **dw maxproj** works with file that are not in the current folder.

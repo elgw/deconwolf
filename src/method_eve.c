@@ -131,6 +131,7 @@
 
      if(s->nIter == 0)
      {
+         free(psf);
          return fim_copy(im, M*N*P);
      }
 
@@ -279,7 +280,7 @@
 
      float alpha = 0;
 
-     afloat * f = fim_constant(wMNP, sumg/wMNP); /* Initial guess */
+     afloat * f = fim_constant(wMNP, sumg/(float) wMNP); /* Initial guess */
      afloat * y = fim_copy(f, wMNP);
      afloat * x1 = fim_copy(f, wMNP);
      afloat * x2 = fim_copy(f, wMNP);
@@ -436,7 +437,7 @@
          xm = x;
          x = xp;
          xp = NULL;
-
+         benchmark_write(s, it, err, x, M, N, P, wM, wN, wP);
          it++;
      } /* End of main loop */
 
@@ -451,22 +452,26 @@
 
      fulldump(s, x, wM, wN, wP, "fulldump_x.tif");
 
-     /* Extract the observed region from the last iteration */
-     afloat * out = fim_subregion(x, wM, wN, wP, M, N, P);
 
      fftwf_free(f);
-     if(x != NULL)
-     {
-         fftwf_free(x); x = NULL;
-     }
+
      if(xm != NULL)
      {
          fftwf_free(xm);
          xm = NULL;
      }
+
      fftwf_free(g);
      fftwf_free(gm);
      fftwf_free(fftPSF);
      fftwf_free(y);
+
+     /* Extract the observed region from the last iteration */
+     afloat * out = fim_subregion(x, wM, wN, wP, M, N, P);
+
+     if(x != NULL)
+     {
+         fftwf_free(x); x = NULL;
+     }
      return out;
  }

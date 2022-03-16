@@ -25,6 +25,7 @@
 #include <locale.h>
 #include <math.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -80,11 +81,15 @@ struct _dw_opts{
     int nIter;
     char * imFile;
     char * psfFile;
+    char * refFile; /* Name of reference image */
+    char * tsvFile; /* Where to write tsv benchmark data */
+    afloat * ref; /* Reference image */
     char * outFile;
     char * logFile;
     char * prefix;
     char * flatfieldFile;
     FILE * log;
+    FILE * tsv;
     int tiling_maxSize;
     int tiling_padding;
     int overwrite; /* overwrite output if exist */
@@ -130,6 +135,8 @@ struct _dw_opts{
     /* How far should bigger image sizes be considered? */
     int lookahead;
     int eve; /* Use Exponential vector extrapolation */
+
+    struct timespec tstart;
 };
 
 
@@ -176,11 +183,23 @@ float * psf_autocrop(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  // 
 /* Write A to disk as fulldump_<name>.tif if s->fulldump = 1 */
 void fulldump(dw_opts * s, float * A, size_t M, size_t N, size_t P, char * name);
 
-/* Mean squared error between the input, y, and the forward propagated
- * current guess */
+/* Passes on to got_fMSE at the moment */
 float getError(const afloat * restrict y, const afloat * restrict g,
                const int64_t M, const int64_t N, const int64_t P,
                const int64_t wM, const int64_t wN, const int64_t wP);
+
+
+/* Mean squared error between the input, y, and the forward propagated
+ * current guess */
+float get_fMSE(const afloat * restrict y, const afloat * restrict g,
+               const int64_t M, const int64_t N, const int64_t P,
+               const int64_t wM, const int64_t wN, const int64_t wP);
+
+/* Idiv between the input, y, and the forward propagated current
+ * guess */
+float get_fIdiv(const afloat * restrict y, const afloat * restrict g,
+                const int64_t M, const int64_t N, const int64_t P,
+                const int64_t wM, const int64_t wN, const int64_t wP);
 
 
 /* Create initial guess: the fft of an image that is 1 in MNP and 0 outside
@@ -203,6 +222,13 @@ double clockdiff(struct timespec* end, struct timespec * start);
 /* Show a green dot and flush stdout */
 void putdot(const dw_opts *s);
 int64_t int64_t_max(int64_t a, int64_t b);
+
+/* Write diagostics to s->tsv if open
+ * To do: add timings as well (excluding) this function
+*/
+void benchmark_write(dw_opts * s, int iter, double fMSE,const afloat * x,
+                     const int64_t M, const int64_t N, const int64_t P,
+                     const int64_t wM, const int64_t wN, const int64_t wP);
 
 
 #include "method_eve.h"
