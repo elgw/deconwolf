@@ -16,7 +16,7 @@
      float numerator = 0;
      float denominator = 0;
 
-#pragma omp parallel for reduction(+:numerator, denominator)
+#pragma omp parallel for reduction(+:numerator, denominator) shared(Xk, Xkm1)
      for(size_t kk = 0; kk < wMNP; kk++)
      {
          if( (Ukm1[kk] > 0) && (Ukm2[kk] > 0) ) /* Why is U 0 ? */
@@ -62,7 +62,7 @@
 
 
      int y_has_zero = 0;
-#pragma omp parallel for
+#pragma omp parallel for shared(y, im)
      for(size_t cc = 0; cc < (size_t) wP; cc++){
          for(size_t bb = 0; bb < (size_t) wN; bb++){
              for(size_t aa = 0; aa < (size_t) wM; aa++){
@@ -101,13 +101,13 @@
      /* Eq. 18 in Bertero */
      if(W != NULL)
      {
-#pragma omp parallel for
+#pragma omp parallel for shared(x,f,W)
          for(size_t cc = 0; cc<wMNP; cc++)
          {
              x[cc] *= f[cc]*W[cc];
          }
      } else {
-#pragma omp parallel for
+#pragma omp parallel for shared(x,f)
          for(size_t cc = 0; cc<wMNP; cc++)
          {
              x[cc] *= f[cc];
@@ -258,7 +258,7 @@
          {
              /* Sigma in Bertero's paper, introduced for Eq. 17 */
              float sigma = 0.01; // Until 2021.11.25 used 0.001
-#pragma omp parallel for
+#pragma omp parallel for shared(W)
              for(size_t kk = 0; kk<wMNP; kk++)
              {
                  if(W[kk] > sigma)
@@ -340,7 +340,7 @@
 
              clock_gettime(CLOCK_REALTIME, &tstart);
              // printf("Alpha = %f\n", alpha);
-#pragma omp parallel for
+#pragma omp parallel for shared(xm, x, y)
              for(size_t kk = 0; kk<wMNP; kk++)
              {
                  if(xm[kk] > 0 && x[kk] > 0)
@@ -354,7 +354,7 @@
              }
          } else {
              /* Biggs accelaration disabled */
-#pragma omp parallel for
+#pragma omp parallel for shared(xm, y, x)
              for(size_t kk = 0; kk<wMNP; kk++)
              {
                  if(xm[kk] > 0)
@@ -424,7 +424,7 @@
 
          if(s->bg > 0)
          {
-#pragma omp parallel for
+#pragma omp parallel for shared(xp)
              for(size_t kk = 0; kk<wMNP; kk++)
              {
                  if(xp[kk] < s->bg)

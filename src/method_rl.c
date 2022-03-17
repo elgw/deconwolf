@@ -21,7 +21,7 @@
      float error = getError(y, im, M, N, P, wM, wN, wP);
 
      int y_has_zero = 0;
-#pragma omp parallel for
+#pragma omp parallel for shared(im, y)
      for(size_t cc = 0; cc < (size_t) wP; cc++){
          for(size_t bb = 0; bb < (size_t) wN; bb++){
              for(size_t aa = 0; aa < (size_t) wM; aa++){
@@ -61,13 +61,13 @@
      /* Eq. 18 in Bertero */
      if(W != NULL)
      {
-#pragma omp parallel for
+#pragma omp parallel for shared(x,f,W)
          for(size_t cc = 0; cc<wMNP; cc++)
          {
              x[cc] *= f[cc]*W[cc];
          }
      } else {
-#pragma omp parallel for
+#pragma omp parallel for shared(x,f)
          for(size_t cc = 0; cc<wMNP; cc++)
          {
              x[cc] *= f[cc];
@@ -216,7 +216,7 @@
          {
              /* Sigma in Bertero's paper, introduced for Eq. 17 */
              float sigma = 0.01; // Until 2021.11.25 used 0.001
-#pragma omp parallel for
+#pragma omp parallel for shared(W)
              for(size_t kk = 0; kk<wMNP; kk++)
              {
                  if(W[kk] > sigma)
@@ -301,7 +301,7 @@
 
          if(s->bg > 0)
          {
-#pragma omp parallel for
+#pragma omp parallel for shared(x)
              for(size_t kk = 0; kk<wMNP; kk++)
              {
                  if(x[kk] < s->bg)

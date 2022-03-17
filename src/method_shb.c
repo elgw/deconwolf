@@ -103,7 +103,7 @@ float * deconvolve_shb(afloat * restrict im,
     }
 
     // cK : "full size" fft of the PSF
-    afloat * Z = fftwf_malloc(wMNP*sizeof(float));
+   afloat * Z = fftwf_malloc(wMNP*sizeof(float));
     memset(Z, 0, wMNP*sizeof(float));
     /* Insert the psf into the bigger Z */
     fim_insert(Z, wM, wN, wP,
@@ -165,7 +165,7 @@ float * deconvolve_shb(afloat * restrict im,
         fftwf_complex * F_one = initial_guess(M, N, P, wM, wN, wP);
         afloat * P1 = fft_convolve_cc_conj_f2(cK, F_one, wM, wN, wP); // can't replace this one with cK!
         float sigma = 0.01; // Until 2021.11.25 used 0.001
-#pragma omp parallel for
+#pragma omp parallel for shared(P1)
         for(size_t kk = 0; kk<wMNP; kk++)
         {
             if(P1[kk] > sigma)
@@ -223,7 +223,7 @@ float * deconvolve_shb(afloat * restrict im,
 
 
 
-#pragma omp parallel for
+#pragma omp parallel for shared(p, x, xp)
             /* To be interpreted as p^k in Eq. 7 of SHB */
             for(size_t kk = 0; kk<wMNP; kk++)
             {
@@ -262,7 +262,7 @@ float * deconvolve_shb(afloat * restrict im,
         /* Enforce a priori information about the lowest possible value */
         if(s->positivity)
         {
-#pragma omp parallel for
+#pragma omp parallel for shared(x)
             for(size_t kk = 0; kk<wMNP; kk++)
             {
                 if(x[kk] < s->bg)
@@ -355,7 +355,7 @@ float iter_shb(
     putdot(s);
 
     const double mindiv = 1e-6; /* Smallest allowed divisor */
-#pragma omp parallel for
+#pragma omp parallel for shared(y, im)
     for(size_t cc =0; cc < (size_t) wP; cc++){
         for(size_t bb = 0; bb < (size_t) wN; bb++){
             for(size_t aa = 0; aa < (size_t) wM; aa++){
@@ -381,13 +381,13 @@ float iter_shb(
     /* Eq. 18 in Bertero */
     if(W != NULL)
     {
-#pragma omp parallel for
+#pragma omp parallel for shared(x, pk, W)
         for(size_t cc = 0; cc<wMNP; cc++)
         {
             x[cc] *= pk[cc]*W[cc];
         }
     } else {
-#pragma omp parallel for
+#pragma omp parallel for shared(x, pk)
         for(size_t cc = 0; cc<wMNP; cc++)
         {
             x[cc] *= pk[cc];

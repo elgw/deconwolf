@@ -9,7 +9,7 @@ float alpha_ave(const afloat * restrict g,
     double ggm = 0;
     double gmgm = 0;
 
-#pragma omp parallel for reduction(+: ggm, gmgm)
+#pragma omp parallel for reduction(+: ggm, gmgm) shared(g, gm)
     for(size_t kk = 0; kk<wMNP; kk++)
     {
         ggm += g[kk]*gm[kk];
@@ -61,7 +61,7 @@ static float iter_ave(
      putdot(s);
 
      const double mindiv = 1e-6; // Before 2021.11.24: 1e-6
-#pragma omp parallel for
+#pragma omp parallel for shared(y)
      for(size_t cc =0; cc < (size_t) wP; cc++){
          for(size_t bb = 0; bb < (size_t) wN; bb++){
              for(size_t aa = 0; aa < (size_t) wM; aa++){
@@ -87,13 +87,13 @@ static float iter_ave(
      /* Eq. 18 in Bertero */
      if(W != NULL)
      {
-#pragma omp parallel for
+#pragma omp parallel for shared(x, f, W)
          for(size_t cc = 0; cc<wMNP; cc++)
          {
              x[cc] *= f[cc]*W[cc];
          }
      } else {
-#pragma omp parallel for
+#pragma omp parallel for shared(x, f)
          for(size_t cc = 0; cc<wMNP; cc++)
          {
              x[cc] *= f[cc];
@@ -269,7 +269,7 @@ float * deconvolve_ave(afloat * restrict im,
          if(s->borderQuality > 0)
          {
              float sigma = 0.01; // Until 2021.11.25 used 0.001
-#pragma omp parallel for
+#pragma omp parallel for shared(P1)
              for(size_t kk = 0; kk<wMNP; kk++)
              {
                  if(P1[kk] > sigma)
@@ -332,7 +332,7 @@ float * deconvolve_ave(afloat * restrict im,
          {
              memcpy(y, x, wMNP*sizeof(float));
          } else {
-#pragma omp parallel for
+#pragma omp parallel for shared(y,x,xm)
          for(size_t kk = 0; kk<wMNP; kk++)
          {
              y[kk] = x[kk] + alpha*(x[kk]-xm[kk]);
@@ -341,7 +341,7 @@ float * deconvolve_ave(afloat * restrict im,
          /* Enforce a priori information about the lowest possible value */
          if(s->positivity)
          {
-#pragma omp parallel for
+#pragma omp parallel for shared(y)
              for(size_t kk = 0; kk<wMNP; kk++)
              {
                  if(y[kk] < s->bg)

@@ -106,7 +106,7 @@ void fim_argmax(const float * I,
 float fim_sum(const afloat * restrict A, size_t N)
 {
   double sum = 0;
-#pragma omp parallel for reduction(+:sum)
+#pragma omp parallel for shared(A) reduction(+:sum)
   for(size_t kk = 0; kk<N; kk++)
   {
       sum+=(double) A[kk];
@@ -139,7 +139,7 @@ void fim_div(afloat * restrict  A,
 {
     size_t kk = 0;
 
-#pragma omp parallel for
+#pragma omp parallel for shared(A, B, C)
     for(kk = 0; kk<N; kk++)
     {
         A[kk] = B[kk]/C[kk];
@@ -157,7 +157,7 @@ void fim_minus(afloat * restrict  A,
 {
   size_t kk = 0;
 
-#pragma omp parallel for
+#pragma omp parallel for shared(A,B,C)
   for(kk = 0; kk<N; kk++)
   {
     A[kk] = B[kk] - C[kk];
@@ -192,6 +192,7 @@ float fim_mse(afloat * A, afloat * B, size_t N)
   */
 {
   double mse = 0;
+#pragma omp parallel for reduction(+:mse) shared(A, B)
   for(size_t kk = 0; kk<N; kk++)
   {
     mse += pow(A[kk]-B[kk], 2);
@@ -202,6 +203,7 @@ float fim_mse(afloat * A, afloat * B, size_t N)
 void fim_flipall(afloat * restrict T, const afloat * restrict A, const int64_t a1, const int64_t a2, const int64_t a3)
   /* Equivalent to T = flip(flip(flip(A,1),2),3) in matlab */
 {
+#pragma omp parallel for shared(T, A)
   for(int64_t aa = 0; aa<a1; aa++){
     for(int64_t bb = 0; bb<a2; bb++){
       for(int64_t cc = 0; cc<a3; cc++){
@@ -232,6 +234,7 @@ void fim_insert(afloat * restrict T, const int64_t t1, const int64_t t2, const i
                f1, f2, f3, t1, t2, t3);
         exit(-1);
     }
+#pragma omp parallel for shared(T, F)
   for(int64_t pp = 0; pp<f3; pp++)
   {
     for(int64_t nn = 0; nn<f2; nn++)
@@ -262,6 +265,7 @@ void fim_insert_ref(afloat * T, int64_t t1, int64_t t2, int64_t t3,
                f1, f2, f3, t1, t2, t3);
         exit(-1);
     }
+#pragma omp parallel for shared(F, T)
     for(int64_t mm = 0; mm<f1; mm++)
   {
     for(int64_t nn = 0; nn<f2; nn++)
@@ -292,6 +296,7 @@ afloat * fim_get_cuboid(afloat * restrict A, const int64_t M, const int64_t N, c
   afloat * C = fftwf_malloc(m*n*p*sizeof(float));
   assert(C != NULL);
 
+#pragma omp parallel for shared(C, A)
   for(int64_t aa = m0; aa <= m1; aa++)
   {
     for(int64_t bb = n0; bb <= n1; bb++)
@@ -320,6 +325,7 @@ afloat * fim_subregion(const afloat * restrict A, const int64_t M, const int64_t
   /* Extract sub region starting at (0,0,0) */
   afloat * S = fftwf_malloc(m*n*p*sizeof(float));
   assert(S != NULL);
+#pragma omp parallel for shared(S, A)
   for(int64_t pp = 0; pp<p; pp++)
   {
     for(int64_t nn = 0; nn<n; nn++)
@@ -362,6 +368,7 @@ afloat * fim_subregion_ref(afloat * A, int64_t M, int64_t N, int64_t P, int64_t 
 void fim_set_min_to_zero(afloat * I, size_t N)
 {
   float min = fim_min(I, N);
+#pragma omp parallel for shared(I)
   for(size_t kk = 0; kk<N; kk++)
   {
     I[kk] -= min;
@@ -370,6 +377,7 @@ void fim_set_min_to_zero(afloat * I, size_t N)
 
 void fim_mult_scalar(afloat * I, size_t N, float x)
 {
+#pragma omp parallel for shared(I)
   for(size_t kk = 0; kk < N ; kk++)
   {
     I[kk]*=x;
@@ -384,9 +392,11 @@ void fim_normalize_sum1(afloat * psf, int64_t M, int64_t N, int64_t P)
 {
   size_t pMNP = M*N*P;;
   double psf_sum = 0;
+#pragma omp parallel for shared(psf) reduction(+:psf_sum)
   for(size_t kk = 0; kk<pMNP; kk++)
   { psf_sum += psf[kk]; }
   //  printf("psf_sum: %f\n", psf_sum);
+#pragma omp parallel for shared(psf)
   for(size_t kk = 0; kk<pMNP; kk++)
   { psf[kk]/=psf_sum; }
 }
@@ -411,6 +421,7 @@ afloat * fim_constant(const size_t N, const float value)
   // Allocate and return an array of N floats sets to a constant value
 {
   afloat * A = fftwf_malloc(N*sizeof(float));
+#pragma omp parallel for shared(A)
   for(size_t kk = 0; kk<N; kk++)
   {
     A[kk] = value;
@@ -424,13 +435,13 @@ void fim_circshift(afloat * restrict A,
   /* Shift the image A [MxNxP] by sm, sn, sp in each dimension */
 {
 
+    /* TODO set up buffer space for all threads */
   const size_t bsize = fmax(fmax(M, N), P);
-//#pragma omp parallel
+  //#pragma omp parallel
   {
     afloat * restrict buf = malloc(bsize*sizeof(float));
 
     // Dimension 1
-//#pragma omp for
     for(int64_t cc = 0; cc<P; cc++)
     {
       for(int64_t bb = 0; bb<N; bb++)

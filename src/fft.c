@@ -246,7 +246,7 @@ void fft_mul_conj(fftwf_complex * restrict C,
     size_t N = (n1+3)/2*n2*n3;
     // C = A*B
     size_t kk = 0;
-#pragma omp parallel for
+#pragma omp parallel for shared(A, B, C)
     for(kk = 0; kk<N; kk++)
     {
         float a = A[kk][0]; float ac = -A[kk][1];
@@ -276,7 +276,7 @@ afloat * fft_convolve_cc_f2(fftwf_complex * A, fftwf_complex * B,
 
     const size_t MNP = M*N*P;
 
-#pragma omp parallel for
+#pragma omp parallel for shared(out)
     for(size_t kk = 0; kk < MNP; kk++)
     {
         out[kk]/=(MNP);
@@ -307,7 +307,7 @@ afloat * fft_convolve_cc_conj_f2(fftwf_complex * A, fftwf_complex * B,
     fftwf_free(C);
     const float MNP_float = (float) M*N*P;
     const size_t MNP = M*N*P;
-#pragma omp parallel for
+#pragma omp parallel for shared(out)
     for(size_t kk = 0; kk < MNP; kk++)
     {
         out[kk] /= MNP_float;
@@ -334,6 +334,7 @@ afloat * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B,
     fftwf_free(C);
 
     const size_t MNP = M*N*P;
+#pragma omp parallel for shared(out)
     for(size_t kk = 0; kk<MNP; kk++)
     {
         out[kk]/=(MNP);
@@ -358,6 +359,7 @@ afloat * fft_convolve_cc_conj(fftwf_complex * A, fftwf_complex * B,
     fftwf_free(C);
 
     const size_t MNP = M*N*P;
+#pragma omp parallel for shared(out)
     for(size_t kk = 0; kk<MNP; kk++)
     {
         out[kk]/=(MNP);

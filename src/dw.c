@@ -358,6 +358,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     };
 
 
+    int known_method = 1;
     int ch;
     while((ch = getopt_long(argc, argv,
                             "a:b:c:f:ghil:m:n:o:p:r:s:tvwx:B:C:DFI:L:R:TPQ:X:",
@@ -444,7 +445,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             strcpy(s->prefix, optarg);
             break;
         case 'm':
-            int known_method = 0;
+            known_method = 0;
             if(strcmp(optarg, "eve") == 0)
             {
                 s->method = DW_METHOD_EVE;
@@ -817,7 +818,7 @@ float get_fMSE(const afloat * restrict y, const afloat * restrict g,
         exit(-1);
     }
     float e = 0;
-#pragma omp parallel for reduction(+: e)
+#pragma omp parallel for reduction(+: e) shared(y, g)
     for(int64_t c = 0; c<P; c++)
     {
         for(int64_t b = 0; b<N; b++)
@@ -848,7 +849,7 @@ float get_fIdiv(const afloat * restrict y, const afloat * restrict g,
         exit(-1);
     }
     float I = 0;
-#pragma omp parallel for reduction(+: I)
+#pragma omp parallel for reduction(+: I) shared(y, g)
     for(int64_t c = 0; c<P; c++)
     {
         for(int64_t b = 0; b<N; b++)
@@ -927,7 +928,7 @@ fftwf_complex * initial_guess(const int64_t M, const int64_t N, const int64_t P,
 
     afloat * one = fim_zeros(wM*wN*wP);
 
-#pragma omp parallel for
+#pragma omp parallel for shared(one)
     for(int64_t cc = 0; cc < P; cc++) {
         for(int64_t bb = 0; bb < N; bb++) {
             for(int64_t aa = 0; aa < M; aa++) {
