@@ -801,8 +801,8 @@ float getError(const afloat * restrict y, const afloat * restrict g,
 {
     /* Idiv is a better distance measurement but it takes longer to
        calculate due to the log function. */
-    return get_fMSE(y, g, M, N, P, wM, wN, wP);
-    //return get_fIdiv(y, g, M, N, P, wM, wN, wP);
+    //return get_fMSE(y, g, M, N, P, wM, wN, wP);
+    return get_fIdiv(y, g, M, N, P, wM, wN, wP);
 }
 
 float get_fMSE(const afloat * restrict y, const afloat * restrict g,

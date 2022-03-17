@@ -11,12 +11,13 @@
       * Full single precision accuracy is probably not needed,
       * so we could think of using approximate calculations
       * or sampling.
+      * 0 < \alpha_k < 1
       */
 
      float numerator = 0;
      float denominator = 0;
 
-#pragma omp parallel for reduction(+:numerator, denominator) shared(Xk, Xkm1)
+#pragma omp parallel for reduction(+:numerator, denominator) shared(Xk, Xkm1, Ukm1, Ukm2)
      for(size_t kk = 0; kk < wMNP; kk++)
      {
          if( (Ukm1[kk] > 0) && (Ukm2[kk] > 0) ) /* Why is U 0 ? */
@@ -34,9 +35,10 @@
          return 0;
      }
      float alpha = numerator / denominator;
-     alpha < 0 ? alpha = 0 : 0;
-     alpha > 1.0 ? alpha = 1.0 : 0;
-     alpha *= 0.98; /* Cap at 0.95 */
+     float minalpha = 0.01;
+     float maxalpha = 0.98;
+     alpha < minalpha ? alpha = minalpha : 0;
+     alpha > maxalpha ? alpha = maxalpha : 0;
      return alpha;
  }
 
@@ -328,8 +330,9 @@
              if(s->showTime){
                  printf("\n--timing alpha: %f\n", clockdiff(&tend, &tstart));
              }
-
+             //printf("alpha = %f\n", alpha);
              alpha = powf(alpha, 1.1);
+             //printf("alpha = %f\n", alpha);
 
              if(alpha > alpha_last)
              {
@@ -340,18 +343,22 @@
 
              clock_gettime(CLOCK_REALTIME, &tstart);
              // printf("Alpha = %f\n", alpha);
+             float minvalue = 1e-6;
 #pragma omp parallel for shared(xm, x, y)
              for(size_t kk = 0; kk<wMNP; kk++)
              {
-                 if(xm[kk] > 0 && x[kk] > 0)
+                 if(xm[kk] > minvalue)
                  {
                      y[kk] = x[kk]*powf(x[kk]/xm[kk], alpha);
                  }
                  else
                  {
-                     y[kk] = 1e-6;
+                     y[kk] = minvalue;
                  }
              }
+             /* Possibly: Set back to pre-extrapolated value (i.e. x) if
+              *  the likelihood didn't increase
+              */
          } else {
              /* Biggs accelaration disabled */
 #pragma omp parallel for shared(xm, y, x)
@@ -400,18 +407,22 @@
              g = gm; gm = swap;
          }
 
-         fim_div(g, xp, y, wMNP); // g = xp/y "g is Biggs u_k"
+         /* The "correction factor" u_k in Biggs */
+         fim_div(g, xp, y, wMNP); // g = xp/y
 
-         if(1){
+         /* Any zero pixels have their correction factor set to unity */
+#pragma omp parallel for shared(y,g)
              for(size_t kk = 0; kk<wMNP; kk++)
              {
-                 if(y[kk] == 0)
+                 if(y[kk] <= s->bg)
                  {
-                     g[kk] = xp[kk];
+                     g[kk] = 1;
                  }
-             }}
+             }
+
          if(W != NULL)
          {
+#pragma omp parallel for shared(W, g)
              for(size_t kk = 0; kk<wMNP; kk++)
              {
 
