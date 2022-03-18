@@ -250,7 +250,8 @@ void fim_insert(afloat * restrict T, const int64_t t1, const int64_t t2, const i
 
 void fim_insert_ref(afloat * T, int64_t t1, int64_t t2, int64_t t3,
                     afloat * F, int64_t f1, int64_t f2, int64_t f3)
-/* Insert F [f1xf2xf3] into T [t1xt2xt3] in the "upper left" corner */
+/* Insert F [f1xf2xf3] into T [t1xt2xt3] in the "upper left" corner
+* Target, T is larger than F*/
 {
     if(f3 > t3 || f2 > t2 || f1 > t1)
     {
@@ -435,38 +436,42 @@ void fim_circshift(afloat * restrict A,
 /* Shift the image A [MxNxP] by sm, sn, sp in each dimension */
 {
 
-    /* TODO set up buffer space for all threads */
 
 
     int nThreads = 0;
 
 #pragma omp parallel
     {
-            nThreads = omp_get_num_threads();
+                  nThreads = omp_get_num_threads();
     }
 
-    printf("nThreads=%d\n", nThreads);
+    printf("will use nThreads=%d\n", nThreads);
     const size_t bsize = fmax(fmax(M, N), P);
-    afloat * restrict buf = malloc(nThreads*bsize*sizeof(float));
+    afloat * restrict buf = malloc(bsize*sizeof(float)*nThreads);
 
 
-    // Dimension 1
-#pragma omp parallel for shared(A, buf)
+    /* Dimension 1 */
+#pragma omp parallel for
     for(int64_t cc = 0; cc<P; cc++)
     {
         float * tbuf = buf + bsize*omp_get_thread_num();
         for(int64_t bb = 0; bb<N; bb++)
         {
             //shift_vector(A + bb*M + cc*M*N, 1, M, sm);
-            shift_vector_buf(A + bb*M + cc*M*N, 1, M, sm, tbuf);
+            shift_vector_buf(A + bb*M + cc*M*N, // start
+                             1, // stride
+                             M, // number of elements
+                             sm, // shift
+                             tbuf); // buffer
         }
     }
 
-    // Dimension 2
-#pragma omp parallel for shared(A, buf)
+    /* Dimension 2 */
+#pragma omp parallel for
     for(int64_t cc = 0; cc<P; cc++)
     {
         float * tbuf = buf + bsize*omp_get_thread_num();
+        //printf("Thread num: %d\n", omp_get_thread_num());
         for(int64_t aa = 0; aa<M; aa++)
         {
             //shift_vector(A + aa+cc*M*N, M, N, sn);
@@ -474,8 +479,8 @@ void fim_circshift(afloat * restrict A,
         }
     }
 
-    // Dimension 3
-#pragma omp parallel for shared(A, buf)
+    /* Dimension 3 */
+#pragma omp parallel for
     for(int64_t bb = 0; bb<N; bb++)
     {
         float * tbuf = buf + bsize*omp_get_thread_num();
@@ -488,6 +493,15 @@ void fim_circshift(afloat * restrict A,
 
     free(buf);
 
+#if 0
+    char name[100];
+    sprintf(name, "shift%d.raw", nThreads);
+    printf("Debugdump to %s\n", name);
+    FILE *fid = fopen(name, "w");
+    fwrite(A, sizeof(float), M*N*P, fid);
+    fclose(fid);
+#endif
+
     return;
 }
 
@@ -498,10 +512,11 @@ INLINED static int64_t mod_int(const int64_t a, const int64_t b)
     return r < 0 ? r + b : r;
 }
 
-void shift_vector_buf(afloat * restrict V,
-                      const int64_t S,
-                      const int64_t N,
-                      int64_t k, afloat * restrict buffer)
+void shift_vector_buf(afloat * restrict V, // data
+                      const int64_t S, // stride
+                      const int64_t N, // elements
+                      int64_t k, // shift
+                      afloat * restrict buffer)
 /* Circular shift of a vector of length N with stride S by step k */
 {
 

@@ -877,7 +877,10 @@ float getError(const afloat * restrict y, const afloat * restrict g,
                dw_metric metric)
 {
     /* Idiv is a better distance measurement but it takes longer to
-       calculate due to the log function. */
+       calculate due to the log function.
+       These calculations needs to be done with double precision or the results
+       will look different depending on the number of threads used (cancellation)
+    */
 
     float error = 0;
     switch(metric)
@@ -905,23 +908,23 @@ float get_fMSE(const afloat * restrict y, const afloat * restrict g,
         fprintf(stderr, "Something is funky with the dimensions of the images.\n");
         exit(-1);
     }
-    float e = 0;
-#pragma omp parallel for reduction(+: e) shared(y, g)
+    double e = 0;
+    //#pragma omp parallel for reduction(+: e) shared(y, g)
     for(int64_t c = 0; c<P; c++)
     {
         for(int64_t b = 0; b<N; b++)
         {
             for(int64_t a = 0; a<M; a++)
             {
-                float yval = y[a + b*wM + c*wM*wN];
-                float gval = g[a + b*M + c * M*N];
-                e += powf(yval-gval, 2);
+                double yval = y[a + b*wM + c*wM*wN];
+                double gval = g[a + b*M + c * M*N];
+                e += pow(yval-gval, 2);
             }
         }
     }
 
-    float mse = e / (float) (M*N*P);
-    return mse;
+    double mse = e / (double) (M*N*P);
+    return (double) mse;
 }
 
 float get_fIdiv(const afloat * restrict y, const afloat * restrict g,
@@ -936,7 +939,7 @@ float get_fIdiv(const afloat * restrict y, const afloat * restrict g,
         fprintf(stderr, "Something is funky with the dimensions of the images.\n");
         exit(-1);
     }
-    float I = 0;
+    double I = 0;
 #pragma omp parallel for reduction(+: I) shared(y, g)
     for(int64_t c = 0; c<P; c++)
     {
@@ -944,8 +947,8 @@ float get_fIdiv(const afloat * restrict y, const afloat * restrict g,
         {
             for(int64_t a = 0; a<M; a++)
             {
-                float yval = y[a + b*wM + c*wM*wN];
-                float gval = g[a + b*M + c * M*N];
+                double yval = y[a + b*wM + c*wM*wN];
+                double gval = g[a + b*M + c * M*N];
                 if(yval > 0 && gval > 0)
                 {
                     I += gval*log(gval/yval) - (gval-yval);
@@ -954,8 +957,8 @@ float get_fIdiv(const afloat * restrict y, const afloat * restrict g,
         }
     }
 
-    float mI = I / (float) (M*N*P);
-    return mI;
+    double mI = I / (double) (M*N*P);
+    return (float) mI;
 }
 
 
