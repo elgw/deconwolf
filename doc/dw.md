@@ -19,8 +19,8 @@ or, for max projections over z:
 : Set the number of computational threads to use.
 
 **\--out file.tif**
-: Explicitly set the name of the output file. By default the name of the
-input file prefixed by `dw_` will be used.
+: Explicitly set the name of the output file. By default the output
+file name is the name of the input file prefixed by `dw_`.
 
 **\--prefix str**
 : Set the prefix to use for the output file. An extra `_` will be appended
@@ -67,6 +67,11 @@ and quality. n=2 default.
  - `ave` Additive Vector Extrapolation by Biggs and Andrews.
  - `eve` Exponential Vector Extrapolation by Biggs.
 
+**\--mse**
+: Show the Mean Square Error between the input image and the current
+  guess convolved with the PSF at each iteration. If not set the
+  I-divergence is shown.
+
 **\--psigma s**
 : Pre-process the image and the PSF by convolving it by a 3-D isotropic
 Gaussian with sigma=s. This acts as a low pass filter.
@@ -77,10 +82,17 @@ Have been found useful for very noisy image.
 projections of all following tif files. Output will be prefixed with `max_`.
 
 # While running
-At normal verbosity deconwolf will put one green dot per FFT. The fMSE value
-reported at each iteration is the Mean Squared Error between the input image
-and the forward projected current guess (i.e. the PSF convoved with the
-current guess).
+At normal verbosity deconwolf will put one green dot per FFT. After
+each iteration the Idiv or MSE (with **--mse**) is shown, not that
+this is not a measurement on the final image quality.  Warnings are
+prefixed with ' ! '. More information can be found in the log file.
+
+# INPUT
+**dw** reads 16-bit (unsigned integers) or 32-bit (floating point) tif
+files. It does not understand compressed files or any dimensions
+except x,y,z, so only one color per image etc. To test if **dw** reads
+and writes your files, try the **--method id** option. In general, if
+an image is saved by ImageJ dw should be able to read it.
 
 # OUTPUT
 Without specifying the output file name, the output file will

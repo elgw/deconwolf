@@ -17,6 +17,13 @@
 /* Read and write tiff files to/from single precision floats
  */
 
+/* fim_tiff is not thread safe
+ * You need to initialize with a call to
+ * fim_tiff_init()
+ * and should probably also redirect the output by
+ * fim_tiff_set_log(FILE *)
+*/
+
 #ifndef fim_tiff_h
 #define fim_tiff_h
 
@@ -32,6 +39,7 @@
 #include <stdint.h>
 #include <inttypes.h>
 #include "fim.h"
+
 
 #define INLINED inline __attribute__((always_inline))
 #define XTAG_IJIJUNKNOWN 50838
@@ -64,17 +72,23 @@ void ttags_set_imagesize(ttags *, int M, int N, int P);
 void ttags_set_pixelsize(ttags *, double, double, double);
 void ttags_free(ttags **);
 
+/* Initialization, sets the output file to stdout */
+void fim_tiff_init(void);
+
+/* Redirect all output here */
+void fim_tiff_set_log(FILE * fp);
+
 // Last argument: where to print output
 int fim_tiff_write(const char * fName, const float * V,
                    ttags * T,
-    int64_t M, int64_t N, int64_t P, FILE *);
+    int64_t M, int64_t N, int64_t P);
 
 
 int fim_tiff_write_float(const char * fName, const float * V,
                          ttags * T,
-    int64_t M, int64_t N, int64_t P, FILE *);
+    int64_t M, int64_t N, int64_t P);
 
-int fim_tiff_write_zeros(const char * fName, int64_t M, int64_t N, int64_t P, FILE *);
+int fim_tiff_write_zeros(const char * fName, int64_t M, int64_t N, int64_t P);
 
 // Write to the tif file fName as uint16, using the raw data
 // in rName

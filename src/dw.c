@@ -22,10 +22,10 @@
 #define toc(X) clock_gettime(CLOCK_REALTIME, &tictoc_end); printf(#X); printf(" %f s\n", timespec_diff(&tictoc_end, &tictoc_start)); fflush(stdout);
 
 
-// GLOBALS
-// used by tiffErrHandler
-FILE * tifflogfile = NULL; // Set to stdout or a file
-// END GLOBALS
+/* GLOBALS */
+/* used by tiffErrHandler */
+FILE * logfile = NULL;
+/* END GLOBALS */
 
 
 dw_opts * dw_opts_new(void)
@@ -67,8 +67,38 @@ dw_opts * dw_opts_new(void)
     s->psigma = 0;
     s->biggs = 1;
     s->eve = 1;
+    s->metric = DW_METRIC_IDIV;
     clock_gettime(CLOCK_REALTIME, &s->tstart);
     return s;
+}
+
+void dw_show_iter(dw_opts * s, int it, int nIter, float err)
+{
+    if(s->verbosity > 0){
+        printf("\r                                             ");
+        if(s->metric == DW_METRIC_MSE)
+        {
+            printf("\rIteration %3d/%3d, fMSE=%e ", it+1, nIter, err);
+        }
+        if(s->metric == DW_METRIC_IDIV)
+        {
+            printf("\rIteration %3d/%3d, Idiv=%e ", it+1, nIter, err);
+        }
+        fflush(stdout);
+    }
+
+    if(s->log != NULL)
+    {
+        if(s->metric == DW_METRIC_MSE)
+        {
+            fprintf(s->log, "\rIteration %3d/%3d, fMSE=%e ", it+1, nIter, err);
+        }
+        if(s->metric == DW_METRIC_IDIV)
+        {
+            fprintf(s->log, "\rIteration %3d/%3d, Idiv=%e ", it+1, nIter, err);
+        }
+        fflush(s->log);
+    }
 }
 
 void nullfree(void * p)
@@ -153,6 +183,15 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
         fprintf(f, "method: Scaled Heavy Ball (SHB)\n");
         break;
     }
+    switch(s->metric)
+    {
+    case DW_METRIC_MSE:
+        fprintf(f, "metric: MSE\n");
+        break;
+    case DW_METRIC_IDIV:
+        fprintf(f, "metric: Idiv\n");
+        break;
+    }
     if(s->psigma > 0)
     {
         fprintf(f, "pre-filtering enabled, sigma = %f\n", s->psigma);
@@ -209,6 +248,13 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
     fprintf(f, "\n");
 }
 
+void warning(FILE * fid)
+{
+    //fprintf(fid, ANSI_UNDERSCORE " ! " ANSI_COLOR_RESET );
+    fprintf(fid, " ! ");
+    return;
+}
+
 static double timespec_diff(struct timespec* end, struct timespec * start)
 {
     double elapsed = (end->tv_sec - start->tv_sec);
@@ -237,7 +283,7 @@ void fulldump(dw_opts * s, float * A, size_t M, size_t N, size_t P, char * name)
     if(A != NULL)
     {
         printf("Dumping to %s\n", name);
-        fim_tiff_write_float(name, A, NULL, M, N, P, stdout);
+        fim_tiff_write_float(name, A, NULL, M, N, P);
     }
     return;
 }
@@ -349,6 +395,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         { "float",     no_argument,       NULL,  'F' },
         { "niterdump", required_argument, NULL,  'I' },
         { "lookahead", required_argument, NULL,  'L' },
+        { "mse",       no_argument,       NULL,  'M' },
         { "ref",       required_argument, NULL,  'R' },
         { "onetile",   no_argument,       NULL,  'T' },
         { "nopos",     no_argument,       NULL,  'P' },
@@ -360,8 +407,9 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
 
     int known_method = 1;
     int ch;
+    int prefix_set = 0;
     while((ch = getopt_long(argc, argv,
-                            "a:b:c:f:ghil:m:n:o:p:r:s:tvwx:B:C:DFI:L:R:TPQ:X:",
+                            "a:b:c:f:ghil:m:n:o:p:r:s:tvwx:B:C:DFI:L:MR:TPQ:X:",
                             longopts, NULL)) != -1)
     {
         switch(ch) {
@@ -382,6 +430,9 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             break;
         case 'L':
             s->lookahead = atoi(optarg);
+            break;
+        case 'M':
+            s->metric = DW_METRIC_MSE;
             break;
         case 'P':
             s->positivity = 0;
@@ -443,41 +494,57 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             free(s->prefix);
             s->prefix = malloc(strlen(optarg) + 1);
             strcpy(s->prefix, optarg);
+            prefix_set = 1;
             break;
         case 'm':
             known_method = 0;
             if(strcmp(optarg, "eve") == 0)
             {
                 s->method = DW_METHOD_EVE;
-                sprintf(s->prefix, "dw");
+                if(prefix_set == 0)
+                {
+                sprintf(s->prefix, "eve");
+                }
                 s->fun = &deconvolve_eve;
                 known_method = 1;
             }
             if(strcmp(optarg, "ave") == 0)
             {
                 s->method = DW_METHOD_AVE;
-                sprintf(s->prefix, "ave");
+                if(prefix_set == 0)
+                {
+                    sprintf(s->prefix, "ave");
+                }
                 s->fun = &deconvolve_ave;
                 known_method = 1;
             }
             if(strcmp(optarg, "rl") == 0)
             {
                 s->method = DW_METHOD_RL;
-                sprintf(s->prefix, "rl");
+                if(prefix_set == 0)
+                {
+                    sprintf(s->prefix, "rl");
+                }
                 s->fun = &deconvolve_rl;
                 known_method = 1;
             }
             if(strcmp(optarg, "id") == 0)
             {
                 s->method = DW_METHOD_ID;
-                sprintf(s->prefix, "id");
+                if(prefix_set == 0)
+                {
+                    sprintf(s->prefix, "id");
+                }
                 s->fun = &deconvolve_identity;
                 known_method = 1;
             }
             if(strcmp(optarg, "shb") == 0)
             {
                 s->method = DW_METHOD_SHB;
-                sprintf(s->prefix, "shb");
+                if(prefix_set == 0)
+                {
+                    sprintf(s->prefix, "shb");
+                }
                 s->fun = &deconvolve_shb;
                 known_method = 1;
             }
@@ -714,13 +781,13 @@ void benchmark_write(dw_opts * s, int iter, double fMSE,
     double KL = 0;
     if(s->ref != NULL)
     {
-    for(size_t kk = 0; kk<MNP; kk++)
-    {
-        if(s->ref[kk] > 0)
+        for(size_t kk = 0; kk<MNP; kk++)
         {
-            KL += log( x[kk]/s->ref[kk]) * x[kk];
+            if(s->ref[kk] > 0)
+            {
+                KL += log( x[kk]/s->ref[kk]) * x[kk];
+            }
         }
-    }
     }
     fftw_free(x);
     struct timespec tnow;
@@ -797,12 +864,24 @@ float getError_idiv(const afloat * restrict y, const afloat * restrict g,
    error */
 float getError(const afloat * restrict y, const afloat * restrict g,
                const int64_t M, const int64_t N, const int64_t P,
-               const int64_t wM, const int64_t wN, const int64_t wP)
+               const int64_t wM, const int64_t wN, const int64_t wP,
+               dw_metric metric)
 {
     /* Idiv is a better distance measurement but it takes longer to
        calculate due to the log function. */
-    //return get_fMSE(y, g, M, N, P, wM, wN, wP);
-    return get_fIdiv(y, g, M, N, P, wM, wN, wP);
+
+    float error = 0;
+    switch(metric)
+    {
+    case DW_METRIC_MSE:
+        error = get_fMSE(y, g, M, N, P, wM, wN, wP);
+        break;
+    case DW_METRIC_IDIV:
+        error = get_fIdiv(y, g, M, N, P, wM, wN, wP);
+        break;
+    }
+
+    return error;
 }
 
 float get_fMSE(const afloat * restrict y, const afloat * restrict g,
@@ -837,8 +916,8 @@ float get_fMSE(const afloat * restrict y, const afloat * restrict g,
 }
 
 float get_fIdiv(const afloat * restrict y, const afloat * restrict g,
-    const int64_t M, const int64_t N, const int64_t P,
-    const int64_t wM, const int64_t wN, const int64_t wP)
+                const int64_t M, const int64_t N, const int64_t P,
+                const int64_t wM, const int64_t wN, const int64_t wP)
 {
     /* Mean squared error between the input, y, and the forward propagated
      * current guess */
@@ -1094,7 +1173,8 @@ float * psf_autocrop_byImage(float * psf,/* psf and size */
 
     if(p < popt)
     {
-        fprintf(stdout, ANSI_COLOR_RED "WARNING:" ANSI_COLOR_RESET " The PSF has only %" PRId64
+        warning(stdout);
+        fprintf(stdout, "The PSF has only %" PRId64
                 " slices, %" PRId64 " would be better.\n", p, popt);
         fprintf(s->log, "WARNING: The PSF has only %" PRId64 " slices, %" PRId64 " would be better.\n", p, popt);
         return psf;
@@ -1374,7 +1454,7 @@ int deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
         if(0)
         {
             printf("writing to tiledump.tif\n");
-            fim_tiff_write("tiledump.tif", im_tile, NULL, tileM, tileN, tileP, s->log);
+            fim_tiff_write("tiledump.tif", im_tile, NULL, tileM, tileN, tileP);
             getchar();
         }
 
@@ -1474,7 +1554,7 @@ void timings()
         V[0]+= e1;
 
     tic
-        float e2 = getError(V, A, M, N, P, M, N, P);
+        float e2 = getError(V, A, M, N, P, M, N, P, DW_METRIC_MSE);
     toc(getError)
         V[0]+=e2;
 
@@ -1488,7 +1568,7 @@ void timings()
         tic
         float * S2 = fim_subregion_ref(V, M, N, P, M-1, N-1, P-1);
     toc(fim_subregion_ref)
-        printf("S1 - S2 = %f\n", getError(S1, S1, M-1, N-1, P-1, M-1, N-1, P-1));
+        printf("S1 - S2 = %f\n", getError(S1, S1, M-1, N-1, P-1, M-1, N-1, P-1, DW_METRIC_MSE));
     free(S1);
     free(S2);
 
@@ -1587,14 +1667,7 @@ double get_nbg(float * I, size_t N, float bg)
 }
 
 
-void tiffErrHandler(const char* module, const char* fmt, va_list ap)
-{
-    assert(tifflogfile != NULL);
-    fprintf(tifflogfile, "libtiff: Module: %s\n", module);
-    fprintf(tifflogfile, "libtiff: ");
-    vfprintf(tifflogfile, fmt, ap);
-    fprintf(tifflogfile, "\n");
-}
+
 
 void flatfieldCorrection(dw_opts * s, float * im, int64_t M, int64_t N, int64_t P)
 {
@@ -1663,13 +1736,15 @@ int dw_run(dw_opts * s)
 
     s->verbosity > 1 ? dw_fprint_info(NULL, s) : 0;
 
-    tifflogfile = stdout;
+    logfile = stdout;
+
+    fim_tiff_init();
+    fim_tiff_set_log(stdout);
     if(s->verbosity < 2)
     {
-        tifflogfile = s->log;
-        TIFFSetWarningHandler(tiffErrHandler);
-        TIFFSetErrorHandler(tiffErrHandler);
+        fim_tiff_set_log(s->log);
     }
+
 
     int64_t M = 0, N = 0, P = 0;
     if(fim_tiff_get_size(s->imFile, &M, &N, &P))
@@ -1776,8 +1851,8 @@ int dw_run(dw_opts * s)
 
     if(fim_maxAtOrigo(psf, pM, pN, pP) == 0)
     {
-        printf("PSF is not centered!\n");
-        // return -1;
+        warning(stdout);
+        printf("The PSF is not centered!\n");
     }
 
     // Possibly the PSF will be cropped even more per tile later on
@@ -1826,7 +1901,8 @@ int dw_run(dw_opts * s)
     {
         if(s->flatfieldFile != NULL)
         {
-            printf("Warning: Flat-field correction can't be used in tiled mode\n");
+            warning(stdout);
+            printf("Flat-field correction can't be used in tiled mode\n");
         }
         deconvolve_tiles(M, N, P, psf, pM, pN, pP, // psf and size
                          s);// settings
@@ -1875,19 +1951,19 @@ int dw_run(dw_opts * s)
                 if(s->iterdump)
                 {
                     char * outFile = gen_iterdump_name(s, s->nIter);
-                    fim_tiff_write_float(outFile, out, T, M, N, P, s->log);
+                    fim_tiff_write_float(outFile, out, T, M, N, P);
                     free(outFile);
                 } else {
-                    fim_tiff_write_float(s->outFile, out, T, M, N, P, s->log);
+                    fim_tiff_write_float(s->outFile, out, T, M, N, P);
                 }
             } else {
                 if(s->iterdump)
                 {
                     char * outFile = gen_iterdump_name(s, s->nIter);
-                    fim_tiff_write(outFile, out, T, M, N, P, s->log);
+                    fim_tiff_write(outFile, out, T, M, N, P);
                     free(outFile);
                 } else {
-                    fim_tiff_write(s->outFile, out, T, M, N, P, s->log);
+                    fim_tiff_write(s->outFile, out, T, M, N, P);
                 }
             }
         }

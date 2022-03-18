@@ -779,7 +779,7 @@ void fim_gsmooth(float * restrict V, size_t M, size_t N, size_t P, float sigma)
     }
 
   size_t nW = max_size_t(M, max_size_t(N, P));
-  printf("fim_gsmooth: M: %zu, N: %zu, P: %zu, nW: %zu\n", M, N, P, nW); fflush(stdout);
+  //printf("fim_gsmooth: M: %zu, N: %zu, P: %zu, nW: %zu\n", M, N, P, nW); fflush(stdout);
 
   /* Temporary storage/buffer for conv1 */
 float * W = malloc(nW*sizeof(float));

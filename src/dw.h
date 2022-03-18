@@ -66,6 +66,11 @@ typedef enum {
     DW_METHOD_SHB, /* Wang and Miller, Scaled Heavy Ball */
 } dw_method;
 
+typedef enum {
+    DW_METRIC_MSE, /* Mean Square Error */
+    DW_METRIC_IDIV /* I-Divergence */
+} dw_metric;
+
 typedef float afloat;
 
 
@@ -106,6 +111,7 @@ struct _dw_opts{
     /* Selection of method */
     dw_method method; /* what algorithm to use */
     dw_function fun; /* Function pointer */
+    dw_metric metric;
 
     /* How aggressive should the Biggs acceleration be.
      *  0 = off,
@@ -178,6 +184,7 @@ float * psf_autocrop(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  // 
 #define ANSI_COLOR_MAGENTA "\x1b[35m"
 #define ANSI_COLOR_CYAN    "\x1b[36m"
 #define ANSI_COLOR_RESET   "\x1b[0m"
+#define ANSI_UNDERSCORE    "\x1b[4m"
 
 
 /* Write A to disk as fulldump_<name>.tif if s->fulldump = 1 */
@@ -186,7 +193,7 @@ void fulldump(dw_opts * s, float * A, size_t M, size_t N, size_t P, char * name)
 /* Passes on to got_fMSE at the moment */
 float getError(const afloat * restrict y, const afloat * restrict g,
                const int64_t M, const int64_t N, const int64_t P,
-               const int64_t wM, const int64_t wN, const int64_t wP);
+               const int64_t wM, const int64_t wN, const int64_t wP, dw_metric);
 
 
 /* Mean squared error between the input, y, and the forward propagated
@@ -201,6 +208,8 @@ float get_fIdiv(const afloat * restrict y, const afloat * restrict g,
                 const int64_t M, const int64_t N, const int64_t P,
                 const int64_t wM, const int64_t wN, const int64_t wP);
 
+/* Show the current iteration, can be called by all method_ */
+void dw_show_iter(dw_opts * s, int it, int nIter, float error);
 
 /* Create initial guess: the fft of an image that is 1 in MNP and 0 outside
  * M, N, P is the dimension of the microscopic image
@@ -230,6 +239,9 @@ void benchmark_write(dw_opts * s, int iter, double fMSE,const afloat * x,
                      const int64_t M, const int64_t N, const int64_t P,
                      const int64_t wM, const int64_t wN, const int64_t wP);
 
+
+/* "WARNING" in some formatting */
+void warning(FILE * fid);
 
 #include "method_eve.h"
 #include "method_identity.h"

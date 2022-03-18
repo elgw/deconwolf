@@ -777,6 +777,7 @@ int main(int argc, char ** argv)
         return EXIT_SUCCESS;
     }
 
+
     if(conf->verbose > 1)
     {
         bw_conf_printf(stdout, conf);
@@ -787,6 +788,8 @@ int main(int argc, char ** argv)
         fprintf(stderr, "Failed to open %s for writing\n", conf->logFile);
         exit(-1);
     }
+    fim_tiff_init();
+    fim_tiff_set_log(conf->log);
     fprint_time(conf->log);
     bw_conf_printf(conf->log, conf);
     fflush(conf->log);
@@ -829,7 +832,7 @@ int main(int argc, char ** argv)
     ttags_set_pixelsize(T, conf->resLateral, conf->resLateral, conf->resAxial);
     free(swstring);
 
-    fim_tiff_write_float(conf->outFile, conf->V, T, conf->M, conf->N, conf->P, conf->log);
+    fim_tiff_write_float(conf->outFile, conf->V, T, conf->M, conf->N, conf->P);
     ttags_free(&T);
 
     fprint_time(conf->log);

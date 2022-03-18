@@ -60,7 +60,7 @@
      putdot(s);
      afloat * y = fft_convolve_cc_f2(fftPSF, F, wM, wN, wP); /* FFT#2 */
      putdot(s);
-     float error = getError(y, im, M, N, P, wM, wN, wP);
+     float error = getError(y, im, M, N, P, wM, wN, wP, s->metric);
 
 
      int y_has_zero = 0;
@@ -141,8 +141,14 @@
 
      if(fim_maxAtOrigo(psf, pM, pN, pP) == 0)
      {
-         printf("deconv_w: PSF is not centered!\n");
-         //return NULL;
+         if(s->verbosity > 0)
+         {
+             printf(" ! EVE: PSF is not centered!\n");
+         }
+         if(s->log != stdout)
+         {
+             fprintf(s->log, " ! EVE: PSF is not centered!\n");
+         }
      }
 
      /* This is the 'work dimensions', i.e., dimensions
@@ -237,7 +243,7 @@
      if(s->fulldump)
      {
          printf("Dumping to fullPSF.tif\n");
-         fim_tiff_write_float("fulldump_PSF.tif", Z, NULL, wM, wN, wP, stdout);
+         fim_tiff_write_float("fulldump_PSF.tif", Z, NULL, wM, wN, wP);
      }
 
      fftwf_complex * fftPSF = fft(Z, wM, wN, wP);
@@ -307,9 +313,9 @@
                  //fulldump(s, temp, M, N, P, outname);
                  if(s->outFormat == 32)
                  {
-                     fim_tiff_write_float(outname, temp, NULL, M, N, P, s->log);
+                     fim_tiff_write_float(outname, temp, NULL, M, N, P);
                  } else {
-                     fim_tiff_write(outname, temp, NULL, M, N, P, s->log);
+                     fim_tiff_write(outname, temp, NULL, M, N, P);
                  }
                  free(outname);
                  free(temp);
@@ -389,18 +395,7 @@
                                s);
 
          putdot(s);
-
-         if(s->verbosity > 0){
-             printf("\r                                             ");
-             printf("\rIteration %3d/%3d, fMSE=%e ", it+1, nIter, err);
-             fflush(stdout);
-         }
-
-         if(s->log != NULL)
-         {
-             fprintf(s->log, "Iteration %d/%d, fMSE=%e\n", it+1, nIter, err);
-             fflush(s->log);
-         }
+         dw_show_iter(s, it, nIter, err);
 
          {
              afloat * swap = g;

@@ -57,7 +57,7 @@ static float iter_ave(
      fftwf_complex * F = fft(f, wM, wN, wP);
      putdot(s);
      afloat * y = fft_convolve_cc_f2(cK, F, wM, wN, wP); // F is freed
-     float error = getError(y, im, M, N, P, wM, wN, wP);
+     float error = getError(y, im, M, N, P, wM, wN, wP, s->metric);
      putdot(s);
 
      const double mindiv = 1e-6; // Before 2021.11.24: 1e-6
@@ -137,7 +137,8 @@ float * deconvolve_ave(afloat * restrict im,
 
      if(fim_maxAtOrigo(psf, pM, pN, pP) == 0)
      {
-         printf("deconv_w: PSF is not centered!\n");
+         printf(" ! AVE PSF is not centered!\n");
+         fprintf(s->log, " ! AVE PSF is not centered!\n");
          //return NULL;
      }
 
@@ -229,7 +230,7 @@ float * deconvolve_ave(afloat * restrict im,
      if(s->fulldump)
      {
          printf("Dumping to fullPSF.tif\n");
-         fim_tiff_write_float("fullPSF.tif", Z, NULL, wM, wN, wP, stdout);
+         fim_tiff_write_float("fullPSF.tif", Z, NULL, wM, wN, wP);
      }
 
      fftwf_complex * cK = fft(Z, wM, wN, wP);
@@ -318,9 +319,9 @@ float * deconvolve_ave(afloat * restrict im,
                  //printf(" Writing current guess to %s\n", outname);
                  if(s->outFormat == 32)
                  {
-                     fim_tiff_write_float(outname, temp, NULL, M, N, P, s->log);
+                     fim_tiff_write_float(outname, temp, NULL, M, N, P);
                  } else {
-                     fim_tiff_write(outname, temp, NULL, M, N, P, s->log);
+                     fim_tiff_write(outname, temp, NULL, M, N, P);
                  }
                  free(outname);
                  free(temp);
@@ -373,17 +374,8 @@ float * deconvolve_ave(afloat * restrict im,
 
          putdot(s);
 
-         if(s->verbosity > 0){
-             printf("\r                                             ");
-             printf("\rIteration %3d/%3d, MSE=%e ", it+1, nIter, err);
-             fflush(stdout);
-         }
+         dw_show_iter(s, it, nIter, err);
 
-         if(s->log != NULL)
-         {
-             fprintf(s->log, "Iteration %d/%d, MSE=%e\n", it+1, nIter, err);
-             fflush(s->log);
-         }
 
          afloat * swap = g;
          g = gm; gm = swap;
@@ -416,7 +408,7 @@ float * deconvolve_ave(afloat * restrict im,
      if(s->fulldump)
      {
          printf("Dumping to fulldump.tif\n");
-         fim_tiff_write("fulldump.tif", x, NULL, wM, wN, wP, stdout);
+         fim_tiff_write("fulldump.tif", x, NULL, wM, wN, wP);
      }
 
      afloat * out = fim_subregion(x, wM, wN, wP, M, N, P);
