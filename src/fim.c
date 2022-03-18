@@ -440,12 +440,13 @@ void fim_circshift(afloat * restrict A,
 
     int nThreads = 0;
 
+    /* Start a parallel region to figure out how many threads that will be used
+       and how much memory to allocate for the buffers */
 #pragma omp parallel
     {
                   nThreads = omp_get_num_threads();
     }
 
-    printf("will use nThreads=%d\n", nThreads);
     const size_t bsize = fmax(fmax(M, N), P);
     afloat * restrict buf = malloc(bsize*sizeof(float)*nThreads);
 
