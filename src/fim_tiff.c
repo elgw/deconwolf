@@ -279,7 +279,7 @@ void readUint16(TIFF * tfile, float * V,
                 const uint32_t ndirs,
                 const uint32_t nstrips,
                 const uint32_t perDirectory
-                )
+    )
 {
     // Number of elements per strip
     size_t nes = ssize/sizeof(uint16_t);
@@ -349,7 +349,7 @@ void readFloat(TIFF * tfile, afloat * V,
                uint32_t ndirs,
                uint32_t nstrips,
                uint32_t perDirectory
-               )
+    )
 {
     // Number of elements per strip
     size_t nes = ssize/sizeof(float);
@@ -1050,7 +1050,7 @@ void ttags_get(TIFF * tfile, ttags * T)
     }
 
     char * software = NULL;
-        if(TIFFGetField(tfile, TIFFTAG_SOFTWARE, &software) == 1)
+    if(TIFFGetField(tfile, TIFFTAG_SOFTWARE, &software) == 1)
     {
         T->software = malloc(strlen(software)+2);
         strcpy(T->software, software);
@@ -1058,35 +1058,35 @@ void ttags_get(TIFF * tfile, ttags * T)
     }
 
 #if 0
-        /*
-         * From https://github.com/imagej/ImageJA/blob/master/src/main/java/ij/io/TiffDecoder.java
-         * 	public static final int META_DATA_BYTE_COUNTS = 50838; // private tag registered with Adobe
-         *      public static final int META_DATA = 50839; // private tag registered with Adobe
-         */
+    /*
+     * From https://github.com/imagej/ImageJA/blob/master/src/main/java/ij/io/TiffDecoder.java
+     * 	public static final int META_DATA_BYTE_COUNTS = 50838; // private tag registered with Adobe
+     *      public static final int META_DATA = 50839; // private tag registered with Adobe
+     */
 
-        uint32_t count;
-        void * data;
-        if(TIFFGetField(tfile, XTAG_IJIJUNKNOWN, &count, &data))
+    uint32_t count;
+    void * data;
+    if(TIFFGetField(tfile, XTAG_IJIJUNKNOWN, &count, &data))
+    {
+        uint32_t * dvalue  = (uint32_t*) data;
+
+        for(int kk = 0; kk<count; kk++)
         {
-            uint32_t * dvalue  = (uint32_t*) data;
-
-            for(int kk = 0; kk<count; kk++)
-            {
-                fprintf(fim_tiff_log, "Tag %d: %d, count %d\n", XTAG_IJIJUNKNOWN, dvalue[kk], count);
-            }
+            fprintf(fim_tiff_log, "Tag %d: %d, count %d\n", XTAG_IJIJUNKNOWN, dvalue[kk], count);
         }
+    }
 
-        T->nIJIJinfo = 0;
-        T->IJIJinfo = NULL;
-        if(TIFFGetField(tfile, XTAG_IJIJINFO, &count, &data))
-        {
-            T->nIJIJinfo = count;
-            T->IJIJinfo = malloc(count);
-            memcpy(T->IJIJinfo, data, count);
-            uint8_t * udata = (uint8_t*) data;
-            for(int kk = 0; kk<count; kk++)
-            { fprintf(fim_tiff_log, "%02d %c %u\n ", kk, udata[kk], udata[kk]);};
-        }
+    T->nIJIJinfo = 0;
+    T->IJIJinfo = NULL;
+    if(TIFFGetField(tfile, XTAG_IJIJINFO, &count, &data))
+    {
+        T->nIJIJinfo = count;
+        T->IJIJinfo = malloc(count);
+        memcpy(T->IJIJinfo, data, count);
+        uint8_t * udata = (uint8_t*) data;
+        for(int kk = 0; kk<count; kk++)
+        { fprintf(fim_tiff_log, "%02d %c %u\n ", kk, udata[kk], udata[kk]);};
+    }
 #endif
 }
 
@@ -1108,10 +1108,10 @@ void ttags_set(TIFF * tfile, ttags * T)
     {
         static TIFFFieldInfo xtiffFieldInfo[] =
             {
-             { XTAG_IJIJUNKNOWN,TIFF_VARIABLE, TIFF_VARIABLE, TIFF_LONG, FIELD_CUSTOM,
-               0, 1, "IJIJunknown" },
-             { XTAG_IJIJINFO, TIFF_VARIABLE, TIFF_VARIABLE, TIFF_ASCII, FIELD_CUSTOM,
-               1, 0, "IJIJinfo" }
+                { XTAG_IJIJUNKNOWN,TIFF_VARIABLE, TIFF_VARIABLE, TIFF_LONG, FIELD_CUSTOM,
+                  0, 1, "IJIJunknown" },
+                { XTAG_IJIJINFO, TIFF_VARIABLE, TIFF_VARIABLE, TIFF_ASCII, FIELD_CUSTOM,
+                  1, 0, "IJIJinfo" }
             };
 
         // Guessing that ImageJ requires IJIJinfo to be of type ASCII
@@ -1300,18 +1300,20 @@ afloat * fim_tiff_read_sub(const char * fName,
 
     if(verbosity > 1)
     {
-        if(gotB){
-            printf(" TIFFTAG_IMAGEDEPTH: %u\n", B);}
-        printf(" TIFFTAG_BITSPERSAMPLE: %u\n", BPS);
-        printf(" size: %zu x %zu, %zu bits\n", (size_t) M, (size_t) N, (size_t) BPS);
-        printf(" # strips: %zu \n", (size_t) nstrips);
-        printf(" strip size (ssize): %zu bytes \n", (size_t) ssize);
-        printf(" # dirs (slices): %zu\n", (size_t) ndirs);
+        if(gotB)
+        {
+            fprintf(fim_tiff_log, " TIFFTAG_IMAGEDEPTH: %u\n", B);
+        }
+        fprintf(fim_tiff_log, " TIFFTAG_BITSPERSAMPLE: %u\n", BPS);
+        fprintf(fim_tiff_log, " size: %zu x %zu, %zu bits\n", (size_t) M, (size_t) N, (size_t) BPS);
+        fprintf(fim_tiff_log, " # strips: %zu \n", (size_t) nstrips);
+        fprintf(fim_tiff_log, " strip size (ssize): %zu bytes \n", (size_t) ssize);
+        fprintf(fim_tiff_log, " # dirs (slices): %zu\n", (size_t) ndirs);
     }
 
     if(TIFFIsTiled(tfile))
     {
-        fprintf(fim_tiff_log, "Tiled files are not supported\n");
+        fprintf(stderr, "fim_tiff: Tiled files are not supported\n");
         TIFFClose(tfile);
         return NULL;
     }

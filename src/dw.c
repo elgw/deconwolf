@@ -32,6 +32,15 @@ dw_opts * dw_opts_new(void)
 {
     dw_opts * s = malloc(sizeof(dw_opts));
     s->nThreads = 4;
+    #ifndef WINDOWS
+    /* Reports #threads, typically 2x#cores */
+    s->nThreads = sysconf(_SC_NPROCESSORS_ONLN)/2;
+    #endif
+    #ifdef OMP
+    /* Reports number of cores */
+    s->nThreads = omp_get_num_procs();
+    #endif
+    s->nThreads < 1 ? s->nThreads = 1 : 0;
     s->nIter = 25;
     s->imFile = NULL;
     s->psfFile = NULL;
@@ -87,15 +96,15 @@ void dw_show_iter(dw_opts * s, int it, int nIter, float err)
         fflush(stdout);
     }
 
-    if(s->log != NULL)
+    if(s->log != NULL && s->log != stdout)
     {
         if(s->metric == DW_METRIC_MSE)
         {
-            fprintf(s->log, "\rIteration %3d/%3d, fMSE=%e ", it+1, nIter, err);
+            fprintf(s->log, "Iteration %3d/%3d, fMSE=%e\n", it+1, nIter, err);
         }
         if(s->metric == DW_METRIC_IDIV)
         {
-            fprintf(s->log, "\rIteration %3d/%3d, Idiv=%e ", it+1, nIter, err);
+            fprintf(s->log, "Iteration %3d/%3d, Idiv=%e\n", it+1, nIter, err);
         }
         fflush(s->log);
     }
@@ -1739,8 +1748,8 @@ int dw_run(dw_opts * s)
     logfile = stdout;
 
     fim_tiff_init();
-    fim_tiff_set_log(stdout);
-    if(s->verbosity < 2)
+    fim_tiff_set_log(s->log);
+    if(s->verbosity > 2)
     {
         fim_tiff_set_log(s->log);
     }

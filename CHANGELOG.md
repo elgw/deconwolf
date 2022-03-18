@@ -1,21 +1,21 @@
 # CHANGELOG
 
 ## v 0.1.0
-- Reorganization of code with one file per method.
-- Separate RL implementation for clarity.
+- Implements the 'Scaled Heavy Ball'. More
+memory efficient than eve and about the same speed and image
+quality. Might become the default method.
+- Reorganization of code with one file per deconvolution method, RL is
+  now separated to an own file which improves readability.
 - The **--method** argument can be used to switch between several
 methods, see **--help** or the man page.
 - Showing Idivergence after each iteration, switch back to MSE with
 **--mse**
 - Cleaned up the text written to the terminal, notably any warnings
 from libtiff now go to the log file.
-- Implements the 'Scaled Heavy Ball'. More
-memory efficient than eve and about the same speed and image
-quality. Might become the default method.
 - OMP is set to use as many cores as FFTW.
 - Added OMP directives to a few more loops.
 - Introduces the **--tsv** argument to save information per
-iteration to a separate tsv file.
+iteration to a separate tsv file for easier plotting and analysis.
 
 ## v 0.0.26
 - **dw maxproj** works with file that are not in the current folder.

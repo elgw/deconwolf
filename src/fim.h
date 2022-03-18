@@ -26,6 +26,11 @@
 #include <stdint.h>
 #include <inttypes.h>
 
+#ifdef _OPENMP // turned on with -fopenmp
+#include <omp.h>
+#endif
+
+
 #define INLINED inline __attribute__((always_inline))
 
 /* fim : operations on 3D floating point images
