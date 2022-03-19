@@ -1735,9 +1735,12 @@ int dw_run(dw_opts * s)
 #else
     omp_set_num_threads(s->nThreads);
     fprintf(s->log, "Set the number of OMP threads to %d\n", s->nThreads);
+    /* Fastest of static, dynamic and guided in limited tests */
     omp_set_dynamic(false);
     omp_set_schedule(omp_sched_static, 0);
     fprintf(s->log, "Using static scheduling\n");
+    /* Better on heavily loaded machine? */
+    //omp_set_schedule(omp_sched_guided, 0);
 #endif
 #endif
 
