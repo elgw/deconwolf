@@ -19,8 +19,10 @@ images:
    can crop and deconvolve small regions of interest.
  - RAM usage can be reduced at the cost of slightly longer computation times by
    tiling. That makes it possible to deconvolve large images on small machines.
- - It can make use of all precious cores of your "big" machine since the
-   critical parts run on separate threads (as many as you would like).
+ - It can make use of all precious cores of your "big" machine since
+   the critical parts run on separate threads (as many as you would
+   like). However, for maximal throughput (and if you have enough
+   RAM), run several instances of dw in parallel.
  - Deconwolf is tiny! The binaries could even fit on a floppy drive
    (if you are fortunate enough to own one of those antiquities).
  - It is shipped with program to generate Point Spread Functions (PSFs)

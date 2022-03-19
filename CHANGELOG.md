@@ -14,6 +14,7 @@ methods, see **--help** or the man page.
 from libtiff now go to the log file.
 - OMP is set to use as many cores as FFTW.
 - Added OMP directives to a few more loops.
+- Using static OMP schedule.
 - Introduces the **--tsv** argument to save information per
 iteration to a separate tsv file for easier plotting and analysis.
 
