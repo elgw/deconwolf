@@ -1738,7 +1738,7 @@ int dw_run(dw_opts * s)
     /* Fastest of static, dynamic and guided in limited tests */
     omp_set_dynamic(false);
     omp_set_schedule(omp_sched_static, 0);
-    fprintf(s->log, "Using static scheduling\n");
+    fprintf(s->log, "Using static scheduling for OMP\n");
     /* Better on heavily loaded machine? */
     //omp_set_schedule(omp_sched_guided, 0);
 #endif
