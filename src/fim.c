@@ -45,7 +45,7 @@ int fim_maxAtOrigo(const afloat * restrict V, const int64_t M, const int64_t N, 
 
     float maxV = 0;
     int64_t m = 0, n = 0, p = 0;
-
+    // TODO reduction(max:maxV)
     for(int64_t pp = 0; pp < P; pp++) {
         for(int64_t nn = 0; nn < N; nn++) {
             for(int64_t mm = 0; mm < M; mm++) {
@@ -169,6 +169,7 @@ void fim_minus(afloat * restrict  A,
 float fim_max(const afloat * A, size_t N)
 {
     float amax = A[0];
+#pragma omp parallel for reduction(max:amax)
     for(size_t kk = 0; kk<N; kk++)
     {
         if(A[kk] > amax)
@@ -267,11 +268,11 @@ void fim_insert_ref(afloat * T, int64_t t1, int64_t t2, int64_t t3,
         exit(-1);
     }
 #pragma omp parallel for shared(F, T)
-    for(int64_t mm = 0; mm<f1; mm++)
+    for(int64_t pp = 0; pp<f3; pp++)
     {
         for(int64_t nn = 0; nn<f2; nn++)
         {
-            for(int64_t pp = 0; pp<f3; pp++)
+            for(int64_t mm = 0; mm<f1; mm++)
             {
                 afloat x = F[mm + nn*f1 + pp*f1*f2];
                 T[mm + nn*t1 + pp*t1*t2] = x;

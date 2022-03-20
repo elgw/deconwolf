@@ -1,7 +1,5 @@
 #include "method_shb.h"
 
-
-
 float * deconvolve_shb(afloat * restrict im,
                        const int64_t M, const int64_t N, const int64_t P,
                        afloat * restrict psf,
@@ -197,8 +195,15 @@ float * deconvolve_shb(afloat * restrict im,
      *  set to be the same */
 
     afloat * x = fim_constant(wMNP, sumg/wMNP);
-    afloat * xp = fim_copy(x, wMNP);
 
+    if(0)
+    {
+        printf("EXPERIMENTAL\n");
+        /* If only few iterations can be afforded it makes sense to
+         * start with the observed images as the starting guess */
+        fim_insert(x, wM, wN, wP, im, M, N, P);
+    }
+    afloat * xp = fim_copy(x, wMNP);
 
     int it = 0;
     while(it<nIter)

@@ -222,7 +222,8 @@ void fft_mul(fftwf_complex * restrict C,
              const size_t n1, const size_t n2, const size_t n3)
 {
     size_t N = (n1+3)/2*n2*n3;
-    // C = A*B
+    /* C = A*B */
+#pragma omp parallel for shared(A,B,C)
     for(size_t kk = 0; kk<N; kk++)
     {
         float a = A[kk][0]; float ac = A[kk][1];

@@ -119,8 +119,9 @@ void fim_tiff_ut()
 void floatimage_normalize(afloat * restrict I, const size_t N)
 {
     // Scale image to span the whole 16 bit range.
-    float imax = 1e7; float imin = 1e7;
+    float imax = I[0]; float imin = I[0];
     int ok = 1;
+//#pragma omp parallel for reduction(min:imin) reduction(max:imax) shared(I)
     for(size_t kk=0; kk<N; kk++)
     {
         if(!isfinite(I[kk]))
@@ -141,6 +142,7 @@ void floatimage_normalize(afloat * restrict I, const size_t N)
 
     if(imax>0)
     {
+#pragma omp parallel for shared(I)
         for(size_t kk=0; kk<N; kk++)
             I[kk]*=(pow(2,16)-1)/imax;
     }
@@ -150,8 +152,8 @@ void floatimage_normalize(afloat * restrict I, const size_t N)
 void floatimage_show_stats(afloat * I, size_t N, size_t M, size_t P)
 {
     float isum = 0;
-    float imin = INFINITY;
-    float imax = -INFINITY;
+    float imin = I[0];
+    float imax = I[0];
     for(size_t kk = 0; kk<M*N*P; kk++)
     {
         I[kk] > imax ? imax = I[kk] : 0 ;
@@ -161,47 +163,6 @@ void floatimage_show_stats(afloat * I, size_t N, size_t M, size_t P)
     printf("min: %f max: %f mean: %f\n", imin, imax, isum/(M*N*P));
 }
 
-/*
-  void readUint8_sub(TIFF * tfile, afloat * V,
-  const uint32_t ssize,
-  const uint32_t ndirs,
-  const uint32_t nstrips,
-  const uint32_t perDirectory,
-  int64_t sM, int64_t sN, int64_t sP, int64_t wM, int64_t wN, int64_t wP)
-  {
-  perror("Not implemented\n");
-  exit(1);
-  }
-
-
-  void readUint8(TIFF * tfile, afloat * V,
-  const uint32_t ssize,
-  const uint32_t ndirs,
-  const uint32_t nstrips,
-  const uint32_t perDirectory
-  )
-  {
-  // Number of elements per strip
-  size_t nes = ssize/sizeof(uint8_t);
-  uint8_t * buf = _TIFFmalloc(ssize);
-  assert(buf != NULL);
-
-  for(int64_t dd=0; dd<ndirs; dd++) {
-  TIFFSetDirectory(tfile, dd);
-  for(int64_t kk=0; kk<nstrips; kk++) {
-  int64_t strip = kk;
-  tsize_t read = TIFFReadEncodedStrip(tfile, strip, buf, (tsize_t) - 1);
-  assert(read>0);
-
-  for(int64_t ii = 0; ii<read/sizeof(uint8_t); ii++) {
-  size_t pos = ii+kk*nes + dd*perDirectory;
-  V[pos] = (float) buf[ii];
-  }
-  }
-  }
-  _TIFFfree(buf);
-  }
-*/
 
 INLINED extern void sub2ind(size_t ind,
                             int64_t M, int64_t N, __attribute__((unused)) int64_t P,
@@ -802,17 +763,7 @@ int fim_tiff_write(const char * fName, const afloat * V,
 
     if(V != NULL)
     {
-        float imax = 0;
-        for(size_t kk = 0; kk < (size_t) M*N*P; kk++)
-        {
-            if(isfinite(V[kk]))
-            {
-                if(V[kk] > imax)
-                {
-                    imax = V[kk];
-                }
-            }
-        }
+        float imax = fim_max(V, M*N*P);
         scaling = 1.0/imax*(pow(2,16)-1.0);
     }
 
