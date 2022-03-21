@@ -28,9 +28,6 @@ float * deconvolve_shb(afloat * restrict im,
         return fim_copy(im, M*N*P);
     }
 
-    const int nIter = s->nIter;
-
-
     if(fim_maxAtOrigo(psf, pM, pN, pP) == 0)
     {
         if(s->verbosity > 0)
@@ -188,7 +185,7 @@ float * deconvolve_shb(afloat * restrict im,
 
     float sumg = fim_sum(im, M*N*P);
 
-    float alpha = 0;
+
 
     /* x is the initial guess, initially the previous iteration,
      *  xp is
@@ -205,15 +202,15 @@ float * deconvolve_shb(afloat * restrict im,
     }
     afloat * xp = fim_copy(x, wMNP);
 
-    int it = 0;
-    while(it<nIter)
+    dw_iterator_t * it = dw_iterator_new(s);
+    while(dw_iterator_next(it) >= 0)
     {
 
         if(s->iterdump > 0){
-            if(it % s->iterdump == 0)
+            if(it->iter % s->iterdump == 0)
             {
                 afloat * temp = fim_subregion(x, wM, wN, wP, M, N, P);
-                char * outname = gen_iterdump_name(s, it);
+                char * outname = gen_iterdump_name(s, it->iter);
                 //printf(" Writing current guess to %s\n", outname);
                 if(s->outFormat == 32)
                 {
@@ -229,10 +226,10 @@ float * deconvolve_shb(afloat * restrict im,
         //afloat * p = fim_copy(x, wMNP);
         afloat * p = xp; /* We don't need xp more */
 
-            /* Eq. 10 in SHB paper */
-            alpha = ((float) it-1.0)/((float) it+2.0);
-            //alpha /= 1.5;
-            alpha < 0 ? alpha = 0: 0;
+        /* Eq. 10 in SHB paper */
+        double alpha = ((float) it->iter-1.0)/((float) it->iter+2.0);
+        //alpha /= 1.5;
+        alpha < 0 ? alpha = 0: 0;
 
 
 
@@ -264,7 +261,7 @@ float * deconvolve_shb(afloat * restrict im,
             M, N, P, // Original size
             s);
         fftwf_free(p); // i.e. p
-
+        dw_iterator_set_error(it, err);
         if(1){
             /* Swap so that the current is named x */
             afloat * t = x;
@@ -285,13 +282,12 @@ float * deconvolve_shb(afloat * restrict im,
             }
         }
 
-
         putdot(s);
-        dw_show_iter(s, it, nIter, err);
+        dw_iterator_show(it, s);
+        benchmark_write(s, it->iter, it->error, x, M, N, P, wM, wN, wP);
 
-        benchmark_write(s, it, err, x, M, N, P, wM, wN, wP);
-        it++;
-    } // End of main loop
+    } /* End of main loop */
+    dw_iterator_free(it);
 
     {
         /* Swap back so that x is the final iteration */

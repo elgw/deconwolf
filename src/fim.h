@@ -45,6 +45,7 @@ float fim_min(const float * A, size_t N);
 float fim_mean(const float * A, size_t N);
 float fim_max(const float * A, size_t N);
 float fim_sum(const float * restrict A, size_t N);
+
 /* A = B - C */
 void fim_minus(float * restrict  A,
     const float * restrict B,

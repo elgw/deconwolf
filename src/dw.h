@@ -71,6 +71,12 @@ typedef enum {
     DW_METRIC_IDIV /* I-Divergence */
 } dw_metric;
 
+typedef enum {
+    DW_ITER_ABS,
+    DW_ITER_REL,
+    DW_ITER_FIXED
+} dw_iter_type;
+
 typedef float afloat;
 
 
@@ -83,7 +89,7 @@ typedef float * (*dw_function) (afloat * restrict im, const int64_t M, const int
 
 struct _dw_opts{
     int nThreads;
-    int nIter;
+
     char * imFile;
     char * psfFile;
     char * refFile; /* Name of reference image */
@@ -98,6 +104,13 @@ struct _dw_opts{
     int tiling_maxSize;
     int tiling_padding;
     int overwrite; /* overwrite output if exist */
+
+    int nIter_auto; /* Automatic stopping? */
+    int nIter; /* Fixed number of iterations, used when nIter_auto = 0 */
+    int maxiter; /* Max number of iter for rel and abs mode */
+    float err_rel;
+    float err_abs;
+    dw_iter_type iter_type;
 
     int verbosity;
     int showTime; /* For dev: show detailed timings */
@@ -242,6 +255,23 @@ void benchmark_write(dw_opts * s, int iter, double fMSE,const afloat * x,
 
 /* "WARNING" in some formatting */
 void warning(FILE * fid);
+
+
+typedef struct{
+    float error; /* Current error */
+    float lasterror; /* Last error */
+    int iter; /* Current iteration */
+    int niter; /* Max number of iterations */
+    float relerror; /* Relative error to stop at */
+    float abserror; /* Absolute error to stop at */
+    dw_iter_type itertype; /* Stop condition class */
+} dw_iterator_t;
+
+dw_iterator_t * dw_iterator_new(const dw_opts *);
+int dw_iterator_next(dw_iterator_t * );
+void dw_iterator_set_error(dw_iterator_t *, float);
+void dw_iterator_show(dw_iterator_t *, const dw_opts *);
+void dw_iterator_free(dw_iterator_t * );
 
 #include "method_eve.h"
 #include "method_identity.h"

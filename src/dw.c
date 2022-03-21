@@ -28,6 +28,128 @@ FILE * logfile = NULL;
 /* END GLOBALS */
 
 
+dw_iterator_t * dw_iterator_new(const dw_opts * s)
+{
+    dw_iterator_t * it = malloc(sizeof(dw_iterator_t));
+    it->error = 1;
+    it->lasterror = 1;
+    it->itertype = s->iter_type;
+    it->abserror = s->err_abs;
+    it->relerror = s->err_rel;
+    it->iter = -1;
+    it->niter = s->nIter;
+    if(it->itertype != DW_ITER_FIXED)
+    {
+        it->niter = s->maxiter;
+    }
+
+    return it;
+}
+
+int dw_iterator_next(dw_iterator_t * it)
+{
+    it->iter++;
+    switch(it->itertype)
+    {
+    case DW_ITER_FIXED:
+        //printf("DW_ITER_FIXED\n");
+        break;
+    case DW_ITER_REL:
+        //printf("DW_ITER_REL, %e, %e\n", fabs(it->error - it->lasterror)/it->error, it->relerror);
+        if(it->iter < 2)
+        {
+            it->lasterror = 2*it->error*it->relerror;
+        }
+        if(fabs(it->error - it->lasterror)/it->error < it->relerror)
+        {
+            return -1;
+        }
+        break;
+    case DW_ITER_ABS:
+        //printf("DW_ITER_ABS %f < %f ?\n", it->error, it->abserror);
+        if(it->iter > 0 && it->error < it->abserror)
+        {
+            return -1;
+        }
+        break;
+    }
+
+    if(it->iter >= it->niter)
+    {
+        return -1;
+    }
+
+    return it->iter;
+}
+
+void dw_iterator_set_error(dw_iterator_t * it, float err)
+{
+    it->lasterror = it->error;
+    it->error = err;
+}
+
+void dw_iterator_show(dw_iterator_t * it, const dw_opts *s)
+{
+    if(s->verbosity > 0){
+        printf("\r                                             ");
+        if(s->metric == DW_METRIC_MSE)
+        {
+            printf("\rIteration %3d/%3d, fMSE=%.3e ",
+                   it->iter+1, it->niter, it->error);
+        }
+        if(s->metric == DW_METRIC_IDIV)
+        {
+            printf("\rIteration %3d/%3d, Idiv=%.3e ",
+                   it->iter+1, it->niter, it->error);
+        }
+        if(it->itertype == DW_ITER_REL && it->iter > 1)
+        {
+            double rel = fabs(it->error - it->lasterror)/it->error;
+            printf("(%.3e", rel);
+            if(rel > it->relerror)
+            {
+                printf(" > ");
+            } else {
+                printf(" < ");
+            }
+            printf("%.3e) ", it->relerror);
+        }
+        if(it->itertype == DW_ITER_ABS && it->iter > 0)
+        {
+            printf("(");
+            if(it->error > it->abserror)
+            {
+                printf(" > ");
+            } else {
+                printf(" < ");
+            }
+            printf("%.3e) ", it->abserror);
+        }
+        fflush(stdout);
+    }
+
+    if(s->log != NULL && s->log != stdout)
+    {
+        if(s->metric == DW_METRIC_MSE)
+        {
+            fprintf(s->log, "Iteration %3d/%3d, fMSE=%e\n",
+                    it->iter+1, it->niter, it->error);
+        }
+        if(s->metric == DW_METRIC_IDIV)
+        {
+            fprintf(s->log, "Iteration %3d/%3d, Idiv=%e\n",
+                    it->iter+1, it->niter, it->error);
+        }
+        fflush(s->log);
+    }
+}
+void dw_iterator_free(dw_iterator_t * it)
+{
+    free(it);
+}
+
+
+
 dw_opts * dw_opts_new(void)
 {
     dw_opts * s = malloc(sizeof(dw_opts));
@@ -41,13 +163,18 @@ dw_opts * dw_opts_new(void)
     s->nThreads = omp_get_num_procs();
     #endif
     s->nThreads < 1 ? s->nThreads = 1 : 0;
-    s->nIter = 25;
+    s->nIter = 1; /* Always overwritten if used */
+    s->maxiter = 250;
+    s->err_rel = 0.02;
+    s->err_abs = 1; /* Always overwritten if used */
+    s->nIter_auto = 1;
     s->imFile = NULL;
     s->psfFile = NULL;
     s->outFile = NULL;
     s->logFile = NULL;
     s->refFile = NULL;
     s->tsvFile = NULL;
+    s->iter_type = DW_ITER_REL;
     s->tsv = NULL;
     s->ref = NULL;
     s->prefix = malloc(10*sizeof(char));
@@ -199,6 +326,21 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
         break;
     case DW_METRIC_IDIV:
         fprintf(f, "metric: Idiv\n");
+        break;
+    }
+    switch(s->iter_type)
+    {
+    case DW_ITER_ABS:
+        fprintf(f, "Stopping on absolute error: %e or %d iterations\n",
+                s->err_abs, s->maxiter);
+        break;
+    case DW_ITER_REL:
+        fprintf(f, "Stopping on relative error: %e or %d iterations\n",
+                s->err_rel, s->maxiter);
+        break;
+    case DW_ITER_FIXED:
+        fprintf(f, "Stopping after %d iterations\n",
+                s->nIter);
         break;
     }
     if(s->psigma > 0)
@@ -383,10 +525,12 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         { "bg",        required_argument, NULL, 'b' },
         { "threads",   required_argument, NULL, 'c' },
         { "tsv",       required_argument, NULL, 'd' },
+        { "abserror",  required_argument, NULL, 'e' },
         { "prefix",    required_argument, NULL, 'f' },
         { "times",     no_argument,       NULL, 'g' },
         { "help",      no_argument,       NULL, 'h' },
         { "iterdump",  no_argument,       NULL, 'i' },
+        { "relerror",  required_argument, NULL, 'j' },
         { "verbose",   required_argument, NULL, 'l' },
         { "method",    required_argument, NULL, 'm' },
         { "iter",      required_argument, NULL, 'n' },
@@ -405,6 +549,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         { "niterdump", required_argument, NULL,  'I' },
         { "lookahead", required_argument, NULL,  'L' },
         { "mse",       no_argument,       NULL,  'M' },
+        { "maxiter",   required_argument, NULL,  'N' },
         { "ref",       required_argument, NULL,  'R' },
         { "onetile",   no_argument,       NULL,  'T' },
         { "nopos",     no_argument,       NULL,  'P' },
@@ -434,14 +579,25 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         case 'd': /* diagnostics */
             s->tsvFile = strdup(optarg);
             break;
+        case 'e': /* --abserror */
+            s->err_abs = atof(optarg);
+            s->iter_type = DW_ITER_ABS;
+            break;
         case 'g':
             s->showTime = 1;
+            break;
+        case 'j': /* --relerror */
+            s->err_rel = atof(optarg);
+            s->iter_type = DW_ITER_REL;
             break;
         case 'L':
             s->lookahead = atoi(optarg);
             break;
         case 'M':
             s->metric = DW_METRIC_MSE;
+            break;
+        case 'N':
+            s->maxiter = atoi(optarg);
             break;
         case 'P':
             s->positivity = 0;
@@ -473,6 +629,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             break;
         case 'n':
             s->nIter = atoi(optarg);
+            s->iter_type = DW_ITER_FIXED;
             break;
         case 'c':
             s->nThreads = atoi(optarg);

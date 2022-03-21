@@ -142,9 +142,7 @@ void floatimage_normalize(afloat * restrict I, const size_t N)
 
     if(imax>0)
     {
-#pragma omp parallel for shared(I)
-        for(size_t kk=0; kk<N; kk++)
-            I[kk]*=(pow(2,16)-1)/imax;
+        fim_mult_scalar(I, N, (pow(2,16)-2)/imax);
     }
 
 }
@@ -764,7 +762,7 @@ int fim_tiff_write(const char * fName, const afloat * V,
     if(V != NULL)
     {
         float imax = fim_max(V, M*N*P);
-        scaling = 1.0/imax*(pow(2,16)-1.0);
+        scaling = 1.0/imax*(pow(2,16)-2.0);
     }
 
     if(!isfinite(scaling))
