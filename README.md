@@ -25,6 +25,10 @@ Deconwolf does not:
  - Diagnose your imaging system and correct for typical CMOS or CCD
    artifacts.
  - Estimate your PSF based on real images.
+ - Tell you how many iterations that you should use although there are
+   three ways to make it stop i) after a fixed number of iterations
+   ii) when the progress is slow, or iii) at a fixed difference
+   between the input image and the current guess (convolved with the PSF).
  - If you miss one or more of these features,
    or just want something else, there is an (incomplete)
    list of [alternative](#aternatives) software.
