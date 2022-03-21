@@ -187,7 +187,7 @@ The PSF calculations in **dw_bw** use these:
    of the Optical Society of America A 34.6 (May 2017), p. 1029.
    [doi](https://doi.org/10.1364/josaa.34001029)
 
-   Used for the **-{}-li** argument.
+   Enable by **\--li**.
 
 
 ## Alternatives
