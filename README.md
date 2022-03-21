@@ -246,17 +246,39 @@ The deconvolution algorithm is based on the following papers:
  * Lucy, L. B. (1974). "An iterative technique for the rectification of observed
    distributions". Astronomical Journal. 79 (6): 745–754.
    [doi](https://doi.org/10.1086%2F111605)
- * Biggs, D.S.C. “Acceleration of Iterative Image Restoration Algorithms.”
-   Applied Optics. Vol. 36. Number 8, 1997, pp. 1766–1775.
-   [doi](https://doi.org/10.1364/AO.36.001766)
+
+   These together are referred to as Richardson-Lucy
+   (RL). Enable with **\--method rl**.
+
+ * Biggs, D.S.C. and Andrews, M. “Acceleration of Iterative Image
+   Restoration Algorithms.”  Applied Optics. Vol. 36. Number 8, 1997,
+   pp. 1766–1775.  [doi](https://doi.org/10.1364/AO.36.001766)
+
+   The Additive Vector Extrapolation Method, enable with **-{}-method ave**
+
  * Biggs, D.S.C “Accelerated iterative blind deconvolution”. PhD thesis.
    University of Auckland, New Zealand, 1998.
+
+   The Exponential Vector Extrapolation Method is described, enable
+   with **\--method eve**
+
+ * Wang H, et al. Scaled Heavy-Ball Acceleration of the
+   Richardson-Lucy Algorithm for 3D Microscopy Image Restoration. IEEE
+   Trans Image Process. 2014 [doi](https://doi.org/10.1109/TIP.2013.2291324).
+
+   The default method, i.e., **\--method shb** does nothing.
+
  * M. Bertero and P. Boccacci, A simple method for the reduction of boundary
    effects in the Richardson-Lucy approach to image deconvolution,
    A&A 437, 369-374 (2005).
    [doi](https://doi.org/10.1051/0004-6361:20052717)
 
-The PSF generation is based on these:
+   When **\--bq 2** (default) is used, this is the way that boundaries
+   are handled. **\--bq 0** turns this completely off (i.e., image is
+   treated as circular in all dimensions). **\--bq 1** is a compromise
+   of speed and memory vs quality.
+
+The PSF calculations in **dw_bw** use these:
 
  * Max Born. Principles of optics : electromagnetic theory of propagation, interference,
    and diffraction of light. Cambridge: Cambridge University Press, 2019.
@@ -267,11 +289,12 @@ The PSF generation is based on these:
    Technology Lausanne (EPFL), May 2009
    [url](http://bigwww.epfl.ch/publications/aguet0903.html)
 
- * The `--li` option uses:
-   Jizhou Li, Feng Xue, and Thierry Blu. “Fast and accurate three-dimensional
+ * Jizhou Li, Feng Xue, and Thierry Blu. “Fast and accurate three-dimensional
    point spread function computation for fluorescence microscopy”. In: Journal
    of the Optical Society of America A 34.6 (May 2017), p. 1029.
    [doi](https://doi.org/10.1364/josaa.34001029)
+
+   Used for the **-{}-li** argument.
 
 
 ## Alternatives

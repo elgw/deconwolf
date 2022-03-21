@@ -412,9 +412,9 @@ void fft_train(const size_t M, const size_t N, const size_t P, const int verbosi
     {
         if(verbosity > 0)
         {
-            printf("> generating c2r plan\n");
+            printf("> generating fftw3 c2r plan\n");
         }
-        fprintf(log, "> generating c2r plan\n");
+        fprintf(log, "> generating fftw3 c2r plan\n");
         fftwf_plan p1 = fftwf_plan_dft_c2r_3d(P, N, M,
                                               C, R, MYPLAN);
         fftwf_execute(p1);
@@ -423,9 +423,9 @@ void fft_train(const size_t M, const size_t N, const size_t P, const int verbosi
     } else {
         if(verbosity > 1)
         {
-            printf("\t Using cached c2r plan\n");
+            printf("\t Using cached fftw3 c2r plan\n");
         }
-        fprintf(log, "Using cached c2r plan\n");
+        fprintf(log, "Using cached fftw3 c2r plan\n");
     }
     fftwf_destroy_plan(p0);
 
@@ -435,9 +435,9 @@ void fft_train(const size_t M, const size_t N, const size_t P, const int verbosi
     if(p0 == NULL)
     {
         if(verbosity > 0){
-            printf("> generating r2c plan \n");
+            printf("> generating fftw3 r2c plan \n");
         }
-        fprintf(log, "> generating r2c plan\n");
+        fprintf(log, "> generating fftw3 r2c plan\n");
         fftwf_plan p2 = fftwf_plan_dft_r2c_3d(P, N, M,
                                               R, C, MYPLAN);
         fftwf_execute(p2);
@@ -446,9 +446,9 @@ void fft_train(const size_t M, const size_t N, const size_t P, const int verbosi
     } else {
         if(verbosity > 1)
         {
-            printf("\t Using cached r2c plan\n");
+            printf("\t Using cached fftw3 r2c plan\n");
         }
-        fprintf(log, "Using cached r2c plan\n");
+        fprintf(log, "Using cached fftw3 r2c plan\n");
     }
     fftwf_destroy_plan(p0);
 

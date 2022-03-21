@@ -17,6 +17,8 @@ from libtiff now go to the log file.
 - Using static OMP schedule.
 - Introduces the **--tsv** argument to save information per
 iteration to a separate tsv file for easier plotting and analysis.
+- Three different stopping criteria: Relative error (default) Fixed
+  number of iterations or at an absolute error.
 
 ## v 0.0.26
 - **dw maxproj** works with file that are not in the current folder.

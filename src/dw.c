@@ -521,7 +521,6 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
 
 
     struct option longopts[] = {
-        { "biggs",     required_argument, NULL, 'a' },
         { "bg",        required_argument, NULL, 'b' },
         { "threads",   required_argument, NULL, 'c' },
         { "tsv",       required_argument, NULL, 'd' },
@@ -567,9 +566,6 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
                             longopts, NULL)) != -1)
     {
         switch(ch) {
-        case 'a': /* Accelerations */
-            s->biggs = atoi(optarg);
-            break;
         case 'C':
             s->flatfieldFile = strdup(optarg);
             break;
@@ -2024,6 +2020,7 @@ int dw_run(dw_opts * s)
 
     if(fim_maxAtOrigo(psf, pM, pN, pP) == 0)
     {
+        /* It might still be centered between pixels */
         warning(stdout);
         printf("The PSF is not centered!\n");
     }
