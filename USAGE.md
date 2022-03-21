@@ -181,3 +181,29 @@ skimage reports the size **40x201x101** by
 In general this is nothing to worry about, see
 [https://en.wikipedia.org/wiki/Row-_and_column-major_order]
 for a discussion around this topic.
+
+## Maximizing throughput
+To get a high throughput, i.e., many processed images / hour it is
+typically a little faster to process many images in parallel (if
+enough RAM).  Here are some example timings based on images:
+[2048x2048x20], psf: [117x117x39] **\--iter 20**, **\--bq 2**. Using
+dw version 0.1.0 on an AMD Ryzen 3700X
+
+ - One dw (using **\--threads 8**) took 88 s using 7294 MB RAM.
+
+ -> 40 images / hour or 88 s / image
+
+ - Two dw in parallel (using **\--threads 4**) took 2 m 44 s using 2x7106 =
+   14212 MB RAM
+
+ -> 43 images / hour or 82 s / image
+
+ - Four dw in parallel (using **\--threads 2**) took 297 s using 6795x4 =
+   27181 MB RAM
+
+ -> 48 images / hour or 74 s / image
+
+ - Eight dw in parallel (using **\--threads 1**) took 9 m 12 s, using
+   6712x8 = 53696 MB RAM
+
+-> 52 images / hour or 69 s / image
