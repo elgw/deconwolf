@@ -137,7 +137,6 @@
          return fim_copy(im, M*N*P);
      }
 
-     const int nIter = s->nIter;
 
      if(fim_maxAtOrigo(psf, pM, pN, pP) == 0)
      {
@@ -301,15 +300,15 @@
      afloat * g = fim_zeros(wMNP);
      double alpha_last = 0;
 
-     int it = 0;
-     while(it<nIter)
+     dw_iterator_t * it = dw_iterator_new(s);
+     while(dw_iterator_next(it) >= 0)
      {
 
          if(s->iterdump > 0){
-             if(it % s->iterdump == 0)
+             if(it->iter % s->iterdump == 0)
              {
                  afloat * temp = fim_subregion(x, wM, wN, wP, M, N, P);
-                 char * outname = gen_iterdump_name(s, it);
+                 char * outname = gen_iterdump_name(s, it->iter);
                  //fulldump(s, temp, M, N, P, outname);
                  if(s->outFormat == 32)
                  {
@@ -324,7 +323,7 @@
 
          struct timespec tstart, tend;
          clock_gettime(CLOCK_REALTIME, &tstart);
-         if(it >= 2 && s->biggs > 0)
+         if(it->iter >= 2 && s->biggs > 0)
          {
 
              clock_gettime(CLOCK_REALTIME, &tstart);
@@ -395,7 +394,8 @@
                                s);
 
          putdot(s);
-         dw_show_iter(s, it, nIter, err);
+         dw_iterator_set_error(it, err);
+         dw_iterator_show(it, s);
 
          {
              afloat * swap = g;
@@ -443,8 +443,7 @@
          xm = x;
          x = xp;
          xp = NULL;
-         benchmark_write(s, it, err, x, M, N, P, wM, wN, wP);
-         it++;
+         benchmark_write(s, it->iter, err, x, M, N, P, wM, wN, wP);
      } /* End of main loop */
 
      if(s->verbosity > 0) {

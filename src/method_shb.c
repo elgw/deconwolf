@@ -240,8 +240,6 @@ float * deconvolve_shb(afloat * restrict im,
                 p[kk] = x[kk] + alpha*(x[kk]-xp[kk]);
             }
 
-
-
         if(s->psigma > 0)
         {
             printf("gsmoothing()\n");

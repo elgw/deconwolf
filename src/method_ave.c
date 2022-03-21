@@ -133,8 +133,6 @@ float * deconvolve_ave(afloat * restrict im,
          return fim_copy(im, M*N*P);
      }
 
-     const int nIter = s->nIter;
-
      if(fim_maxAtOrigo(psf, pM, pN, pP) == 0)
      {
          printf(" ! AVE PSF is not centered!\n");
@@ -307,15 +305,15 @@ float * deconvolve_ave(afloat * restrict im,
      afloat * gm = fim_zeros(wMNP);
      afloat * g = fim_zeros(wMNP);
 
-     int it = 0;
-     while(it<nIter)
+     dw_iterator_t * it = dw_iterator_new(s);
+     while(dw_iterator_next(it) >= 0)
      {
 
          if(s->iterdump > 0){
-             if(it % s->iterdump == 0)
+             if(it->iter % s->iterdump == 0)
              {
                  afloat * temp = fim_subregion(x, wM, wN, wP, M, N, P);
-                 char * outname = gen_iterdump_name(s, it);
+                 char * outname = gen_iterdump_name(s, it->iter);
                  //printf(" Writing current guess to %s\n", outname);
                  if(s->outFormat == 32)
                  {
@@ -373,8 +371,8 @@ float * deconvolve_ave(afloat * restrict im,
                            s);
 
          putdot(s);
-
-         dw_show_iter(s, it, nIter, err);
+         dw_iterator_set_error(it, err);
+         dw_iterator_show(it, s);
 
 
          afloat * swap = g;
@@ -382,7 +380,7 @@ float * deconvolve_ave(afloat * restrict im,
 
          fim_minus(g, xp, y, wMNP); // g = xp - y
 
-         if(it > 0) { /* 20211127 'it > 0' */
+         if(it->iter > 0) { /* 20211127 'it > 0' */
              alpha = alpha_ave(g, gm, wMNP, s->biggs);
          }
 
@@ -391,8 +389,8 @@ float * deconvolve_ave(afloat * restrict im,
          xp = NULL;
 
 
-         benchmark_write(s, it, err, x, M, N, P, wM, wN, wP);
-         it++;
+         benchmark_write(s, it->iter, err, x, M, N, P, wM, wN, wP);
+
      } // End of main loop
 
 
