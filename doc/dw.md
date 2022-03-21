@@ -19,8 +19,8 @@ or, for max projections over z:
 : Set the number of computational threads to use.
 
 **\--out file.tif**
-: Explicitly set the name of the output file. By default the name of the
-input file prefixed by `dw_` will be used.
+: Explicitly set the name of the output file. By default the output
+file name is the name of the input file prefixed by `dw_`.
 
 **\--prefix str**
 : Set the prefix to use for the output file. An extra `_` will be appended
@@ -33,7 +33,21 @@ to the str.
 : Save every nth iteration to disk, including the final image.
 
 **\--iter n**
-: Set the number of iterations.
+: Set the number of fixed iterations.
+
+**\--relerror r**
+: Tell **dw** to stop when the relative error between to iterations is
+  below **r**. This can be combined with **\--maxiter** to set a limit
+  on the number of iterations to perform.
+
+**\--abserror e**
+: Tell **dw** to stop when an absolute error is reached. This can be
+  combined with **\--maxiter** to set a limit on the number of
+  iterations to perform.
+
+**\--maxiter m**
+: If a relative or abolute error is used as stopping criteria, this
+  limits the number of iterations to perform.
 
 **\--tilesize s**
 : Set the size (axial side length, in pixels) of the largest portion that
@@ -51,7 +65,10 @@ will be deconvolved in tiles.
 and quality. n=2 default.
 
 **\--float**
-: Save the output using 32-bit floats, also turns off any scaling.
+: Save the output using 32-bit floats, also turns off any
+scaling. Please note that without this flag, images will be saved as
+16-bit unsigned integers and will be scaled to make most use of that
+format, see the log files for scaling factor used.
 
 **\--version**, **-V**
 : Show version information and quit.
@@ -59,9 +76,19 @@ and quality. n=2 default.
 **\--help**
 : Show a short help message and quit.
 
-**\--biggs b**
-: Set b to 0 to turn acceleration off, in that case dw reverts to the standard
-Richardson-Lucy method.
+**\--method METHOD**
+: Select what method to use. Valid options are
+  i/ **id** identity transform, i.e. nothing. Useful to see if images
+   loads, scales and saves correctly.
+  ii/ **rl** classical Richardson-Lucy.
+  iii/ **ave** Additive Vector Extrapolation by Biggs and Andrews.
+  iv/ **eve** Exponential Vector Extrapolation by Biggs.
+  v/ **shb** Scaled Heavy Ball.
+
+**\--mse**
+: Show the Mean Square Error between the input image and the current
+  guess convolved with the PSF at each iteration. If not set,
+  I-divergence is shown.
 
 **\--psigma s**
 : Pre-process the image and the PSF by convolving it by a 3-D isotropic
@@ -73,10 +100,17 @@ Have been found useful for very noisy image.
 projections of all following tif files. Output will be prefixed with `max_`.
 
 # While running
-At normal verbosity deconwolf will put one green dot per FFT. The fMSE value
-reported at each iteration is the Mean Squared Error between the input image
-and the forward projected current guess (i.e. the PSF convoved with the
-current guess).
+At normal verbosity deconwolf will put one green dot per FFT. After
+each iteration the Idiv or MSE (with **\--mse**) is shown, not that
+this is not a measurement on the final image quality.  Warnings are
+prefixed with ' ! '. More information can be found in the log file.
+
+# INPUT
+**dw** reads 16-bit (unsigned integers) or 32-bit (floating point) tif
+files. It does not understand compressed files or any dimensions
+except x,y,z, so only one color per image etc. To test if **dw** reads
+and writes your files, try the **\-\-method id** option. In general, if
+an image is saved by ImageJ dw should be able to read it.
 
 # OUTPUT
 Without specifying the output file name, the output file will
@@ -87,6 +121,14 @@ to the log file that also will be created (as `dw_file.tif.log.txt`).
 Unless **\--float** was specified the output images will be scaled
 to use the full dynamic range of the 16 bit format. The scaling factor
 can be found in the log file.
+
+# PERFORMANCE
+Without specifying any arguments to **dw** it will use one thread per
+cpu core in the host machine. This is typically the fastest way to
+deconvolve one image. For maximal throughput it is better to run
+several copies of **dw** using fewer cores each. E.g. on an 8-core
+machine the maximal throughput can be reached by deconvolving eight
+images in parallel using one core each (if enough RAM is available).
 
 # SEE ALSO
 **dw_bw** for generation of point spread functions according to

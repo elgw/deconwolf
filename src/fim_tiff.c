@@ -26,7 +26,33 @@
 
 //typedef float afloat __attribute__ ((__aligned__(16)));
 typedef float afloat;
+FILE * fim_tiff_log = NULL; /* Indicates stdout */
+void fim_tiff_init(void)
+{
+    fim_tiff_log = stdout;
+}
 
+/* Used to redirect errors from libtiff */
+void tiffErrHandler(const char* module, const char* fmt, va_list ap)
+{
+    fprintf(fim_tiff_log, "libtiff: Module: %s\n", module);
+    fprintf(fim_tiff_log, "libtiff: ");
+    vfprintf(fim_tiff_log, fmt, ap);
+    fprintf(fim_tiff_log, "\n");
+}
+
+
+void fim_tiff_set_log(FILE * fp)
+{
+    if(fp != NULL)
+    {
+        fim_tiff_log = fp;
+    } else {
+        fim_tiff_log = stdout;
+    }
+    TIFFSetWarningHandler(tiffErrHandler);
+    TIFFSetErrorHandler(tiffErrHandler);
+}
 
 void fim_tiff_ut()
 {
@@ -56,7 +82,7 @@ void fim_tiff_ut()
     im[pos2] = 2;
     im[pos3] = 3;
 
-    fim_tiff_write(fname, im, NULL, M, N, P, stdout);
+    fim_tiff_write(fname, im, NULL, M, N, P);
 
     int64_t M2 = 0, N2 = 0, P2 = 0;
     afloat * im2 = fim_tiff_read(fname, NULL, &M2, &N2, &P2, 0);
@@ -93,8 +119,9 @@ void fim_tiff_ut()
 void floatimage_normalize(afloat * restrict I, const size_t N)
 {
     // Scale image to span the whole 16 bit range.
-    float imax = 1e7; float imin = 1e7;
+    float imax = I[0]; float imin = I[0];
     int ok = 1;
+//#pragma omp parallel for reduction(min:imin) reduction(max:imax) shared(I)
     for(size_t kk=0; kk<N; kk++)
     {
         if(!isfinite(I[kk]))
@@ -115,8 +142,7 @@ void floatimage_normalize(afloat * restrict I, const size_t N)
 
     if(imax>0)
     {
-        for(size_t kk=0; kk<N; kk++)
-            I[kk]*=(pow(2,16)-1)/imax;
+        fim_mult_scalar(I, N, (pow(2,16)-2)/imax);
     }
 
 }
@@ -124,8 +150,8 @@ void floatimage_normalize(afloat * restrict I, const size_t N)
 void floatimage_show_stats(afloat * I, size_t N, size_t M, size_t P)
 {
     float isum = 0;
-    float imin = INFINITY;
-    float imax = -INFINITY;
+    float imin = I[0];
+    float imax = I[0];
     for(size_t kk = 0; kk<M*N*P; kk++)
     {
         I[kk] > imax ? imax = I[kk] : 0 ;
@@ -135,47 +161,6 @@ void floatimage_show_stats(afloat * I, size_t N, size_t M, size_t P)
     printf("min: %f max: %f mean: %f\n", imin, imax, isum/(M*N*P));
 }
 
-/*
-  void readUint8_sub(TIFF * tfile, afloat * V,
-  const uint32_t ssize,
-  const uint32_t ndirs,
-  const uint32_t nstrips,
-  const uint32_t perDirectory,
-  int64_t sM, int64_t sN, int64_t sP, int64_t wM, int64_t wN, int64_t wP)
-  {
-  perror("Not implemented\n");
-  exit(1);
-  }
-
-
-  void readUint8(TIFF * tfile, afloat * V,
-  const uint32_t ssize,
-  const uint32_t ndirs,
-  const uint32_t nstrips,
-  const uint32_t perDirectory
-  )
-  {
-  // Number of elements per strip
-  size_t nes = ssize/sizeof(uint8_t);
-  uint8_t * buf = _TIFFmalloc(ssize);
-  assert(buf != NULL);
-
-  for(int64_t dd=0; dd<ndirs; dd++) {
-  TIFFSetDirectory(tfile, dd);
-  for(int64_t kk=0; kk<nstrips; kk++) {
-  int64_t strip = kk;
-  tsize_t read = TIFFReadEncodedStrip(tfile, strip, buf, (tsize_t) - 1);
-  assert(read>0);
-
-  for(int64_t ii = 0; ii<read/sizeof(uint8_t); ii++) {
-  size_t pos = ii+kk*nes + dd*perDirectory;
-  V[pos] = (float) buf[ii];
-  }
-  }
-  }
-  _TIFFfree(buf);
-  }
-*/
 
 INLINED extern void sub2ind(size_t ind,
                             int64_t M, int64_t N, __attribute__((unused)) int64_t P,
@@ -253,7 +238,7 @@ void readUint16(TIFF * tfile, float * V,
                 const uint32_t ndirs,
                 const uint32_t nstrips,
                 const uint32_t perDirectory
-                )
+    )
 {
     // Number of elements per strip
     size_t nes = ssize/sizeof(uint16_t);
@@ -323,7 +308,7 @@ void readFloat(TIFF * tfile, afloat * V,
                uint32_t ndirs,
                uint32_t nstrips,
                uint32_t perDirectory
-               )
+    )
 {
     // Number of elements per strip
     size_t nes = ssize/sizeof(float);
@@ -506,13 +491,13 @@ int fim_tiff_to_raw(const char * fName, const char * oName)
         }
     }
     else {
-        printf("Warning: TIFFTAG_SAMPLEFORMAT not specified, assuming uint but that could be wrong!\n");
+        fprintf(fim_tiff_log, "Warning: TIFFTAG_SAMPLEFORMAT not specified, assuming uint but that could be wrong!\n");
         isUint = 1;
     }
 
     if(!(isUint || isFloat))
     {
-        printf("Only unsigned integer and float images are supported\n");
+        fprintf(stderr, "Only unsigned integer and float images are supported\n");
         return -1;
     }
 
@@ -533,21 +518,21 @@ int fim_tiff_to_raw(const char * fName, const char * oName)
 
     if(gotptag != 1)
     {
-        printf("WARNING: Could not read TIFFTAG_PHOTOMETRIC, assuming minIsBlack\n");
+        fprintf(fim_tiff_log, "fim_tiff: WARNING: Could not read TIFFTAG_PHOTOMETRIC, assuming minIsBlack\n");
         PTAG=1;
     }
     //printf("PTAG = %u\n", PTAG);
     if(PTAG == 0)
     {
-        printf("Tiling mode does not support inverted images\n");
+        fprintf(stderr, "Tiling mode does not support inverted images\n");
         return -1;
     }
 
     if(PTAG > 1)
     {
-        printf("WARNING: Only WhiteIsZero or BlackIsZero are supported Photometric Interpretations, tag found: %u\n", PTAG);
+        fprintf(fim_tiff_log, "fim_tiff: WARNING: Only WhiteIsZero or BlackIsZero are supported Photometric Interpretations, tag found: %u\n", PTAG);
         PTAG = 1;
-        printf("Assuming min-is-black\n");
+        fprintf(fim_tiff_log, "fim_tiff: Assuming min-is-black\n");
         fflush(stdout);
     }
 
@@ -589,7 +574,7 @@ int fim_tiff_from_raw(const char * fName, // Name of tiff file to be written
     if(MNP*sizeof(uint16_t) >= pow(2, 32))
     {
         sprintf(formatString, "w8\n");
-        printf("WARNING: File is > 2 GB, using BigTIFF format\n");
+        fprintf(fim_tiff_log, "fim_tiff WARNING: File is > 2 GB, using BigTIFF format\n");
     }
 
     TIFF * out = TIFFOpen(fName, formatString);
@@ -597,7 +582,7 @@ int fim_tiff_from_raw(const char * fName, // Name of tiff file to be written
 
     if(out == NULL)
     {
-        printf("ERROR: Failed to open %s for writing using formatString: %s\n", fName, formatString);
+        fprintf(stderr, "fim_tiff ERROR: Failed to open %s for writing using formatString: %s\n", fName, formatString);
         exit(1);
     }
 
@@ -619,7 +604,8 @@ int fim_tiff_from_raw(const char * fName, // Name of tiff file to be written
     FILE * rf = fopen(rName, "r");
     if(rf == NULL)
     {
-        printf("Failed to open %s for writing\n", rName);
+        fprintf(stderr, "fim_tiff ERROR: Failed to open %s for writing\n", rName);
+        exit(EXIT_FAILURE);
     }
 
     // Can TIFFCheckpointDirectory be used to speed up this?
@@ -662,7 +648,8 @@ int fim_tiff_from_raw(const char * fName, // Name of tiff file to be written
                                        0); //sample
             if(ok != 1)
             {
-                printf("TIFFWriteScanline failed\n");
+                fprintf(stderr, "TIFFWriteScanline failed\n");
+                exit(EXIT_FAILURE);
             }
         }
 
@@ -677,23 +664,23 @@ int fim_tiff_from_raw(const char * fName, // Name of tiff file to be written
     return 0;
 }
 
-int fim_tiff_write_zeros(const char * fName, int64_t N, int64_t M, int64_t P, FILE * fout)
+int fim_tiff_write_zeros(const char * fName, int64_t N, int64_t M, int64_t P)
 {
-    return fim_tiff_write(fName, NULL, NULL, N, M, P, fout);
+    return fim_tiff_write(fName, NULL, NULL, N, M, P);
 }
 
 int fim_tiff_write_float(const char * fName, const afloat * V,
                          ttags * T,
-                         int64_t N, int64_t M, int64_t P, FILE * fout)
+                         int64_t N, int64_t M, int64_t P)
 {
 
-    fprintf(fout, "scaling: 1\n");
+    fprintf(fim_tiff_log, "scaling: 1\n");
     size_t bytesPerSample = sizeof(float);
     char formatString[4] = "w";
     if(M*N*P*sizeof(uint16_t) >= pow(2, 32))
     {
         sprintf(formatString, "w8\n");
-        fprintf(fout, "WARNING: File is > 2 GB, using BigTIFF format\n");
+        fprintf(fim_tiff_log, "fim_tiff: File is > 2 GB, using BigTIFF format\n");
     }
 
     TIFF* out = TIFFOpen(fName, formatString);
@@ -746,7 +733,8 @@ int fim_tiff_write_float(const char * fName, const afloat * V,
                                        0); //sample
             if(ok != 1)
             {
-                fprintf(fout, "TIFFWriteScanline failed\n");
+                fprintf(stderr, "TIFFWriteScanline failed\n");
+                exit(EXIT_FAILURE);
             }
         }
 
@@ -761,41 +749,35 @@ int fim_tiff_write_float(const char * fName, const afloat * V,
 
 int fim_tiff_write(const char * fName, const afloat * V,
                    ttags * T,
-                   int64_t N, int64_t M, int64_t P, FILE * fout)
+                   int64_t N, int64_t M, int64_t P)
 {
+    if(fim_tiff_log == NULL)
+    {
+        fim_tiff_log = stdout;
+    }
     // if V == NULL and empty file will be written
 
     float scaling = 1;
 
     if(V != NULL)
     {
-        float imax = 0;
-        for(size_t kk = 0; kk < (size_t) M*N*P; kk++)
-        {
-            if(isfinite(V[kk]))
-            {
-                if(V[kk] > imax)
-                {
-                    imax = V[kk];
-                }
-            }
-        }
-        scaling = 1.0/imax*(pow(2,16)-1.0);
+        float imax = fim_max(V, M*N*P);
+        scaling = 1.0/imax*(pow(2,16)-2.0);
     }
 
     if(!isfinite(scaling))
     {
-        fprintf(fout, "Non-finite scaling value, changing to 1\n");
+        fprintf(fim_tiff_log, "fim_tiff WARNING: Non-finite scaling value, changing to 1\n");
         scaling = 1;
     }
-    fprintf(fout, "scaling: %f\n", scaling);
+    fprintf(fim_tiff_log, "scaling: %f\n", scaling);
 
     size_t bytesPerSample = sizeof(uint16_t);
     char formatString[4] = "w";
     if(M*N*P*sizeof(uint16_t) >= pow(2, 32))
     {
         sprintf(formatString, "w8\n");
-        fprintf(fout, "WARNING: File is > 2 GB, using BigTIFF format\n");
+        fprintf(fim_tiff_log, "tim_tiff: File is > 2 GB, using BigTIFF format\n");
     }
 
     TIFF* out = TIFFOpen(fName, formatString);
@@ -850,7 +832,8 @@ int fim_tiff_write(const char * fName, const afloat * V,
                                        0); //sample
             if(ok != 1)
             {
-                fprintf(fout, "TIFFWriteScanline failed\n");
+                fprintf(stderr, "fim_tiff ERROR: TIFFWriteScanline failed\n");
+                exit(EXIT_FAILURE);
             }
         }
 
@@ -930,12 +913,12 @@ void ttags_set_pixelsize(ttags * T, double xres, double yres, double zres)
     if(T->M == 0)
     {
         fprintf(stderr, "use ttags_set_imagesize before ttags_set_pixelsize");
-        assert(0);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     if(xres != yres)
     {
         fprintf(stderr, "Only supports isotropic pixels in x-y\n");
+        exit(EXIT_FAILURE);
     }
     T->xresolution = 1/xres; // Pixels per nm
     T->yresolution = 1/yres;
@@ -954,8 +937,8 @@ void ttags_free(ttags ** Tp)
     ttags * T = Tp[0];
     if(T == NULL)
     {
-        fprintf(stderr, "T = NULL, on line %d in %s\n", __LINE__, __FILE__);
-        return;
+        fprintf(stderr, "fim_tiff: T = NULL, on line %d in %s\n", __LINE__, __FILE__);
+        exit(EXIT_FAILURE);
     }
     if(T->software != NULL)
     {
@@ -1016,7 +999,7 @@ void ttags_get(TIFF * tfile, ttags * T)
     }
 
     char * software = NULL;
-        if(TIFFGetField(tfile, TIFFTAG_SOFTWARE, &software) == 1)
+    if(TIFFGetField(tfile, TIFFTAG_SOFTWARE, &software) == 1)
     {
         T->software = malloc(strlen(software)+2);
         strcpy(T->software, software);
@@ -1024,35 +1007,35 @@ void ttags_get(TIFF * tfile, ttags * T)
     }
 
 #if 0
-        /*
-         * From https://github.com/imagej/ImageJA/blob/master/src/main/java/ij/io/TiffDecoder.java
-         * 	public static final int META_DATA_BYTE_COUNTS = 50838; // private tag registered with Adobe
-         *      public static final int META_DATA = 50839; // private tag registered with Adobe
-         */
+    /*
+     * From https://github.com/imagej/ImageJA/blob/master/src/main/java/ij/io/TiffDecoder.java
+     * 	public static final int META_DATA_BYTE_COUNTS = 50838; // private tag registered with Adobe
+     *      public static final int META_DATA = 50839; // private tag registered with Adobe
+     */
 
-        uint32_t count;
-        void * data;
-        if(TIFFGetField(tfile, XTAG_IJIJUNKNOWN, &count, &data))
+    uint32_t count;
+    void * data;
+    if(TIFFGetField(tfile, XTAG_IJIJUNKNOWN, &count, &data))
+    {
+        uint32_t * dvalue  = (uint32_t*) data;
+
+        for(int kk = 0; kk<count; kk++)
         {
-            uint32_t * dvalue  = (uint32_t*) data;
-
-            for(int kk = 0; kk<count; kk++)
-            {
-                printf("Tag %d: %d, count %d\n", XTAG_IJIJUNKNOWN, dvalue[kk], count);
-            }
+            fprintf(fim_tiff_log, "Tag %d: %d, count %d\n", XTAG_IJIJUNKNOWN, dvalue[kk], count);
         }
+    }
 
-        T->nIJIJinfo = 0;
-        T->IJIJinfo = NULL;
-        if(TIFFGetField(tfile, XTAG_IJIJINFO, &count, &data))
-        {
-            T->nIJIJinfo = count;
-            T->IJIJinfo = malloc(count);
-            memcpy(T->IJIJinfo, data, count);
-            uint8_t * udata = (uint8_t*) data;
-            for(int kk = 0; kk<count; kk++)
-            { printf("%02d %c %u\n ", kk, udata[kk], udata[kk]);};
-        }
+    T->nIJIJinfo = 0;
+    T->IJIJinfo = NULL;
+    if(TIFFGetField(tfile, XTAG_IJIJINFO, &count, &data))
+    {
+        T->nIJIJinfo = count;
+        T->IJIJinfo = malloc(count);
+        memcpy(T->IJIJinfo, data, count);
+        uint8_t * udata = (uint8_t*) data;
+        for(int kk = 0; kk<count; kk++)
+        { fprintf(fim_tiff_log, "%02d %c %u\n ", kk, udata[kk], udata[kk]);};
+    }
 #endif
 }
 
@@ -1074,10 +1057,10 @@ void ttags_set(TIFF * tfile, ttags * T)
     {
         static TIFFFieldInfo xtiffFieldInfo[] =
             {
-             { XTAG_IJIJUNKNOWN,TIFF_VARIABLE, TIFF_VARIABLE, TIFF_LONG, FIELD_CUSTOM,
-               0, 1, "IJIJunknown" },
-             { XTAG_IJIJINFO, TIFF_VARIABLE, TIFF_VARIABLE, TIFF_ASCII, FIELD_CUSTOM,
-               1, 0, "IJIJinfo" }
+                { XTAG_IJIJUNKNOWN,TIFF_VARIABLE, TIFF_VARIABLE, TIFF_LONG, FIELD_CUSTOM,
+                  0, 1, "IJIJunknown" },
+                { XTAG_IJIJINFO, TIFF_VARIABLE, TIFF_VARIABLE, TIFF_ASCII, FIELD_CUSTOM,
+                  1, 0, "IJIJinfo" }
             };
 
         // Guessing that ImageJ requires IJIJinfo to be of type ASCII
@@ -1090,12 +1073,12 @@ void ttags_set(TIFF * tfile, ttags * T)
 
         uint32_t  avalue[] = {12, 80};
         TIFFSetField(tfile, XTAG_IJIJUNKNOWN, 2, &avalue);
-        printf("-> nIJINFO: %d bytes", T->nIJIJinfo);
+        fprintf(fim_tiff_log, "fim_tiff: -> nIJINFO: %d bytes", T->nIJIJinfo);
         TIFFSetField(tfile, XTAG_IJIJINFO, T->IJIJinfo, T->nIJIJinfo);
 
         char * readback = NULL;
         TIFFGetField(tfile, XTAG_IJIJINFO, &readback);
-        printf("readback: %s\n", readback);
+        fprintf(fim_tiff_log, "fim_tiff: readback: %s\n", readback);
     }
 #endif
 
@@ -1180,7 +1163,7 @@ afloat * fim_tiff_read_sub(const char * fName,
     {
         if(CMP != 1)
         {
-            printf("TIFFTAG_COMPRESSION=%u is not supported\n", CMP);
+            fprintf(fim_tiff_log, "TIFFTAG_COMPRESSION=%u is not supported\n", CMP);
             return NULL;
         }
     }
@@ -1200,26 +1183,29 @@ afloat * fim_tiff_read_sub(const char * fName,
         }
     }
     else {
-        printf("Warning: TIFFTAG_SAMPLEFORMAT not specified, assuming uint but that could be wrong!\n");
+        fprintf(fim_tiff_log, "Warning: TIFFTAG_SAMPLEFORMAT not specified, "
+                "assuming uint but that could be wrong!\n");
         isUint = 1;
     }
 
     if(!(isUint || isFloat))
     {
-        printf("Only unsigned integer and float images are supported\n");
+        fprintf(fim_tiff_log, "fim_tiff: Only unsigned integer and float images are supported\n");
         return NULL;
     }
 
     if(isUint && !(BPS == 16 || BPS == 8))
     {
-        printf("Unsigned %d-bit images are not supported, only 8 and 16.\n", BPS);
+        fprintf(fim_tiff_log, "fim_tiff: Unsigned %d-bit images are not supported, only 8 and 16.\n", BPS);
         return NULL;
     }
 
     if(isFloat && (BPS != 32))
     {
-        printf("ERROR: For floating point images, only 32-bit samples are supported (this image has %u bits per sample)\n", BPS);
-        exit(-1);
+        fprintf(fim_tiff_log, "ERROR: For floating point images, only 32-bit "
+                "samples are supported (this image has %u bits per sample)\n",
+                BPS);
+        exit(EXIT_FAILURE);
     }
 
     M0[0] = (size_t) M;
@@ -1235,7 +1221,8 @@ afloat * fim_tiff_read_sub(const char * fName,
     int inverted = 0;
     if(gotptag != 1)
     {
-        printf("WARNING: Could not read TIFFTAG_PHOTOMETRIC, assuming minIsBlack\n");
+        fprintf(fim_tiff_log, "fim_tiff: WARNING: Could not read "
+                "TIFFTAG_PHOTOMETRIC, assuming minIsBlack\n");
         PTAG=1;
     }
     //printf("PTAG = %u\n", PTAG);
@@ -1246,9 +1233,11 @@ afloat * fim_tiff_read_sub(const char * fName,
 
     if(PTAG > 1)
     {
-        printf("WARNING: Only WhiteIsZero or BlackIsZero are supported Photometric Interpretations, tag found: %u\n", PTAG);
+        fprintf(fim_tiff_log, "fim_tiff WARNING: Only WhiteIsZero or BlackIsZero "
+                "are supported Photometric Interpretations, tag found: %u\n",
+                PTAG);
         PTAG = 1;
-        printf("Assuming min-is-black\n");
+        fprintf(fim_tiff_log, "Assuming min-is-black\n");
         fflush(stdout);
     }
 
@@ -1260,18 +1249,20 @@ afloat * fim_tiff_read_sub(const char * fName,
 
     if(verbosity > 1)
     {
-        if(gotB){
-            printf(" TIFFTAG_IMAGEDEPTH: %u\n", B);}
-        printf(" TIFFTAG_BITSPERSAMPLE: %u\n", BPS);
-        printf(" size: %zu x %zu, %zu bits\n", (size_t) M, (size_t) N, (size_t) BPS);
-        printf(" # strips: %zu \n", (size_t) nstrips);
-        printf(" strip size (ssize): %zu bytes \n", (size_t) ssize);
-        printf(" # dirs (slices): %zu\n", (size_t) ndirs);
+        if(gotB)
+        {
+            fprintf(fim_tiff_log, " TIFFTAG_IMAGEDEPTH: %u\n", B);
+        }
+        fprintf(fim_tiff_log, " TIFFTAG_BITSPERSAMPLE: %u\n", BPS);
+        fprintf(fim_tiff_log, " size: %zu x %zu, %zu bits\n", (size_t) M, (size_t) N, (size_t) BPS);
+        fprintf(fim_tiff_log, " # strips: %zu \n", (size_t) nstrips);
+        fprintf(fim_tiff_log, " strip size (ssize): %zu bytes \n", (size_t) ssize);
+        fprintf(fim_tiff_log, " # dirs (slices): %zu\n", (size_t) ndirs);
     }
 
     if(TIFFIsTiled(tfile))
     {
-        printf("Tiled files are not supported\n");
+        fprintf(stderr, "fim_tiff: Tiled files are not supported\n");
         TIFFClose(tfile);
         return NULL;
     }
@@ -1294,12 +1285,12 @@ afloat * fim_tiff_read_sub(const char * fName,
     {
         if(verbosity > 1)
         {
-            printf("ReadFloat ...\n");
+            fprintf(fim_tiff_log, "ReadFloat ...\n");
         }
         if(subregion)
         {
             perror("readFloat_sub is not implemented.\n");
-            exit(-1);
+            exit(EXIT_FAILURE);
             //readFloat_sub(tfile, V, ssize, ndirs, nstrips, M*N,
             //sM, sN, sP, wM, wN, wP);
         } else {
@@ -1310,13 +1301,16 @@ afloat * fim_tiff_read_sub(const char * fName,
     {
         if(verbosity > 1)
         {
-            printf("ReadUint ...\n");
+            fprintf(fim_tiff_log, "ReadUint ...\n");
         }
         if(BPS == 16)
         {
             if(subregion)
             {
-                printf("%" PRId64 " %" PRId64 " %" PRId64 ", %" PRId64 " %" PRId64 " %" PRId64 ", %" PRId64 " %" PRId64 " %" PRId64 "\n", M, N, P, sM, sN, sP, wM, wN, wP);
+                fprintf(fim_tiff_log, "%" PRId64 " %" PRId64 " %" PRId64 ", %"
+                        PRId64 " %" PRId64 " %" PRId64 ", %" PRId64 " %"
+                        PRId64 " %" PRId64 "\n",
+                        M, N, P, sM, sN, sP, wM, wN, wP);
                 readUint16_sub(tfile, V, ssize, ndirs, nstrips, M*N,
                                M, N, (int) P, sM, sN, sP, wM, wN, wP);
             } else {
@@ -1341,7 +1335,8 @@ afloat * fim_tiff_read_sub(const char * fName,
 
     TIFFClose(tfile);
     if(verbosity>1)
-    {printf("Done reading\n");
+    {
+        fprintf(fim_tiff_log, "Done reading\n");
     }
 
     if(inverted == 1)
@@ -1393,7 +1388,7 @@ int main(int argc, char ** argv)
 
     ttags_show(stdout, T);
 
-    fim_tiff_write(outname, I, T, M, N, P, stdout);
+    fim_tiff_write(outname, I, T, M, N, P);
     ttags_free(&T);
 
     free(I);

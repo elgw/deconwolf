@@ -1,66 +1,58 @@
 # deconwolf
 
- * [Introduction](#Introduction)
- * [Build and Install](#build-and-install)
-   * [Dependencies](#dependencies)
-   * [Ubuntu 20.04](#ubuntu-2004)
-   * [macOS Big Sur](#macos-big-sur)
-   * [Windows 10](#Windows-10)
-   * [FreeBSD 13.0](#freebsd)
- * [Usage](#Minimal-Usage-Example)
-   * [Bugs](#bugs)
- * [References](#references)
- * [Alternatives](#alternatives)
-
-## Introduction
-**deconwolf** is a program for 3-D deconvolution of fluorescent wide-field
+**deconwolf** is a software for 3-D deconvolution of fluorescent wide-field
 images:
  - The deconvolved images shows very mild boundary effects which means that you
    can crop and deconvolve small regions of interest.
  - RAM usage can be reduced at the cost of slightly longer computation times by
    tiling. That makes it possible to deconvolve large images on small machines.
- - It can make use of all precious cores of your "big" machine since the
-   critical parts run on separate threads (as many as you would like).
+ - Critical parts run on separate threads (as many as you would
+   like). However, for maximal throughput (and if you have enough
+   RAM), run several instances of dw in parallel.
  - Deconwolf is tiny! The binaries could even fit on a floppy drive
    (if you are fortunate enough to own one of those antiquities).
  - It is shipped with program to generate Point Spread Functions (PSFs)
    according to the Born and Wolf model. Our program is the only one we
    know of that actually integrate the PSF over each pixel.
- - Fully open source. And we embrace [contributions and suggestions](CONTRIBUTING.md).
-
-Except for this README.me there is also a short [USAGE.md](USAGE.md),
-a [CHANGELOG.md](CHANGELOG.md) and a [TODO.md](TODO.md).
-
-This repository provides two binaries,
- - `dw` -- for deconvolution, [man page](doc/dw.txt)
- - `dw_bw` -- to create PSFs using the Born-Wolf model [man page](doc/dw_bw.txt)
+ - Fully open source. And we embrace [contributions and
+   suggestions](CONTRIBUTING.md).
 
 Deconwolf does not:
  - Have a full-featured Graphical User Interface (GUI), however, if you
    like to click buttons there is a limited
    [GUI](https://github.com/elgw/deconwolf-gui).
  - Show your images, for that, try [ImageJ](https://imagej.net/Welcome)
- - Diagnose your imaging system.
+ - Diagnose your imaging system and correct for typical CMOS or CCD
+   artifacts.
  - Estimate your PSF based on real images.
+ - Tell you how many iterations that you should use although there are
+   three ways to make it stop i) after a fixed number of iterations
+   ii) when the progress is slow, or iii) at a fixed difference
+   between the input image and the current guess (convolved with the PSF).
  - If you miss one or more of these features,
    or just want something else, there is an (incomplete)
-   list of [alternatives](#aternatives).
+   list of [alternative](#aternatives) software.
+
+Except for this README.me there is also a short [USAGE.md](USAGE.md),
+a [CHANGELOG.md](CHANGELOG.md) and a [TODO.md](TODO.md).
+
+After building and installing you will find two binaries:
+ - **dw** -- for deconvolution, [man page](doc/dw.txt)
+ - **dw_bw** -- to create PSFs using the Born-Wolf model [man page](doc/dw_bw.txt)
 
 At the moment we don't provide pre-built packages. You will have to build
 deconwolf from the source code, instructions follows below.
 
-
 ## Build and install
-Deconwolf runs on 64-bit machines with x86_64 architecture and require no
-special hardware. Jump directly to
-installation instructions for [Ubuntu](#linux) or [macOS](#osx),
-[Windows 10](#win10) or [FreeBSD 13](#freebsd). Instruction for other
-systems will be collected in [INSTALL.md](INSTALL.md). To compile and install
-deconwolf should take less than a minute on any platform with a normal computer.
-However to installation of the dependencies is estimated take up to an hour
-MacOS (due to installing Xcode) and Windows due to the extra work of manually
-copying dependencies. We hope to provide pre-compiled version in the future.
-
+Deconwolf runs on 64-bit machines with x86_64 architecture and require
+no special hardware. Installation instructions for Ubuntu can be found
+below, for macOS, Windows 10, FreeBSD, CentOS etc, see
+[INSTALL.md](INSTALL.md).  To compile and install deconwolf should
+take less than a minute on any platform with a normal computer.
+However to the dependencies is estimated take up to an hour MacOS (due
+to installing Xcode) and Windows due to the extra work of manually
+copying dependencies. We hope to provide pre-compiled version in the
+future.
 
 ### Dependencies
 Deconwolf uses:
@@ -69,15 +61,16 @@ Deconwolf uses:
  * [libtiff](https://gitlab.com/libtiff/libtiff) to read and write TIFF files.
  * [GNU Scientific Library](https://www.gnu.org/software/gsl/) for
    integration and special functions.
- * [OpenMP](https://www.openmp.org/) for _automatic_ parallelization of code.
- * [POSIX Threads](https://en.wikipedia.org/wiki/Pthreads) for explicit paralellization.
+ * [OpenMP](https://www.openmp.org/) for _automatic_ parallelization
+   of code, used in **dw**.
+ * [POSIX Threads](https://en.wikipedia.org/wiki/Pthreads) for
+   explicit paralellization (in **dw_bw**)
 
 If these libraries are available for your platform, chances are that that it can
-be built.
+be built. FFTW can also be replaced by Intel MKL or NVIDIA CUFFTW.
 
 
 ### Ubuntu 20.04
-
 Install required packages:
 
 ``` shell
@@ -87,7 +80,7 @@ sudo apt-get update
 sudo apt-get install libfftw3-single3
 sudo apt-get install libfftw3-dev
 sudo apt-get install openmp
-sudo apt-get install tiff-5     # or possibly the one on the next line
+sudo apt-get install tiff-5     # or possibly the next line
 sudo apt-get install libtiff-dev
 sudo apt-get install libgsl-dev
 ```
@@ -98,101 +91,6 @@ make -B
 sudo make install
 ```
 
-### macOS Big Sur
-
-For building you will need XCode from the App Store and [brew](https://brew.sh/).
-
-Then set up XCode and install the required packages:
-``` shell
-xcode-select --install
-brew install libopenmpt # Not sure if this is needed
-brew install libomp
-brew install libtiff
-brew install fftw
-brew install gsl
-```
-
-Build and install deconwolf
-``` shell
-make -B
-sudo make install
-```
-
-
-### Windows 10
-
-The simplest way to build native windows binaries seems to be using msys2.
-Follow all steps of the [msys2](https://www.msys2.org/) installation guide,
-then install the dependencies in the 'MSYS2 MinGW 64-bit` terminal:
-
-``` shell
-pacman -S mingw-w64-x86_64-fftw
-pacman -S mingw-w64-x86_64-libtiff
-pacman -S mingw-w64-x86_64-msmpi
-pacman -S mingw-w64-cross-winpthreads-git
-pacman -S git
-```
-
-Then get deconwolf and build:
-
-``` shell
-git clone https://www.github.com/elgw/deconwolf
-cd deconwolf
-make WINDOWS=1 -B
-```
-
-binaries will end up in the `bin` sub folder. All dependencies (DLLs) can be
-found in `/mingw64/bin/` under the directory where msys64 is installed. To use
-deconwolf outside of msys2 you will need to copy the binaries and the following
-DLL files to the same folder.
-
-```
-libdeflate.dll libfftw3f-3.dll     libgcc_s_seh-1.dll libgomp-1.dll
-libgsl-25.dll  libgslcblas-0.dll   libjbig-0.dll      libjpeg-8.dll
-libLerc.dll    liblzma-5.dll       libstdc++-6.dll    libtiff-5.dll
-libwebp-7.dll  libwinpthread-1.dll libzstd.dll        zlib1.dll
-```
-
-At least one person has build deconwolf using Windows Subsystem for Linux but
-beware, there might be a
-[performance penalty](https://www.phoronix.com/scan.php?page=article&item=wsl-wsl2-tr3970x&num=1).
-
-
-### FreeBSD
-
-The following packages were required:
-``` shell
-pkg install git
-pkg install gmake
-pkg install fftw3
-pkg install tiff
-pkg install gsl
-pkg install sudo
-```
-
-To build and install deconwolf:
-``` shell
-gmake -f makefile-freebsd
-sudo gmake install
-```
-## Meson
-deconwolf can also be installed using [meson](https://mesonbuild.com/),
-tested only Ubuntu and MacOS
-
-To build and install:
-``` shell
-meson setup builddir --buildtype release
-cd builddir
-meson compile
-meson install # Note: only works if meson was installed by sudo
-```
-
-To uninstall:
-
-``` shell
-sudo ninja -C builddir uninstall
-```
-
 ## Minimal usage example
 To generate a parametric PSF and deconvolve an image, all you need is something
 like this:
@@ -200,7 +98,7 @@ like this:
 # generate PSF.tif
 dw_bw --resxy 130 --resz 250 --NA 1.46 --ni 1.518 --lambda 460 PSF.tiff
 # Deconvolve image.tiff -> dw_image.tiff
-dw --iter 50 image.tiff PSF.tiff
+dw image.tiff PSF.tiff
 ```
 For available options, please see
 
@@ -209,16 +107,17 @@ dw --help
 dw_bw --help
 ```
 
-There is a single nuclei in the `/demo/dapi_001.tif` folder, to deconvolve just run:
+There is a single nuclei in the `/demo/dapi_001.tif` folder, to
+deconvolve just run:
 
 ``` shell
 cd demo
 make
 imagej dapi_001.tif dw_dapi_001.tif
 ```
-The run time on an AMD 3700x was 38s the first time. The second time you run it fftw
+The run time on an AMD 3700x was 38s the first time. The second time you run it fftw3
 will already know how to handle this specific image size and the run time was
-17 s on the same machine.
+6 s on the same machine.
 
 For more documentation see the short [usage guide](USAGE.md), and the manual
 pages for both binaries, [man dw](doc/dw.txt) [man dw_bw](doc/dw_bw.txt).
@@ -233,7 +132,6 @@ have any issues with the program.
 
 ## References
 
-
 There is a [pseudo code](PSEUDOCODE.md) description of what the binaries does.
 
 The deconvolution algorithm is based on the following papers:
@@ -244,17 +142,40 @@ The deconvolution algorithm is based on the following papers:
  * Lucy, L. B. (1974). "An iterative technique for the rectification of observed
    distributions". Astronomical Journal. 79 (6): 745–754.
    [doi](https://doi.org/10.1086%2F111605)
- * Biggs, D.S.C. “Acceleration of Iterative Image Restoration Algorithms.”
-   Applied Optics. Vol. 36. Number 8, 1997, pp. 1766–1775.
-   [doi](https://doi.org/10.1364/AO.36.001766)
+
+   These together are referred to as Richardson-Lucy
+   (RL). Enable with **\--method rl**.
+
+ * Biggs, D.S.C. and Andrews, M. “Acceleration of Iterative Image
+   Restoration Algorithms.”  Applied Optics. Vol. 36. Number 8, 1997,
+   pp. 1766–1775.  [doi](https://doi.org/10.1364/AO.36.001766)
+
+   The Additive Vector Extrapolation Method, enable with **\--method ave**
+
  * Biggs, D.S.C “Accelerated iterative blind deconvolution”. PhD thesis.
    University of Auckland, New Zealand, 1998.
+
+   The Exponential Vector Extrapolation Method is described, enable
+   with **\--method eve**
+
+ * Wang H, et al. Scaled Heavy-Ball Acceleration of the
+   Richardson-Lucy Algorithm for 3D Microscopy Image Restoration. IEEE
+   Trans Image Process. 2014 [doi](https://doi.org/10.1109/TIP.2013.2291324).
+
+   The default method, i.e., **\--method shb** does nothing.
+
  * M. Bertero and P. Boccacci, A simple method for the reduction of boundary
    effects in the Richardson-Lucy approach to image deconvolution,
    A&A 437, 369-374 (2005).
    [doi](https://doi.org/10.1051/0004-6361:20052717)
 
-The PSF generation is based on these:
+   When **\--bq 2** (default) is used, this is the way that boundaries
+   are handled (although it is extended to 3D in **dw**). **\--bq 0**
+   turns this completely off (i.e., image is treated as circular in
+   all dimensions). **\--bq 1** is a compromise of speed and memory vs
+   quality.
+
+The PSF calculations in **dw_bw** use these:
 
  * Max Born. Principles of optics : electromagnetic theory of propagation, interference,
    and diffraction of light. Cambridge: Cambridge University Press, 2019.
@@ -265,11 +186,12 @@ The PSF generation is based on these:
    Technology Lausanne (EPFL), May 2009
    [url](http://bigwww.epfl.ch/publications/aguet0903.html)
 
- * The `--li` option uses:
-   Jizhou Li, Feng Xue, and Thierry Blu. “Fast and accurate three-dimensional
+ * Jizhou Li, Feng Xue, and Thierry Blu. “Fast and accurate three-dimensional
    point spread function computation for fluorescence microscopy”. In: Journal
    of the Optical Society of America A 34.6 (May 2017), p. 1029.
    [doi](https://doi.org/10.1364/josaa.34001029)
+
+   Enable by **\--li**.
 
 
 ## Alternatives

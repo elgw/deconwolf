@@ -1,7 +1,5 @@
 DECONWOLF(1)							  DECONWOLF(1)
 
-
-
 NAME
        deconwolf  dw  is  a  tool  for	deconvolution of wide field microscopy
        stacks.
@@ -20,8 +18,8 @@ OPTIONS
 	      Set the number of computational threads to use.
 
        --out file.tif
-	      Explicitly set the name of the output file.  By default the name
-	      of the input file prefixed by dw_ will be used.
+	      Explicitly set the name of the output file.  By default the out‐
+	      put file name is the name of the input file prefixed by dw_.
 
        --prefix str
 	      Set  the	prefix to use for the output file.  An extra _ will be
@@ -34,11 +32,25 @@ OPTIONS
 	      Save every nth iteration to disk, including the final image.
 
        --iter n
-	      Set the number of iterations.
+	      Set the number of fixed iterations.
+
+       --relerror r
+	      Tell dw to stop when the relative error between to iterations is
+	      below  r.	 This can be combined with --maxiter to set a limit on
+	      the number of iterations to perform.
+
+       --abserror e
+	      Tell dw to stop when an absolute error is reached.  This can  be
+	      combined	with  --maxiter to set a limit on the number of itera‐
+	      tions to perform.
+
+       --maxiter m
+	      If a relative or abolute error is	 used  as  stopping  criteria,
+	      this limits the number of iterations to perform.
 
        --tilesize s
-	      Set the size (axial side length, in pixels) of the largest  por-
-	      tion  that can be deconvolved at a time.	E.g., if s is 2048 any
+	      Set  the size (axial side length, in pixels) of the largest por‐
+	      tion that can be deconvolved at a time.  E.g., if s is 2048  any
 	      image larger than 2048 will be deconvolved in tiles.
 
        --tilepad p
@@ -47,46 +59,72 @@ OPTIONS
        --overwrite
 	      Overwrite the target if it exists.
 
-       --bq n Border/edge handling.  n=0: no padding.  n=1: a  compromise  be-
+       --bq n Border/edge  handling.   n=0: no padding.	 n=1: a compromise be‐
 	      tween memory/speed and quality.  n=2 default.
 
        --float
 	      Save the output using 32-bit floats, also turns off any scaling.
+	      Please  note  that  without  this	 flag, images will be saved as
+	      16-bit unsigned integers and will be scaled to make most use  of
+	      that format, see the log files for scaling factor used.
 
        --version, -V
 	      Show version information and quit.
 
        --help Show a short help message and quit.
 
-       --biggs b
-	      Set b to 0 to turn acceleration off, in that case dw reverts  to
-	      the standard Richardson-Lucy method.
+       --method METHOD
+	      Select  what  method  to	use.  Valid options are i/ id identity
+	      transform, i.e. nothing.	Useful to see if images loads,	scales
+	      and  saves  correctly.   ii/ rl classical Richardson-Lucy.  iii/
+	      ave Additive Vector Extrapolation by Biggs and Andrews.  iv/ eve
+	      Exponential  Vector Extrapolation by Biggs.  v/ shb Scaled Heavy
+	      Ball.
+
+       --mse  Show the Mean Square Error between the input image and the  cur‐
+	      rent  guess  convolved  with  the PSF at each iteration.	If not
+	      set, I-divergence is shown.
 
        --psigma s
-	      Pre-process the image and the PSF by convolving it by a 3-D iso-
-	      tropic Gaussian with sigma=s.  This acts as a low  pass  filter.
+	      Pre-process the image and the PSF by convolving it by a 3-D iso‐
+	      tropic  Gaussian	with sigma=s.  This acts as a low pass filter.
 	      Have been found useful for very noisy image.
 
        maxproj
-	      With  maxproj  as  the  first argument deconwolf will create max
+	      With maxproj as the first argument  deconwolf  will  create  max
 	      projections of all following tif files.  Output will be prefixed
 	      with max_.
 
 While running
-       At normal verbosity deconwolf will put one green dot per FFT.  The fMSE
-       value reported at each iteration is the Mean Squared Error between  the
-       input  image and the forward projected current guess (i.e. the PSF con-
-       voved with the current guess).
+       At normal verbosity deconwolf will put one green dot  per  FFT.	 After
+       each  iteration the Idiv or MSE (with --mse) is shown, not that this is
+       not a measurement on the final image quality.   Warnings	 are  prefixed
+       with ’ ! ’.  More information can be found in the log file.
+
+INPUT
+       dw  reads  16-bit  (unsigned  integers)	or 32-bit (floating point) tif
+       files.  It does not understand compressed files or any  dimensions  ex‐
+       cept  x,y,z,  so only one color per image etc.  To test if dw reads and
+       writes your files, try the --method id option.  In general, if an image
+       is saved by ImageJ dw should be able to read it.
 
 OUTPUT
-       Without specifying the output file name, the output file will  be  pre-
+       Without	specifying  the output file name, the output file will be pre‐
        fixed with dw_, e.g, if you deconvolve file.tif the output file will be
-       called dw_file.tif.  Please pay attention to the  log  file  that  also
+       called  dw_file.tif.   Please  pay  attention to the log file that also
        will be created (as dw_file.tif.log.txt).
 
-       Unless  --float	was  specified the output images will be scaled to use
+       Unless --float was specified the output images will be  scaled  to  use
        the full dynamic range of the 16 bit format.  The scaling factor can be
        found in the log file.
+
+PERFORMANCE
+       Without specifying any arguments to dw it will use one thread  per  cpu
+       core  in the host machine.  This is typically the fastest way to decon‐
+       volve one image.	 For maximal throughput it is better  to  run  several
+       copies  of  dw  using fewer cores each.	E.g.  on an 8-core machine the
+       maximal throughput can be reached by deconvolving eight images in  par‐
+       allel using one core each (if enough RAM is available).
 
 SEE ALSO
        dw_bw  for  generation of point spread functions according to the Born-
@@ -99,14 +137,12 @@ REPORTING BUGS
        Please report bugs at <https://github.com/elgw/deconwolf/issues/>
 
 COPYRIGHT
-       Copyright (C) 2022 Erik Wernersson.  License GPLv3+: GNU GPL version  3
-       or  later  <https://gnu.org/licenses/gpl.html>.	This is free software:
-       you are free to change and redistribute it.  There is NO  WARRANTY,  to
-       the extent permitted by law.
+       Copyright © 2022 Erik Wernersson.  License GPLv3+: GNU GPL version 3 or
+       later  <https://gnu.org/licenses/gpl.html>.  This is free software: you
+       are free to change and redistribute it.	There is NO WARRANTY,  to  the
+       extent permitted by law.
 
 AUTHORS
        Erik Wernersson.
 
-
-
-dw				     2022			  DECONWOLF(1)
+dw 0.1.0			     2022			  DECONWOLF(1)

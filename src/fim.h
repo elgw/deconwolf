@@ -26,6 +26,11 @@
 #include <stdint.h>
 #include <inttypes.h>
 
+#ifdef _OPENMP // turned on with -fopenmp
+#include <omp.h>
+#endif
+
+
 #define INLINED inline __attribute__((always_inline))
 
 /* fim : operations on 3D floating point images
@@ -40,6 +45,7 @@ float fim_min(const float * A, size_t N);
 float fim_mean(const float * A, size_t N);
 float fim_max(const float * A, size_t N);
 float fim_sum(const float * restrict A, size_t N);
+
 /* A = B - C */
 void fim_minus(float * restrict  A,
     const float * restrict B,
@@ -87,7 +93,7 @@ float * fim_get_cuboid(float * restrict A, const int64_t M, const int64_t N, con
  * Y = A(m0:m1, n0:n1, p0:p1)
  */
 
-float * fim_subregion(float * restrict A, const int64_t M, const int64_t N, const int64_t P, const int64_t m, const int64_t n, const int64_t p);
+float * fim_subregion(const float * restrict A, const int64_t M, const int64_t N, const int64_t P, const int64_t m, const int64_t n, const int64_t p);
 /* MATLAB:
  * Y = A(1:m, 1:n, 1:p);
  */
