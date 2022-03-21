@@ -1,23 +1,12 @@
 # deconwolf
 
- * [Introduction](#Introduction)
- * [Build and Install](#build-and-install)
-   * [Dependencies](#dependencies)
-   * [Ubuntu 20.04](#ubuntu-2004)
- * [Usage](#Minimal-Usage-Example)
-   * [Bugs](#bugs)
- * [References](#references)
- * [Alternatives](#alternatives)
-
-## Introduction
-**deconwolf** is a program for 3-D deconvolution of fluorescent wide-field
+**deconwolf** is a software for 3-D deconvolution of fluorescent wide-field
 images:
  - The deconvolved images shows very mild boundary effects which means that you
    can crop and deconvolve small regions of interest.
  - RAM usage can be reduced at the cost of slightly longer computation times by
    tiling. That makes it possible to deconvolve large images on small machines.
- - It can make use of all precious cores of your "big" machine since
-   the critical parts run on separate threads (as many as you would
+ - Critical parts run on separate threads (as many as you would
    like). However, for maximal throughput (and if you have enough
    RAM), run several instances of dw in parallel.
  - Deconwolf is tiny! The binaries could even fit on a floppy drive
@@ -27,13 +16,6 @@ images:
    know of that actually integrate the PSF over each pixel.
  - Fully open source. And we embrace [contributions and
    suggestions](CONTRIBUTING.md).
-
-Except for this README.me there is also a short [USAGE.md](USAGE.md),
-a [CHANGELOG.md](CHANGELOG.md) and a [TODO.md](TODO.md).
-
-This repository provides two binaries,
- - **dw** -- for deconvolution, [man page](doc/dw.txt)
- - **dw_bw** -- to create PSFs using the Born-Wolf model [man page](doc/dw_bw.txt)
 
 Deconwolf does not:
  - Have a full-featured Graphical User Interface (GUI), however, if you
@@ -45,11 +27,17 @@ Deconwolf does not:
  - Estimate your PSF based on real images.
  - If you miss one or more of these features,
    or just want something else, there is an (incomplete)
-   list of [alternative](#aternatives) softwares.
+   list of [alternative](#aternatives) software.
+
+Except for this README.me there is also a short [USAGE.md](USAGE.md),
+a [CHANGELOG.md](CHANGELOG.md) and a [TODO.md](TODO.md).
+
+After building and installing you will find two binaries:
+ - **dw** -- for deconvolution, [man page](doc/dw.txt)
+ - **dw_bw** -- to create PSFs using the Born-Wolf model [man page](doc/dw_bw.txt)
 
 At the moment we don't provide pre-built packages. You will have to build
 deconwolf from the source code, instructions follows below.
-
 
 ## Build and install
 Deconwolf runs on 64-bit machines with x86_64 architecture and require
@@ -69,8 +57,10 @@ Deconwolf uses:
  * [libtiff](https://gitlab.com/libtiff/libtiff) to read and write TIFF files.
  * [GNU Scientific Library](https://www.gnu.org/software/gsl/) for
    integration and special functions.
- * [OpenMP](https://www.openmp.org/) for _automatic_ parallelization of code.
- * [POSIX Threads](https://en.wikipedia.org/wiki/Pthreads) for explicit paralellization.
+ * [OpenMP](https://www.openmp.org/) for _automatic_ parallelization
+   of code, used in **dw**.
+ * [POSIX Threads](https://en.wikipedia.org/wiki/Pthreads) for
+   explicit paralellization (in **dw_bw**)
 
 If these libraries are available for your platform, chances are that that it can
 be built. FFTW can also be replaced by Intel MKL or NVIDIA CUFFTW.
