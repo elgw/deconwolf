@@ -1,4 +1,4 @@
-#include "deconwolf_tif_max.h"
+#include "dw_maxproj.h"
 
 #define MODE_MAX 0
 #define MODE_SLICE 1

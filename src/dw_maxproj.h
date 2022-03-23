@@ -1,5 +1,5 @@
-#ifndef _deconwolf_tif_max_h_
-#define _deconwolf_tif_max_h_
+#ifndef _dw_maxproj_h_
+#define _dw_maxproj_h_
 
 #include <stdio.h>
 #include <stdlib.h>
