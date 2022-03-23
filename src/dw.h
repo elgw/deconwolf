@@ -43,7 +43,8 @@
 #include <mkl.h>
 #endif
 
-#include "deconwolf_tif_max.h"
+#include "dw_maxproj.h"
+#include "dw_imshift.h"
 #include "dw_version.h"
 #include "fim.h"
 #include "fim_tiff.h"
@@ -272,6 +273,8 @@ int dw_iterator_next(dw_iterator_t * );
 void dw_iterator_set_error(dw_iterator_t *, float);
 void dw_iterator_show(dw_iterator_t *, const dw_opts *);
 void dw_iterator_free(dw_iterator_t * );
+
+
 
 #include "method_eve.h"
 #include "method_identity.h"

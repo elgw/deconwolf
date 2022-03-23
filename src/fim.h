@@ -32,6 +32,7 @@
 
 
 #define INLINED inline __attribute__((always_inline))
+typedef float afloat;
 
 /* fim : operations on 3D floating point images
  * all allocations are done with fftw3f_malloc (for alignment)
@@ -100,22 +101,32 @@ float * fim_subregion(const float * restrict A, const int64_t M, const int64_t N
 
 float * fim_subregion_ref(float * A, int64_t M, int64_t N, int64_t P, int64_t m, int64_t n, int64_t p);
 
+/* Normalize an image to have the sum 1.0 */
 void fim_normalize_sum1(float * psf, int64_t M, int64_t N, int64_t P);
 
-
+/* Return a newly allocated copy of V */
 float * fim_copy(const float * restrict V, const size_t N);
-  // Return a newly allocated copy of V
 
+
+/* Allocate and return an array of N floats */
 float * fim_zeros(const size_t N);
-  // Allocate and return an array of N floats
 
+
+/* Allocate and return an array of N floats sets to a constant value */
 float * fim_constant(const size_t N, const float value);
-  // Allocate and return an array of N floats sets to a constant value
 
+
+/* Shift the image A [MxNxP] by sm, sn, sp in each dimension */
 void fim_circshift(float * restrict A,
     const int64_t M, const int64_t N, const int64_t P,
     const int64_t sm, const int64_t sn, const int64_t sp);
-  /* Shift the image A [MxNxP] by sm, sn, sp in each dimension */
+
+/* Shift the image A [MxNxP] by dm, dn, dp in each dimension,
+ * What is outside of the image is interpreted as zero */
+void fim_shift(float * restrict A,
+                   const int64_t M, const int64_t N, const int64_t P,
+                   const float dm, const float dn, const float dp);
+
 
 float * fim_expand(const float * restrict in,
     const int64_t pM, const int64_t pN, const int64_t pP,
@@ -139,6 +150,15 @@ void shift_vector_buf(float * restrict V,
     const int64_t S,
     const int64_t N,
     int64_t k, float * restrict buffer);
+
+/* Shift vector by interpolation */
+void shift_vector_float_buf(afloat * restrict V, // data
+                            const int64_t S, // stride
+                            const int64_t N, // elements
+                            int n, // integer shift
+                            afloat * restrict kernel, // centered kernel used for sub pixels shift
+                            const int nkernel, // kernel size (odd!)
+                            afloat * restrict buffer);
 
 /* Multiply a float array of size N by x */
 void fim_mult_scalar(float * fim, size_t N, float x);

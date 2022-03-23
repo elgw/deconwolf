@@ -27,6 +27,10 @@ int main(int argc, char ** argv)
         {
             return dw_tiff_max(argc-1, argv+1);
         }
+        if(strcmp(argv[1], "imshift") == 0)
+        {
+            return dw_imshift(argc-1, argv+1);
+        }
     }
 
     dw_opts * s = dw_opts_new(); /* Load default settings and initialize */

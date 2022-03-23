@@ -17,7 +17,7 @@
 #include "fim.h"
 
 //typedef float afloat __attribute__ ((__aligned__(16)));
-typedef float afloat;
+
 
 static float * gaussian_kernel(float sigma, size_t * nK);
 static void conv1(float * restrict V, int stride, float * restrict W,
@@ -507,12 +507,166 @@ void fim_circshift(afloat * restrict A,
     return;
 }
 
+/* A linear interpolation kernel for -1<delta<1 */
+static float * kernel_linear_shift(float delta, int * _N)
+{
+    *_N = 3; /* Always three elements */
+    float * K = malloc(3*sizeof(float));
+    K[2] = delta;
+    K[2] < 0 ? K[2] = 0 : 0;
+    K[1] = fabs(1.0-fabs(delta));
+    K[0] = -delta;
+    K[0] < 0 ? K[0] = 0 : 0;
+    printf("Kernel : [%f, %f, %f]\n", K[0], K[1], K[2]);
+    return K;
+}
+
+/* Shift the image A [MxNxP] by dm, dn, dp in each dimension,
+ * What is outside of the image is interpreted as zero */
+void fim_shift(afloat * restrict A,
+                   const int64_t M, const int64_t N, const int64_t P,
+                   const float dm, const float dn, const float dp)
+{
+    int nThreads = 0;
+
+
+    int sm = round(dm);
+    int sn = round(dn);
+    int sp = round(dp);
+
+    float deltam = dm-sm;
+    float deltan = dn-sn;
+    float deltap = dp-sp;
+
+    int nkernelx = -1, nkernely = -1, nkernelz = -1;
+    float * kernelx = kernel_linear_shift(deltam, &nkernelx);
+    float * kernely = kernel_linear_shift(deltan, &nkernely);
+    float * kernelz = kernel_linear_shift(deltap, &nkernelz);
+
+
+    printf("X Shift: %f = %d+%f\n", dm, sm, deltam);
+    printf("Y Shift: %f = %d+%f\n", dn, sn, deltan);
+    printf("Z Shift: %f = %d+%f\n", dp, sp, deltap);
+
+    /* Start a parallel region to figure out how many threads that will be used
+       and how much memory to allocate for the buffers */
+#pragma omp parallel
+    {
+                  nThreads = omp_get_num_threads();
+    }
+
+    const size_t bsize = fmax(fmax(M, N), P);
+    afloat * restrict buf = malloc(bsize*sizeof(float)*nThreads);
+
+
+    /* Dimension 1 */
+#pragma omp parallel for
+    for(int64_t cc = 0; cc<P; cc++)
+    {
+        float * tbuf = buf + bsize*omp_get_thread_num();
+        for(int64_t bb = 0; bb<N; bb++)
+        {
+            //shift_vector(A + bb*M + cc*M*N, 1, M, sm);
+            shift_vector_float_buf(A + bb*M + cc*M*N, // start
+                             1, // stride
+                             M, // number of elements
+                             sm, // shift
+                                   kernelx,
+                                   nkernelx,
+                             tbuf); // buffer
+        }
+    }
+
+    /* Dimension 2 */
+#pragma omp parallel for
+    for(int64_t cc = 0; cc<P; cc++)
+    {
+        float * tbuf = buf + bsize*omp_get_thread_num();
+        //printf("Thread num: %d\n", omp_get_thread_num());
+        for(int64_t aa = 0; aa<M; aa++)
+        {
+            //shift_vector(A + aa+cc*M*N, M, N, sn);
+            shift_vector_float_buf(A + aa+cc*M*N,
+                                   M,
+                                   N,
+                                   sn, kernely, nkernely, tbuf);
+        }
+    }
+
+    /* Dimension 3 */
+#pragma omp parallel for
+    for(int64_t bb = 0; bb<N; bb++)
+    {
+        float * tbuf = buf + bsize*omp_get_thread_num();
+        for(int64_t aa = 0; aa<M; aa++)
+        {
+            //shift_vector(A + aa+bb*M, M*N, P, sp);
+            shift_vector_float_buf(A + aa+bb*M,
+                                   M*N,
+                                   P,
+                                   sp, kernelz, nkernelz, tbuf);
+        }
+    }
+
+    free(buf);
+
+    free(kernelx);
+    free(kernely);
+    free(kernelz);
+
+#if 0
+    char name[100];
+    sprintf(name, "shift%d.raw", nThreads);
+    printf("Debugdump to %s\n", name);
+    FILE *fid = fopen(name, "w");
+    fwrite(A, sizeof(float), M*N*P, fid);
+    fclose(fid);
+#endif
+
+    return;
+}
+
 
 INLINED static int64_t mod_int(const int64_t a, const int64_t b)
 {
     int64_t r = a % b;
     return r < 0 ? r + b : r;
 }
+
+
+/* Shift vector by interpolation */
+void shift_vector_float_buf(afloat * restrict V, // data
+                      const int64_t S, // stride
+                      const int64_t N, // elements
+                      int n, // integer shift
+                      afloat * restrict kernel, // centered kernel used for sub pixels shift
+                      const int nkernel, // kernel size (odd!)
+                      afloat * restrict buffer)
+{
+    // 1. Sub pixel shift by convolution (conv1) of signal and kernel
+    // 2. Integer part of the shift
+    /* TODO: Interpolation here ... by interpolation kernel?*/
+    /* First integer part and then sub pixel? */
+    conv1(V, S, buffer, N, kernel, nkernel);
+
+    for(size_t pp = 0; pp<(size_t) N; pp++)
+    {
+        int q = pp+n;
+        if(q>= 0 && q<N)
+        {
+            buffer[pp] = V[q*S];
+        } else {
+            buffer[pp] = 0;
+        }
+    }
+
+    for(size_t pp = 0; pp < (size_t) N; pp++)
+    {
+        V[pp*S] = buffer[pp];
+    }
+    return;
+}
+
 
 void shift_vector_buf(afloat * restrict V, // data
                       const int64_t S, // stride
