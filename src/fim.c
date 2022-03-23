@@ -1107,33 +1107,41 @@ float * fim_local_sum(float * A, size_t M, size_t N, size_t pM, size_t pN)
     /* Work size */
     size_t wM = M + pM;
     size_t wN = N + pN;
-
+    printf("pM = %zu, pN = %zu\n", pM, pN);
     float * B = fim_zeros(wM*wN);
     fim_insert(B, wM, wN, 1, A, M, N, 1);
     fim_cumsum(B, wM, wN, 0);
     //c = s(1+m:end-1,:)-s(1:end-m-1,:);
     float * C = fim_zeros(wM*wN);
     /* Difference along 0th dimension */
+    printf("B= cumsum dim 0\n");
+    fim_show(B, wM, wN, 1);
     for(size_t nn = 0; nn<wN; nn++)
     {
         float * B0 = B+wM*nn;
-        for(size_t mm = 0; mm<wM; mm++)
+        for(size_t mm = 0; mm+pM<wM; mm++)
         {
             C[nn*wM+mm] = B0[mm+pM] - B0[mm];
         }
     }
+    printf("C=\n");
+    fim_show(C, wM, wN, 1);
     fftwf_free(B);
     /* Second dimension */
     float * D = fim_zeros(wM*wN);
     fim_cumsum(C, wM, wN, 1);
+    printf("cumsum C=\n");
+    fim_show(C, wM, wN, 1);
     for(size_t mm = 0; mm<wM; mm++)
     {
         float * C0 = C+mm;
-        for(size_t nn = 0; nn<wN; nn++)
+        for(size_t nn = 0; nn+pN<wN; nn++)
         {
-            D[nn*wM+mm] = C0[(mm+pM)*wM] - C0[mm*wM];
+            D[nn*wM+mm] = C0[(nn+pN)*wM] - C0[nn*wM];
         }
     }
+    printf("D=\n");
+    fim_show(D, wM, wN, 1);
     fftwf_free(C);
     return D;
 }
