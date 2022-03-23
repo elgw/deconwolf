@@ -10,7 +10,7 @@ fft_ut:
 	$(cc) fft_ut.c fft.c fim.c $(CFLAGS) -lm -lfftw3f -lfftw3f_threads -o fft_ut
 
 fim_ut:
-	$(cc) fim_ut.c fim.c $(CFLAGS) -lm -o fim_ut -lfftw3f
+	$(cc) -fopenmp fim_ut.c fim.c $(CFLAGS) -lm -o fim_ut -lfftw3f
 
 # Read a tif file and write it back as foo.tif
 fim_tiff_ut:

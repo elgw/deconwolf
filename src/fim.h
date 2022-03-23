@@ -47,6 +47,11 @@ float fim_mean(const float * A, size_t N);
 float fim_max(const float * A, size_t N);
 float fim_sum(const float * restrict A, size_t N);
 
+/* Cumulative sum along dimension dim
+ * Only supports 2D images
+*/
+void fim_cumsum2(float *, size_t M, size_t N, int dim);
+
 /* A = B - C */
 void fim_minus(float * restrict  A,
     const float * restrict B,
@@ -175,5 +180,9 @@ void fim_argmax(const float * fim,
                 size_t M, size_t N, size_t P,
                 int64_t * _aM, int64_t *_aN, int64_t *_aP);
 
+/*  */
+float * fim_local_sum(float * A, size_t M, size_t N, size_t pM, size_t pN);
 
+/* Cumulative sum along dimension dim */
+void fim_cumsum(float * A, const size_t M, const size_t N, const int dim);
 #endif

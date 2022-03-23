@@ -23,6 +23,8 @@ static float * gaussian_kernel(float sigma, size_t * nK);
 static void conv1(float * restrict V, int stride, float * restrict W,
                   const size_t nV,
                   const float * restrict K, const size_t nKu);
+static void cumsum_array(float * A, size_t N, size_t stride);
+static void fim_show(float * A, size_t M, size_t N, size_t P);
 
 int fim_maxAtOrigo(const afloat * restrict V, const int64_t M, const int64_t N, const int64_t P)
 /* Check that the MAX of the fim is in the middle
@@ -252,7 +254,7 @@ void fim_insert(afloat * restrict T, const int64_t t1, const int64_t t2, const i
 void fim_insert_ref(afloat * T, int64_t t1, int64_t t2, int64_t t3,
                     afloat * F, int64_t f1, int64_t f2, int64_t f3)
 /* Insert F [f1xf2xf3] into T [t1xt2xt3] in the "upper left" corner
-* Target, T is larger than F*/
+ * Target, T is larger than F*/
 {
     if(f3 > t3 || f2 > t2 || f1 > t1)
     {
@@ -445,7 +447,7 @@ void fim_circshift(afloat * restrict A,
        and how much memory to allocate for the buffers */
 #pragma omp parallel
     {
-                  nThreads = omp_get_num_threads();
+        nThreads = omp_get_num_threads();
     }
 
     const size_t bsize = fmax(fmax(M, N), P);
@@ -510,6 +512,11 @@ void fim_circshift(afloat * restrict A,
 /* A linear interpolation kernel for -1<delta<1 */
 static float * kernel_linear_shift(float delta, int * _N)
 {
+    if(delta == 0)
+    {
+        *_N = 0;
+        return NULL;
+    }
     *_N = 3; /* Always three elements */
     float * K = malloc(3*sizeof(float));
     K[2] = delta;
@@ -524,8 +531,8 @@ static float * kernel_linear_shift(float delta, int * _N)
 /* Shift the image A [MxNxP] by dm, dn, dp in each dimension,
  * What is outside of the image is interpreted as zero */
 void fim_shift(afloat * restrict A,
-                   const int64_t M, const int64_t N, const int64_t P,
-                   const float dm, const float dn, const float dp)
+               const int64_t M, const int64_t N, const int64_t P,
+               const float dm, const float dn, const float dp)
 {
     int nThreads = 0;
 
@@ -552,7 +559,7 @@ void fim_shift(afloat * restrict A,
        and how much memory to allocate for the buffers */
 #pragma omp parallel
     {
-                  nThreads = omp_get_num_threads();
+        nThreads = omp_get_num_threads();
     }
 
     const size_t bsize = fmax(fmax(M, N), P);
@@ -568,12 +575,12 @@ void fim_shift(afloat * restrict A,
         {
             //shift_vector(A + bb*M + cc*M*N, 1, M, sm);
             shift_vector_float_buf(A + bb*M + cc*M*N, // start
-                             1, // stride
-                             M, // number of elements
-                             sm, // shift
+                                   1, // stride
+                                   M, // number of elements
+                                   sm, // shift
                                    kernelx,
                                    nkernelx,
-                             tbuf); // buffer
+                                   tbuf); // buffer
         }
     }
 
@@ -636,18 +643,26 @@ INLINED static int64_t mod_int(const int64_t a, const int64_t b)
 
 /* Shift vector by interpolation */
 void shift_vector_float_buf(afloat * restrict V, // data
-                      const int64_t S, // stride
-                      const int64_t N, // elements
-                      int n, // integer shift
-                      afloat * restrict kernel, // centered kernel used for sub pixels shift
-                      const int nkernel, // kernel size (odd!)
-                      afloat * restrict buffer)
+                            const int64_t S, // stride
+                            const int64_t N, // elements
+                            int n, // integer shift
+                            afloat * restrict kernel, // centered kernel used for sub pixels shift
+                            const int nkernel, // kernel size (odd!)
+                            afloat * restrict buffer)
 {
     // 1. Sub pixel shift by convolution (conv1) of signal and kernel
     // 2. Integer part of the shift
     /* TODO: Interpolation here ... by interpolation kernel?*/
     /* First integer part and then sub pixel? */
-    conv1(V, S, buffer, N, kernel, nkernel);
+    if(kernel == NULL)
+    {
+        for(size_t pp = 0; pp < (size_t) N; pp++)
+        {
+            buffer[pp] = V[pp*S];
+        }
+    } else {
+        conv1(V, S, buffer, N, kernel, nkernel);
+    }
 
     for(size_t pp = 0; pp<(size_t) N; pp++)
     {
@@ -781,6 +796,7 @@ void shift_vector_ut()
         { printf("%.0f ", V[kk]);}
         printf("\n");
     }
+    fftwf_free(V);
 }
 
 void fim_invert(float * restrict A, size_t N)
@@ -799,6 +815,45 @@ static void show_vec(float * V, int N)
         printf("%f ", V[kk]);
     }
     printf("\n");
+}
+
+void fim_local_sum_ut()
+{
+    printf("fim_local_sum_ut\n");
+    size_t M = 3;
+    size_t N = 5;
+    float * A = fim_constant(M*N, 1);
+    fim_show(A, M, N, 1);
+    float * L = fim_local_sum(A, M, N, 2, 2);
+    fim_show(L, M+2, N+2, 1);
+    fftwf_free(A);
+    fftwf_free(L);
+
+}
+
+void fim_cumsum_ut()
+{
+    size_t M = 3;
+    size_t N = 5;
+    float * A = fim_zeros(M*N);
+    fim_show(A, M, N, 1);
+    fim_cumsum(A, M, N, 0);
+    for(size_t kk = 0; kk<M*N; kk++)
+    {
+        assert(A[kk] == 0);
+    }
+    for(size_t kk = 0; kk<M*N; kk++)
+    {
+        A[kk] = kk;
+    }
+    fim_show(A, M, N, 1);
+    printf("After cumsum along dim 0\n");
+    fim_cumsum(A, M, N, 0);
+    fim_show(A, M, N, 1);
+    printf("After cumsum along dim 1\n");
+    fim_cumsum(A, M, N, 1);
+    fim_show(A, M, N, 1);
+    fftwf_free(A);
 }
 
 void fim_ut()
@@ -832,6 +887,8 @@ void fim_ut()
     free(V);
     free(K);
 
+    fim_cumsum_ut();
+    fim_local_sum_ut();
 }
 
 #if 0
@@ -940,7 +997,7 @@ static float * gaussian_kernel(float sigma, size_t * nK)
         K[kk] = exp(-0.5*pow(x,2)/s2);
     }
 
-/* Normalize the sum to 1 */
+    /* Normalize the sum to 1 */
     float sum = 0;
     for(int kk = 0; kk<N; kk++)
         sum+=K[kk];
@@ -968,12 +1025,12 @@ void fim_gsmooth(float * restrict V, size_t M, size_t N, size_t P, float sigma)
     /* Temporary storage/buffer for conv1 */
     float * W = malloc(nW*sizeof(float));
 
-/* Create a kernel  */
+    /* Create a kernel  */
     size_t nK = 0;
     float * K = gaussian_kernel(sigma, &nK);
     assert(nK > 0);
 
-// X
+    // X
     for(size_t pp = 0; pp < P; pp++)
     {
         for(size_t nn = 0; nn < N; nn++)
@@ -983,7 +1040,7 @@ void fim_gsmooth(float * restrict V, size_t M, size_t N, size_t P, float sigma)
     }
 
     if(1){
-// Y
+        // Y
         for(size_t pp = 0; pp<P; pp++)
         {
             for(size_t mm = 0; mm<M; mm++)
@@ -995,7 +1052,7 @@ void fim_gsmooth(float * restrict V, size_t M, size_t N, size_t P, float sigma)
 
     if(1){
 
-// Z
+        // Z
         for(size_t mm = 0; mm<M; mm++)
         {
             for(size_t nn = 0; nn<N; nn++)
@@ -1007,4 +1064,96 @@ void fim_gsmooth(float * restrict V, size_t M, size_t N, size_t P, float sigma)
 
     free(W);
     return;
+}
+
+static void cumsum_array(float * A, size_t N, size_t stride)
+{
+    for(size_t kk = 1; kk<N; kk++)
+    {
+        A[kk*stride] += A[(kk-1)*stride];
+    }
+}
+
+
+
+void fim_cumsum(float * A, const size_t M, const size_t N, const int dim)
+{
+    assert(dim >= 0);
+    assert(dim <= 1);
+    if(dim == 0)
+    {
+        #pragma omp parallel for
+        for(size_t nn = 0; nn<N; nn++)
+        {
+            cumsum_array(A+M*nn, M, 1);
+        }
+    }
+    if(dim == 1)
+    {
+#pragma omp parallel for
+        for(size_t mm = 0; mm<M; mm++)
+        {
+            cumsum_array(A+mm, N, M);
+        }
+    }
+}
+
+/* Local sum in pM x pN windows, pads the input by (pM, pN), i.e. the
+ * output is M+pM x N+pN. Equivalent to convolution by a constant
+ * array of size pM x pN */
+
+float * fim_local_sum(float * A, size_t M, size_t N, size_t pM, size_t pN)
+{
+    /* Work size */
+    size_t wM = M + pM;
+    size_t wN = N + pN;
+
+    float * B = fim_zeros(wM*wN);
+    fim_insert(B, wM, wN, 1, A, M, N, 1);
+    fim_cumsum(B, wM, wN, 0);
+    //c = s(1+m:end-1,:)-s(1:end-m-1,:);
+    float * C = fim_zeros(wM*wN);
+    /* Difference along 0th dimension */
+    for(size_t nn = 0; nn<wN; nn++)
+    {
+        float * B0 = B+wM*nn;
+        for(size_t mm = 0; mm<wM; mm++)
+        {
+            C[nn*wM+mm] = B0[mm+pM] - B0[mm];
+        }
+    }
+    fftwf_free(B);
+    /* Second dimension */
+    float * D = fim_zeros(wM*wN);
+    fim_cumsum(C, wM, wN, 1);
+    for(size_t mm = 0; mm<wM; mm++)
+    {
+        float * C0 = C+mm;
+        for(size_t nn = 0; nn<wN; nn++)
+        {
+            D[nn*wM+mm] = C0[(mm+pM)*wM] - C0[mm*wM];
+        }
+    }
+    fftwf_free(C);
+    return D;
+}
+
+static void fim_show(float * A, size_t M, size_t N, size_t P)
+{
+    for(size_t pp = 0; pp<P; pp++)
+    {
+        if(P > 1)
+        {
+            printf("z=%zu\n", pp);
+        }
+        for(int mm = 0; mm<M; mm++)
+        {
+            for(int nn = 0; nn<N; nn++)
+            {
+                printf("%f ", A[mm+nn*M+pp*M*N]);
+            }
+            printf("\n");
+        }
+        printf("\n");
+    }
 }
