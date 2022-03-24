@@ -79,6 +79,7 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"image", required_argument, NULL, 'i'},
         {"overwrite", no_argument, NULL, 'o'},
         {"ref",     required_argument, NULL, 'r'},
+        {"threads", required_argument, NULL, 't'},
         {"verbose", required_argument, NULL, 'v'},
         {"dx", required_argument, NULL, 'x'},
         {"dy", required_argument, NULL, 'y'},
@@ -100,6 +101,9 @@ static void argparsing(int argc, char ** argv, opts * s)
             break;
         case 'r':
             s->refImage = strdup(optarg);
+            break;
+        case 't':
+            s->nthreads = atoi(optarg);
             break;
         case 'v':
             s->verbose = atoi(optarg);
@@ -153,6 +157,7 @@ int dw_imshift(int argc, char ** argv)
     }
 
     myfftw_start(s->nthreads, s->verbose, stdout);
+    omp_set_num_threads(s->nthreads);
 
     char * inFile = s->image;
     char * outFile = NULL;
@@ -223,10 +228,14 @@ int dw_imshift(int argc, char ** argv)
 
         if(s->verbose > 1)
         {
+            printf("Image size: [%ld, %ld, %ld]\n", M, N, P);
             printf("Creating max projections\n");
         }
-        float * mA = fim_maxproj(A, M, N, P);
-        float * mR = fim_maxproj(R, M, N, P);
+        //float * mA = fim_maxproj(A, M, N, P);
+        //float * mR = fim_maxproj(R, M, N, P);
+        float * mA = fim_sumproj(A, M, N, P);
+        float * mR = fim_sumproj(R, M, N, P);
+        fim_tiff_write_float("mA.tif", mA, NULL, M, N, 1);
         free(R);
 
         if(s->verbose > 1)
@@ -237,23 +246,31 @@ int dw_imshift(int argc, char ** argv)
         fftw_free(mA);
         fftw_free(mR);
 
+        //fim_tiff_write_float("XC.tif", XC, NULL, 2*M-1, 2*N-1, 1);
+
         int64_t aM=0;
         int64_t aN=0;
         int64_t aP = 0;
-        // TODO: argmax
+
         fim_argmax(XC, 2*M-1, 2*N-1, 1, &aM, &aN, &aP);
-        fftwf_free(XC);
+
+
+
         if(s->verbose > 1)
         {
-            printf("Found max at %ld, %ld, %ld\n", aM, aN, aP);
+            printf("Found max at (%ld, %ld, %ld)\n",
+                   aM, aN, aP);
         }
         s->dx = (float) M-aM-1.0;
         s->dy = (float) N-aN-1.0;
         s->dz = 0;
         if(s->verbose > 0)
         {
+            float corr = fim_max(XC, (2*M-1)*(2*N-1));
+            printf("Normalized cross correlation: %f\n", corr);
             printf("Shifting image by %f, %f, %f\n", s->dx, s->dy, s->dz);
         }
+        fftwf_free(XC);
         fim_shift(A, M, N, P, s->dx, s->dy, s->dz);
         if(s->verbose > 0)
         {

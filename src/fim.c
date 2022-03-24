@@ -863,13 +863,21 @@ void fim_cumsum_ut()
 
 void fim_xcorr2_ut()
 {
-    size_t M = 5;
-    size_t N = 6;
+    size_t M = 3;
+    size_t N = 7;
     float * T = fim_zeros(M*N);
     float * A = fim_zeros(M*N);
     T[0] = 1;
     T[1] = 1;
     A[M+1] = 1;
+    A[M+2] = 0.5;
+    for(size_t kk = 0; kk<M*N; kk++)
+    {
+        A[kk] = (float) rand()/RAND_MAX;
+        T[kk] = A[kk];
+    }
+    printf("A=\n");
+    fim_show(A, M, N, 1);
     float * X = fim_xcorr2(T, A, M, N);
     printf("T=\n");
     fim_show(T, M, N, 1);
@@ -1256,13 +1264,15 @@ float * fim_xcorr2(const float * T, const float * A,
     fftwf_free(xT);
     float * C = fft_convolve_cc(fxT, fxA, wM, wN, 1);
     // TODO fft_convolve_cc_conj instead?
+    //fim_tiff_write_float("C.tif", C, NULL, wM, wN, 1);
     fftwf_free(fxT);
     fftwf_free(fxA);
 
     //printf("C=\n");
     //fim_show(C, 2*M-1, 2*N-1, 1);
 
-    float * LS = fim_local_sum(A, M, N, M, N);
+    float * LS = fim_local_sum(A, M, N,
+                               M, N);
     //printf("LS=\n");
     //fim_show(LS, 2*M-1, 2*N-1, 1);
     float * numerator = fim_zeros(wM*wN);
@@ -1275,7 +1285,7 @@ float * fim_xcorr2(const float * T, const float * A,
     }
     //printf("Numerator = \n");
     //fim_show(numerator, wM, wN, 1);
-    free(LS);
+
     float * A2 = fim_zeros(M*N);
 #pragma omp parallel for shared(A, A2)
     for(size_t kk = 0; kk<M*N; kk++)
@@ -1283,9 +1293,11 @@ float * fim_xcorr2(const float * T, const float * A,
         A2[kk] = powf(A[kk], 2);
     }
 
-    float * LS2 = fim_local_sum(A2, M, N, M, N);
+    float * LS2 = fim_local_sum(A2, M, N,
+                                M, N);
     fftwf_free(A2);
     float * denom_I = fim_zeros(wM*wN);
+
 #pragma omp parallel for shared(LS2, denom_I)
     for(size_t kk = 0; kk<wM*wN; kk++)
     {
@@ -1294,6 +1306,7 @@ float * fim_xcorr2(const float * T, const float * A,
         v < 0 ? v = 0 : 0;
         denom_I[kk] = v;
     }
+    free(LS);
     fftwf_free(LS2);
     //printf("denom_I=\n");
     //fim_show(denom_I, wM, wN, 1);
@@ -1350,6 +1363,25 @@ float * fim_maxproj(const float * V, size_t M, size_t N, size_t P)
         for(size_t nn = 0; nn<N; nn++)
         {
             Pr[mm+M*nn] = fim_array_max(V+mm+M*nn, P, M*N);
+        }
+    }
+    return Pr;
+}
+
+float * fim_sumproj(const float * V, size_t M, size_t N, size_t P)
+{
+    float * Pr = fim_zeros(M*N);
+#pragma omp parallel for shared(Pr, V)
+    for(size_t mm = 0; mm<M ; mm++)
+    {
+        for(size_t nn = 0; nn<N; nn++)
+        {
+            float sum = 0;
+            for(size_t pp = 0; pp<P; pp++)
+            {
+                sum += V[mm+M*nn+pp*M*N];
+            }
+            Pr[mm+M*nn] = sum;
         }
     }
     return Pr;

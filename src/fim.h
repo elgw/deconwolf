@@ -52,6 +52,8 @@ float fim_std(const float * V, size_t N);
 
 float * fim_maxproj(const float * A, size_t M, size_t N, size_t P);
 
+float * fim_sumproj(const float * A, size_t M, size_t N, size_t P);
+
 /* Cumulative sum along dimension dim
  * Only supports 2D images
 */
