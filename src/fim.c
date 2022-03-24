@@ -877,6 +877,9 @@ void fim_xcorr2_ut()
     fim_show(A, M, N, 1);
     printf("xcorr2(T,A)=\n");
     fim_show(X, 2*M-1, 2*N-1, 1);
+    fftwf_free(A);
+    fftwf_free(T);
+    fftwf_free(X);
 }
 
 void fim_ut()
@@ -1272,7 +1275,7 @@ float * fim_xcorr2(const float * T, const float * A,
     }
     //printf("Numerator = \n");
     //fim_show(numerator, wM, wN, 1);
-
+    free(LS);
     float * A2 = fim_zeros(M*N);
 #pragma omp parallel for shared(A, A2)
     for(size_t kk = 0; kk<M*N; kk++)
@@ -1281,7 +1284,7 @@ float * fim_xcorr2(const float * T, const float * A,
     }
 
     float * LS2 = fim_local_sum(A2, M, N, M, N);
-
+    fftwf_free(A2);
     float * denom_I = fim_zeros(wM*wN);
 #pragma omp parallel for shared(LS2, denom_I)
     for(size_t kk = 0; kk<wM*wN; kk++)
@@ -1291,6 +1294,7 @@ float * fim_xcorr2(const float * T, const float * A,
         v < 0 ? v = 0 : 0;
         denom_I[kk] = v;
     }
+    fftwf_free(LS2);
     //printf("denom_I=\n");
     //fim_show(denom_I, wM, wN, 1);
 
@@ -1306,7 +1310,8 @@ float * fim_xcorr2(const float * T, const float * A,
             C[kk] = numerator[kk] / d;
         }
     }
-
+    fftwf_free(numerator);
+    fftwf_free(denom_I);
     return C;
 }
 
@@ -1339,7 +1344,7 @@ float fim_array_max(const float * A, size_t N, size_t stride)
 float * fim_maxproj(const float * V, size_t M, size_t N, size_t P)
 {
     float * Pr = fim_zeros(M*N);
-#pragma parallel for shared(Pr, A)
+#pragma omp parallel for shared(Pr, V)
     for(size_t mm = 0; mm<M ; mm++)
     {
         for(size_t nn = 0; nn<N; nn++)

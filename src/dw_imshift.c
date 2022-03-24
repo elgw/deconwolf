@@ -56,6 +56,10 @@ static void opts_free(opts * s)
     {
         free(s->refImage);
     }
+    if(s->image != NULL)
+    {
+        free(s->image);
+    }
     free(s);
 }
 
@@ -223,18 +227,22 @@ int dw_imshift(int argc, char ** argv)
         }
         float * mA = fim_maxproj(A, M, N, P);
         float * mR = fim_maxproj(R, M, N, P);
+        free(R);
 
         if(s->verbose > 1)
         {
             printf("Calculating normalized cross correlation\n");
         }
         float * XC = fim_xcorr2(mA, mR, M, N);
+        fftw_free(mA);
+        fftw_free(mR);
 
         int64_t aM=0;
         int64_t aN=0;
         int64_t aP = 0;
         // TODO: argmax
         fim_argmax(XC, 2*M-1, 2*N-1, 1, &aM, &aN, &aP);
+        fftwf_free(XC);
         if(s->verbose > 1)
         {
             printf("Found max at %ld, %ld, %ld\n", aM, aN, aP);
@@ -253,7 +261,7 @@ int dw_imshift(int argc, char ** argv)
         }
         fim_tiff_write(outFile, A, NULL, M, N, P);
         free(A);
-        free(R);
+
     }
 
     free(outFile);
