@@ -58,6 +58,6 @@ void fft_ut(void);
 /* Benchmark 1D ffts of size from, from+1, ... to
  * return time for each size
  */
-double * fft_bench_1d(uint64_t from, uint64_t to, int niter);
+double * fft_bench_1d(int64_t from, int64_t to, int niter);
 
 #endif

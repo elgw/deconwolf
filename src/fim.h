@@ -25,6 +25,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <inttypes.h>
+#include "fft.h"
 
 #ifdef _OPENMP // turned on with -fopenmp
 #include <omp.h>
@@ -84,12 +85,15 @@ void fim_flipall(float * restrict T, const float * restrict A, const int64_t a1,
    * T = flip(flip(flip(A,1),2),3)*/
 
 
-void fim_insert(float * restrict T, const int64_t t1, const int64_t t2, const int64_t t3,
-    const float * restrict F, const int64_t f1, const int64_t f2, const int64_t f3);
+void fim_insert(float * restrict T,
+                const int64_t t1, const int64_t t2, const int64_t t3,
+                const float * restrict F,
+                const int64_t f1, const int64_t f2, const int64_t f3);
   /* Insert F [f1xf2xf3] into T [t1xt2xt3] in the "upper left" corner
    * MATLAB:
    * T(1:size(F,1), 1:size(F,2), 1:sizes(F,3) = F;
    * */
+
 void fim_insert_ref(float * T, int64_t t1, int64_t t2, int64_t t3,
     float * F, int64_t f1, int64_t f2, int64_t f3);
 
@@ -181,8 +185,21 @@ void fim_argmax(const float * fim,
                 int64_t * _aM, int64_t *_aN, int64_t *_aP);
 
 /*  */
-float * fim_local_sum(float * A, size_t M, size_t N, size_t pM, size_t pN);
+float * fim_local_sum(const float * A, size_t M, size_t N, size_t pM, size_t pN);
 
 /* Cumulative sum along dimension dim */
 void fim_cumsum(float * A, const size_t M, const size_t N, const int dim);
 #endif
+
+
+/* Normalized cross correlation between T and A
+ * See MATLAB's normxcorr2
+ * This function requires that T and A have the same size
+ * The returned image is of size [2xM-1, 2xN-1] and the values
+ * should be in the range [0,1]
+*/
+float * fim_xcorr2(const float * T, const float * A,
+                   const size_t M, const size_t N);
+
+
+float fim_std(const float * V, size_t N);

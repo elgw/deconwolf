@@ -4,6 +4,7 @@ typedef struct{
     int overwrite;
     int verbose;
     int optpos;
+    char * refImage;
 } opts;
 
 static opts * opts_new();
@@ -21,11 +22,16 @@ static opts * opts_new()
     s->overwrite = 0;
     s->verbose = 1;
     s->optpos = -1;
+    s->refImage = NULL;
     return s;
 }
 
 static void opts_free(opts * s)
 {
+    if(s->refImage != NULL)
+    {
+        free(s->refImage);
+    }
     free(s);
 }
 
@@ -43,10 +49,11 @@ static void argparsing(int argc, char ** argv, opts * s)
     struct option longopts[] = {
         {"help", no_argument, NULL, 'h'},
         {"overwrite", no_argument, NULL, 'o'},
+        {"ref",     required_argument, NULL, 'r'},
         {"verbose", required_argument, NULL, 'v'},
         {NULL, 0, NULL, 0}};
     int ch;
-    while((ch = getopt_long(argc, argv, "hov:", longopts, NULL)) != -1)
+    while((ch = getopt_long(argc, argv, "hor:v:", longopts, NULL)) != -1)
     {
         switch(ch){
         case 'o':
@@ -55,6 +62,9 @@ static void argparsing(int argc, char ** argv, opts * s)
         case 'h':
             usage(argc, argv);
             exit(0);
+            break;
+        case 'r':
+            s->refImage = strdup(optarg);
             break;
         case 'v':
             s->verbose = atoi(optarg);
@@ -90,17 +100,26 @@ int dw_imshift(int argc, char ** argv)
     fim_tiff_init();
     opts * s = opts_new();
 
-    if(argc < 4)
+    argparsing(argc, argv, s);
+
+    if(s->refImage == NULL)
     {
-        usage(argc, argv);
-        exit(1);
+        if(argc < 4)
+        {
+            usage(argc, argv);
+            exit(1);
+        }
+    } else {
+        if(argc < 4)
+        {
+            usage(argc, argv);
+            exit(1);
+        }
     }
 
-    argparsing(argc, argv, s);
 
     char * outFile;
     char * inFile;
-
 
 
     inFile = argv[s->optpos];
@@ -138,8 +157,9 @@ int dw_imshift(int argc, char ** argv)
     if(s->overwrite == 0 && file_exist(outFile))
     {
         printf("%s exists, skipping.\n", outFile);
+        exit(EXIT_SUCCESS);
     }
-    else
+    if(s->refImage == NULL)
     {
         printf("%s -> %s\n", inFile, outFile);
         int64_t M = 0, N = 0, P = 0;
@@ -147,7 +167,35 @@ int dw_imshift(int argc, char ** argv)
         fim_shift(A, M, N, P, dx, dy, dz);
         fim_tiff_write(outFile, A, NULL, M, N, P);
         free(A);
+    }
+    if(s->refImage != NULL)
+    {
+        printf("%s -> %s\n", inFile, outFile);
+        printf("Using reference image: %s\n", s->refImage);
+        int64_t M = 0, N = 0, P = 0;
+        float * A = fim_tiff_read(inFile,
+                                  NULL, &M, &N, &P, s->verbose);
+        int64_t rM = 0, rN = 0, rP = 0;
+        float * R = fim_tiff_read(s->refImage,
+                                              NULL, &rM, &rN, &rP,
+                                              s->verbose);
 
+        if(M!=rM || N != rN || P != rP)
+        {
+            printf("Image dimensions does not match\n");
+            exit(EXIT_FAILURE);
+        }
+
+        // TODO: Max projections
+
+        // TODO: xcorr2
+
+        // TODO: argmax
+
+        fim_shift(A, M, N, P, dx, dy, dz);
+        fim_tiff_write(outFile, A, NULL, M, N, P);
+        free(A);
+        free(R);
     }
 
     free(outFile);

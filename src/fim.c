@@ -417,6 +417,7 @@ afloat * fim_zeros(const size_t N)
 // Allocate and return an array of N floats
 {
     afloat * A = fftwf_malloc(N*sizeof(float));
+    assert(A != NULL);
     memset(A, 0, N*sizeof(float));
     return A;
 }
@@ -824,8 +825,11 @@ void fim_local_sum_ut()
     size_t N = 5;
     float * A = fim_constant(M*N, 1);
     fim_show(A, M, N, 1);
-    float * L = fim_local_sum(A, M, N, 2, 2);
-    fim_show(L, M+2, N+2, 1);
+    int filtM = 2; int filtN = 2;
+    float * L = fim_local_sum(A, M, N, filtM, filtN);
+    size_t lM = M + filtM-1;
+    size_t lN = N + filtN-1;
+    fim_show(L, lM, lN, 1);
     fftwf_free(A);
     fftwf_free(L);
 
@@ -854,6 +858,24 @@ void fim_cumsum_ut()
     fim_cumsum(A, M, N, 1);
     fim_show(A, M, N, 1);
     fftwf_free(A);
+}
+
+void fim_xcorr2_ut()
+{
+    size_t M = 5;
+    size_t N = 6;
+    float * T = fim_zeros(M*N);
+    float * A = fim_zeros(M*N);
+    T[0] = 1;
+    T[1] = 1;
+    A[M+1] = 1;
+    float * X = fim_xcorr2(T, A, M, N);
+    printf("T=\n");
+    fim_show(T, M, N, 1);
+    printf("A=\n");
+    fim_show(A, M, N, 1);
+    printf("xcorr2(T,A)=\n");
+    fim_show(X, 2*M-1, 2*N-1, 1);
 }
 
 void fim_ut()
@@ -889,6 +911,10 @@ void fim_ut()
 
     fim_cumsum_ut();
     fim_local_sum_ut();
+    //exit(EXIT_FAILURE);
+    myfftw_start(1, 1, stdout);
+    fim_xcorr2_ut();
+    myfftw_stop();
 }
 
 #if 0
@@ -1099,49 +1125,67 @@ void fim_cumsum(float * A, const size_t M, const size_t N, const int dim)
 }
 
 /* Local sum in pM x pN windows, pads the input by (pM, pN), i.e. the
- * output is M+pM x N+pN. Equivalent to convolution by a constant
+ * output is M+pM-1 x N+pN-1. Equivalent to convolution by a constant
  * array of size pM x pN */
 
-float * fim_local_sum(float * A, size_t M, size_t N, size_t pM, size_t pN)
+float * fim_local_sum(const float * A,
+                      size_t M, size_t N,
+                      size_t pM, size_t pN)
 {
     /* Work size */
-    size_t wM = M + pM;
-    size_t wN = N + pN;
-    printf("pM = %zu, pN = %zu\n", pM, pN);
+    size_t wM = M + 2*pM;
+    size_t wN = N + 2*pN;
+    printf("pM = %zu, pN = %zu wM = %zu wN = %zu\n", pM, pN, wM, wN);
     float * B = fim_zeros(wM*wN);
-    fim_insert(B, wM, wN, 1, A, M, N, 1);
+
+    /* Insert A, centered, into B */
+    // TODO: fim_padarray
+    for(size_t mm = 0; mm<M; mm++)
+    {
+        for(size_t nn = 0; nn<N; nn++)
+        {
+            B[mm+pM + (nn+pN)*wM] = A[mm + M*nn];
+        }
+    }
+    //printf("B=\n");
+    //fim_show(B, wM, wN, 1);
     fim_cumsum(B, wM, wN, 0);
     //c = s(1+m:end-1,:)-s(1:end-m-1,:);
-    float * C = fim_zeros(wM*wN);
+    size_t cM = wM-pM-1;
+    size_t cN = wN;
+    printf("cM = %zu, cN = %zu\n", cM, cN);
+    float * C = fim_zeros(cM*cN);
     /* Difference along 0th dimension */
-    printf("B= cumsum dim 0\n");
-    fim_show(B, wM, wN, 1);
-    for(size_t nn = 0; nn<wN; nn++)
+    //printf("B= cumsum dim 0\n");
+    //fim_show(B, wM, wN, 1);
+    for(size_t nn = 0; nn<cN; nn++)
     {
         float * B0 = B+wM*nn;
-        for(size_t mm = 0; mm+pM<wM; mm++)
+        for(size_t mm = 0; mm<cM; mm++)
         {
-            C[nn*wM+mm] = B0[mm+pM] - B0[mm];
+            C[nn*cM+mm] = B0[mm+pM] - B0[mm];
         }
     }
-    printf("C=\n");
-    fim_show(C, wM, wN, 1);
+    //printf("C=\n");
+    //fim_show(C, cM, cN, 1);
     fftwf_free(B);
     /* Second dimension */
-    float * D = fim_zeros(wM*wN);
-    fim_cumsum(C, wM, wN, 1);
-    printf("cumsum C=\n");
-    fim_show(C, wM, wN, 1);
-    for(size_t mm = 0; mm<wM; mm++)
+    size_t dM = (wM-pM-1);
+    size_t dN = (wN-pN-1);
+    float * D = fim_zeros(dM*dN);
+    fim_cumsum(C, cM, cN, 1);
+    //printf("cumsum C, 1=\n");
+    //fim_show(C, cM, cN, 1);
+    for(size_t mm = 0; mm<dM; mm++)
     {
         float * C0 = C+mm;
-        for(size_t nn = 0; nn+pN<wN; nn++)
+        for(size_t nn = 0; nn<dN; nn++)
         {
-            D[nn*wM+mm] = C0[(nn+pN)*wM] - C0[nn*wM];
+            D[nn*dM+mm] = C0[(nn+pN)*cM] - C0[nn*cM];
         }
     }
-    printf("D=\n");
-    fim_show(D, wM, wN, 1);
+    //printf("D=\n");
+    //fim_show(D, dM, dN, 1);
     fftwf_free(C);
     return D;
 }
@@ -1154,14 +1198,119 @@ static void fim_show(float * A, size_t M, size_t N, size_t P)
         {
             printf("z=%zu\n", pp);
         }
-        for(int mm = 0; mm<M; mm++)
+        for(size_t mm = 0; mm<M; mm++)
         {
-            for(int nn = 0; nn<N; nn++)
+            for(size_t nn = 0; nn<N; nn++)
             {
-                printf("%f ", A[mm+nn*M+pp*M*N]);
+                printf("% .3f ", A[mm+nn*M+pp*M*N]);
             }
             printf("\n");
         }
         printf("\n");
     }
+}
+
+
+float * fim_xcorr2(const float * T, const float * A,
+                   const size_t M, const size_t N)
+{
+
+
+    /* Work size and size of output */
+    size_t wM = 2*M-1;
+    size_t wN = 2*N-1;
+
+    fft_train(wM, wN, 1,
+              1, 1,
+              stdout);
+
+    float * xA = fim_zeros(wM*wN);
+    fim_insert(xA, wM, wN, 1,
+               A, M, N, 1);
+
+    float * temp = fim_zeros(M*N);
+    //printf("Allocated %zu x %zu = %zu elements\n", M, N, M*N);
+    for(size_t kk = 0; kk < M*N; kk++)
+    {
+        temp[kk] = T[M*N-1-kk];
+    }
+    //printf("temp=\n");
+    //fim_show(temp, M, N, 1);
+    float * xT = fim_zeros(wM*wN);
+    fim_insert(xT, wM, wN, 1,
+               temp, M, N, 1);
+    fftwf_free(temp);
+    temp = NULL;
+
+    fftwf_complex * fxT = fft(xA, wM, wN, 1);
+    fftwf_free(xA);
+    fftwf_complex * fxA = fft(xT, wM, wN, 1);
+    fftwf_free(xT);
+    float * C = fft_convolve_cc(fxT, fxA, wM, wN, 1);
+    // TODO fft_convolve_cc_conj instead?
+    fftwf_free(fxT);
+    fftwf_free(fxA);
+
+    //printf("C=\n");
+    //fim_show(C, 2*M-1, 2*N-1, 1);
+
+    float * LS = fim_local_sum(A, M, N, M, N);
+    //printf("LS=\n");
+    //fim_show(LS, 2*M-1, 2*N-1, 1);
+    float * numerator = fim_zeros(wM*wN);
+    const float MN = M*N;
+    const float sumT = fim_sum(T, M*N);
+    for(size_t kk = 0; kk<wM*wN; kk++)
+    {
+        numerator[kk] = (C[kk] - LS[kk]*sumT/MN);
+    }
+    //printf("Numerator = \n");
+    //fim_show(numerator, wM, wN, 1);
+
+    float * A2 = fim_zeros(M*N);
+    for(size_t kk = 0; kk<M*N; kk++)
+    {
+        A2[kk] = powf(A[kk], 2);
+    }
+
+    float * LS2 = fim_local_sum(A2, M, N, M, N);
+
+    float * denom_I = fim_zeros(wM*wN);
+    for(size_t kk = 0; kk<wM*wN; kk++)
+    {
+        float dLS = ( LS2[kk] - powf(LS[kk],2)/MN );
+        float v = sqrt(dLS);
+        v < 0 ? v = 0 : 0;
+        denom_I[kk] = v;
+    }
+    //printf("denom_I=\n");
+    //fim_show(denom_I, wM, wN, 1);
+
+    float denom_J = sqrt(M*N-1.0)*fim_std(T, M*N);
+    //printf("std = %f\n", fim_std(T, M*N));
+    //printf("denom_J = %f\n", denom_J);
+    for(size_t kk = 0; kk<wM*wN; kk++)
+    {
+        float d = denom_I[kk]*denom_J;
+        if(d > 1e-9)
+        {
+            C[kk] = numerator[kk] / d;
+        }
+    }
+
+    return C;
+}
+
+
+float fim_std(const float * V, size_t N)
+{
+
+    float mean = fim_sum(V, N)/N;
+    double s = 0;
+    for(size_t kk = 0; kk<N; kk++)
+    {
+        s += pow(V[kk]-mean, 2);
+    }
+
+    return (float) sqrt(s/ (double) (N - 1.0) );
 }
