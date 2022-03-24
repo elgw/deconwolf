@@ -14,8 +14,8 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef fim_h
-#define fim_h
+#ifndef _fim_h_
+#define _fim_h_
 
 #include <math.h>
 #include <fftw3.h>
@@ -47,6 +47,10 @@ float fim_min(const float * A, size_t N);
 float fim_mean(const float * A, size_t N);
 float fim_max(const float * A, size_t N);
 float fim_sum(const float * restrict A, size_t N);
+/* Standard deviation, normalizing by (N-1) */
+float fim_std(const float * V, size_t N);
+
+float * fim_maxproj(const float * A, size_t M, size_t N, size_t P);
 
 /* Cumulative sum along dimension dim
  * Only supports 2D images
@@ -184,12 +188,15 @@ void fim_argmax(const float * fim,
                 size_t M, size_t N, size_t P,
                 int64_t * _aM, int64_t *_aN, int64_t *_aP);
 
+
+
+
 /*  */
 float * fim_local_sum(const float * A, size_t M, size_t N, size_t pM, size_t pN);
 
 /* Cumulative sum along dimension dim */
 void fim_cumsum(float * A, const size_t M, const size_t N, const int dim);
-#endif
+
 
 
 /* Normalized cross correlation between T and A
@@ -202,4 +209,5 @@ float * fim_xcorr2(const float * T, const float * A,
                    const size_t M, const size_t N);
 
 
-float fim_std(const float * V, size_t N);
+
+#endif /* _fim_h_ */

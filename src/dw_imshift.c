@@ -5,6 +5,11 @@ typedef struct{
     int verbose;
     int optpos;
     char * refImage;
+    char * image;
+    double dx;
+    double dy;
+    double dz;
+    int nthreads;
 } opts;
 
 static opts * opts_new();
@@ -13,6 +18,20 @@ static void usage(__attribute__((unused)) int argc, char ** argv);
 static void argparsing(int argc, char ** argv, opts * s);
 static int file_exist(char * fname);
 int dw_imshift(int argc, char ** argv);
+
+static int dw_get_threads(void)
+{
+    int nThreads = 4;
+#ifndef WINDOWS
+/* Reports #threads, typically 2x#cores */
+    nThreads = sysconf(_SC_NPROCESSORS_ONLN)/2;
+#endif
+#ifdef OMP
+/* Reports number of cores */
+    nThreads = omp_get_num_procs();
+#endif
+    return nThreads;
+}
 
 
 static opts * opts_new()
@@ -23,6 +42,11 @@ static opts * opts_new()
     s->verbose = 1;
     s->optpos = -1;
     s->refImage = NULL;
+    s->image = NULL;
+    s->dx = 0;
+    s->dy = 0;
+    s->dz = 0;
+    s->nthreads = dw_get_threads();
     return s;
 }
 
@@ -48,12 +72,16 @@ static void argparsing(int argc, char ** argv, opts * s)
 {
     struct option longopts[] = {
         {"help", no_argument, NULL, 'h'},
+        {"image", required_argument, NULL, 'i'},
         {"overwrite", no_argument, NULL, 'o'},
         {"ref",     required_argument, NULL, 'r'},
         {"verbose", required_argument, NULL, 'v'},
+        {"dx", required_argument, NULL, 'x'},
+        {"dy", required_argument, NULL, 'y'},
+        {"dz", required_argument, NULL, 'z'},
         {NULL, 0, NULL, 0}};
     int ch;
-    while((ch = getopt_long(argc, argv, "hor:v:", longopts, NULL)) != -1)
+    while((ch = getopt_long(argc, argv, "hi:or:v:x:y:z:", longopts, NULL)) != -1)
     {
         switch(ch){
         case 'o':
@@ -63,11 +91,23 @@ static void argparsing(int argc, char ** argv, opts * s)
             usage(argc, argv);
             exit(0);
             break;
+        case 'i':
+            s->image = strdup(optarg);
+            break;
         case 'r':
             s->refImage = strdup(optarg);
             break;
         case 'v':
             s->verbose = atoi(optarg);
+            break;
+        case 'x':
+            s->dx = atof(optarg);
+            break;
+        case 'y':
+            s->dy = atof(optarg);
+            break;
+        case 'z':
+            s->dz = atof(optarg);
             break;
         }
     }
@@ -102,30 +142,20 @@ int dw_imshift(int argc, char ** argv)
 
     argparsing(argc, argv, s);
 
-    if(s->refImage == NULL)
+    if(s->image == NULL)
     {
-        if(argc < 4)
-        {
-            usage(argc, argv);
-            exit(1);
-        }
-    } else {
-        if(argc < 4)
-        {
-            usage(argc, argv);
-            exit(1);
-        }
+        printf("No --image specified\n");
+        exit(EXIT_FAILURE);
     }
 
+    myfftw_start(s->nthreads, s->verbose, stdout);
 
-    char * outFile;
-    char * inFile;
+    char * inFile = s->image;
+    char * outFile = NULL;
 
-
-    inFile = argv[s->optpos];
-    double dx = -atof(argv[s->optpos+1]);
-    double dy = -atof(argv[s->optpos+2]);
-    double dz = -atof(argv[s->optpos+3]);
+    double dx = s->dx;
+    double dy = s->dy;
+    double dz = s->dz;
 
     if(!file_exist(inFile))
     {
@@ -173,6 +203,7 @@ int dw_imshift(int argc, char ** argv)
         printf("%s -> %s\n", inFile, outFile);
         printf("Using reference image: %s\n", s->refImage);
         int64_t M = 0, N = 0, P = 0;
+        printf("reading images\n");
         float * A = fim_tiff_read(inFile,
                                   NULL, &M, &N, &P, s->verbose);
         int64_t rM = 0, rN = 0, rP = 0;
@@ -186,13 +217,40 @@ int dw_imshift(int argc, char ** argv)
             exit(EXIT_FAILURE);
         }
 
-        // TODO: Max projections
+        if(s->verbose > 1)
+        {
+            printf("Creating max projections\n");
+        }
+        float * mA = fim_maxproj(A, M, N, P);
+        float * mR = fim_maxproj(R, M, N, P);
 
-        // TODO: xcorr2
+        if(s->verbose > 1)
+        {
+            printf("Calculating normalized cross correlation\n");
+        }
+        float * XC = fim_xcorr2(mA, mR, M, N);
 
+        int64_t aM=0;
+        int64_t aN=0;
+        int64_t aP = 0;
         // TODO: argmax
-
-        fim_shift(A, M, N, P, dx, dy, dz);
+        fim_argmax(XC, 2*M-1, 2*N-1, 1, &aM, &aN, &aP);
+        if(s->verbose > 1)
+        {
+            printf("Found max at %ld, %ld, %ld\n", aM, aN, aP);
+        }
+        s->dx = (float) M-aM-1.0;
+        s->dy = (float) N-aN-1.0;
+        s->dz = 0;
+        if(s->verbose > 0)
+        {
+            printf("Shifting image by %f, %f, %f\n", s->dx, s->dy, s->dz);
+        }
+        fim_shift(A, M, N, P, s->dx, s->dy, s->dz);
+        if(s->verbose > 0)
+        {
+            printf("Writing to %s\n", outFile);
+        }
         fim_tiff_write(outFile, A, NULL, M, N, P);
         free(A);
         free(R);
@@ -200,5 +258,6 @@ int dw_imshift(int argc, char ** argv)
 
     free(outFile);
     opts_free(s);
+    myfftw_stop();
     return 0;
 }

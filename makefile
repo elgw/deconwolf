@@ -115,8 +115,8 @@ endif
 CC = cc $(CFLAGS)
 SRCDIR = src/
 
-dw_OBJECTS = fim.o tiling.o fft.o fim_tiff.o dw.o deconwolf.o dw_maxproj.o method_eve.o method_identity.o method_rl.o method_ave.o method_shb.o dw_imshift.o
-dwbw_OBJECTS = fim.o fim_tiff.o dw_bwpsf.o bw_gsl.o lanczos.o li.o
+dw_OBJECTS = fim.o tiling.o fft.o fim_tiff.o dw.o deconwolf.o dw_maxproj.o method_eve.o method_identity.o method_rl.o method_ave.o method_shb.o dw_imshift.o fft.o
+dwbw_OBJECTS = fim.o fim_tiff.o dw_bwpsf.o bw_gsl.o lanczos.o li.o fft.o
 
 # dwtm = bin/dw_tiffmax
 # dwtm_OBJECTS = fim.o fim_tiff.o deconwolf_tif_max.o

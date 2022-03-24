@@ -59,6 +59,8 @@ static double timespec_diff(struct timespec* end, struct timespec * start)
 const unsigned int MYPLAN = FFTW_MEASURE;
 //const unsigned int MYPLAN = FFTW_PATIENT;
 
+static int fft_nthreads;
+
 static int isdir(char * dir)
 {
     /* Check if directory exist, do not create if missing
@@ -147,6 +149,7 @@ void myfftw_start(__attribute__((unused)) const int nThreads,
 #ifndef CUDA
 void myfftw_start(const int nThreads, int verbose, FILE * log)
 {
+    fft_nthreads = nThreads;
 
     if(verbose > 1)
     {
@@ -381,10 +384,17 @@ void fft_train( __attribute__((unused)) const size_t M,
 #endif
 
 #ifndef CUDA
-void fft_train(const size_t M, const size_t N, const size_t P, const int verbosity, const int nThreads,
+void fft_train(const size_t M, const size_t N, const size_t P,
+               const int verbosity, int nThreads,
                FILE * log)
 {
     int updatedWisdom = 0;
+
+    if(nThreads < 1)
+    {
+        nThreads = fft_nthreads;
+    }
+    nThreads < 1 ? nThreads = 1 : 0;
 
     if(MYPLAN == FFTW_ESTIMATE)
     {
@@ -399,7 +409,10 @@ void fft_train(const size_t M, const size_t N, const size_t P, const int verbosi
     if(verbosity > 1){
         printf("fftw3 training ... \n"); fflush(stdout);
     }
-    fprintf(log, "--- fftw3 training ---\n");
+    if(log != stdout)
+    {
+        fprintf(log, "--- fftw3 training ---\n");
+    }
 
     size_t MNP = M*N*P;
     fftwf_complex * C = fftwf_malloc(MNP*sizeof(fftwf_complex));
@@ -425,7 +438,10 @@ void fft_train(const size_t M, const size_t N, const size_t P, const int verbosi
         {
             printf("\t Using cached fftw3 c2r plan\n");
         }
-        fprintf(log, "Using cached fftw3 c2r plan\n");
+        if(log != stdout)
+        {
+            fprintf(log, "Using cached fftw3 c2r plan\n");
+        }
     }
     fftwf_destroy_plan(p0);
 
@@ -437,7 +453,10 @@ void fft_train(const size_t M, const size_t N, const size_t P, const int verbosi
         if(verbosity > 0){
             printf("> generating fftw3 r2c plan \n");
         }
-        fprintf(log, "> generating fftw3 r2c plan\n");
+        if(log != stdout)
+        {
+            fprintf(log, "> generating fftw3 r2c plan\n");
+        }
         fftwf_plan p2 = fftwf_plan_dft_r2c_3d(P, N, M,
                                               R, C, MYPLAN);
         fftwf_execute(p2);

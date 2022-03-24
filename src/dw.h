@@ -254,6 +254,7 @@ void benchmark_write(dw_opts * s, int iter, double fMSE,const afloat * x,
                      const int64_t wM, const int64_t wN, const int64_t wP);
 
 
+
 /* "WARNING" in some formatting */
 void warning(FILE * fid);
 

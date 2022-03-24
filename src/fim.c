@@ -23,6 +23,7 @@ static float * gaussian_kernel(float sigma, size_t * nK);
 static void conv1(float * restrict V, int stride, float * restrict W,
                   const size_t nV,
                   const float * restrict K, const size_t nKu);
+
 static void cumsum_array(float * A, size_t N, size_t stride);
 static void fim_show(float * A, size_t M, size_t N, size_t P);
 
@@ -552,9 +553,9 @@ void fim_shift(afloat * restrict A,
     float * kernelz = kernel_linear_shift(deltap, &nkernelz);
 
 
-    printf("X Shift: %f = %d+%f\n", dm, sm, deltam);
-    printf("Y Shift: %f = %d+%f\n", dn, sn, deltan);
-    printf("Z Shift: %f = %d+%f\n", dp, sp, deltap);
+    //    printf("X Shift: %f = %d+%f\n", dm, sm, deltam);
+    //    printf("Y Shift: %f = %d+%f\n", dn, sn, deltan);
+    //    printf("Z Shift: %f = %d+%f\n", dp, sp, deltap);
 
     /* Start a parallel region to figure out how many threads that will be used
        and how much memory to allocate for the buffers */
@@ -1135,11 +1136,12 @@ float * fim_local_sum(const float * A,
     /* Work size */
     size_t wM = M + 2*pM;
     size_t wN = N + 2*pN;
-    printf("pM = %zu, pN = %zu wM = %zu wN = %zu\n", pM, pN, wM, wN);
+    //printf("pM = %zu, pN = %zu wM = %zu wN = %zu\n", pM, pN, wM, wN);
     float * B = fim_zeros(wM*wN);
 
     /* Insert A, centered, into B */
     // TODO: fim_padarray
+#pragma omp parallel for shared(A, B)
     for(size_t mm = 0; mm<M; mm++)
     {
         for(size_t nn = 0; nn<N; nn++)
@@ -1153,11 +1155,12 @@ float * fim_local_sum(const float * A,
     //c = s(1+m:end-1,:)-s(1:end-m-1,:);
     size_t cM = wM-pM-1;
     size_t cN = wN;
-    printf("cM = %zu, cN = %zu\n", cM, cN);
+    //printf("cM = %zu, cN = %zu\n", cM, cN);
     float * C = fim_zeros(cM*cN);
     /* Difference along 0th dimension */
     //printf("B= cumsum dim 0\n");
     //fim_show(B, wM, wN, 1);
+#pragma omp parallel for shared(C, B)
     for(size_t nn = 0; nn<cN; nn++)
     {
         float * B0 = B+wM*nn;
@@ -1176,6 +1179,7 @@ float * fim_local_sum(const float * A,
     fim_cumsum(C, cM, cN, 1);
     //printf("cumsum C, 1=\n");
     //fim_show(C, cM, cN, 1);
+#pragma omp parallel for shared(D, C)
     for(size_t mm = 0; mm<dM; mm++)
     {
         float * C0 = C+mm;
@@ -1221,7 +1225,7 @@ float * fim_xcorr2(const float * T, const float * A,
     size_t wN = 2*N-1;
 
     fft_train(wM, wN, 1,
-              1, 1,
+              1, 0,
               stdout);
 
     float * xA = fim_zeros(wM*wN);
@@ -1230,6 +1234,7 @@ float * fim_xcorr2(const float * T, const float * A,
 
     float * temp = fim_zeros(M*N);
     //printf("Allocated %zu x %zu = %zu elements\n", M, N, M*N);
+#pragma omp parallel for shared(temp, T)
     for(size_t kk = 0; kk < M*N; kk++)
     {
         temp[kk] = T[M*N-1-kk];
@@ -1260,6 +1265,7 @@ float * fim_xcorr2(const float * T, const float * A,
     float * numerator = fim_zeros(wM*wN);
     const float MN = M*N;
     const float sumT = fim_sum(T, M*N);
+#pragma omp parallel for shared(C, LS, numerator)
     for(size_t kk = 0; kk<wM*wN; kk++)
     {
         numerator[kk] = (C[kk] - LS[kk]*sumT/MN);
@@ -1268,6 +1274,7 @@ float * fim_xcorr2(const float * T, const float * A,
     //fim_show(numerator, wM, wN, 1);
 
     float * A2 = fim_zeros(M*N);
+#pragma omp parallel for shared(A, A2)
     for(size_t kk = 0; kk<M*N; kk++)
     {
         A2[kk] = powf(A[kk], 2);
@@ -1276,6 +1283,7 @@ float * fim_xcorr2(const float * T, const float * A,
     float * LS2 = fim_local_sum(A2, M, N, M, N);
 
     float * denom_I = fim_zeros(wM*wN);
+#pragma omp parallel for shared(LS2, denom_I)
     for(size_t kk = 0; kk<wM*wN; kk++)
     {
         float dLS = ( LS2[kk] - powf(LS[kk],2)/MN );
@@ -1289,6 +1297,7 @@ float * fim_xcorr2(const float * T, const float * A,
     float denom_J = sqrt(M*N-1.0)*fim_std(T, M*N);
     //printf("std = %f\n", fim_std(T, M*N));
     //printf("denom_J = %f\n", denom_J);
+#pragma omp parallel for shared(denom_I, C, numerator)
     for(size_t kk = 0; kk<wM*wN; kk++)
     {
         float d = denom_I[kk]*denom_J;
@@ -1307,10 +1316,36 @@ float fim_std(const float * V, size_t N)
 
     float mean = fim_sum(V, N)/N;
     double s = 0;
+#pragma omp parallel for reduction(+:s)
     for(size_t kk = 0; kk<N; kk++)
     {
         s += pow(V[kk]-mean, 2);
     }
 
     return (float) sqrt(s/ (double) (N - 1.0) );
+}
+
+/* Don't parallelize, called by fim_maxproj */
+float fim_array_max(const float * A, size_t N, size_t stride)
+{
+    float m = A[0];
+    for(size_t kk = 0; kk<N; kk++)
+    {
+        A[kk*stride] > m ? m = A[kk*stride] : 0;
+    }
+    return m;
+}
+
+float * fim_maxproj(const float * V, size_t M, size_t N, size_t P)
+{
+    float * Pr = fim_zeros(M*N);
+#pragma parallel for shared(Pr, A)
+    for(size_t mm = 0; mm<M ; mm++)
+    {
+        for(size_t nn = 0; nn<N; nn++)
+        {
+            Pr[mm+M*nn] = fim_array_max(V+mm+M*nn, P, M*N);
+        }
+    }
+    return Pr;
 }
