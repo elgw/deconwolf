@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## v 0.1.1
+- Added experimental **dw imshift** for shifting images, also shift
+  estimation using normalized cross correlation with **dw imshift
+  --ref file.tif**. Might be extended to basic tiling etc.
+
 ## v 0.1.0
 - Implements the 'Scaled Heavy Ball'. More
 memory efficient than eve and about the same speed and image
