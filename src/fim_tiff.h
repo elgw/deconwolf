@@ -22,6 +22,9 @@
  * fim_tiff_init()
  * and should probably also redirect the output by
  * fim_tiff_set_log(FILE *)
+ *
+ * TODO:
+ * Flags to dw_write_tif for scaling on/off
 */
 
 #ifndef fim_tiff_h
@@ -78,11 +81,15 @@ void fim_tiff_init(void);
 /* Redirect all output here */
 void fim_tiff_set_log(FILE * fp);
 
-// Last argument: where to print output
+/* Scale and write data */
 int fim_tiff_write(const char * fName, const float * V,
                    ttags * T,
     int64_t M, int64_t N, int64_t P);
 
+/* Don't scale data */
+int fim_tiff_write_noscale(const char * fName, const afloat * V,
+                           ttags * T,
+                           int64_t N, int64_t M, int64_t P);
 
 int fim_tiff_write_float(const char * fName, const float * V,
                          ttags * T,

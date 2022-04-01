@@ -47,6 +47,7 @@ float fim_min(const float * A, size_t N);
 float fim_mean(const float * A, size_t N);
 float fim_max(const float * A, size_t N);
 float fim_sum(const float * restrict A, size_t N);
+
 /* Standard deviation, normalizing by (N-1) */
 float fim_std(const float * V, size_t N);
 
@@ -71,6 +72,10 @@ void fim_div(float * restrict  A,
                const float * restrict C,
                const size_t N);
 
+/* A[kk] += B[kk] */
+void fim_add(float * restrict A,
+             const float * restrict B,
+             size_t N);
 
 void fim_invert(float * restrict A, const size_t N);
 
@@ -180,8 +185,6 @@ void fim_mult_scalar(float * fim, size_t N, float x);
 
 void fim_ut(void);
 
-/* Gaussian smoothing, normalized at edges */
-void fim_gsmooth(float * restrict V, size_t M, size_t N, size_t P, float sigma);
 
 /* Arg max: find coordinates of largest element
 * If more than one maxima, return the first found
@@ -210,6 +213,76 @@ void fim_cumsum(float * A, const size_t M, const size_t N, const int dim);
 float * fim_xcorr2(const float * T, const float * A,
                    const size_t M, const size_t N);
 
+/* Image binarization with Otsu's method */
+float * fim_otsu(float * Im, size_t M, size_t N);
+
+
+typedef struct{
+    uint32_t * C; /* Counts */
+    float left; /* Left edge of first bin */
+    float right; /* Right edge of last bin */
+    size_t nbin; /* Number of bins */
+} fim_histogram_t;
+
+/* Return a histogram, the number of bins as well as the bin edges are
+ * set automatically. The smallest end largest value should end up in
+ * the middle of the first and last bin. */
+fim_histogram_t * fim_histogram(const float * Im, size_t N);
+
+/* Return a global threshold by Otsu's method */
+float fim_histogram_otsu(fim_histogram_t * H);
+void fim_histogram_free(fim_histogram_t * H);
+
+/* 2D connected components using 6-connectivity. TODO: see
+ * wu2005optimizing for something smarter. */
+int * fim_conncomp6(float * Im, size_t M, size_t N);
+
+/* row-major table */
+typedef struct {
+    float * T;
+    size_t nrow;
+    size_t ncol;
+    size_t nrow_alloc; /* To know if we need to extend the size */
+} fim_table_t;
+
+void fim_table_free(fim_table_t * T);
+void fim_table_insert(fim_table_t * T, float * row);
+
+/* Find local maxima in I */
+//fim_table_t * fim_lmax(const float * I, size_t M, size_t N, size_t P);
+fim_table_t * fim_lmax(const float * Im, size_t M, size_t N, size_t P);
+/* Sort with largest value first */
+void fim_table_sort(fim_table_t * T, int col);
+
+/* Spatial convolution */
+
+/* Convolution of a single vector
+ * In MATLAB that would be
+ * Y = convn(V, K, 'same') / convn(ones(size(V)), K, 'same')
+ * With normalized == 1 it would be
+ * Y = convn(V, K, 'same') / convn(ones(size(V)), K, 'same')
+ * That is only useful for gaussians
+ */
+void fim_conv1_vector(float * restrict V, int stride, float * restrict W,
+                  const size_t nV,
+                      const float * restrict K, const size_t nKu,
+    const int normalized);
+
+/* In-place convolution of a 3D volume, V, with a 1D filter, K along
+ * dimension dim (0,1 or 2). The value of normalized is passed on to
+ * fim_conv1_vector
+ */
+int fim_convn1(float * restrict V, size_t M, size_t N, size_t P,
+               float * K, size_t nK,
+               int dim, const int normalized);
+
+
+/* Gaussian smoothing, normalized at edges */
+void fim_gsmooth(float * restrict V, size_t M, size_t N, size_t P, float sigma);
+
+/* Laplacian of Gaussian filter */
+float * fim_LoG(const float * V, size_t M, size_t N, size_t P,
+                float sigmaxy, float sigmaz);
 
 
 #endif /* _fim_h_ */

@@ -20,12 +20,9 @@
 
 
 static float * gaussian_kernel(float sigma, size_t * nK);
-static void conv1(float * restrict V, int stride, float * restrict W,
-                  const size_t nV,
-                  const float * restrict K, const size_t nKu);
-
 static void cumsum_array(float * A, size_t N, size_t stride);
 static void fim_show(float * A, size_t M, size_t N, size_t P);
+static void fim_show_int(int * A, size_t M, size_t N, size_t P);
 
 int fim_maxAtOrigo(const afloat * restrict V, const int64_t M, const int64_t N, const int64_t P)
 /* Check that the MAX of the fim is in the middle
@@ -164,6 +161,21 @@ void fim_minus(afloat * restrict  A,
     for(kk = 0; kk<N; kk++)
     {
         A[kk] = B[kk] - C[kk];
+    }
+    return;
+}
+
+void fim_add(float * restrict  A,
+               const afloat * restrict B,
+               const size_t N)
+/* A[kk] += B[kk] */
+{
+    size_t kk = 0;
+
+#pragma omp parallel for shared(A,B)
+    for(kk = 0; kk<N; kk++)
+    {
+        A[kk] += B[kk];
     }
     return;
 }
@@ -663,7 +675,7 @@ void shift_vector_float_buf(afloat * restrict V, // data
             buffer[pp] = V[pp*S];
         }
     } else {
-        conv1(V, S, buffer, N, kernel, nkernel);
+        fim_conv1_vector(V, S, buffer, N, kernel, nkernel, 1);
     }
 
     for(size_t pp = 0; pp<(size_t) N; pp++)
@@ -890,8 +902,54 @@ void fim_xcorr2_ut()
     fftwf_free(X);
 }
 
+void fim_otsu_ut()
+{
+    size_t M = 10;
+    size_t N = 10;
+    size_t P = 1;
+    float * Im = calloc(M*N*P, sizeof(float));
+    for(size_t kk = 0; kk<M*N; kk++)
+    {
+        if(kk < M*N/2)
+        {
+            Im[kk] = 1 + 1*((float) rand() / (float) RAND_MAX - 0.5);
+        } else {
+            Im[kk] = 2 + 1*((float) rand() / (float) RAND_MAX - 0.5);
+        }
+    }
+    fim_show(Im, M, N, P);
+    float * B = fim_otsu(Im, M, N);
+    fim_show(B, M, N, P);
+    free(Im);
+    free(B);
+}
+
+void fim_conncomp6_ut()
+{
+    printf("fim_conncomp6_ut\n");
+    size_t M = 10;
+    size_t N = 10;
+    float * Im = calloc(M*N, sizeof(float));
+    for(size_t kk = 0; kk < M*N/4; kk++)
+    {
+        size_t idx = rand() % (M*N);
+        Im[idx] = 1;
+    }
+    printf("Input image\n");
+    fim_show(Im, M, N, 1);
+    int * L = fim_conncomp6(Im, M, N);
+    printf("Labelled array\n");
+    fim_show_int(L, M, N, 1);
+    free(L);
+    free(Im);
+}
+
 void fim_ut()
 {
+    fim_conncomp6_ut();
+    exit(EXIT_SUCCESS);
+    fim_otsu_ut();
+    exit(EXIT_SUCCESS);
     fim_flipall_ut();
     shift_vector_ut();
     size_t N = 0;
@@ -914,7 +972,7 @@ void fim_ut()
     }
     printf("V=");
     show_vec(V, nV);
-    conv1(V, 1, NULL, nV, K, N);
+    fim_conv1_vector(V, 1, NULL, nV, K, N, 1);
     printf("V*K = ");
     show_vec(V, nV);
 
@@ -945,14 +1003,11 @@ static size_t max_size_t(size_t a, size_t b)
     return b;
 }
 
-static void conv1(float * restrict V, int stride, float * restrict W,
+void fim_conv1_vector(float * restrict V, int stride, float * restrict W,
                   const size_t nV,
-                  const float * restrict K, const size_t nKu)
+                      const float * restrict K, const size_t nKu, const int normalized)
 {
-    /* Normalized convolution
-     * In MATLAB that would be
-     * Y = convn(V, K, 'same') / convn(ones(size(V)), K, 'same')
-     */
+
     int Walloc = 0;
     if(W == NULL)
     {
@@ -973,7 +1028,12 @@ static void conv1(float * restrict V, int stride, float * restrict W,
             acc0 = acc0 + K[kk]*V[(vv-k2+kk)*stride];
             kacc += K[kk];
         }
-        W[bpos++] = acc0/kacc;
+        if(normalized)
+        {
+            W[bpos++] = acc0/kacc;
+        } else {
+            W[bpos++] = acc0;
+        }
     }
 
     /* Central part where K fits completely */
@@ -997,7 +1057,12 @@ static void conv1(float * restrict V, int stride, float * restrict W,
             acc0 = acc0 + K[kk]*V[(vv-k2+kk)*stride];
             kacc += K[kk];
         }
-        W[bpos++] = acc0/kacc;
+        if(normalized)
+        {
+            W[bpos++] = acc0/kacc;
+        } else {
+            W[bpos++] = acc0;
+        }
     }
 
     /* Write back */
@@ -1047,7 +1112,29 @@ static float * gaussian_kernel(float sigma, size_t * nK)
     return K;
 }
 
-void fim_gsmooth(float * restrict V, size_t M, size_t N, size_t P, float sigma)
+static float * gaussian_kernel_d2(float sigma, size_t * nK)
+{
+    /* d2/dx2 Gaussian kernel */
+    float * K = gaussian_kernel(sigma, nK);
+
+    int n = (int) nK[0];
+    int m = (n-1)/2;
+    float s2 = pow(sigma, 2);
+    float b = 1.0/(2*s2);
+
+    for(int kk = 0; kk < n; kk++)
+    {
+        float x = kk-m;
+        float x2 = pow(x, 2);
+        K[kk] *= -2*b*(2*b*x2-1.0);
+    }
+
+
+    return K;
+}
+
+
+void fim_gsmooth_old(float * restrict V, size_t M, size_t N, size_t P, float sigma)
 {
     /* Convolve V by an isotropic Gaussian
      * implemented as a separated convolution. */
@@ -1073,7 +1160,7 @@ void fim_gsmooth(float * restrict V, size_t M, size_t N, size_t P, float sigma)
     {
         for(size_t nn = 0; nn < N; nn++)
         {
-            conv1(V+pp*(M*N)+nn*M, 1, W, M, K, nK);
+            fim_conv1_vector(V+pp*(M*N)+nn*M, 1, W, M, K, nK, 1);
         }
     }
 
@@ -1083,7 +1170,7 @@ void fim_gsmooth(float * restrict V, size_t M, size_t N, size_t P, float sigma)
         {
             for(size_t mm = 0; mm<M; mm++)
             {
-                conv1(V + pp*(M*N) + mm, M, W, N, K, nK);
+                fim_conv1_vector(V + pp*(M*N) + mm, M, W, N, K, nK, 1);
             }
         }
     }
@@ -1095,7 +1182,7 @@ void fim_gsmooth(float * restrict V, size_t M, size_t N, size_t P, float sigma)
         {
             for(size_t nn = 0; nn<N; nn++)
             {
-                conv1(V+mm+M*nn, M*N, W, P, K, nK);
+                fim_conv1_vector(V+mm+M*nn, M*N, W, P, K, nK, 1);
             }
         }
     }
@@ -1103,6 +1190,32 @@ void fim_gsmooth(float * restrict V, size_t M, size_t N, size_t P, float sigma)
     free(W);
     return;
 }
+
+void fim_gsmooth(float * restrict V, size_t M, size_t N, size_t P, float sigma)
+{
+    /* Convolve V by an isotropic Gaussian
+     * implemented as a separated convolution. */
+
+    if(sigma < 0)
+    {
+        printf("fim_gsmooth sigma=%f does not make sense.", sigma);
+    }
+
+    /* Create a kernel  */
+    size_t nK = 0;
+    float * K = gaussian_kernel(sigma, &nK);
+    assert(nK > 0);
+
+    fim_convn1(V, M, N, P, K, nK, 0, 1);
+    fim_convn1(V, M, N, P, K, nK, 1, 1);
+    fim_convn1(V, M, N, P, K, nK, 2, 1);
+
+    free(K);
+    return;
+}
+
+
+
 
 static void cumsum_array(float * A, size_t N, size_t stride)
 {
@@ -1218,6 +1331,26 @@ static void fim_show(float * A, size_t M, size_t N, size_t P)
             for(size_t nn = 0; nn<N; nn++)
             {
                 printf("% .3f ", A[mm+nn*M+pp*M*N]);
+            }
+            printf("\n");
+        }
+        printf("\n");
+    }
+}
+
+static void fim_show_int(int * A, size_t M, size_t N, size_t P)
+{
+    for(size_t pp = 0; pp<P; pp++)
+    {
+        if(P > 1)
+        {
+            printf("z=%zu\n", pp);
+        }
+        for(size_t mm = 0; mm<M; mm++)
+        {
+            for(size_t nn = 0; nn<N; nn++)
+            {
+                printf("% d ", A[mm+nn*M+pp*M*N]);
             }
             printf("\n");
         }
@@ -1354,7 +1487,7 @@ float fim_array_max(const float * A, size_t N, size_t stride)
     return m;
 }
 
-float * fim_maxproj(const float * V, size_t M, size_t N, size_t P)
+float * fim_maxproj_ref(const float * V, size_t M, size_t N, size_t P)
 {
     float * Pr = fim_zeros(M*N);
 #pragma omp parallel for shared(Pr, V)
@@ -1367,6 +1500,24 @@ float * fim_maxproj(const float * V, size_t M, size_t N, size_t P)
     }
     return Pr;
 }
+
+float * fim_maxproj(const float * V, size_t M, size_t N, size_t P)
+{
+    /* Initialize to first plane */
+    float * Pr = fim_copy(V, M*N);
+
+    /* Compare to remaining planes */
+    for(size_t pp = 1; pp<P ; pp++)
+    {
+        const float * Vp = V + pp*M*N;
+        for(size_t kk = 0; kk<M*N; kk++)
+        {
+            Pr[kk] < Vp[kk] ? Pr[kk] = Vp[kk] : 0;
+        }
+    }
+    return Pr;
+}
+
 
 float * fim_sumproj(const float * V, size_t M, size_t N, size_t P)
 {
@@ -1385,4 +1536,554 @@ float * fim_sumproj(const float * V, size_t M, size_t N, size_t P)
         }
     }
     return Pr;
+}
+
+void fim_table_free(fim_table_t * T)
+{
+    if(T == NULL)
+    {
+        return;
+    }
+    if(T->T != NULL)
+    {
+        free(T->T);
+    }
+    free(T);
+    return;
+}
+
+fim_table_t * fim_table_new(int ncol)
+{
+    fim_table_t * T = malloc(sizeof(fim_table_t));
+    T->ncol = ncol;
+    T->nrow = 0;
+    T->nrow_alloc = 1024;
+    T->T = malloc(T->ncol*T->nrow_alloc*sizeof(float));
+    return T;
+}
+
+typedef struct{
+    float value;
+    size_t idx;
+} fim_table_sort_pair;
+
+int fim_table_sort_pair_cmp(const void * _A, const void * _B)
+{
+    fim_table_sort_pair * A = (fim_table_sort_pair*) _A;
+    fim_table_sort_pair * B = (fim_table_sort_pair*) _B;
+
+    //printf("idx: %zu, value: %f\n", A->idx, A->value);
+    //printf("idx: %zu, value: %f\n", B->idx, B->value);
+    //exit(1);
+    float fa = A->value;
+    float fb = B->value;
+    if(fa == fb)
+    {
+        return 0;
+    }
+    if(fa < fb)
+    {
+        return 1;
+    }
+    return -1;
+}
+
+void fim_table_sort(fim_table_t * T, int col)
+{
+    fim_table_sort_pair * P = malloc(T->nrow*sizeof(fim_table_sort_pair));
+    /* Extract values from col %d and sort */
+    printf("Really the first %f\n", T->T[3]);
+    for(size_t kk = 0; kk < T->nrow; kk++)
+    {
+        P[kk].idx = kk;
+        P[kk].value = T->T[kk*T->ncol + col];
+    }
+    printf("First: %f, Last: %f\n", P[0].value, P[T->nrow-1].value);
+    printf("Sorting dots %zu dots\n", T->nrow);
+    qsort(P, T->nrow,
+          sizeof(fim_table_sort_pair),
+          fim_table_sort_pair_cmp);
+    float * T2 = malloc(T->ncol*T->nrow_alloc*sizeof(float));
+    for(size_t kk = 0; kk< T->nrow; kk++)
+    {
+        size_t newpos = P[kk].idx*T->ncol;
+        size_t oldpos = kk*T->ncol;
+        memcpy(T2+oldpos,
+               T->T + newpos,
+               sizeof(float)*T->ncol);
+    }
+    free(P);
+    free(T->T);
+    T->T = T2;
+    return;
+}
+
+void fim_table_insert(fim_table_t * T, float * row)
+{
+    assert(T != NULL);
+    assert(row != NULL);
+    if(T->nrow == T->nrow_alloc)
+    {
+        T->nrow_alloc += T->nrow_alloc*0.69;
+        T->T = realloc(T->T, T->nrow_alloc*T->ncol*sizeof(float));
+    }
+    memcpy(T->T+T->ncol*T->nrow,
+           row, T->ncol*sizeof(float));
+    T->nrow++;
+}
+
+float strel333_max(const float * I, size_t M, size_t N,
+                   __attribute__((unused))  size_t P,
+                const float * strel)
+{
+
+    float max = 0; /* ok since we handle image data */
+    for(int aa = 0 ; aa < 3; aa++)
+    {
+        for(int bb = 0 ; bb < 3; bb++)
+        {
+            for(int cc = 0 ; cc < 3; cc++)
+            {
+                if(strel[aa+3*bb+9*cc] == 1)
+                {
+                    float v = I[(aa-1) + (bb-1)*M + (cc-1)*M*N];
+                    v > max ? max = v : 0;
+                }
+            }
+        }
+    }
+    return max;
+}
+
+fim_table_t * fim_lmax(const float * I, size_t M, size_t N, size_t P)
+{
+    fim_table_t * T = fim_table_new(4);
+
+    /* 3x3x3 structuring element with 26-connectivity */
+    float * strel = malloc(27*sizeof(float));
+    for(int kk = 0; kk<27; kk++)
+    {
+        strel[kk] = 1;
+    }
+    strel[13] = 0;
+
+    for(size_t mm = 1; mm+1 < M; mm++)
+    {
+        for(size_t nn = 1; nn+1 < N; nn++)
+        {
+            for(size_t pp = 1; pp+1 < P; pp++)
+            {
+                size_t pos = mm + nn*M + pp*M*N;
+                if(strel333_max(I + pos, M, N, P, strel) > I[pos])
+                {
+                    /* Pos is s a local maxima */
+                    float row[4] = {mm, nn, pp, I[pos]};
+                    fim_table_insert(T, row);
+                }
+            }
+        }
+    }
+
+    free(strel);
+    return T;
+}
+
+
+fim_histogram_t * fim_histogram(const float * Im, size_t N)
+{
+    float min = fim_min(Im, N);
+    float max = fim_max(Im, N);
+    size_t nbin = pow(2, 16);
+    float delta = (max-min) / ((float) nbin);
+    float left = min - 0.5*delta-1e-6;
+    float right = max + 0.5*delta+1e-6;
+    delta = (right-left)/((float) nbin);
+    printf("Histogram: #=%zu [%f, %f], delta=%f\n", nbin, left, right, delta);
+    fim_histogram_t * H = malloc(sizeof(fim_histogram_t));
+    H->left = left;
+    H->right = right;
+    H->nbin = nbin;
+    H->C = calloc(nbin, sizeof(uint32_t));
+
+
+    for(size_t kk = 0; kk<N; kk++)
+    {
+        float v = Im[kk]; /* Value */
+        //        printf("v=%f\n", v);
+        float fbin = (v-left)/(right-left)*((float) (nbin));
+        assert(fbin < nbin);
+        assert(fbin >= 0);
+        //printf("v=%f, bin=%f\n", v, fbin);
+        size_t bin = round(fbin);
+
+        H->C[bin]++;
+    }
+    return H;
+}
+
+void fim_histogram_free(fim_histogram_t * H)
+{
+    if(H == NULL)
+    {
+        return;
+    }
+    if(H->C != NULL)
+    {
+        free(H->C);
+    }
+    free(H);
+    return;
+}
+
+float fim_histogram_otsu(fim_histogram_t * H)
+{
+    /* Convert histogram to pdf */
+    size_t sum = 0;
+    for(size_t kk = 0; kk<H->nbin; kk++)
+    {
+        sum+=H->C[kk];
+    }
+    float * P = malloc(sizeof(float)*H->nbin);
+    for(size_t kk = 0; kk<H->nbin; kk++)
+    {
+        P[kk] = (float) H->C[kk] / (float) sum;
+    }
+
+    /* Otsu's method */
+    float delta = (H->right - H->left) / (float) H->nbin;
+    //printf("[%f, %f], #=%zu, sum=%f, Delta = %f\n", H->left, H->right,
+    //       H->nbin, (float) sum, delta);
+
+    double sumB = 0;
+    float wB = 0;
+    float maximum = 0.0;
+    float sum1 = 0;
+    for(size_t ii = 0; ii<H->nbin; ii++)
+    {
+        float v = H->left + (ii+0.5)*delta;
+        sum1 += v*P[ii];
+    }
+    //    printf("Sum1=%f\n", sum1);
+    float best_level = 0;
+    float wF = 1;
+    for(size_t ii = 0 ; ii < H->nbin; ii++)
+    {
+        /* Testing the left edge of the bin */
+        float level = H->left + ((float) ii)*delta;
+
+        //        printf("P[%zu] = %f, H=%u, wB= %f, wF= %f level=%f ", ii, P[ii], H->C[ii], wB, wF, level);
+        if(wB > 0 && wF > 0)
+        {
+            float mF = (sum1 - sumB) / wF;
+            float val = wB * wF * ((sumB / wB) - mF) * ((sumB / wB) - mF);
+
+            if ( val >= maximum )
+            {
+                maximum = val;
+                best_level = level;
+            }
+            //            printf("mB = %f, mF = %f, val=%f", sumB/wB, mF, val);
+        }
+        //printf("\n");
+        wB += P[ii];
+        wF = 1 - wB;
+
+        float v = H->left + (ii+0.5)*delta;
+        sumB += v*P[ii];
+
+        if(ii+2 == H->nbin)
+        {
+            wF = 0;
+            wB = 1;
+        }
+
+    }
+    //    printf("em=%f\n", maximum);
+
+    free(P);
+    return best_level;
+}
+
+float * fim_otsu(float * Im, size_t M, size_t N)
+{
+    //float mean = fim_sum(Im, M*N)/( (float) M*N);
+    //printf("Mean=%f\n", mean);
+    fim_histogram_t * H = fim_histogram(Im, M*N);
+    float th = fim_histogram_otsu(H);
+    //    printf("Threshold = %f\n", th);
+    fim_histogram_free(H);
+    float * B = malloc(M*N*1*sizeof(float));
+    for(size_t kk = 0; kk < M*N; kk++)
+    {
+        if( Im[kk] > th )
+        {
+            B[kk] = 1;
+        } else {
+            B[kk] = 0;
+        }
+    }
+    return B;
+}
+
+int * fim_conncomp6(float * im, size_t M, size_t N)
+{
+    int * lab = calloc(M*N, sizeof(float));
+    int label = 0;
+
+    //    printf("First pass\n");
+    /* First label along the first dimension */
+    for(size_t nn = 0; nn<N; nn++)
+    {
+        int currlabel = 0;
+        float * Aim = im + nn*M;
+        int * Alab = lab + nn*M;
+        for(size_t mm = 0; mm<M; mm++)
+        {
+            if(currlabel == 0)
+            {
+                if(Aim[mm] > 0)
+                {
+                    Alab[mm] = ++label;
+                    currlabel = label;
+                }
+            } else {
+                if(Aim[mm] > 0)
+                {
+                    Alab[mm] = label;
+                } else {
+                    currlabel = 0;
+                }
+            }
+        }
+    }
+
+    //    fim_show_int(lab, M, N, 1);
+    label++;
+    //    printf("Second pass, set up equivalences\n");
+    int * E = malloc(label*sizeof(int));
+    assert(E != NULL);
+    for(size_t kk = 0; kk< (size_t) label; kk++)
+    {
+        E[kk] = kk;
+    }
+    int changed = 1;
+    while(changed > 0)
+    {
+        //   printf("."); fflush(stdout);
+        changed = 0;
+        for(size_t mm = 0; mm<M; mm++)
+        {
+            int * Alab = lab + mm;
+            for(size_t nn = 0; nn+1<N; nn++)
+            {
+                int a = Alab[nn*M];
+                if(a > 0)
+                {
+                    int b = Alab[nn*M+M];
+                    if(b > 0)
+                    {
+                        if(E[a] < E[b])
+                        {
+                            E[b] = E[a];
+                            changed++;
+                        }
+                        if(E[a] > E[b])
+                        {
+                            E[a] = E[b];
+                            changed++;
+                        }
+                    }
+                }
+            }
+        }
+        //printf("%d\n", changed);
+    }
+    //printf("\n");
+
+
+    //for(size_t kk = 0; kk<M*N; kk++)
+    //{
+    //lab[kk] = E[lab[kk]];
+    //}
+
+
+    //    printf("Third pass, set pixel values\n");
+    int * E2 = calloc(label, sizeof(int));
+    int newlabel = 1;
+    for(size_t kk = 0; kk<M*N; kk++)
+    {
+        if(lab[kk] > 0)
+        {
+            int e = E[lab[kk]];
+            int e2 = E2[e];
+            if(e2 == 0)
+            {
+                e2 = newlabel;
+                E2[e] = newlabel++;
+            }
+            lab[kk] = e2;
+        }
+    }
+    free(E2);
+
+    free(E);
+    return lab;
+}
+
+int fim_convn1(float * restrict V, size_t M, size_t N, size_t P,
+                float * K, size_t nK,
+               int dim, const int normalized)
+{
+    if(dim < 0 || dim > 2)
+    {
+        return EXIT_FAILURE;
+    }
+
+    /* Temporary storage/buffer for conv1_vector */
+    // TODO: one buffer per thread
+    size_t nW = max_size_t(M, max_size_t(N, P));
+
+    int nThreads = 1;
+#pragma omp parallel
+    {
+        nThreads = omp_get_num_threads();
+    }
+
+
+    float * W = malloc(nThreads*nW*sizeof(float));
+
+    if(dim == 0)
+    {
+#pragma omp parallel for
+        for(size_t pp = 0; pp < P; pp++)
+        {
+            float * buff = W+omp_get_thread_num()*nW;
+            for(size_t nn = 0; nn < N; nn++)
+            {
+                fim_conv1_vector(V+pp*(M*N)+nn*M, 1, buff, M, K, nK, normalized);
+            }
+        }
+    }
+
+    if(dim == 1)
+    {
+#pragma omp parallel for
+        for(size_t pp = 0; pp<P; pp++)
+        {
+            float * buff = W+omp_get_thread_num()*nW;
+            for(size_t mm = 0; mm<M; mm++)
+            {
+                fim_conv1_vector(V + pp*(M*N) + mm, M, buff, N, K, nK, normalized);
+            }
+        }
+    }
+
+    if(dim == 2)
+    {
+#pragma omp parallel for
+        for(size_t mm = 0; mm<M; mm++)
+        {
+            float * buff = W+omp_get_thread_num()*nW;
+            for(size_t nn = 0; nn<N; nn++)
+            {
+                fim_conv1_vector(V+mm+M*nn, M*N, buff, P, K, nK, normalized);
+            }
+        }
+    }
+
+    free(W);
+
+
+    return EXIT_SUCCESS;
+}
+
+
+
+float * fim_LoG(const float * V, const size_t M, const size_t N, const size_t P,
+                const float sigmaxy, const float sigmaz)
+{
+
+    /* Set up filters */
+    /* Lateral filters */
+    size_t nlG = 0;
+    float * lG = gaussian_kernel(sigmaxy, &nlG);
+    size_t nl2;
+    float * l2 = gaussian_kernel_d2(sigmaxy, &nl2);
+    /* Axial filters */
+    size_t naG = 0;
+    float * aG = gaussian_kernel(sigmaz,  &naG);
+    size_t na2;
+    float * a2 = gaussian_kernel_d2(sigmaz,  &na2);
+
+    /* 1st dimension */
+    float * LoG = NULL;
+    {
+        float * GGL = fim_copy(V, M*N*P);
+        fim_convn1(GGL, M, N, P, lG, nlG, 0, 0);
+        fim_convn1(GGL, M, N, P, lG, nlG, 1, 0);
+        fim_convn1(GGL, M, N, P, a2, na2, 2, 0);
+        LoG = GGL;
+    }
+
+    /* 2nd dimension */
+    {
+        float * GLG = fim_copy(V, M*N*P);
+        fim_convn1(GLG, M, N, P, lG, nlG, 0, 0);
+        fim_convn1(GLG, M, N, P, l2, nl2, 1, 0);
+        fim_convn1(GLG, M, N, P, aG, naG, 2, 0);
+        fim_add(LoG, GLG, M*N*P);
+        free(GLG);
+    }
+
+    /* 3rd dimension */
+    {
+        float * LGG = fim_copy(V, M*N*P);
+        fim_convn1(LGG, M, N, P, l2, nl2, 0, 0);
+        fim_convn1(LGG, M, N, P, lG, nlG, 1, 0);
+        fim_convn1(LGG, M, N, P, aG, naG, 2, 0);
+        fim_add(LoG, LGG, M*N*P);
+        free(LGG);
+    }
+
+    /* Free the kernels */
+    free(lG);
+    free(l2);
+    free(aG);
+    free(a2);
+
+    /* Set border to 0 */
+    int apad = (naG-1)/2;
+    int lpad = (nlG-1)/2;
+    size_t pos = 0;
+    for(int pp = 0; pp< (int) P; pp++)
+    {
+        int uz = 1;
+        if(pp<apad || pp+apad >= (int) P)
+        {
+            uz = 0;
+        }
+        for(int nn = 0; nn< (int) N; nn++)
+        {
+            int uy = 1;
+            if(nn<lpad || nn+lpad >= (int) N)
+            {
+                uy = 0;
+            }
+            for(int mm = 0; mm< (int) M; mm++)
+            {
+                int ux = 1;
+                if(mm<lpad || mm+lpad >= (int) M)
+                {
+                    ux = 0;
+                }
+                if(ux*uy*uz != 1)
+                {
+                    LoG[pos] = 0;
+                }
+                pos++;
+            }
+        }
+    }
+
+    return LoG;
 }

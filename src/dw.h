@@ -46,6 +46,9 @@
 #include "dw_maxproj.h"
 #include "dw_imshift.h"
 #include "dw_version.h"
+#include "dw_otsu.h"
+#include "dw_dots.h"
+
 #include "fim.h"
 #include "fim_tiff.h"
 #include "fft.h"
@@ -282,5 +285,6 @@ void dw_iterator_free(dw_iterator_t * );
 #include "method_rl.h"
 #include "method_ave.h"
 #include "method_shb.h"
+
 
 #endif

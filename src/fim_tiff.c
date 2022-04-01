@@ -26,6 +26,11 @@
 
 //typedef float afloat __attribute__ ((__aligned__(16)));
 typedef float afloat;
+
+int fim_tiff_write_opt(const char * fName, const afloat * V,
+                       ttags * T,
+                       int64_t N, int64_t M, int64_t P, int scaling);
+
 FILE * fim_tiff_log = NULL; /* Indicates stdout */
 void fim_tiff_init(void)
 {
@@ -751,6 +756,23 @@ int fim_tiff_write(const char * fName, const afloat * V,
                    ttags * T,
                    int64_t N, int64_t M, int64_t P)
 {
+    /* Default, use scaling */
+    return fim_tiff_write_opt(fName, V, T, N, M, P, 1);
+}
+
+int fim_tiff_write_noscale(const char * fName, const afloat * V,
+                   ttags * T,
+                   int64_t N, int64_t M, int64_t P)
+{
+    /* Default, use scaling */
+    return fim_tiff_write_opt(fName, V, T, N, M, P, 0);
+}
+
+
+int fim_tiff_write_opt(const char * fName, const afloat * V,
+                   ttags * T,
+                       int64_t N, int64_t M, int64_t P, int scale)
+{
     if(fim_tiff_log == NULL)
     {
         fim_tiff_log = stdout;
@@ -759,10 +781,13 @@ int fim_tiff_write(const char * fName, const afloat * V,
 
     float scaling = 1;
 
+    if(scale)
+    {
     if(V != NULL)
     {
         float imax = fim_max(V, M*N*P);
         scaling = 1.0/imax*(pow(2,16)-2.0);
+    }
     }
 
     if(!isfinite(scaling))

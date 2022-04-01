@@ -31,6 +31,14 @@ int main(int argc, char ** argv)
         {
             return dw_imshift(argc-1, argv+1);
         }
+        if(strcmp(argv[1], "otsu") == 0)
+        {
+            return dw_otsu(argc-1, argv+1);
+        }
+        if(strcmp(argv[1], "dots") == 0)
+        {
+            return dw_dots(argc-1, argv+1);
+        }
     }
 
     dw_opts * s = dw_opts_new(); /* Load default settings and initialize */
