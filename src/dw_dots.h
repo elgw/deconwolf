@@ -9,6 +9,7 @@
 #include "fim.h"
 #include "fim_tiff.h"
 #include "dw_version.h"
+#include "fwhm.h"
 
 int dw_dots(int argc, char ** argv);
 

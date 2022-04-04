@@ -42,6 +42,14 @@ typedef float afloat;
  * tweaked or alternative versions.
  * */
 
+typedef struct{
+    float * V;
+    size_t M;
+    size_t N;
+    size_t P;
+} fim_image_t;
+
+fim_image_t * fim_image_from_array(float * V, size_t M, size_t N, size_t P);
 
 float fim_min(const float * A, size_t N);
 float fim_mean(const float * A, size_t N);
@@ -218,7 +226,7 @@ float * fim_otsu(float * Im, size_t M, size_t N);
 
 
 typedef struct{
-    uint32_t * C; /* Counts */
+    double * C; /* Counts */
     float left; /* Left edge of first bin */
     float right; /* Right edge of last bin */
     size_t nbin; /* Number of bins */
@@ -231,6 +239,10 @@ fim_histogram_t * fim_histogram(const float * Im, size_t N);
 
 /* Return a global threshold by Otsu's method */
 float fim_histogram_otsu(fim_histogram_t * H);
+
+/* Replace count C[kk] = log(1+C[kk]) */
+void fim_histogram_log(fim_histogram_t * H);
+
 void fim_histogram_free(fim_histogram_t * H);
 
 /* 2D connected components using 6-connectivity. TODO: see
@@ -280,9 +292,19 @@ int fim_convn1(float * restrict V, size_t M, size_t N, size_t P,
 /* Gaussian smoothing, normalized at edges */
 void fim_gsmooth(float * restrict V, size_t M, size_t N, size_t P, float sigma);
 
+/* Gaussian smoothing, normalized at edges, separate values for lateral and axial
+ * filter */
+void fim_gsmooth_aniso(float * restrict V,
+                       size_t M, size_t N, size_t P,
+                       float lsigma, float asigma);
+
 /* Laplacian of Gaussian filter */
 float * fim_LoG(const float * V, size_t M, size_t N, size_t P,
                 float sigmaxy, float sigmaz);
 
+/* Extract a line centered at (x, y, z) with nPix pixels along dimension dim */
+double * fim_get_line_double(fim_image_t * Im,
+                          int x, int y, int z,
+                          int dim, int nPix);
 
 #endif /* _fim_h_ */

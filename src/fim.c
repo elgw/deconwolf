@@ -24,6 +24,16 @@ static void cumsum_array(float * A, size_t N, size_t stride);
 static void fim_show(float * A, size_t M, size_t N, size_t P);
 static void fim_show_int(int * A, size_t M, size_t N, size_t P);
 
+fim_image_t * fim_image_from_array(float * V, size_t M, size_t N, size_t P)
+{
+    fim_image_t * I = malloc(sizeof(fim_image_t));
+    I->V = V;
+    I->M = M;
+    I->N = N;
+    I->P = P;
+    return I;
+}
+
 int fim_maxAtOrigo(const afloat * restrict V, const int64_t M, const int64_t N, const int64_t P)
 /* Check that the MAX of the fim is in the middle
  * returns 1 on success.
@@ -114,6 +124,19 @@ float fim_sum(const afloat * restrict A, size_t N)
 
     return (float) sum;
 }
+
+float fim_sum_double(const double * restrict A, size_t N)
+{
+    double sum = 0;
+#pragma omp parallel for shared(A) reduction(+:sum)
+    for(size_t kk = 0; kk<N; kk++)
+    {
+        sum+=(double) A[kk];
+    }
+
+    return sum;
+}
+
 
 float fim_mean(const afloat * A, size_t N)
 {
@@ -1191,31 +1214,34 @@ void fim_gsmooth_old(float * restrict V, size_t M, size_t N, size_t P, float sig
     return;
 }
 
-void fim_gsmooth(float * restrict V, size_t M, size_t N, size_t P, float sigma)
+void fim_gsmooth_aniso(float * restrict V,
+                       size_t M, size_t N, size_t P,
+                       float lsigma, float asigma)
 {
-    /* Convolve V by an isotropic Gaussian
-     * implemented as a separated convolution. */
 
-    if(sigma < 0)
+    if(lsigma > 0)
     {
-        printf("fim_gsmooth sigma=%f does not make sense.", sigma);
+        size_t nKl = 0;
+        float * Kl = gaussian_kernel(lsigma, &nKl);
+        fim_convn1(V, M, N, P, Kl, nKl, 0, 1);
+        fim_convn1(V, M, N, P, Kl, nKl, 1, 1);
+        free(Kl);
+    }
+    if(asigma > 0)
+    {
+        size_t nKa = 0;
+        float * Ka = gaussian_kernel(lsigma, &nKa);
+        fim_convn1(V, M, N, P, Ka, nKa, 2, 1);
+        free(Ka);
     }
 
-    /* Create a kernel  */
-    size_t nK = 0;
-    float * K = gaussian_kernel(sigma, &nK);
-    assert(nK > 0);
-
-    fim_convn1(V, M, N, P, K, nK, 0, 1);
-    fim_convn1(V, M, N, P, K, nK, 1, 1);
-    fim_convn1(V, M, N, P, K, nK, 2, 1);
-
-    free(K);
     return;
 }
 
-
-
+void fim_gsmooth(float * restrict V, size_t M, size_t N, size_t P, float sigma)
+{
+    fim_gsmooth_aniso(V, M, N, P, sigma, sigma);
+}
 
 static void cumsum_array(float * A, size_t N, size_t stride)
 {
@@ -1674,7 +1700,7 @@ fim_table_t * fim_lmax(const float * I, size_t M, size_t N, size_t P)
             for(size_t pp = 1; pp+1 < P; pp++)
             {
                 size_t pos = mm + nn*M + pp*M*N;
-                if(strel333_max(I + pos, M, N, P, strel) > I[pos])
+                if(I[pos] > strel333_max(I + pos, M, N, P, strel))
                 {
                     /* Pos is s a local maxima */
                     float row[4] = {mm, nn, pp, I[pos]};
@@ -1703,7 +1729,7 @@ fim_histogram_t * fim_histogram(const float * Im, size_t N)
     H->left = left;
     H->right = right;
     H->nbin = nbin;
-    H->C = calloc(nbin, sizeof(uint32_t));
+    H->C = calloc(nbin, sizeof(double));
 
 
     for(size_t kk = 0; kk<N; kk++)
@@ -1721,6 +1747,14 @@ fim_histogram_t * fim_histogram(const float * Im, size_t N)
     return H;
 }
 
+void fim_histogram_log(fim_histogram_t * H)
+{
+    for(size_t kk = 0; kk<H->nbin; kk++)
+    {
+        H->C[kk] = log(1+H->C[kk]);
+    }
+}
+
 void fim_histogram_free(fim_histogram_t * H)
 {
     if(H == NULL)
@@ -1735,73 +1769,45 @@ void fim_histogram_free(fim_histogram_t * H)
     return;
 }
 
-float fim_histogram_otsu(fim_histogram_t * H)
+size_t otsu(double * C, size_t N)
 {
-    /* Convert histogram to pdf */
-    size_t sum = 0;
-    for(size_t kk = 0; kk<H->nbin; kk++)
-    {
-        sum+=H->C[kk];
-    }
-    float * P = malloc(sizeof(float)*H->nbin);
-    for(size_t kk = 0; kk<H->nbin; kk++)
-    {
-        P[kk] = (float) H->C[kk] / (float) sum;
-    }
-
-    /* Otsu's method */
-    float delta = (H->right - H->left) / (float) H->nbin;
-    //printf("[%f, %f], #=%zu, sum=%f, Delta = %f\n", H->left, H->right,
-    //       H->nbin, (float) sum, delta);
-
+    double total = fim_sum_double(C, N);
     double sumB = 0;
-    float wB = 0;
-    float maximum = 0.0;
-    float sum1 = 0;
-    for(size_t ii = 0; ii<H->nbin; ii++)
+    double wB = 0;
+    double maximum = 0;
+    double sum1 = 0;
+    for(float ii = 0; ii<N; ii++)
     {
-        float v = H->left + (ii+0.5)*delta;
-        sum1 += v*P[ii];
+        sum1 += ii*C[(int) ii];
     }
-    //    printf("Sum1=%f\n", sum1);
     float best_level = 0;
-    float wF = 1;
-    for(size_t ii = 0 ; ii < H->nbin; ii++)
+    for(size_t ii = 0 ; ii < N; ii++)
     {
-        /* Testing the left edge of the bin */
-        float level = H->left + ((float) ii)*delta;
+        double wF = total - wB;
 
-        //        printf("P[%zu] = %f, H=%u, wB= %f, wF= %f level=%f ", ii, P[ii], H->C[ii], wB, wF, level);
         if(wB > 0 && wF > 0)
         {
-            float mF = (sum1 - sumB) / wF;
-            float val = wB * wF * ((sumB / wB) - mF) * ((sumB / wB) - mF);
+            double mF = (sum1 - sumB) / wF;
+            double val = wB * wF * ((sumB / wB) - mF) * ((sumB / wB) - mF);
 
             if ( val >= maximum )
             {
                 maximum = val;
-                best_level = level;
+                best_level = ii;
             }
-            //            printf("mB = %f, mF = %f, val=%f", sumB/wB, mF, val);
         }
-        //printf("\n");
-        wB += P[ii];
-        wF = 1 - wB;
-
-        float v = H->left + (ii+0.5)*delta;
-        sumB += v*P[ii];
-
-        if(ii+2 == H->nbin)
-        {
-            wF = 0;
-            wB = 1;
-        }
-
+        wB += C[(int) ii];
+        sumB += ii*C[(int) ii];
     }
-    //    printf("em=%f\n", maximum);
 
-    free(P);
     return best_level;
+}
+
+float fim_histogram_otsu(fim_histogram_t * H)
+{
+    double level = otsu(H->C, H->nbin);
+    double slevel = H->left + level/(pow(2,16)-1)*(H->right-H->left);
+    return (float) slevel;
 }
 
 float * fim_otsu(float * Im, size_t M, size_t N)
@@ -2086,4 +2092,47 @@ float * fim_LoG(const float * V, const size_t M, const size_t N, const size_t P,
     }
 
     return LoG;
+}
+
+double * fim_get_line_double(fim_image_t * I,
+                          int x, int y, int z,
+                          int dim, int nPix)
+{
+    const float * V = I->V;
+    int M = I->M;
+    int N = I->N;
+    int P = I->P;
+    int pos = z*M*N + y*M + x;
+    double * L = calloc(nPix, sizeof(double));
+    if(dim == 0)
+    {
+        for(int kk = 0; kk<nPix; kk++)
+        {
+            int d = kk-(nPix-1)/2;
+            if(x + d < 0 || x + d >= M)
+                continue;
+            L[kk] = V[pos + d];
+        }
+    }
+    if(dim == 1)
+    {
+        for(int kk = 0; kk<nPix; kk++)
+        {
+            int d = kk-(nPix-1)/2;
+            if(y + d < 0 || y + d >= N)
+                continue;
+            L[kk] = V[pos + d*M];
+        }
+    }
+    if(dim == 3)
+    {
+        for(int kk = 0; kk<nPix; kk++)
+        {
+            int d = kk-(nPix-1)/2;
+            if(z + d < 0 || z + d >= P)
+                continue;
+            L[kk] = V[pos + d*M*N];
+        }
+    }
+    return L;
 }
