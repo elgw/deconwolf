@@ -283,7 +283,7 @@ int fwhm1d(const double * x, const double * y, size_t N, double * w)
         retvalue = EXIT_FAILURE;
         goto exit1;
     }
-    //printf("xm=%f, ym=%f\n", xm, ym);
+    //printf("bg=%f, xm=%f, ym=%f\n", bg, xm, ym);
 
 
 
@@ -293,12 +293,12 @@ int fwhm1d(const double * x, const double * y, size_t N, double * w)
     gsl_root_fsolver * rsolve = gsl_root_fsolver_alloc(Tsolve);
 
     /* Search for left and right intersections */
-    double intersections[2];
+    double intersections[2] = {0,0};
     /* Don't use the full line profile for the search, the edge
      * pixels are only used to find the bg level */
     double edge = (xm-(double) N2)/2.0;
     //printf("b edge = %f -> ", edge);
-    for(int kk = edge; kk+1 < N2; kk++)
+    for(int kk = 0; kk+1 < N2; kk++)
     {
        y[kk] < bg + 0.5*(bg-ym) ? edge = x[kk] : 0;
     }
@@ -309,7 +309,7 @@ int fwhm1d(const double * x, const double * y, size_t N, double * w)
                                    &intersections[0]);
     edge = (xm+(double) N2)/2.0;
     //printf("a edge = %f -> ", edge);
-    for(int kk = edge+N2; kk > N2 + 1; kk--)
+    for(int kk = N+1; kk < (int) N; kk--)
     {
        y[kk] < bg + 0.5*(bg-ym) ? edge = x[kk] : 0;
     }
@@ -481,7 +481,7 @@ float fwhm_lateral(fim_image_t * I,
                    int x, int y, int z,
                    int verbose)
 {
-    int nPix = 11;
+    int nPix = 11*2+1;
     assert(nPix % 2 == 1);
     /* Line length */
     double * X = malloc(nPix*sizeof(double));
@@ -514,18 +514,19 @@ float fwhm_lateral(fim_image_t * I,
     free(lx);
     free(ly);
 
+    /* Use the average if both profiles seemed ok */
     float fwhm = -1;
     if(status_x == 0 && status_y == 0)
     {
-        fwhm = fwhm_x + fwhm_y;
+        fwhm = 0.5*(fwhm_x + fwhm_y);
     }
     if(status_x == 0 && status_y != 0)
     {
-        fwhm = 2.0*fwhm_x;
+        fwhm = fwhm_x;
     }
     if(status_x != 0 && status_y == 0)
     {
-        fwhm = 2.0*fwhm_y;
+        fwhm = fwhm_y;
     }
 
     return fwhm;

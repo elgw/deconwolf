@@ -1,5 +1,5 @@
-#ifndef _dw_dots_h_
-#define _dw_dots_h_
+#ifndef _dw_render_h_
+#define _dw_render_h_
 
 #include <getopt.h>
 #include <libgen.h>
@@ -7,12 +7,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <cairo.h>
+#include <cairo-svg.h>
 
 #include "fim.h"
 #include "fim_tiff.h"
 #include "dw_version.h"
-#include "fwhm.h"
 
-int dw_dots(int argc, char ** argv);
+
+int dw_render(int argc, char ** argv);
 
 #endif

@@ -38,6 +38,14 @@ static int dw_get_threads(void)
     return nThreads;
 }
 
+static double clockdiff(struct timespec* end, struct timespec * start)
+{
+    double elapsed = (end->tv_sec - start->tv_sec);
+    elapsed += (end->tv_nsec - start->tv_nsec) / 1000000000.0;
+    return elapsed;
+}
+
+
 
 static opts * opts_new()
 {
@@ -227,6 +235,30 @@ static int file_exist(char * fname)
 
 static size_t write_dots(const opts * s, fim_image_t * V, const fim_table_t * T, FILE * fid)
 {
+    struct timespec tstart, tend;
+    float * fwhm = NULL;
+    if(s->fwhm)
+    {
+        if(s->verbose > 1)
+        {
+            printf("Calculating fwhm..."); fflush(stdout);
+        }
+        clock_gettime(CLOCK_REALTIME, &tstart);
+        fwhm = malloc(T->nrow*sizeof(float));
+        #pragma omp parallel for
+        for(size_t kk = 0; kk<T->nrow; kk++)
+        {
+            float * row = T->T + kk*T->ncol;
+            fwhm[kk] = fwhm_lateral(V, row[0], row[1], row[2], s->verbose);
+        }
+        clock_gettime(CLOCK_REALTIME, &tend);
+        double t = clockdiff(&tend, &tstart);
+        if(s->verbose > 1)
+        {
+            printf(" took %.4f s\n", t);
+        }
+    }
+
     fprintf(fid, "x\ty\tz\tvalue\tuse");
     if(s->fwhm)
     {
@@ -242,8 +274,7 @@ static size_t write_dots(const opts * s, fim_image_t * V, const fim_table_t * T,
                 row[0]+1, row[1]+1, row[2]+1, row[3], row[3] > s->th);
         if(s->fwhm)
         {
-            float fwhm = fwhm_lateral(V, row[0], row[1], row[2], s->verbose);
-            fprintf(fid, "\t%f", fwhm);
+            fprintf(fid, "\t%f", fwhm[kk]);
         }
         fprintf(fid, "\n");
         nwritten++;
@@ -253,6 +284,7 @@ static size_t write_dots(const opts * s, fim_image_t * V, const fim_table_t * T,
             break;
         }
     }
+    nullfree(fwhm);
     return nwritten;
 }
 
@@ -273,7 +305,10 @@ int dw_dots(int argc, char ** argv)
 
     argparsing(argc, argv, s);
     omp_set_num_threads(s->nthreads);
-    opts_print(stdout, s);
+    if(s->verbose > 1)
+    {
+        opts_print(stdout, s);
+    }
     opts_print(s->log, s);
 
     char * inFile = s->image;
@@ -281,7 +316,7 @@ int dw_dots(int argc, char ** argv)
 
     if(!file_exist(inFile))
     {
-        printf("Can't open %s!\n", inFile);
+        fprintf(stderr, "Can't open %s!\n", inFile);
         exit(1);
     }
 
@@ -301,7 +336,6 @@ int dw_dots(int argc, char ** argv)
         exit(EXIT_SUCCESS);
     }
 
-
     fprintf(s->log, "Reading %s\n", inFile);
     int64_t M = 0, N = 0, P = 0;
     float * A = fim_tiff_read(inFile, NULL, &M, &N, &P, s->verbose);
@@ -316,13 +350,18 @@ int dw_dots(int argc, char ** argv)
     float * feature = NULL;
     if(s->LoG == 1)
     {
-        if(s->verbose > 0)
+        if(s->verbose > 1)
         {
             printf("LoG filter, lsigma=%.2f asigma=%.2f\n", s->lsigma, s->asigma);
         }
         feature = fim_LoG(A, M, N, P, s->lsigma, s->asigma);
         free(A);
     } else {
+        if(s->verbose > 1)
+        {
+            printf("Low pass filtering with lsigma=%f, asigma=%f\n",
+                   s->lsigma, s->asigma);
+        }
         fim_gsmooth_aniso(A, M, N, P, s->lsigma, s->asigma);
         feature = A;
     }
@@ -330,15 +369,25 @@ int dw_dots(int argc, char ** argv)
 
     if(s->fout != NULL)
     {
-        printf("Writing filtered image to %s\n", s->fout);
+        if(s->verbose > 1)
+        {
+            printf("Writing filtered image to %s\n", s->fout);
+        }
         fim_tiff_write_float(s->fout, feature, NULL, M, N, P);
     }
 
     /* Detect local maxima */
+    if(s->verbose > 1)
+    {
+        printf("Detecting local maxima\n");
+    }
     fim_table_t * T = fim_lmax(feature, M, N, P);
     fim_table_sort(T, 3); /* highest value first */
 
-
+    if(s->verbose > 1)
+    {
+        printf("Looking for a threshold\n");
+    }
     /* Get a threshold suggestion */
     float * values = malloc(sizeof(float)*T->nrow);
     for(size_t kk = 0; kk<T->nrow; kk++)
@@ -347,17 +396,22 @@ int dw_dots(int argc, char ** argv)
     }
     float mean = fim_mean(values, T->nrow);
     float std = fim_std(values, T->nrow);
-    if(s->verbose > 0)
+    if(s->verbose > 1)
     {
-        printf("Mean=%f, std=%f\n", mean, std);
+        printf("Extrated %zu dots: Mean=%f, std=%f\n", T->nrow, mean, std);
     }
-    fprintf(s->log, "Mean=%f, std=%f\n", mean, std);
+    fprintf(s->log, "Extracted %zu dots: Mean=%f, std=%f\n", T->nrow, mean, std);
 
     fim_histogram_t * H = fim_histogram(values, T->nrow);
+    free(values);
     //s->th = fim_histogram_otsu(H);
     fim_histogram_log(H);
     s->th = fim_histogram_otsu(H);
-    printf("Suggested threshold (from %zu dots): %f\n", T->nrow, s->th);
+    if(s->verbose > 1)
+    {
+        printf("Suggested threshold (from %zu dots): %f\n", T->nrow, s->th);
+    }
+    fprintf(s->log, "Suggested threshold (from %zu dots): %f\n", T->nrow, s->th);
     fim_histogram_free(H);
 
     /* Write to file */
@@ -381,16 +435,16 @@ int dw_dots(int argc, char ** argv)
 
     if(s->verbose > 0)
     {
-        printf("Wrote %zu dots\n", nwritten);
+        printf("Wrote %zu dots. Done!\n", nwritten);
     }
-    fprintf(s->log, "Wrote %zu dots\n", nwritten);
+    fprintf(s->log, "Wrote %zu dots. Done!\n", nwritten);
+    //fprintf(s->log, "Optimal detection when \sigma = 0.425*FWHM\n");
 
     fim_table_free(T);
 
     free(fI);
     free(feature);
 
-    fprintf(s->log, "All done!\n");
     opts_free(s);
     return EXIT_SUCCESS;
 }

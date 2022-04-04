@@ -1223,14 +1223,17 @@ void fim_gsmooth_aniso(float * restrict V,
     {
         size_t nKl = 0;
         float * Kl = gaussian_kernel(lsigma, &nKl);
+        printf("x\n");
         fim_convn1(V, M, N, P, Kl, nKl, 0, 1);
+        printf("y\n");
         fim_convn1(V, M, N, P, Kl, nKl, 1, 1);
         free(Kl);
     }
     if(asigma > 0)
     {
         size_t nKa = 0;
-        float * Ka = gaussian_kernel(lsigma, &nKa);
+        float * Ka = gaussian_kernel(asigma, &nKa);
+        printf("z asigma = %f, (nKa = %zu)\n", asigma, nKa);
         fim_convn1(V, M, N, P, Ka, nKa, 2, 1);
         free(Ka);
     }
@@ -1588,6 +1591,107 @@ fim_table_t * fim_table_new(int ncol)
     return T;
 }
 
+
+/* Count the number of newlines in a file */
+static size_t count_newlines(char * fname)
+{
+    FILE * fid = fopen(fname, "r");
+    assert(fid != NULL);
+    size_t N = 0;
+    char c = EOF;
+    while( (c = fgetc(fid) ) != EOF )
+    {
+        if( c == '\n')
+        {
+            N++;
+        }
+    }
+    fclose(fid);
+    return N;
+}
+
+
+int parse_floats(char * l, float * row, int nval)
+{
+    char * f = strtok(l, "\t");
+    if(f == NULL)
+    {
+        return 0;
+    }
+//    printf("0/%d: %s\n", nval, f);
+    row[0] = atof(f);
+    for(int kk = 1; kk<nval; kk++)
+    {
+        f = strtok(NULL, "\t");
+        //      printf("%d: %s\n", kk, f);
+        if(f == NULL)
+        {
+            return 0;
+        }
+        row[kk] = atof(f);
+    }
+
+    if(0){
+    for(int kk = 0; kk<nval; kk++)
+    {
+        printf("%f ", row[kk]);
+    }
+    printf("\n");
+    }
+    //   exit(EXIT_FAILURE);
+    return 1;
+}
+
+fim_table_t * fim_table_from_tsv(char * fname)
+{
+    FILE * fid = fopen(fname, "r");
+    if(fid == NULL)
+    {
+        fprintf(stderr, "Can not open %s\n", fname);
+        return NULL;
+    }
+    fim_table_t * T = malloc(sizeof(fim_table_t));
+    // Get number of columns
+    char * line = NULL;
+    size_t len = 0;
+    int read = getline(&line, &len, fid);
+    if(strlen(line) == 0)
+    {
+        fprintf(stderr, "Empty header line\n");
+        return NULL;
+    }
+    int ncols = 0;
+    for(size_t kk = 0; kk<strlen(line); kk++)
+    {
+        if(line[kk] == '\t')
+        {
+            ncols++;
+        }
+    }
+    ncols++;
+    printf("%d columns\n", ncols);
+    size_t nrows = count_newlines(fname)+1;
+    printf("at most %zu lines\n", nrows);
+
+    // Allocate memory
+    T->T = malloc(nrows*ncols*sizeof(float));
+    T->ncol = ncols;
+    T->nrow_alloc = nrows;
+    // T->nrow = nrows; // set later
+
+    // Read
+    int row = 0;
+    while ((read = getline(&line, &len, fid)) != -1) {
+        if(strlen(line) == 0 && line[0] == '#')
+        {
+            continue;
+        }
+        row += parse_floats(line, T->T + row*T->ncol, T->ncol);
+    }
+    T->nrow = row-1;
+    return T;
+}
+
 typedef struct{
     float value;
     size_t idx;
@@ -1618,14 +1722,14 @@ void fim_table_sort(fim_table_t * T, int col)
 {
     fim_table_sort_pair * P = malloc(T->nrow*sizeof(fim_table_sort_pair));
     /* Extract values from col %d and sort */
-    printf("Really the first %f\n", T->T[3]);
+
     for(size_t kk = 0; kk < T->nrow; kk++)
     {
         P[kk].idx = kk;
         P[kk].value = T->T[kk*T->ncol + col];
     }
-    printf("First: %f, Last: %f\n", P[0].value, P[T->nrow-1].value);
-    printf("Sorting dots %zu dots\n", T->nrow);
+    //printf("First: %f, Last: %f\n", P[0].value, P[T->nrow-1].value);
+    //printf("Sorting dots %zu dots\n", T->nrow);
     qsort(P, T->nrow,
           sizeof(fim_table_sort_pair),
           fim_table_sort_pair_cmp);
@@ -1724,7 +1828,7 @@ fim_histogram_t * fim_histogram(const float * Im, size_t N)
     float left = min - 0.5*delta-1e-6;
     float right = max + 0.5*delta+1e-6;
     delta = (right-left)/((float) nbin);
-    printf("Histogram: #=%zu [%f, %f], delta=%f\n", nbin, left, right, delta);
+    //printf("Histogram: #=%zu [%f, %f], delta=%f\n", nbin, left, right, delta);
     fim_histogram_t * H = malloc(sizeof(fim_histogram_t));
     H->left = left;
     H->right = right;

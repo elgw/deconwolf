@@ -257,6 +257,7 @@ typedef struct {
     size_t nrow_alloc; /* To know if we need to extend the size */
 } fim_table_t;
 
+fim_table_t * fim_table_from_tsv(char * fname);
 void fim_table_free(fim_table_t * T);
 void fim_table_insert(fim_table_t * T, float * row);
 
