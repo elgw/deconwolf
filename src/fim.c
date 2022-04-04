@@ -967,8 +967,43 @@ void fim_conncomp6_ut()
     free(Im);
 }
 
+void fim_conv1_vector_ut()
+{
+    int normalized = 1;
+    int nV = 5;
+    float * V = malloc(nV*sizeof(float));
+    for(int kk = 0; kk<nV; kk++)
+    {
+        V[kk] = kk+1;
+    }
+    int stride = 1;
+    float * W = NULL;
+    printf("V=\n");
+    fim_show(V, 1, nV, 1);
+    for(int nK = 3; nK<8; nK+=2)
+    {
+        for(int kk = 0; kk<nV; kk++)
+        {
+            V[kk] = kk+1;
+        }
+        float * K = malloc(nK*sizeof(float));
+        for(int kk = 0; kk<nK; kk++)
+        {
+            K[kk] = 1.0;
+        }
+        printf("K=");
+        fim_show(K, 1, nK, 1);
+        fim_conv1_vector(V, stride, W, nV, K, nK, normalized);
+        printf("V*K=");
+        fim_show(V, 1, nV, 1);
+        free(K);
+    }
+    free(V);
+}
+
 void fim_ut()
 {
+    fim_conv1_vector_ut();
     fim_conncomp6_ut();
     exit(EXIT_SUCCESS);
     fim_otsu_ut();
@@ -1041,6 +1076,35 @@ void fim_conv1_vector(float * restrict V, int stride, float * restrict W,
     const size_t N = nV;
     size_t bpos = 0;
 
+    if(nKu > nV)
+    {
+        for(size_t kk = 0; kk<nV; kk++)
+        {
+            double acc0 = 0;
+            double kacc = 0;
+            size_t from = kk-k2;
+            k2 > kk ? from = 0 : 0;
+            size_t to = kk+k2+1;
+            to > nV ? to = nV: 0;
+            for(size_t ll = from; ll < to ; ll++)
+            {
+                int kpos = ll-kk+k2;
+                int vpos = ll;
+                //printf("kk=%d, ll=%d, kpos=%d vpos=%d V=%f, K=%f\n", kk, ll, kpos, vpos, V[vpos*stride], K[kpos]);
+                acc0 += V[vpos*stride]*K[kpos];
+                kacc += K[kpos];
+            }
+            //printf("acc0=%f\n", acc0);
+            if(normalized)
+            {
+                W[kk] = acc0/kacc;
+            } else {
+                W[kk] = acc0;
+            }
+        }
+    }
+    else
+    {
     /* Crossing the first edge */
     for(size_t vv = 0;vv<k2; vv++)
     {
@@ -1086,6 +1150,7 @@ void fim_conv1_vector(float * restrict V, int stride, float * restrict W,
         } else {
             W[bpos++] = acc0;
         }
+    }
     }
 
     /* Write back */

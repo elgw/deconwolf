@@ -212,6 +212,8 @@ cairo_surface_t * fim_image_to_cairo_surface(fim_image_t * I)
     int stride;
 
     float imax = fim_max(I->V, I->M*I->N);
+    float imin = fim_min(I->V, I->M*I->N);
+    // TODO: scale by percentiles (fim_historam)
 
     result = cairo_image_surface_create(CAIRO_FORMAT_RGB24, I->M, I->N);
     if (cairo_surface_status(result) != CAIRO_STATUS_SUCCESS)
@@ -223,7 +225,8 @@ cairo_surface_t * fim_image_to_cairo_surface(fim_image_t * I)
     for (int y = 0; y < I->M; y++) {
         uint32_t *row = (void *) current_row;
         for (int x = 0; x < I->N; x++) {
-            float v =  1.5*(I->V[x + I->M*y]) / imax*255.0;
+            float v =  ((I->V[x + I->M*y])-imin) / imax;
+            v*=10*255;
             v>255? v = 255 : 0;
             uint8_t value = v;
             uint32_t r = value;
@@ -268,9 +271,10 @@ void render(opts * s, fim_image_t * I, fim_table_t * T)
     cairo_stroke(cr);
 
     cairo_set_line_width(cr, 1);
-    cairo_set_source_rgb(cr, 0.0, 1.00, 0);
+    cairo_set_source_rgb(cr, 1.0, 0.00, 0);
 
 
+    int nshow = 0;
     if(T != NULL)
     {
         printf("Drawing dots\n");
@@ -279,13 +283,18 @@ void render(opts * s, fim_image_t * I, fim_table_t * T)
             //printf("%f %f\n", T->T[kk*T->ncol], T->T[kk*T->ncol+1]);
             float x = T->T[kk*T->ncol];
             float y = T->T[kk*T->ncol + 1];
-            //cairo_translate(cr, x, y);
-            cairo_arc(cr, x, y, 5, 0, 2 * M_PI);
-            cairo_close_path(cr);
-            cairo_stroke(cr);
+            float use = T->T[kk*T->ncol + 4];
+            if(use == 1)
+            {
+                //cairo_translate(cr, x, y);
+                cairo_arc(cr, x, y, 5, 0, 2 * M_PI);
+                cairo_close_path(cr);
+                cairo_stroke(cr);
+                nshow++;
+            }
         }
     }
-    printf("Drew %zu dots\n", T->nrow);
+    printf("Drew %d/%zu dots\n", nshow, T->nrow);
 
     cairo_surface_destroy(surf);
     cairo_surface_destroy(mip);
