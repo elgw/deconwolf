@@ -24,6 +24,14 @@ static void cumsum_array(float * A, size_t N, size_t stride);
 static void fim_show(float * A, size_t M, size_t N, size_t P);
 static void fim_show_int(int * A, size_t M, size_t N, size_t P);
 
+static double clockdiff(struct timespec* end, struct timespec * start)
+{
+    double elapsed = (end->tv_sec - start->tv_sec);
+    elapsed += (end->tv_nsec - start->tv_nsec) / 1000000000.0;
+    return elapsed;
+}
+
+
 fim_image_t * fim_image_from_array(float * V, size_t M, size_t N, size_t P)
 {
     fim_image_t * I = malloc(sizeof(fim_image_t));
@@ -1001,8 +1009,46 @@ void fim_conv1_vector_ut()
     free(V);
 }
 
+void fim_LoG_ut()
+{
+    struct timespec tstart, tend;
+    size_t M = 2*1024;
+    size_t N = 2*1024;
+    size_t P = 60;
+    float * V = malloc(M*N*P*sizeof(float));
+    for(size_t kk = 0; kk<M*N*P; kk++)
+    {
+        V[kk] = kk % 100;
+    }
+    clock_gettime(CLOCK_REALTIME, &tstart);
+    float * LoG = fim_LoG(V, M, N, P, 1.1, 1.1);
+    clock_gettime(CLOCK_REALTIME, &tend);
+    float tLoG = clockdiff(&tend, &tstart);
+
+    clock_gettime(CLOCK_REALTIME, &tstart);
+    float * LoG2 = fim_LoG_S(V, M, N, P, 1.1, 1.1);
+    clock_gettime(CLOCK_REALTIME, &tend);
+    float tLoG_S = clockdiff(&tend, &tstart);
+
+    printf("LoG : %f s\n", tLoG);
+    printf("LoG_S : %f s\n", tLoG_S);
+
+    float maxabs = fabs(LoG[0]-LoG2[0]);
+    for(size_t kk = 0; kk<M*N*P; kk++)
+    {
+        float diff = fabs(LoG[kk]-LoG2[kk]);
+        diff > maxabs ? maxabs = diff : 0;
+    }
+    printf("Max abs difference: %e\n", maxabs);
+
+    free(V);
+    free(LoG);
+    free(LoG2);
+}
+
 void fim_ut()
 {
+    fim_LoG_ut();
     fim_conv1_vector_ut();
     fim_conncomp6_ut();
     exit(EXIT_SUCCESS);
@@ -2173,6 +2219,59 @@ int fim_convn1(float * restrict V, size_t M, size_t N, size_t P,
 }
 
 
+float * conv1_3(const float * V, size_t M, size_t N, size_t P,
+                      float * K1, size_t nK1,
+                      float * K2, size_t nK2,
+                      float * K3, size_t nK3)
+{
+    fim_image_t * F = fim_image_from_array(V, M, N, P);
+    fim_convn1(F->V, F->M, F->N, F->P, K1, nK1, 0, 0);
+    fim_image_t * F2 = fim_shiftdim(F);
+    free(F);
+    fim_convn1(F2->V, F2->M, F2->N, F2->P, K2, nK2, 0, 0);
+    fim_image_t * F3 = fim_shiftdim(F2);
+    free(F2->V);
+    free(F2);
+    fim_convn1(F3->V, F3->M, F3->N, F3->P, K3, nK3, 0, 0);
+    fim_image_t * F4 = fim_shiftdim(F3);
+    free(F3->V);
+    free(F3);
+    float * out = F4->V;
+    free(F4);
+
+    return out;
+}
+
+float * fim_LoG_S(const float * V, const size_t M, const size_t N, const size_t P,
+                const float sigmaxy, const float sigmaz)
+{
+/* Set up filters */
+    /* Lateral filters */
+    size_t nlG = 0;
+    float * lG = gaussian_kernel(sigmaxy, &nlG);
+    size_t nl2;
+    float * l2 = gaussian_kernel_d2(sigmaxy, &nl2);
+    /* Axial filters */
+    size_t naG = 0;
+    float * aG = gaussian_kernel(sigmaz,  &naG);
+    size_t na2;
+    float * a2 = gaussian_kernel_d2(sigmaz,  &na2);
+    float * GGL = conv1_3(V, M, N, P,
+                                lG, nlG, lG, nlG, a2, na2);
+    float * GLG = conv1_3(V, M, N, P,
+                                lG, nlG, l2, nl2, aG, naG);
+    float * LGG = conv1_3(V, M, N, P,
+                                l2, nl2, lG, nlG, aG, naG);
+    float * LoG = GGL;
+    for(size_t kk = 0; kk<M*N*P; kk++)
+    {
+        LoG[kk] += GLG[kk] + LGG[kk];
+    }
+    free(GLG);
+    free(LGG);
+    return LoG;
+}
+
 
 float * fim_LoG(const float * V, const size_t M, const size_t N, const size_t P,
                 const float sigmaxy, const float sigmaz)
@@ -2304,4 +2403,54 @@ double * fim_get_line_double(fim_image_t * I,
         }
     }
     return L;
+}
+
+fim_image_t * fim_shiftdim(fim_image_t * I)
+{
+    const float * V = I->V;
+    const size_t M = I->M;
+    const size_t N = I->N;
+    const size_t P = I->P;
+
+    /* Output image */
+    fim_image_t * O = malloc(sizeof(fim_image_t));
+    O->V = malloc(M*N*P*sizeof(float));
+    O->M = N;
+    O->N = P;
+    O->P = M;
+    /* The shifted volume */
+    float * S = O->V;
+
+    const size_t blocksize = 2*64;
+
+#pragma omp parallel for shared(V, S)
+    for(size_t pp = 0; pp< P; pp++)
+    {
+        /* Blocks are of size blocksize x blocksize in M and N */
+        for(size_t bm = 0; bm<M; bm = bm+blocksize)
+        {
+            size_t bm_end = bm+blocksize;
+            bm_end > M ? bm_end = M : 0;
+
+            const size_t bm_end_c = bm_end;
+
+            for(size_t bn = 0; bn<N; bn = bn+blocksize)
+            {
+                size_t bn_end = bn+blocksize;
+                bn_end > N ? bn_end = N : 0;
+
+                const size_t bn_end_c = bn_end;
+
+                for(size_t nn = bn; nn< bn_end_c; nn++)
+                {
+                    for(size_t mm = bm; mm< bm_end_c; mm++)
+                    {
+                        S[nn + pp*N + mm*N*P] = V[mm + nn*M + pp*M*N];
+                    }
+                }
+            }
+        }
+    }
+
+    return O;
 }

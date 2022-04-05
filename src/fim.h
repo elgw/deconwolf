@@ -17,14 +17,16 @@
 #ifndef _fim_h_
 #define _fim_h_
 
-#include <math.h>
-#include <fftw3.h>
 #include <assert.h>
+#include <inttypes.h>
+#include <fftw3.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#include <inttypes.h>
+#include <time.h>
+
 #include "fft.h"
 
 #ifdef _OPENMP // turned on with -fopenmp
@@ -49,6 +51,7 @@ typedef struct{
     size_t P;
 } fim_image_t;
 
+/* Create a new object with a pointer to V */
 fim_image_t * fim_image_from_array(float * V, size_t M, size_t N, size_t P);
 
 float fim_min(const float * A, size_t N);
@@ -303,9 +306,17 @@ void fim_gsmooth_aniso(float * restrict V,
 float * fim_LoG(const float * V, size_t M, size_t N, size_t P,
                 float sigmaxy, float sigmaz);
 
+/* Different implementation, using shiftdim */
+float * fim_LoG_S(const float * V, size_t M, size_t N, size_t P,
+                float sigmaxy, float sigmaz);
+
+
 /* Extract a line centered at (x, y, z) with nPix pixels along dimension dim */
 double * fim_get_line_double(fim_image_t * Im,
                           int x, int y, int z,
                           int dim, int nPix);
+
+/* Similar to MATLABs shiftfim, [M,N,P] -> [N,P,M] */
+fim_image_t * fim_shiftdim(fim_image_t *);
 
 #endif /* _fim_h_ */
