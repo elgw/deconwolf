@@ -354,7 +354,7 @@ int dw_dots(int argc, char ** argv)
         {
             printf("LoG filter, lsigma=%.2f asigma=%.2f\n", s->lsigma, s->asigma);
         }
-        feature = fim_LoG(A, M, N, P, s->lsigma, s->asigma);
+        feature = fim_LoG_S(A, M, N, P, s->lsigma, s->asigma);
         free(A);
     } else {
         if(s->verbose > 1)

@@ -32,10 +32,11 @@ static double clockdiff(struct timespec* end, struct timespec * start)
 }
 
 
-fim_image_t * fim_image_from_array(float * V, size_t M, size_t N, size_t P)
+fim_image_t * fim_image_from_array(const float * V, size_t M, size_t N, size_t P)
 {
     fim_image_t * I = malloc(sizeof(fim_image_t));
-    I->V = V;
+    I->V = malloc(M*N*P*sizeof(float));
+    memcpy(I->V, V, M*N*P*sizeof(float));
     I->M = M;
     I->N = N;
     I->P = P;
@@ -1012,11 +1013,11 @@ void fim_conv1_vector_ut()
 void fim_LoG_ut()
 {
     struct timespec tstart, tend;
-    size_t M = 15;
-    size_t N = 15;
-    size_t P = 15;
-    float sigma_l = 0.5;
-    float sigma_a = 0.1;
+    size_t M = 12;
+    size_t N = 12;
+    size_t P = 12;
+    float sigma_l = 3.1;
+    float sigma_a = 1.1;
     float * V = malloc(M*N*P*sizeof(float));
     for(size_t kk = 0; kk<M*N*P; kk++)
     {
@@ -1041,32 +1042,70 @@ void fim_LoG_ut()
     free(S3->V);
     free(S1); free(S2); free(S3);
 
+    for(size_t kk = 0; kk<M*N*P; kk++)
+    {
+        V[kk] = 0;
+    }
+    V[(M/2) + M*(N/2) + M*N*(P/2)] = 1;
 
-    clock_gettime(CLOCK_REALTIME, &tstart);
-    float * LoG = fim_LoG(V, M, N, P, sigma_l, sigma_a);
-    clock_gettime(CLOCK_REALTIME, &tend);
-    float tLoG = clockdiff(&tend, &tstart);
+
+    float * Vpre = fim_copy(V, M*N*P);
 
     clock_gettime(CLOCK_REALTIME, &tstart);
     float * LoG2 = fim_LoG_S(V, M, N, P, sigma_l, sigma_a);
     clock_gettime(CLOCK_REALTIME, &tend);
+    for(size_t kk = 0; kk<M*N*P; kk++)
+    {
+        if(V[kk] != Vpre[kk])
+        {
+            fprintf(stderr, "fim_LoG_S alters the input array\n");
+            exit(EXIT_FAILURE);
+
+        }
+    }
     float tLoG_S = clockdiff(&tend, &tstart);
 
-    printf("LoG : %f s\n", tLoG);
+    clock_gettime(CLOCK_REALTIME, &tstart);
+    float * LoG = fim_LoG(V, M, N, P, sigma_l, sigma_a);
+    clock_gettime(CLOCK_REALTIME, &tend);
+    for(size_t kk = 0; kk<M*N*P; kk++)
+    {
+        if(V[kk] != Vpre[kk])
+        {
+            fprintf(stderr, "fim_LoG alters the input array\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+    free(Vpre);
+
+    float tLoG = clockdiff(&tend, &tstart);
+
+    printf("LoG : %f s (min %f, max %f)\n", tLoG,
+           fim_min(LoG, M*N*P),
+           fim_max(LoG, M*N*P));
     printf("LoG_S : %f s\n", tLoG_S);
 
     float maxabs = fabs(LoG[0]-LoG2[0]);
+    float * Delta = malloc(M*N*P*sizeof(float));
     for(size_t kk = 0; kk<M*N*P; kk++)
     {
         float diff = fabs(LoG[kk]-LoG2[kk]);
         diff > maxabs ? maxabs = diff : 0;
+        Delta[kk] = diff;
     }
     printf("Max abs difference: %e\n", maxabs);
 
-    if(0){
-    fim_tiff_write_float("LoG.tif", LoG, NULL, M, N, P);
-    fim_tiff_write_float("LoG_S.tif", LoG2, NULL, M, N, P);
+    if(1){
+        printf("Writing to V.tif\n");
+        fim_tiff_write_float("V.tif", V, NULL,  N, M, P);
+        printf("Writing to Diff.tif\n");
+        fim_tiff_write_float("Diff.tif", Delta, NULL,  N, M, P);
+        printf("Writing to LoG.tif\n");
+        fim_tiff_write_float("LoG.tif", LoG, NULL,  N, M, P);
+        printf("Writing to LoG_S.tif\n");
+        fim_tiff_write_float("LoG_S.tif", LoG2, NULL, N, M, P);
     }
+    free(Delta);
 
     if(M*N*P < 200)
     {
@@ -1079,6 +1118,8 @@ void fim_LoG_ut()
     free(V);
     free(LoG);
     free(LoG2);
+    free(T->V);
+    free(T);
 }
 
 void fim_ut()
@@ -1143,7 +1184,7 @@ static size_t max_size_t(size_t a, size_t b)
 }
 
 void fim_conv1_vector(float * restrict V, int stride, float * restrict W,
-                  const size_t nV,
+                      const size_t nV,
                       const float * restrict K, const size_t nKu, const int normalized)
 {
 
@@ -1186,52 +1227,52 @@ void fim_conv1_vector(float * restrict V, int stride, float * restrict W,
     }
     else
     {
-    /* Crossing the first edge */
-    for(size_t vv = 0;vv<k2; vv++)
-    {
-        double acc0 = 0;
-        double kacc = 0;
-        for(size_t kk = k2-vv; kk<nKu; kk++)
+        /* Crossing the first edge */
+        for(size_t vv = 0;vv<k2; vv++)
         {
-            acc0 = acc0 + K[kk]*V[(vv-k2+kk)*stride];
-            kacc += K[kk];
+            double acc0 = 0;
+            double kacc = 0;
+            for(size_t kk = k2-vv; kk<nKu; kk++)
+            {
+                acc0 = acc0 + K[kk]*V[(vv-k2+kk)*stride];
+                kacc += K[kk];
+            }
+            if(normalized)
+            {
+                W[bpos++] = acc0/kacc;
+            } else {
+                W[bpos++] = acc0;
+            }
         }
-        if(normalized)
-        {
-            W[bpos++] = acc0/kacc;
-        } else {
-            W[bpos++] = acc0;
-        }
-    }
 
-    /* Central part where K fits completely */
-    for(size_t vv = k2 ; vv+k2 < N; vv++)
-    {
-        double acc = 0;
-        for(size_t kk = 0; kk<nKu; kk++)
+        /* Central part where K fits completely */
+        for(size_t vv = k2 ; vv+k2 < N; vv++)
         {
-            acc = acc + K[kk]*V[(vv-k2+kk)*stride];
+            double acc = 0;
+            for(size_t kk = 0; kk<nKu; kk++)
+            {
+                acc = acc + K[kk]*V[(vv-k2+kk)*stride];
+            }
+            W[bpos++] = acc;
         }
-        W[bpos++] = acc;
-    }
 
-    /* Last part */
-    for(size_t vv = N-k2;vv<N; vv++)
-    {
-        double kacc = 0;
-        double acc0 = 0;
-        for(size_t kk = 0; kk<N-vv+k2; kk++)
+        /* Last part */
+        for(size_t vv = N-k2;vv<N; vv++)
         {
-            acc0 = acc0 + K[kk]*V[(vv-k2+kk)*stride];
-            kacc += K[kk];
+            double kacc = 0;
+            double acc0 = 0;
+            for(size_t kk = 0; kk<N-vv+k2; kk++)
+            {
+                acc0 = acc0 + K[kk]*V[(vv-k2+kk)*stride];
+                kacc += K[kk];
+            }
+            if(normalized)
+            {
+                W[bpos++] = acc0/kacc;
+            } else {
+                W[bpos++] = acc0;
+            }
         }
-        if(normalized)
-        {
-            W[bpos++] = acc0/kacc;
-        } else {
-            W[bpos++] = acc0;
-        }
-    }
     }
 
     /* Write back */
@@ -1364,6 +1405,7 @@ void fim_gsmooth_aniso(float * restrict V,
                        size_t M, size_t N, size_t P,
                        float lsigma, float asigma)
 {
+    // TODO: use the shiftdim approach as in fim_LoG_S
 
     if(lsigma > 0)
     {
@@ -2261,9 +2303,12 @@ float * conv1_3(const float * V, size_t M, size_t N, size_t P,
 {
     const int dim = 0;
     const int norm = 0;
+
     fim_image_t * F = fim_image_from_array(V, M, N, P);
+
     fim_convn1(F->V, F->M, F->N, F->P, K1, nK1, dim, norm);
     fim_image_t * F2 = fim_shiftdim(F);
+    free(F->V);
     free(F);
     fim_convn1(F2->V, F2->M, F2->N, F2->P, K2, nK2, dim, norm);
     fim_image_t * F3 = fim_shiftdim(F2);
@@ -2282,7 +2327,7 @@ float * conv1_3(const float * V, size_t M, size_t N, size_t P,
 float * fim_LoG_S(const float * V, const size_t M, const size_t N, const size_t P,
                 const float sigmaxy, const float sigmaz)
 {
-    printf("Warning: Not working yet\n");
+
 /* Set up filters */
     /* Lateral filters */
     size_t nlG = 0;
@@ -2341,7 +2386,10 @@ float * fim_LoG_S(const float * V, const size_t M, const size_t N, const size_t 
             }
         }
     }
-
+    free(aG);
+    free(lG);
+    free(a2);
+    free(l2);
     return LoG;
 }
 
@@ -2492,7 +2540,7 @@ fim_image_t * fim_shiftdim(fim_image_t * I)
     O->M = N;
     O->N = P;
     O->P = M;
-    printf("%zu, %zu, %zu -> %zu, %zu, %zu\n", I->M, I->N, I->P, O->M, O->N, O->P);
+    //printf("%zu, %zu, %zu -> %zu, %zu, %zu\n", I->M, I->N, I->P, O->M, O->N, O->P);
     /* The shifted volume */
     float * S = O->V;
 

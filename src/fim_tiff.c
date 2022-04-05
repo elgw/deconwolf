@@ -679,7 +679,10 @@ int fim_tiff_write_float(const char * fName, const afloat * V,
                          int64_t N, int64_t M, int64_t P)
 {
 
-    fprintf(fim_tiff_log, "scaling: 1\n");
+    if(fim_tiff_log == NULL)
+    {
+        fim_tiff_log = stdout;
+    }
     size_t bytesPerSample = sizeof(float);
     char formatString[4] = "w";
     if(M*N*P*sizeof(uint16_t) >= pow(2, 32))

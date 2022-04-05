@@ -19,7 +19,7 @@ dw_render: dw_render.c dw_render.h
 
 # Test the float image module
 fim_ut: fim_ut.c fim.c fim.h
-	$(cc) -fopenmp fim_ut.c fft.c fim.c $(CFLAGS) -lm -o fim_ut -lfftw3f -lfftw3f_threads
+	$(cc) -fopenmp fim_ut.c fft.c fim.c fim_tiff.c $(CFLAGS) -lm -o fim_ut -lfftw3f -lfftw3f_threads -ltiff
 
 # Read a tif file and write it back as foo.tif
 fim_tiff_ut:

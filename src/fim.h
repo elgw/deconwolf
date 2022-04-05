@@ -28,6 +28,8 @@
 #include <time.h>
 
 #include "fft.h"
+typedef float afloat;
+#include "fim_tiff.h"
 
 #ifdef _OPENMP // turned on with -fopenmp
 #include <omp.h>
@@ -35,7 +37,7 @@
 
 
 #define INLINED inline __attribute__((always_inline))
-typedef float afloat;
+
 
 /* fim : operations on 3D floating point images
  * all allocations are done with fftw3f_malloc (for alignment)
@@ -52,7 +54,7 @@ typedef struct{
 } fim_image_t;
 
 /* Create a new object with a pointer to V */
-fim_image_t * fim_image_from_array(float * V, size_t M, size_t N, size_t P);
+fim_image_t * fim_image_from_array(const float * V, size_t M, size_t N, size_t P);
 
 float fim_min(const float * A, size_t N);
 float fim_mean(const float * A, size_t N);
