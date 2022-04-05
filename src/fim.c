@@ -1012,21 +1012,43 @@ void fim_conv1_vector_ut()
 void fim_LoG_ut()
 {
     struct timespec tstart, tend;
-    size_t M = 2*1024;
-    size_t N = 2*1024;
-    size_t P = 60;
+    size_t M = 15;
+    size_t N = 15;
+    size_t P = 15;
+    float sigma_l = 0.5;
+    float sigma_a = 0.1;
     float * V = malloc(M*N*P*sizeof(float));
     for(size_t kk = 0; kk<M*N*P; kk++)
     {
         V[kk] = kk % 100;
     }
+
+    fim_image_t * T = fim_image_from_array(V, M, N, P);
+    fim_image_t * S1 = fim_shiftdim(T);
+    fim_image_t * S2 = fim_shiftdim(S1);
+    fim_image_t * S3 = fim_shiftdim(S2);
+    for(size_t kk = 0; kk<M*N*P; kk++)
+    {
+        if(T->V[kk] != S3->V[kk])
+        {
+            printf("fim_shiftdim does not work at index %zu %f != %f\n",
+                   kk, T->V[kk], S3->V[kk]);
+            exit(EXIT_FAILURE);
+        }
+    }
+    free(S1->V);
+    free(S2->V);
+    free(S3->V);
+    free(S1); free(S2); free(S3);
+
+
     clock_gettime(CLOCK_REALTIME, &tstart);
-    float * LoG = fim_LoG(V, M, N, P, 1.1, 1.1);
+    float * LoG = fim_LoG(V, M, N, P, sigma_l, sigma_a);
     clock_gettime(CLOCK_REALTIME, &tend);
     float tLoG = clockdiff(&tend, &tstart);
 
     clock_gettime(CLOCK_REALTIME, &tstart);
-    float * LoG2 = fim_LoG_S(V, M, N, P, 1.1, 1.1);
+    float * LoG2 = fim_LoG_S(V, M, N, P, sigma_l, sigma_a);
     clock_gettime(CLOCK_REALTIME, &tend);
     float tLoG_S = clockdiff(&tend, &tstart);
 
@@ -1040,6 +1062,19 @@ void fim_LoG_ut()
         diff > maxabs ? maxabs = diff : 0;
     }
     printf("Max abs difference: %e\n", maxabs);
+
+    if(0){
+    fim_tiff_write_float("LoG.tif", LoG, NULL, M, N, P);
+    fim_tiff_write_float("LoG_S.tif", LoG2, NULL, M, N, P);
+    }
+
+    if(M*N*P < 200)
+    {
+    printf("LoG = \n");
+    fim_show(LoG, M, N, P);
+    printf("LoG_S = \n");
+    fim_show(LoG2, M, N, P);
+    }
 
     free(V);
     free(LoG);
@@ -2224,15 +2259,17 @@ float * conv1_3(const float * V, size_t M, size_t N, size_t P,
                       float * K2, size_t nK2,
                       float * K3, size_t nK3)
 {
+    const int dim = 0;
+    const int norm = 0;
     fim_image_t * F = fim_image_from_array(V, M, N, P);
-    fim_convn1(F->V, F->M, F->N, F->P, K1, nK1, 0, 0);
+    fim_convn1(F->V, F->M, F->N, F->P, K1, nK1, dim, norm);
     fim_image_t * F2 = fim_shiftdim(F);
     free(F);
-    fim_convn1(F2->V, F2->M, F2->N, F2->P, K2, nK2, 0, 0);
+    fim_convn1(F2->V, F2->M, F2->N, F2->P, K2, nK2, dim, norm);
     fim_image_t * F3 = fim_shiftdim(F2);
     free(F2->V);
     free(F2);
-    fim_convn1(F3->V, F3->M, F3->N, F3->P, K3, nK3, 0, 0);
+    fim_convn1(F3->V, F3->M, F3->N, F3->P, K3, nK3, dim, norm);
     fim_image_t * F4 = fim_shiftdim(F3);
     free(F3->V);
     free(F3);
@@ -2245,6 +2282,7 @@ float * conv1_3(const float * V, size_t M, size_t N, size_t P,
 float * fim_LoG_S(const float * V, const size_t M, const size_t N, const size_t P,
                 const float sigmaxy, const float sigmaz)
 {
+    printf("Warning: Not working yet\n");
 /* Set up filters */
     /* Lateral filters */
     size_t nlG = 0;
@@ -2269,6 +2307,41 @@ float * fim_LoG_S(const float * V, const size_t M, const size_t N, const size_t 
     }
     free(GLG);
     free(LGG);
+
+    /* Set border to 0 */
+    int apad = (naG-1)/2;
+    int lpad = (nlG-1)/2;
+    size_t pos = 0;
+    for(int pp = 0; pp< (int) P; pp++)
+    {
+        int uz = 1;
+        if(pp<apad || pp+apad >= (int) P)
+        {
+            uz = 0;
+        }
+        for(int nn = 0; nn< (int) N; nn++)
+        {
+            int uy = 1;
+            if(nn<lpad || nn+lpad >= (int) N)
+            {
+                uy = 0;
+            }
+            for(int mm = 0; mm< (int) M; mm++)
+            {
+                int ux = 1;
+                if(mm<lpad || mm+lpad >= (int) M)
+                {
+                    ux = 0;
+                }
+                if(ux*uy*uz != 1)
+                {
+                    LoG[pos] = 0;
+                }
+                pos++;
+            }
+        }
+    }
+
     return LoG;
 }
 
@@ -2324,6 +2397,7 @@ float * fim_LoG(const float * V, const size_t M, const size_t N, const size_t P,
     free(l2);
     free(aG);
     free(a2);
+
 
     /* Set border to 0 */
     int apad = (naG-1)/2;
@@ -2418,6 +2492,7 @@ fim_image_t * fim_shiftdim(fim_image_t * I)
     O->M = N;
     O->N = P;
     O->P = M;
+    printf("%zu, %zu, %zu -> %zu, %zu, %zu\n", I->M, I->N, I->P, O->M, O->N, O->P);
     /* The shifted volume */
     float * S = O->V;
 
