@@ -108,7 +108,7 @@ static void opts_print(FILE * f, opts * s)
     }
     if(s->fwhm)
     {
-        fprintf(f, "Will calculate FWHM\n");
+        fprintf(f, "Will calculate FWHM on the filtered image\n");
     } else {
         fprintf(f, "No FWHM calculations\n");
     }
@@ -117,20 +117,26 @@ static void opts_print(FILE * f, opts * s)
 
 static void usage(__attribute__((unused)) int argc, char ** argv)
 {
+    opts * s = opts_new();
     printf("usage: %s [<options>] --image input.tif\n", argv[0]);
     printf("Options:\n");
-    printf(" --LoG\n\t Enable Laplacian of Gaussian\n");
-    printf(" --lsigma s\n\t Lateral sigma\n");
-    printf(" --asigma s\n\t Axial sigma\n");
-    printf(" --overwrite\n\t Overwrite existing files\n");
+    printf(" --LoG\n\t Use Laplacian of Gaussian (recommended for "
+           "non-deconvolved images, default=%d).\n", s->LoG);
+    printf(" --lsigma s\n\t Lateral sigma (default %.1f)\n", s->lsigma);
+    printf(" --asigma s\n\t Axial sigma (default %.1f)\n", s->asigma);
+    printf(" --overwrite\n\t Overwrite existing files (default %d)\n", s->overwrite);
     printf(" --help\n\t Show this message\n");
-    printf(" --ndots n\n\t Number of dots to export\n");
+    printf(" --ndots n\n\t Number of dots to export (default %d)\n", s->ndots);
     printf(" --fout filtered.tif\n\t Write filtered image to file\n");
     printf(" --logfile file.txt\n\t Specify where the log file should be written\n");
-    printf(" --fwhm\n\t Include FWHM in the output\n");
+    printf(" --fwhm\n\t Include FWHM in the output (default %d). Will be "
+           "based on the filtered image.\n", s->fwhm);
+    printf(" --verbose v\n\t Verbosity level (default %d)\n", s->verbose);
+    printf(" --nthreads n\n\t Set the number of computational threads\n");
     printf("\n");
     printf("The log messages will be written to input.tif.log.txt\n");
     printf("Dots will be exported to input.tif.dots.tsv\n");
+    free(s);
 }
 
 static void argparsing(int argc, char ** argv, opts * s)

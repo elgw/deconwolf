@@ -131,6 +131,8 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
            "tries <image>.dots.tsv by default\n");
     printf("Image processing:\n");
     printf(" --lsigma s\n\t Lateral sigma (default %f)\n", s->lsigma);
+    printf(" --plow p\n\t Lower percentile for image scaling (default %.4f)\n", s->plow);
+    printf(" --phigh q\n\t Higher percentile for image scaling (default %.4f)\n", s->phigh);
     printf("Dot plotting\n");
     printf(" --ndots n\n\t Number of dots to export\n");
     printf(" --th th\n\t Set dot threshold\n");
@@ -156,11 +158,13 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"lsigma", required_argument, NULL, 'l'},
         {"ndots",   required_argument, NULL, 'n'},
         {"overwrite", no_argument, NULL, 'o'},
+        {"plow", required_argument, NULL, 'p'},
+        {"phigh", required_argument, NULL, 'q'},
         {"threads", required_argument, NULL, 't'},
         {"verbose", required_argument, NULL, 'v'},
         {NULL, 0, NULL, 0}};
     int ch;
-    while((ch = getopt_long(argc, argv, "O:T:d:hi:l:n:op:r:v:", longopts, NULL)) != -1)
+    while((ch = getopt_long(argc, argv, "O:T:d:hi:l:n:op:q:r:v:", longopts, NULL)) != -1)
     {
         switch(ch){
         case 'N':
@@ -194,7 +198,12 @@ static void argparsing(int argc, char ** argv, opts * s)
         case 'o':
             s->overwrite = 1;
             break;
-
+        case 'p':
+            s->plow = atof(optarg);
+            break;
+        case 'q':
+            s->phigh = atof(optarg);
+            break;
         case 't':
             s->nthreads = atoi(optarg);
             break;
@@ -377,53 +386,60 @@ void render(opts * s, fim_image_t * I, fim_table_t * T)
     printf("Drew %d/%zu dots\n", nshow, T->nrow);
 
     if(s->drawtext){
-        char * buff = malloc(1024);
-        int ypos = 70;
+        size_t bufflen = 1024;
+        char * buff = malloc(bufflen);
+        float ypos = 30;
+        float dy = 30;
+        float xpos = 20;
         cairo_set_source_rgb(cr, 1, 1, 1);
         cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL,
                                CAIRO_FONT_WEIGHT_NORMAL);
         cairo_set_font_size(cr, 20.0);
 
-        cairo_move_to(cr, 10.0, ypos);
+        cairo_move_to(cr, xpos, ypos);
         sprintf(buff, "Image: %s", s->image);
         cairo_show_text(cr, buff);
         cairo_stroke(cr);
-        ypos += 30;
+        ypos += dy;
 
         if(s->dotfile != NULL)
         {
-            cairo_move_to(cr, 10.0, ypos);
+            cairo_move_to(cr, xpos, ypos);
             sprintf(buff, "Table: %s", s->dotfile);
             cairo_show_text(cr, buff);
             cairo_stroke(cr);
-            ypos+=30;
+            ypos+=dy;
         }
 
         sprintf(buff, "Dots: %d/%zu shown", nshow, T->nrow);
-        cairo_move_to(cr, 10.0, ypos);
+        cairo_move_to(cr, xpos, ypos);
         cairo_show_text(cr, buff);
         cairo_stroke(cr);
-        ypos += 30;
+        ypos += dy;
 
         sprintf(buff, "Dot threshold: >= %.1f", minvalue);
-        cairo_move_to(cr, 10.0, ypos);
+        if(s->dot_mode == DOT_MODE_AUTO)
+        {
+            strncat(buff, " (auto)", bufflen);
+        }
+        cairo_move_to(cr, xpos, ypos);
         cairo_show_text(cr, buff);
         cairo_stroke(cr);
-        ypos += 30;
+        ypos += dy;
 
         sprintf(buff, "Dynamic range: [%.1f, %.1f]", low, high);
-        cairo_move_to(cr, 10.0, ypos);
+        cairo_move_to(cr, xpos, ypos);
         cairo_show_text(cr, buff);
         cairo_stroke(cr);
-        ypos += 30;
+        ypos += dy;
 
         if(s->lsigma > 0)
         {
         sprintf(buff, "Gaussian filter, sigma=%.1f", s->lsigma);
-        cairo_move_to(cr, 10.0, ypos);
+        cairo_move_to(cr, xpos, ypos);
         cairo_show_text(cr, buff);
         cairo_stroke(cr);
-        ypos += 30;
+        ypos += dy;
         }
 
         free(buff);

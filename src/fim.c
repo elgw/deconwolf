@@ -1878,7 +1878,7 @@ int parse_col_names(fim_table_t * T, char * line)
 int fim_table_get_col(fim_table_t * T, char * name)
 {
     int ret = -1;
-    for(int kk = 0; kk<T->ncol; kk++)
+    for(size_t kk = 0; kk<T->ncol; kk++)
     {
         if(T->colnames[kk] == NULL)
         {
