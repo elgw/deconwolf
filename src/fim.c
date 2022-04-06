@@ -1386,7 +1386,6 @@ void fim_gsmooth_old(float * restrict V, size_t M, size_t N, size_t P, float sig
     }
 
     if(1){
-
         // Z
         for(size_t mm = 0; mm<M; mm++)
         {
@@ -1411,17 +1410,14 @@ void fim_gsmooth_aniso(float * restrict V,
     {
         size_t nKl = 0;
         float * Kl = gaussian_kernel(lsigma, &nKl);
-        printf("x\n");
         fim_convn1(V, M, N, P, Kl, nKl, 0, 1);
-        printf("y\n");
         fim_convn1(V, M, N, P, Kl, nKl, 1, 1);
         free(Kl);
     }
-    if(asigma > 0)
+    if(asigma > 0 && P > 1)
     {
         size_t nKa = 0;
         float * Ka = gaussian_kernel(asigma, &nKa);
-        printf("z asigma = %f, (nKa = %zu)\n", asigma, nKa);
         fim_convn1(V, M, N, P, Ka, nKa, 2, 1);
         free(Ka);
     }
@@ -1830,6 +1826,76 @@ int parse_floats(char * l, float * row, int nval)
     return 1;
 }
 
+int parse_col_names(fim_table_t * T, char * line)
+{
+    /* Figure out how many columns there are */
+    if(strlen(line) == 0)
+    {
+        return 0;
+    }
+    int ncol = 1;
+    for(size_t kk = 0; kk<strlen(line); kk++)
+    {
+        if(line[kk] == '\t')
+        {
+            ncol++;
+        }
+    }
+    T->ncol = ncol;
+
+    /* Allocate memory */
+    T->colnames = malloc(ncol*sizeof(char*));
+
+    /* Set columns */
+    char * f = strtok(line, "\t");
+    assert(f != NULL); /* we already know that strlen > 0 */
+    T->colnames[0] = strdup(f);
+    for(int kk = 1; kk<ncol; kk++)
+    {
+        f = strtok(NULL, "\t");
+        if(strlen(f) > 0)
+        {
+            if(f[strlen(f)-1] == '\n')
+            {
+                f[strlen(f)-1] = '\0';
+            }
+        }
+        T->colnames[kk] = strdup(f);
+    }
+
+    if(0){
+        printf("Columns names:\n");
+        for(int kk = 0; kk<ncol; kk++)
+        {
+            printf("%d '%s'\n", kk, T->colnames[kk]);
+        }
+        printf("\n");
+    }
+    //   exit(EXIT_FAILURE);
+    return ncol;
+}
+
+int fim_table_get_col(fim_table_t * T, char * name)
+{
+    int ret = -1;
+    for(int kk = 0; kk<T->ncol; kk++)
+    {
+        if(T->colnames[kk] == NULL)
+        {
+            continue;
+        }
+        if(strcmp(T->colnames[kk], name) == 0)
+        {
+            if(ret != -1)
+            {
+                fprintf(stderr, "Warning multiple columns named '%s'", name);
+            }
+            ret = kk;
+        }
+    }
+    return ret;
+}
+
 fim_table_t * fim_table_from_tsv(char * fname)
 {
     FILE * fid = fopen(fname, "r");
@@ -1848,18 +1914,12 @@ fim_table_t * fim_table_from_tsv(char * fname)
         fprintf(stderr, "Empty header line\n");
         return NULL;
     }
-    int ncols = 0;
-    for(size_t kk = 0; kk<strlen(line); kk++)
-    {
-        if(line[kk] == '\t')
-        {
-            ncols++;
-        }
-    }
-    ncols++;
-    printf("%d columns\n", ncols);
+
+    int ncols = parse_col_names(T, line);
+
+    // printf("%d columns\n", ncols);
     size_t nrows = count_newlines(fname)+1;
-    printf("at most %zu lines\n", nrows);
+    // printf("at most %zu lines\n", nrows);
 
     // Allocate memory
     T->T = malloc(nrows*ncols*sizeof(float));
@@ -2093,6 +2153,31 @@ size_t otsu(double * C, size_t N)
     }
 
     return best_level;
+}
+
+float fim_histogram_percentile(const fim_histogram_t * H, const float p)
+{
+    if(p <= 0)
+    {
+        return H->left;
+    }
+    if(p >= 1)
+    {
+        return H->right;
+    }
+
+    float p0 = 0;
+    size_t pos = 0;
+    float sum = fim_sum_double(H->C, H->nbin);
+
+    while(p0 < p*sum)
+    {
+        p0 += H->C[pos++];
+    }
+
+    float rpos = (float) pos / H->nbin; /* Relative value in [0,1] */
+    float th = H->left + (float) rpos*(H->right-H->left);
+    return th;
 }
 
 float fim_histogram_otsu(fim_histogram_t * H)

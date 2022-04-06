@@ -1,16 +1,23 @@
 #include "dw_render.h"
 
+enum DOT_MODE { DOT_MODE_AUTO, DOT_MODE_TH, DOT_MODE_NDOTS};
+
 typedef struct{
     int overwrite;
     int verbose;
     int optpos;
     char * image; /* Image to analyze */
     char * outfile; /* Where to write the tsv output */
-    char * dotfile;
+    char * dotfile; /* TSV file */
     int nthreads;
-    float asigma; /* Axial sigma */
     float lsigma; /* Lateral sigma */
     int ndots; /* Number of dots to export */
+    /* Mapping of image intensities to black, white */
+    enum DOT_MODE dot_mode;
+    float plow; /* Lower percentile for image mapping */
+    float phigh; /* Higher percentile for image mapping */
+    float th; /* Dot threshold, only used when --th is specified */
+    int drawtext;
 } opts;
 
 static opts * opts_new();
@@ -54,10 +61,15 @@ static opts * opts_new()
     s->dotfile = NULL;
     s->nthreads = dw_get_threads();
 
-    s->lsigma = 1;
-    s->asigma = 1;
-    s->ndots = -1; /* Auto */
+    s->lsigma = 0;
 
+    s->ndots = -1; /* Auto */
+    s->th = -1;
+    s->dot_mode = DOT_MODE_AUTO;
+    /* For stretching the image data */
+    s->plow = 0.01;
+    s->phigh = 1.0-0.005;
+    s->drawtext = 1;
     return s;
 }
 
@@ -86,7 +98,18 @@ static void opts_print(FILE * f, opts * s)
 
     fprintf(f, "nthreads = %d\n", s->nthreads);
     fprintf(f, "Lateral sigma: %.2f\n", s->lsigma);
-    fprintf(f, "Axial sigma: %.2f\n", s->asigma);
+    switch(s->dot_mode)
+    {
+    case DOT_MODE_AUTO:
+        fprintf(f, "DOT_MODE: Automatic\n");
+        break;
+    case DOT_MODE_TH:
+        fprintf(f, "DOT_MODE: Threshold (>= %f)\n", s->th);;
+        break;
+    case DOT_MODE_NDOTS:
+        fprintf(f, "DOT_MODE: %d dots\n", s->ndots);
+        break;
+    }
 
     if(s->ndots > 0)
     {
@@ -100,24 +123,33 @@ static void opts_print(FILE * f, opts * s)
 
 static void usage(__attribute__((unused)) int argc, char ** argv)
 {
+    opts * s = opts_new();
     printf("usage: %s [<options>] --image input.tif\n", argv[0]);
     printf("Options:\n");
-    printf(" --lsigma s\n\t Lateral sigma\n");
-    printf(" --asigma s\n\t Axial sigma\n");
+    printf(" --image im.tif\n\t Image to load\n");
+    printf(" --dots file.tsv\n\t Specify TSV file to read, "
+           "tries <image>.dots.tsv by default\n");
+    printf("Image processing:\n");
+    printf(" --lsigma s\n\t Lateral sigma (default %f)\n", s->lsigma);
+    printf("Dot plotting\n");
+    printf(" --ndots n\n\t Number of dots to export\n");
+    printf(" --th th\n\t Set dot threshold\n");
+    printf("General:\n");
     printf(" --overwrite\n\t Overwrite existing files\n");
     printf(" --help\n\t Show this message\n");
-    printf(" --ndots n\n\t Number of dots to export\n");
-    printf(" --dots file.tsv\n\t Specify TSV file to read\n");
+    printf(" --notext\n\t Don't write any text on the image\n");
+    printf(" --verbose v\n\t Verbosity level\n");
     printf("\n");
-
+    opts_free(s);
+    return;
 }
 
 static void argparsing(int argc, char ** argv, opts * s)
 {
     struct option longopts[] = {
-
+        {"notext", no_argument, NULL, 'N'},
         {"out", required_argument, NULL, 'O'},
-        {"asigma", required_argument, NULL, 'a'},
+        {"th", required_argument, NULL, 'T'},
         {"dots",   required_argument, NULL, 'd'},
         {"help", no_argument, NULL, 'h'},
         {"image", required_argument, NULL, 'i'},
@@ -128,16 +160,19 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"verbose", required_argument, NULL, 'v'},
         {NULL, 0, NULL, 0}};
     int ch;
-    while((ch = getopt_long(argc, argv, "a:d:hi:l:n:op:r:v:", longopts, NULL)) != -1)
+    while((ch = getopt_long(argc, argv, "O:T:d:hi:l:n:op:r:v:", longopts, NULL)) != -1)
     {
         switch(ch){
-
+        case 'N':
+            s->drawtext = 0;
+            break;
         case 'O':
             nullfree(s->outfile);
             s->outfile = strdup(optarg);
             break;
-        case 'a':
-            s->asigma = atof(optarg);
+        case 'T':
+            s->th = atof(optarg);
+            s->dot_mode = DOT_MODE_TH;
             break;
         case 'd':
             s->dotfile = strdup(optarg);
@@ -154,6 +189,7 @@ static void argparsing(int argc, char ** argv, opts * s)
             break;
         case 'n':
             s->ndots = atoi(optarg);
+            s->dot_mode = DOT_MODE_NDOTS;
             break;
         case 'o':
             s->overwrite = 1;
@@ -205,15 +241,13 @@ static int file_exist(char * fname)
 
 
 
-cairo_surface_t * fim_image_to_cairo_surface(fim_image_t * I)
+cairo_surface_t * fim_image_to_cairo_surface(fim_image_t * I,
+                                             float low, float high)
 {
     cairo_surface_t * result;
     unsigned char * current_row;
     int stride;
 
-    float imax = fim_max(I->V, I->M*I->N);
-    float imin = fim_min(I->V, I->M*I->N);
-    // TODO: scale by percentiles (fim_historam)
 
     result = cairo_image_surface_create(CAIRO_FORMAT_RGB24, I->M, I->N);
     if (cairo_surface_status(result) != CAIRO_STATUS_SUCCESS)
@@ -225,9 +259,10 @@ cairo_surface_t * fim_image_to_cairo_surface(fim_image_t * I)
     for (int y = 0; y < I->M; y++) {
         uint32_t *row = (void *) current_row;
         for (int x = 0; x < I->N; x++) {
-            float v =  ((I->V[x + I->M*y])-imin) / imax;
-            v*=10*255;
-            v>255? v = 255 : 0;
+            float v =  ((I->V[x + I->M*y])-low) / (high-low);
+            v*=255;
+            v > 255? v = 255 : 0;
+            v < 0 ? v = 0 : 0;
             uint8_t value = v;
             uint32_t r = value;
             uint32_t g = value;
@@ -246,11 +281,21 @@ void render(opts * s, fim_image_t * I, fim_table_t * T)
     printf("Creating max projection\n");
     float * M = fim_maxproj(I->V, I->M, I->N, I->P);
     I->V = M; I->P = 1;
-    cairo_surface_t * mip = fim_image_to_cairo_surface(I);
+    if(s->lsigma > 0)
+    {
+        fim_gsmooth(M, I->M, I->N, 1, s->lsigma);
+    }
+
+    fim_histogram_t * H = fim_histogram(I->V, I->M*I->N*I->P);
+    float low =  fim_histogram_percentile(H, s->plow);
+    float high = fim_histogram_percentile(H, s->phigh);
+    printf("Using range [%f, %f]\n", low, high);
+    fim_histogram_free(H);
+    cairo_surface_t * mip = fim_image_to_cairo_surface(I, low, high);
 
     cairo_surface_t * surf = cairo_svg_surface_create (s->outfile,
-                                                        I->M,
-                                                         I->N);
+                                                       I->M,
+                                                       I->N);
     //cairo_pattern_set_filter(cairo_get_source(cr), CAIRO_FILTER_NEAREST);
 //    cairo_pattern_set_filter(mip, CAIRO_FILTER_NEAREST);
 
@@ -261,32 +306,67 @@ void render(opts * s, fim_image_t * I, fim_table_t * T)
     cairo_pattern_set_filter (cairo_get_source (cr), CAIRO_FILTER_NEAREST);
     cairo_paint(cr);
 
-    cairo_set_source_rgb(cr, 1, 1, 1);
-    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL,
-                           CAIRO_FONT_WEIGHT_NORMAL);
-    cairo_set_font_size(cr, 20.0);
 
-    cairo_move_to(cr, 10.0, 50.0);
-    cairo_show_text(cr, s->image);
-    cairo_stroke(cr);
 
     cairo_set_line_width(cr, 1);
     cairo_set_source_rgb(cr, 1.0, 0.00, 0);
 
+    int xcol = fim_table_get_col(T, "x");
+    int ycol = fim_table_get_col(T, "y");
+    int vcol = fim_table_get_col(T, "value");
+    int ucol = fim_table_get_col(T, "use");
+    if(s->dot_mode == DOT_MODE_AUTO)
+    {
+        if(ucol == -1)
+        {
+            printf("Warning: No column named 'use' will show all dots\n");
+        }
+    }
 
+    float minvalue = 1e99;
     int nshow = 0;
+    if(T == NULL)
+    {
+        if(s->verbose > 0)
+        {
+            printf("No dot table loaded\n");
+        }
+    }
     if(T != NULL)
     {
-        printf("Drawing dots\n");
+        if(s->verbose > 1)
+        {
+            printf("Drawing dots\n");
+        }
         for(size_t kk = 0; kk<T->nrow; kk++)
         {
             //printf("%f %f\n", T->T[kk*T->ncol], T->T[kk*T->ncol+1]);
-            float x = T->T[kk*T->ncol];
-            float y = T->T[kk*T->ncol + 1];
-            float use = T->T[kk*T->ncol + 4];
-            if(use == 1)
+            int draw = 0;
+            float x = T->T[kk*T->ncol + xcol];
+            float y = T->T[kk*T->ncol + ycol];
+            float use = 1;
+            if(ucol >= 0)
             {
-                //cairo_translate(cr, x, y);
+                use = T->T[kk*T->ncol + ucol];
+            }
+            float value = T->T[kk*T->ncol + vcol];
+
+
+            if(s->dot_mode == DOT_MODE_AUTO)
+            {
+                use == 1 ? draw = 1: 0;
+            }
+            if(s->dot_mode == DOT_MODE_TH)
+            {
+                value > s->th ? draw = 1 : 0;
+            }
+            if(s->dot_mode == DOT_MODE_NDOTS)
+            {
+                nshow < s->ndots ? draw = 1 : 0;
+            }
+            if(draw)
+            {
+                value < minvalue ? minvalue = value : 0;
                 cairo_arc(cr, x, y, 5, 0, 2 * M_PI);
                 cairo_close_path(cr);
                 cairo_stroke(cr);
@@ -295,6 +375,59 @@ void render(opts * s, fim_image_t * I, fim_table_t * T)
         }
     }
     printf("Drew %d/%zu dots\n", nshow, T->nrow);
+
+    if(s->drawtext){
+        char * buff = malloc(1024);
+        int ypos = 70;
+        cairo_set_source_rgb(cr, 1, 1, 1);
+        cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL,
+                               CAIRO_FONT_WEIGHT_NORMAL);
+        cairo_set_font_size(cr, 20.0);
+
+        cairo_move_to(cr, 10.0, ypos);
+        sprintf(buff, "Image: %s", s->image);
+        cairo_show_text(cr, buff);
+        cairo_stroke(cr);
+        ypos += 30;
+
+        if(s->dotfile != NULL)
+        {
+            cairo_move_to(cr, 10.0, ypos);
+            sprintf(buff, "Table: %s", s->dotfile);
+            cairo_show_text(cr, buff);
+            cairo_stroke(cr);
+            ypos+=30;
+        }
+
+        sprintf(buff, "Dots: %d/%zu shown", nshow, T->nrow);
+        cairo_move_to(cr, 10.0, ypos);
+        cairo_show_text(cr, buff);
+        cairo_stroke(cr);
+        ypos += 30;
+
+        sprintf(buff, "Dot threshold: >= %.1f", minvalue);
+        cairo_move_to(cr, 10.0, ypos);
+        cairo_show_text(cr, buff);
+        cairo_stroke(cr);
+        ypos += 30;
+
+        sprintf(buff, "Dynamic range: [%.1f, %.1f]", low, high);
+        cairo_move_to(cr, 10.0, ypos);
+        cairo_show_text(cr, buff);
+        cairo_stroke(cr);
+        ypos += 30;
+
+        if(s->lsigma > 0)
+        {
+        sprintf(buff, "Gaussian filter, sigma=%.1f", s->lsigma);
+        cairo_move_to(cr, 10.0, ypos);
+        cairo_show_text(cr, buff);
+        cairo_stroke(cr);
+        ypos += 30;
+        }
+
+        free(buff);
+    }
 
     cairo_surface_destroy(surf);
     cairo_surface_destroy(mip);
@@ -354,7 +487,37 @@ int dw_render(int argc, char ** argv)
     {
         T = fim_table_from_tsv(s->dotfile);
     }
+
+    {
+        int valid_table = 1;
+        if(fim_table_get_col(T, "x") == -1)
+        {
+            fprintf(stderr, "No column named 'x'\n");
+            valid_table = 0;
+        }
+        if(fim_table_get_col(T, "y") == -1)
+        {
+            fprintf(stderr, "No column named 'x'\n");
+            valid_table = 0;
+        }
+        if(fim_table_get_col(T, "z") == -1)
+        {
+            fprintf(stderr, "No column named 'z'\n");
+            valid_table = 0;
+        }
+        if(fim_table_get_col(T, "value") == -1)
+        {
+            fprintf(stderr, "No column named 'value'\n");
+            valid_table = 0;
+        }
+        if(valid_table == 0)
+        {
+            exit(EXIT_FAILURE);
+        }
+    }
+
     render(s, I, T);
+
     fim_table_free(T);
 
     free(I);

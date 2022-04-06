@@ -242,6 +242,9 @@ typedef struct{
  * the middle of the first and last bin. */
 fim_histogram_t * fim_histogram(const float * Im, size_t N);
 
+/* Return a threshold that separates H at percentile p */
+float fim_histogram_percentile(const fim_histogram_t * H, float p);
+
 /* Return a global threshold by Otsu's method */
 float fim_histogram_otsu(fim_histogram_t * H);
 
@@ -260,11 +263,15 @@ typedef struct {
     size_t nrow;
     size_t ncol;
     size_t nrow_alloc; /* To know if we need to extend the size */
+    char ** colnames; /* Name of columns */
 } fim_table_t;
 
 fim_table_t * fim_table_from_tsv(char * fname);
 void fim_table_free(fim_table_t * T);
 void fim_table_insert(fim_table_t * T, float * row);
+/* Get the index of a certain column name
+ * Returns -1 on failure */
+int fim_table_get_col(fim_table_t * T, char * name);
 
 /* Find local maxima in I */
 //fim_table_t * fim_lmax(const float * I, size_t M, size_t N, size_t P);
