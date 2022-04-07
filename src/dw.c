@@ -1766,7 +1766,7 @@ void dw_unittests()
     fprint_peakMemory(NULL);
     timings();
 
-    fim_ut();
+    //fim_ut();
     fim_tiff_ut();
     fft_ut();
     printf("done\n");

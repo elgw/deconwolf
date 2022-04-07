@@ -978,10 +978,11 @@ void fim_conncomp6_ut()
 
 void fim_conv1_vector_ut()
 {
+    printf("->fim_conv1_vector_ut()\n");
     int normalized = 1;
-    int nV = 5;
+    const size_t nV = 5;
     float * V = malloc(nV*sizeof(float));
-    for(int kk = 0; kk<nV; kk++)
+    for(size_t kk = 0; kk<nV; kk++)
     {
         V[kk] = kk+1;
     }
@@ -991,7 +992,7 @@ void fim_conv1_vector_ut()
     fim_show(V, 1, nV, 1);
     for(int nK = 3; nK<8; nK+=2)
     {
-        for(int kk = 0; kk<nV; kk++)
+        for(size_t kk = 0; kk<nV; kk++)
         {
             V[kk] = kk+1;
         }
@@ -1183,19 +1184,25 @@ static size_t max_size_t(size_t a, size_t b)
     return b;
 }
 
-void fim_conv1_vector(float * restrict V, int stride, float * restrict W,
+void fim_conv1_vector(float * restrict V, const int stride, float * restrict W,
                       const size_t nV,
                       const float * restrict K, const size_t nKu, const int normalized)
 {
+    if(V == NULL || K == NULL)
+    {
+        return;
+    }
 
+    /* Allocate buffer if not provided */
     int Walloc = 0;
     if(W == NULL)
     {
         W = malloc(nV*sizeof(float));
         Walloc = 1;
     }
+
     const size_t k2 = (nKu-1)/2;
-    const size_t N = nV;
+
     size_t bpos = 0;
 
     if(nKu > nV)
@@ -1225,7 +1232,9 @@ void fim_conv1_vector(float * restrict V, int stride, float * restrict W,
             }
         }
     }
-    else
+
+    /* Kernel is smaller than signal */
+    if(nKu <= nV)
     {
         /* Crossing the first edge */
         for(size_t vv = 0;vv<k2; vv++)
@@ -1246,22 +1255,23 @@ void fim_conv1_vector(float * restrict V, int stride, float * restrict W,
         }
 
         /* Central part where K fits completely */
-        for(size_t vv = k2 ; vv+k2 < N; vv++)
+        for(size_t vv = k2 ; vv+k2 < nV; vv++)
         {
             double acc = 0;
-            for(size_t kk = 0; kk<nKu; kk++)
+            for(size_t kk = 0; kk < nKu; kk++)
             {
-                acc = acc + K[kk]*V[(vv-k2+kk)*stride];
+                size_t vpos = ((vv-k2)+kk)*stride;
+                acc = acc + K[kk]*V[vpos];
             }
             W[bpos++] = acc;
         }
 
         /* Last part */
-        for(size_t vv = N-k2;vv<N; vv++)
+        for(size_t vv = nV-k2; vv< nV; vv++)
         {
             double kacc = 0;
             double acc0 = 0;
-            for(size_t kk = 0; kk<N-vv+k2; kk++)
+            for(size_t kk = 0; kk<nV-vv+k2; kk++)
             {
                 acc0 = acc0 + K[kk]*V[(vv-k2+kk)*stride];
                 kacc += K[kk];
