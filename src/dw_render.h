@@ -11,6 +11,7 @@
 #include <cairo-svg.h>
 
 #include "fim.h"
+#include "ftab.h"
 #include "fim_tiff.h"
 #include "dw_version.h"
 

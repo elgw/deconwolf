@@ -285,7 +285,7 @@ cairo_surface_t * fim_image_to_cairo_surface(fim_image_t * I,
     return result;
 }
 
-void render(opts * s, fim_image_t * I, fim_table_t * T)
+void render(opts * s, fim_image_t * I, ftab_t * T)
 {
     printf("Creating max projection\n");
     float * M = fim_maxproj(I->V, I->M, I->N, I->P);
@@ -320,10 +320,10 @@ void render(opts * s, fim_image_t * I, fim_table_t * T)
     cairo_set_line_width(cr, 1);
     cairo_set_source_rgb(cr, 1.0, 0.00, 0);
 
-    int xcol = fim_table_get_col(T, "x");
-    int ycol = fim_table_get_col(T, "y");
-    int vcol = fim_table_get_col(T, "value");
-    int ucol = fim_table_get_col(T, "use");
+    int xcol = ftab_get_col(T, "x");
+    int ycol = ftab_get_col(T, "y");
+    int vcol = ftab_get_col(T, "value");
+    int ucol = ftab_get_col(T, "use");
     if(s->dot_mode == DOT_MODE_AUTO)
     {
         if(ucol == -1)
@@ -498,30 +498,30 @@ int dw_render(int argc, char ** argv)
     float * A = fim_tiff_read(inFile, NULL, &M, &N, &P, s->verbose);
     fim_image_t * I = fim_image_from_array(A, M, N, P);
 
-    fim_table_t * T = NULL;
+    ftab_t * T = NULL;
     if(s->dotfile != NULL)
     {
-        T = fim_table_from_tsv(s->dotfile);
+        T = ftab_from_tsv(s->dotfile);
     }
 
     {
         int valid_table = 1;
-        if(fim_table_get_col(T, "x") == -1)
+        if(ftab_get_col(T, "x") == -1)
         {
             fprintf(stderr, "No column named 'x'\n");
             valid_table = 0;
         }
-        if(fim_table_get_col(T, "y") == -1)
+        if(ftab_get_col(T, "y") == -1)
         {
             fprintf(stderr, "No column named 'x'\n");
             valid_table = 0;
         }
-        if(fim_table_get_col(T, "z") == -1)
+        if(ftab_get_col(T, "z") == -1)
         {
             fprintf(stderr, "No column named 'z'\n");
             valid_table = 0;
         }
-        if(fim_table_get_col(T, "value") == -1)
+        if(ftab_get_col(T, "value") == -1)
         {
             fprintf(stderr, "No column named 'value'\n");
             valid_table = 0;
@@ -534,7 +534,7 @@ int dw_render(int argc, char ** argv)
 
     render(s, I, T);
 
-    fim_table_free(T);
+    ftab_free(T);
 
     free(I);
     free(A);

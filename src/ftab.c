@@ -18,7 +18,7 @@
 
 /* Forward declarations for non exported functions */
 static int parse_floats(char * l, float * row, int nval);
-static size_t count_newlines(char * fname);
+static size_t count_newlines(const char * fname);
 
 void ftab_free(ftab_t * T)
 {
@@ -30,8 +30,74 @@ void ftab_free(ftab_t * T)
     {
         free(T->T);
     }
+
+    if(T->colnames != NULL)
+    {
+        for(int kk = 0; kk<T->ncol; kk++)
+        {
+            if(T->colnames[kk] != NULL)
+            {
+                free(T->colnames[kk]);
+            }
+        }
+        free(T->colnames);
+    }
+
     free(T);
     return;
+}
+
+int ftab_write_tsv(const ftab_t * T, const char * fname)
+{
+    FILE * fid = fopen(fname, "w");
+    if(fid == NULL)
+    {
+        return EXIT_FAILURE;
+    }
+    int ret = ftab_print(fid, T);
+    fclose(fid);
+    return ret;
+}
+
+int ftab_print(FILE * fid, const ftab_t * T)
+{
+    /* Write column names if they exist, otherwise col_1 etc */
+    for(size_t cc = 0; cc<T->ncol; cc++)
+    {
+        int colname = 0;
+        if(T->colnames != NULL)
+        {
+            if(T->colnames[cc] != NULL)
+            {
+                fprintf(fid, "%s", T->colnames[cc]);
+                colname = 1;
+            }
+        }
+        if(colname == 0)
+        {
+            fprintf(fid, "col_%zu", cc+1);
+        }
+        if(cc+1 != T->ncol)
+        {
+            fprintf(fid, "\t");
+        }
+    }
+    fprintf(fid, "\n");
+
+    /* Write rows */
+    for(size_t rr = 0; rr<T->nrow; rr++)
+    {
+        for(size_t cc = 0; cc<T->ncol; cc++)
+        {
+            fprintf(fid, "%f", T->T[rr*T->ncol + cc]);
+            if(cc+1 != T->ncol)
+            {
+                fprintf(fid, "\t");
+            }
+        }
+        fprintf(fid, "\n");
+    }
+    return EXIT_SUCCESS;
 }
 
 ftab_t * ftab_new(int ncol)
@@ -41,16 +107,18 @@ ftab_t * ftab_new(int ncol)
     T->nrow = 0;
     T->nrow_alloc = 1024;
     T->T = malloc(T->ncol*T->nrow_alloc*sizeof(float));
+    T->colnames = NULL;
     return T;
 }
 
-int parse_col_names(ftab_t * T, char * line)
+static int parse_col_names(ftab_t * T, const char * _line)
 {
     /* Figure out how many columns there are */
-    if(strlen(line) == 0)
+    if(strlen(_line) == 0)
     {
         return 0;
     }
+    char * line = strdup(_line);
     int ncol = 1;
     for(size_t kk = 0; kk<strlen(line); kk++)
     {
@@ -90,10 +158,11 @@ int parse_col_names(ftab_t * T, char * line)
         printf("\n");
     }
     //   exit(EXIT_FAILURE);
+    free(line);
     return ncol;
 }
 
-int ftab_get_col(ftab_t * T, char * name)
+int ftab_get_col(const ftab_t * T, const char * name)
 {
     int ret = -1;
     for(size_t kk = 0; kk<T->ncol; kk++)
@@ -111,10 +180,11 @@ int ftab_get_col(ftab_t * T, char * name)
             ret = kk;
         }
     }
+    printf("%s is column %d\n", name, ret);
     return ret;
 }
 
-ftab_t * ftab_from_tsv(char * fname)
+ftab_t * ftab_from_tsv(const char * fname)
 {
     FILE * fid = fopen(fname, "r");
     if(fid == NULL)
@@ -130,14 +200,18 @@ ftab_t * ftab_from_tsv(char * fname)
     if(strlen(line) == 0)
     {
         fprintf(stderr, "Empty header line\n");
+        if(line != NULL)
+        {
+            free(line);
+        }
         return NULL;
     }
 
     int ncols = parse_col_names(T, line);
 
-    // printf("%d columns\n", ncols);
+    printf("%zu columns\n", T->ncol);
     size_t nrows = count_newlines(fname)+1;
-    // printf("at most %zu lines\n", nrows);
+    printf("at most %zu lines\n", nrows);
 
     // Allocate memory
     T->T = malloc(nrows*ncols*sizeof(float));
@@ -147,14 +221,18 @@ ftab_t * ftab_from_tsv(char * fname)
 
     // Read
     int row = 0;
-    while ((read = getline(&line, &len, fid)) != -1) {
-        if(strlen(line) == 0 && line[0] == '#')
+    while ((read = getline(&line, &len, fid)) != -1)
+    {
+        if(strlen(line) == 0)
         {
             continue;
         }
         row += parse_floats(line, T->T + row*T->ncol, T->ncol);
     }
-    T->nrow = row-1;
+    T->nrow = row;
+    //printf("Returning a %zux%zu table\n", T->nrow, T->ncol);
+    free(line);
+    fclose(fid);
     return T;
 }
 
@@ -186,6 +264,11 @@ int ftab_sort_pair_cmp(const void * _A, const void * _B)
 
 void ftab_sort(ftab_t * T, int col)
 {
+    if(col == -1)
+    {
+        fprintf(stderr, "ftab_sort: Can't use column %d for sorting\n", col);
+        exit(EXIT_FAILURE);
+    }
     ftab_sort_pair * P = malloc(T->nrow*sizeof(ftab_sort_pair));
     /* Extract values from col %d and sort */
 
@@ -229,7 +312,7 @@ void ftab_insert(ftab_t * T, float * row)
 }
 
 /* Count the number of newlines in a file */
-    static size_t count_newlines(char * fname)
+    static size_t count_newlines(const char * fname)
 {
     FILE * fid = fopen(fname, "r");
     assert(fid != NULL);
@@ -276,4 +359,75 @@ static int parse_floats(char * l, float * row, int nval)
     }
     //   exit(EXIT_FAILURE);
     return 1;
+}
+
+void ftab_set_col_name(ftab_t * T, int col, const char * name)
+{
+    // TODO check that only valid chars are used
+    if(col < 0 || col >= (int) T->ncol)
+    {
+        return;
+    }
+
+    if(name == NULL)
+    {
+        return;
+    }
+
+    if(T->colnames == NULL)
+    {
+        T->colnames = malloc(T->ncol*sizeof(char*));
+        for(size_t kk = 0; kk<T->ncol; kk++)
+        {
+            T->colnames[kk] = NULL;
+        }
+    }
+
+    if(T->colnames[col] != NULL)
+    {
+        free(T->colnames[col]);
+    }
+    T->colnames[col] = strdup(name);
+}
+
+int ftab_ut()
+{
+    ftab_t * T = ftab_new(4);
+    printf("T: %zu x %zu\n", T->nrow, T->ncol);
+    ftab_set_col_name(T, 0, "x");
+    ftab_set_col_name(T, 1, "y");
+    ftab_set_col_name(T, 2, "z");
+    ftab_set_col_name(T, 3, "value");
+    ftab_print(stdout, T);
+
+    float row[4] = {1, 2, 3, 1.23};
+    ftab_insert(T, row);
+    ftab_print(stdout, T);
+
+    /* Save and read */
+    char * fname = malloc(1024);
+    sprintf(fname, "/tmp/ftab-XXXXXX");
+    int filedes = mkstemp(fname);
+    close(filedes);
+
+    printf("Temporary file: %s\n", fname);
+    ftab_write_tsv(T, fname);
+
+
+    ftab_t * T2 = ftab_from_tsv(fname);
+    assert(T2 != NULL);
+    assert(T2->ncol == T->ncol);
+    assert(T2->nrow == T->nrow);
+    for(int kk = 0; kk<T->ncol; kk++)
+    {
+        assert(strcmp(T->colnames[kk], T2->colnames[kk]) == 0);
+    }
+
+
+    unlink(fname);
+    free(fname);
+    ftab_print(stdout, T);
+    ftab_free(T);
+    ftab_free(T2);
+    return EXIT_SUCCESS;
 }

@@ -238,60 +238,51 @@ static int file_exist(char * fname)
     }
 }
 
-
-static size_t write_dots(const opts * s, fim_image_t * V, const ftab_t * T, FILE * fid)
+static ftab_t * append_fwhm(opts * s, ftab_t * T, fim_image_t * V)
 {
+    int xcol = ftab_get_col(T, "x");
+    int ycol = ftab_get_col(T, "y");
+    int zcol = ftab_get_col(T, "z");
+
     struct timespec tstart, tend;
     float * fwhm = NULL;
-    if(s->fwhm)
-    {
-        if(s->verbose > 1)
-        {
-            printf("Calculating fwhm..."); fflush(stdout);
-        }
-        clock_gettime(CLOCK_REALTIME, &tstart);
-        fwhm = malloc(T->nrow*sizeof(float));
-        #pragma omp parallel for
-        for(size_t kk = 0; kk<T->nrow; kk++)
-        {
-            float * row = T->T + kk*T->ncol;
-            fwhm[kk] = fwhm_lateral(V, row[0], row[1], row[2], s->verbose);
-        }
-        clock_gettime(CLOCK_REALTIME, &tend);
-        double t = clockdiff(&tend, &tstart);
-        if(s->verbose > 1)
-        {
-            printf(" took %.4f s\n", t);
-        }
-    }
 
-    fprintf(fid, "x\ty\tz\tvalue\tuse");
-    if(s->fwhm)
+    if(s->verbose > 1)
     {
-        fprintf(fid, "\tfwhm");
+        printf("Calculating fwhm..."); fflush(stdout);
     }
-    fprintf(fid, "\n");
-    size_t nmax = s->ndots;
-    size_t nwritten = 0;
+    clock_gettime(CLOCK_REALTIME, &tstart);
+    fwhm = malloc(T->nrow*sizeof(float));
+#pragma omp parallel for
     for(size_t kk = 0; kk<T->nrow; kk++)
     {
         float * row = T->T + kk*T->ncol;
-        fprintf(fid, "%f\t%f\t%f\t%f\t%d",
-                row[0]+1, row[1]+1, row[2]+1, row[3], row[3] > s->th);
-        if(s->fwhm)
-        {
-            fprintf(fid, "\t%f", fwhm[kk]);
-        }
-        fprintf(fid, "\n");
-        nwritten++;
-
-        if(nwritten == nmax)
-        {
-            break;
-        }
+        fwhm[kk] = fwhm_lateral(V, row[xcol], row[ycol], row[zcol], s->verbose);
     }
-    nullfree(fwhm);
-    return nwritten;
+    clock_gettime(CLOCK_REALTIME, &tend);
+    double t = clockdiff(&tend, &tstart);
+    if(s->verbose > 1)
+    {
+        printf(" took %.4f s\n", t);
+    }
+
+    /* Create a new table with one extra column */
+    ftab_t * T2 = ftab_new(T->ncol + 1);
+    for(size_t cc = 0; cc<T->ncol; cc++)
+    {
+        ftab_set_col_name(T, cc, T->colnames[cc]);
+    }
+    float * row = malloc((T->nrow+1)*sizeof(float));
+    for(size_t rr = 0; rr<T->nrow; rr++)
+    {
+        memcpy(row, T->T+rr*T->ncol, T->ncol);
+        row[T->nrow] = fwhm[rr];
+        ftab_insert(T2, row);
+    }
+    ftab_set_col_name(T2, T->nrow, "fwhm");
+    ftab_free(T);
+    free(fwhm);
+    return T2;
 }
 
 
@@ -387,8 +378,16 @@ int dw_dots(int argc, char ** argv)
     {
         printf("Detecting local maxima\n");
     }
+
     ftab_t * T = fim_lmax(feature, M, N, P);
-    ftab_sort(T, 3); /* highest value first */
+
+    if(s->verbose > 1)
+    {
+        printf("Sorting the local maxima by value\n");
+    }
+
+    /* Sort with highest value first */
+    ftab_sort(T, ftab_get_col(T, "value"));
 
     if(s->verbose > 1)
     {
@@ -420,36 +419,33 @@ int dw_dots(int argc, char ** argv)
     fprintf(s->log, "Suggested threshold (from %zu dots): %f\n", T->nrow, s->th);
     fim_histogram_free(H);
 
+    fim_image_t * fI = fim_image_from_array(feature, M, N, P);
+
+    if(s->fwhm)
+    {
+        T = append_fwhm(s, T, fI);
+    }
+
+    free(fI);
+    free(feature);
+
     /* Write to file */
     if(s->verbose > 0)
     {
         printf("Writing dots to %s\n", s->outfile);
     }
-    FILE * fid = fopen(s->outfile, "w");
-    if(fid == NULL)
+
+    if(ftab_write_tsv(T, s->outfile))
     {
-        fprintf(stderr, "Unable to open %s for writing\n", s->outfile);
-        fprintf(s->log, "Unable to open %s for writing\n", s->outfile);
-        fclose(s->log);
+        fprintf(stderr, "Failed to write to %s\n", s->outfile);
         exit(EXIT_FAILURE);
     }
 
-    fim_image_t * fI = fim_image_from_array(feature, M, N, P);
-    size_t nwritten = write_dots(s, fI, T, fid);
-
-    fclose(fid);
-
-    if(s->verbose > 0)
-    {
-        printf("Wrote %zu dots. Done!\n", nwritten);
-    }
-    fprintf(s->log, "Wrote %zu dots. Done!\n", nwritten);
+    fprintf(s->log, "Wrote %zu dots. Done!\n", T->nrow);
     //fprintf(s->log, "Optimal detection when \sigma = 0.425*FWHM\n");
 
     ftab_free(T);
 
-    free(fI);
-    free(feature);
 
     opts_free(s);
     return EXIT_SUCCESS;

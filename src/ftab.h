@@ -28,6 +28,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <time.h>
+#include <unistd.h>
 
 
 /* row-major table */
@@ -42,13 +43,18 @@ typedef struct {
 /* Create a new table with a fixed number of columns
  * Set column names with ftab_set_colname */
 ftab_t * ftab_new(int ncol);
+/* Load a TSV file */
+ftab_t * ftab_from_tsv(const char * fname);
+
+/* Write tsv file do disk */
+int ftab_write_tsv(const ftab_t * T, const char * fname);
+
+/* Print as tsv to FILE */
+int ftab_print(FILE *, const ftab_t *);
 
 /* Set the name of a column
 * name can be freed */
 void ftab_set_col_name(ftab_t *, int col, const char * name);
-
-/* Load a TSV file */
-ftab_t * ftab_from_tsv(char * fname);
 
 /* Free a ftab and all associated data */
 void ftab_free(ftab_t * T);
@@ -58,6 +64,9 @@ void ftab_insert(ftab_t * T, float * row);
 
 /* Get the index of a certain column name
  * Returns -1 on failure */
-int ftab_get_col(ftab_t * T, char * name);
+int ftab_get_col(const ftab_t * T, const char * name);
+
+/* Some unit tests */
+int ftab_ut(void);
 
 #endif

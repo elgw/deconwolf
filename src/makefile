@@ -14,12 +14,15 @@ tiling_ut:
 fft_ut:
 	$(cc) fft_ut.c fft.c fim.c $(CFLAGS) -lm -lfftw3f -lfftw3f_threads -o fft_ut
 
-dw_render: dw_render.c dw_render.h
-	$(cc) $(cflags) -DSTANDALONE dw_render.c fim.c fim_tiff.c fft.c $(ldflags) -o dw_render
+dw_render: dw_render.c dw_render.h fim.c ftab.c fim_tiff.c
+	$(cc) $(cflags) -DSTANDALONE dw_render.c fim.c fim_tiff.c fft.c ftab.c $(ldflags) -o dw_render
 
 # Test the float image module
 fim_ut: fim_ut.c fim.c fim.h
 	$(cc) -fopenmp fim_ut.c fft.c fim.c fim_tiff.c $(CFLAGS) -lm -o fim_ut -lfftw3f -lfftw3f_threads -ltiff
+
+ftab_ut: ftab.c
+	$(cc) ftab_ut.c ftab.c $(CFLAGS) -o ftab_ut
 
 # Read a tif file and write it back as foo.tif
 fim_tiff_ut:
