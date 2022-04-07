@@ -10,6 +10,7 @@
 
 #include "fim.h"
 #include "fim_tiff.h"
+#include "ftab.h"
 #include "dw_version.h"
 #include "fwhm.h"
 

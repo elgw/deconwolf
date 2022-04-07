@@ -30,6 +30,7 @@
 #include "fft.h"
 typedef float afloat;
 #include "fim_tiff.h"
+#include "ftab.h"
 
 #ifdef _OPENMP // turned on with -fopenmp
 #include <omp.h>
@@ -257,27 +258,12 @@ void fim_histogram_free(fim_histogram_t * H);
  * wu2005optimizing for something smarter. */
 int * fim_conncomp6(float * Im, size_t M, size_t N);
 
-/* row-major table */
-typedef struct {
-    float * T;
-    size_t nrow;
-    size_t ncol;
-    size_t nrow_alloc; /* To know if we need to extend the size */
-    char ** colnames; /* Name of columns */
-} fim_table_t;
-
-fim_table_t * fim_table_from_tsv(char * fname);
-void fim_table_free(fim_table_t * T);
-void fim_table_insert(fim_table_t * T, float * row);
-/* Get the index of a certain column name
- * Returns -1 on failure */
-int fim_table_get_col(fim_table_t * T, char * name);
 
 /* Find local maxima in I */
-//fim_table_t * fim_lmax(const float * I, size_t M, size_t N, size_t P);
-fim_table_t * fim_lmax(const float * Im, size_t M, size_t N, size_t P);
+//ftab_t * fim_lmax(const float * I, size_t M, size_t N, size_t P);
+ftab_t * fim_lmax(const float * Im, size_t M, size_t N, size_t P);
 /* Sort with largest value first */
-void fim_table_sort(fim_table_t * T, int col);
+void ftab_sort(ftab_t * T, int col);
 
 /* Spatial convolution */
 

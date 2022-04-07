@@ -239,7 +239,7 @@ static int file_exist(char * fname)
 }
 
 
-static size_t write_dots(const opts * s, fim_image_t * V, const fim_table_t * T, FILE * fid)
+static size_t write_dots(const opts * s, fim_image_t * V, const ftab_t * T, FILE * fid)
 {
     struct timespec tstart, tend;
     float * fwhm = NULL;
@@ -387,8 +387,8 @@ int dw_dots(int argc, char ** argv)
     {
         printf("Detecting local maxima\n");
     }
-    fim_table_t * T = fim_lmax(feature, M, N, P);
-    fim_table_sort(T, 3); /* highest value first */
+    ftab_t * T = fim_lmax(feature, M, N, P);
+    ftab_sort(T, 3); /* highest value first */
 
     if(s->verbose > 1)
     {
@@ -446,7 +446,7 @@ int dw_dots(int argc, char ** argv)
     fprintf(s->log, "Wrote %zu dots. Done!\n", nwritten);
     //fprintf(s->log, "Optimal detection when \sigma = 0.425*FWHM\n");
 
-    fim_table_free(T);
+    ftab_free(T);
 
     free(fI);
     free(feature);
