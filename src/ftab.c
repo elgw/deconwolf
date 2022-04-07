@@ -33,7 +33,7 @@ void ftab_free(ftab_t * T)
 
     if(T->colnames != NULL)
     {
-        for(int kk = 0; kk<T->ncol; kk++)
+        for(size_t kk = 0; kk<T->ncol; kk++)
         {
             if(T->colnames[kk] != NULL)
             {
@@ -418,7 +418,7 @@ int ftab_ut()
     assert(T2 != NULL);
     assert(T2->ncol == T->ncol);
     assert(T2->nrow == T->nrow);
-    for(int kk = 0; kk<T->ncol; kk++)
+    for(size_t kk = 0; kk<T->ncol; kk++)
     {
         assert(strcmp(T->colnames[kk], T2->colnames[kk]) == 0);
     }

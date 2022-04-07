@@ -1788,14 +1788,12 @@ float strel333_max(const float * I, size_t M, size_t N,
 
 ftab_t * fim_lmax(const float * I, size_t M, size_t N, size_t P)
 {
-    printf("!\n");
     ftab_t * T = ftab_new(4);
-    printf("!!\n");
     ftab_set_col_name(T, 0, "x");
     ftab_set_col_name(T, 1, "y");
     ftab_set_col_name(T, 2, "z");
     ftab_set_col_name(T, 3, "value");
-    printf(".\n");
+
     /* 3x3x3 structuring element with 26-connectivity */
     float * strel = malloc(27*sizeof(float));
     for(int kk = 0; kk<27; kk++)
