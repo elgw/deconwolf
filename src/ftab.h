@@ -14,8 +14,8 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-
-/* Floating point-only table */
+/* Floating point-only table stored in row-major format.
+*/
 
 #ifndef __ftab_h__
 #define __ftab_h__
@@ -37,13 +37,17 @@ typedef struct {
     size_t nrow;
     size_t ncol;
     size_t nrow_alloc; /* To know if we need to extend the size */
-    char ** colnames; /* Name of columns */
+    char ** colnames; /* Name of columns can be NULL*/
 } ftab_t;
 
 /* Create a new table with a fixed number of columns
  * Set column names with ftab_set_colname */
 ftab_t * ftab_new(int ncol);
-/* Load a TSV file */
+
+/* Load a TSV file. The first line is interpreted as
+ * containing the column names. Everything else is interpreted
+ * as float values.
+ */
 ftab_t * ftab_from_tsv(const char * fname);
 
 /* Write tsv file do disk */
@@ -59,17 +63,18 @@ void ftab_set_colname(ftab_t *, int col, const char * name);
 /* Free a ftab and all associated data */
 void ftab_free(ftab_t * T);
 
-/* Append a row */
+/* Append a row. Dynamically grows the table if needed. */
 void ftab_insert(ftab_t * T, float * row);
 
 /* Get the index of a certain column name
- * Returns -1 on failure */
+ * Returns -1 on failure. Undefined behavior if
+ * multiple columns have the same name. */
 int ftab_get_col(const ftab_t * T, const char * name);
 
 /* Some unit tests */
 int ftab_ut(void);
 
-/* Set the the data for one column. It is up to the caller to
+/* Set the data for one column. It is up to the caller to
  * verify that the number of elements in data is T->nrow
  */
 int ftab_set_coldata(ftab_t * T, int col, const float * data);

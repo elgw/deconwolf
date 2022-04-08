@@ -2507,19 +2507,24 @@ static float eig_sym_22_2nd(float a, float b, float c)
 
 ftab_t * fim_features_2d(const fim_t * fI)
 {
+    const int debug = 0; /* Write out the features  */
+    const char debug_image_name[] = "fim_features_2d_debug_image.tif";
+
     if(fI->P != 1)
     {
         fprintf(stderr, "fim_features_2d can only work with 2D images\n");
         exit(EXIT_FAILURE);
     }
     /* For varying sigmas */
-    float sigmas[] = {0.3, 0.7, 1, 1.6, 3.5, 5, 10};
-    int nsigma = 2;
+    //float sigmas[] = {0.3, 0.7, 1, 1.6, 3.5, 5, 10};
+    float sigmas[] = {1.5};
+    int nsigma = 1;
     int f_per_s = 7; /* Features per sigma */
+    int nfeatures = nsigma*f_per_s;
 
     ftab_t * T = malloc(sizeof(ftab_t));
     T->nrow = fI->M*fI->N;
-    T->ncol = nsigma*f_per_s;
+    T->ncol = nfeatures;
     T->T = malloc(T->ncol*T->nrow*sizeof(float));
     T->nrow_alloc = T->nrow;
     T->colnames = NULL;
@@ -2527,6 +2532,12 @@ ftab_t * fim_features_2d(const fim_t * fI)
     const size_t M = fI->M;
     const size_t N = fI->N;
     const size_t P = 1;
+
+    float * debug_image = NULL;
+    if(debug)
+    {
+        debug_image = malloc(M*N*nfeatures*sizeof(float));
+    }
 
     int col = 0;
     char * sbuff = malloc(1024);
@@ -2548,8 +2559,11 @@ ftab_t * fim_features_2d(const fim_t * fI)
         float * value = G->V;
         /* Gaussian, 1f */
         ftab_set_coldata(T, col, value);
+        debug == 1 ? memcpy(debug_image + M*N*col, value, M*N*sizeof(float)) : 0;
         sprintf(sbuff, "s%.1f_Gaussian", sigma);
         ftab_set_colname(T, col++, sbuff);
+        debug == 1 ? memcpy(debug_image + M*N*col, value, M*N*sizeof(float)) : 0;
+
 
         /* LoG, 1f, ddx+ddy*/
         for(size_t kk = 0; kk<M*N; kk++)
@@ -2557,6 +2571,7 @@ ftab_t * fim_features_2d(const fim_t * fI)
             value[kk] = ddx->V[kk] + ddy->V[kk];
         }
         ftab_set_coldata(T, col, value);
+        debug == 1 ? memcpy(debug_image + M*N*col, value, M*N*sizeof(float)) : 0;
         sprintf(sbuff, "s%.1f_LoG", sigma);
         ftab_set_colname(T, col++, sbuff);
 
@@ -2566,6 +2581,7 @@ ftab_t * fim_features_2d(const fim_t * fI)
             value[kk] = sqrt( pow(dx->V[kk], 2) + pow(dy->V[kk], 2));
         }
         ftab_set_coldata(T, col, value);
+        debug == 1 ? memcpy(debug_image + M*N*col, value, M*N*sizeof(float)) : 0;
         sprintf(sbuff, "s%.1f_GM", sigma);
         ftab_set_colname(T, col++, sbuff);
 
@@ -2578,6 +2594,7 @@ ftab_t * fim_features_2d(const fim_t * fI)
             value[kk] = eig_sym_22_1st(a, b, c);
         }
         ftab_set_coldata(T, col, value);
+        debug == 1 ? memcpy(debug_image + M*N*col, value, M*N*sizeof(float)) : 0;
         sprintf(sbuff, "s%.1f_ST_EV_1", sigma);
         ftab_set_colname(T, col++, sbuff);
 
@@ -2589,6 +2606,7 @@ ftab_t * fim_features_2d(const fim_t * fI)
             value[kk] = eig_sym_22_2nd(a, b, c);
         }
         ftab_set_coldata(T, col, value);
+        debug == 1 ? memcpy(debug_image + M*N*col, value, M*N*sizeof(float)) : 0;
         sprintf(sbuff, "s%.1f_ST_EV_2", sigma);
         ftab_set_colname(T, col++, sbuff);
 
@@ -2602,6 +2620,7 @@ ftab_t * fim_features_2d(const fim_t * fI)
             value[kk] = eig_sym_22_1st(a, b, c);
         }
         ftab_set_coldata(T, col, value);
+        debug == 1 ? memcpy(debug_image + M*N*col, value, M*N*sizeof(float)) : 0;
         sprintf(sbuff, "s%.1f_HE_EV_1", sigma);
         ftab_set_colname(T, col++, sbuff);
 
@@ -2613,6 +2632,7 @@ ftab_t * fim_features_2d(const fim_t * fI)
             value[kk] = eig_sym_22_2nd(a, b, c);
         }
         ftab_set_coldata(T, col, value);
+        debug == 1 ? memcpy(debug_image + M*N*col, value, M*N*sizeof(float)) : 0;
         sprintf(sbuff, "s%.1f_HE_EV_2", sigma);
         ftab_set_colname(T, col++, sbuff);
         fim_free(dx);
@@ -2623,6 +2643,13 @@ ftab_t * fim_features_2d(const fim_t * fI)
         fim_free(G);
     }
     free(sbuff); /* Free string buffer */
+    if(debug)
+    {
+        fim_tiff_write_float(debug_image_name,
+                             debug_image, NULL,
+                             M, N, nfeatures);
+        free(debug_image);
+    }
     return T;
 }
 
