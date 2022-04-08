@@ -70,6 +70,10 @@ static void opts_free(opts * s)
 }
 
 
+/* Read png image, when more green that red, set to 1, when more red
+ * than green set to 2. Everything else set to 0.
+ * http://www.libpng.org/pub/png/libpng-manual.txt
+ */
 fim_t * fim_png_read_green_red(char * fname)
 {
     fim_t * F = NULL;
@@ -283,6 +287,7 @@ int dw_otsu(int argc, char ** argv)
         // ftab_insert(features, ftab_get_col("class"), anno->V);
 
         /* Train classifier */
+        // Use prf_forest from pixel_random_forest
         fprintf(stderr, "Pipeline not finished!\n");
         exit(EXIT_FAILURE);
     }
