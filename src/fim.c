@@ -2507,7 +2507,7 @@ static float eig_sym_22_2nd(float a, float b, float c)
 
 ftab_t * fim_features_2d(const fim_t * fI)
 {
-    const int debug = 0; /* Write out the features  */
+    int debug = 0; /* Write out the features  */
     const char debug_image_name[] = "fim_features_2d_debug_image.tif";
 
     if(fI->P != 1)

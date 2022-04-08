@@ -6,9 +6,14 @@
 #include <string.h>
 #include <getopt.h>
 #include <libgen.h>
+
+#include <png.h>
+#include <zlib.h>
+
 #include "fim.h"
 #include "fim_tiff.h"
 #include "dw_version.h"
+
 
 int dw_otsu(int argc, char ** argv);
 

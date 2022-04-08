@@ -2,9 +2,9 @@ cc=gcc
 CFLAGS=-lm -Wno-unknown-pragmas -Wall -g
 CFLAGS2=-lm -Wno-unknown-pragmas -Wall -O3 -flto -march=native -ftree-vectorize
 
-cflags+=-fopenmp
-cflags+=`pkg-config cairo --cflags`
-ldflags+=`pkg-config cairo --libs`
+cflags+=-fopenmp -Wall -Wextra -g
+cflags+=`pkg-config cairo libpng --cflags`
+ldflags+=`pkg-config cairo libpng --libs`
 ldflags+=-lm -ltiff -lfftw3f -lfftw3f_threads
 
 all: tiling_ut fft_ut fim_ut
@@ -16,6 +16,10 @@ fft_ut:
 
 dw_render: dw_render.c dw_render.h fim.c ftab.c fim_tiff.c
 	$(cc) $(cflags) -DSTANDALONE dw_render.c fim.c fim_tiff.c fft.c ftab.c $(ldflags) -o dw_render
+
+dw_otsu: dw_otsu.c fim.c ftab.c fim_tiff.c
+	$(cc) $(cflags) -DSTANDALONE dw_otsu.c fim.c fim_tiff.c fft.c ftab.c $(ldflags) -o dw_otsu
+
 
 # Test the float image module
 fim_ut: fim_ut.c fim.c fim.h

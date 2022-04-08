@@ -46,7 +46,10 @@
 #include "dw_maxproj.h"
 #include "dw_imshift.h"
 #include "dw_version.h"
-#include "dw_otsu.h"
+/* Uncomment to include, requires linking with libpng and libz
+ * can be build separately by the makefile in the src folder
+ */
+// #include "dw_otsu.h"
 #include "dw_dots.h"
 
 #include "fim.h"
