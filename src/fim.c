@@ -28,6 +28,18 @@ static double clockdiff(struct timespec* end, struct timespec * start)
     return elapsed;
 }
 
+void fim_free(fim_t * F)
+{
+    if(F != NULL)
+    {
+        if(F->V != NULL)
+        {
+            free(F->V);
+        }
+        free(F);
+    }
+    return;
+}
 
 fim_t * fim_image_from_array(const float * V, size_t M, size_t N, size_t P)
 {
@@ -455,6 +467,16 @@ float * fim_copy(const float * restrict V, const size_t N)
     return C;
 }
 
+fim_t * fimt_copy(const fim_t * F)
+{
+    fim_t * C = malloc(sizeof(fim_t));
+    C->V = fim_copy(F->V, F->M*F->N*F->P);
+    C->M = F->M;
+    C->N = F->N;
+    C->P = F->P;
+    return C;
+}
+
 float * fim_zeros(const size_t N)
 // Allocate and return an array of N floats
 {
@@ -463,6 +485,21 @@ float * fim_zeros(const size_t N)
     memset(A, 0, N*sizeof(float));
     return A;
 }
+
+fim_t * fimt_zeros(const size_t M, const size_t N, const size_t P)
+// Allocate and return an array of N floats
+{
+    size_t n = M*N*P;
+    fim_t * F = malloc(sizeof(fim_t));
+    F->V = fftwf_malloc(n*sizeof(float));
+    assert(F->V != NULL);
+    F->M = M;
+    F->N = N;
+    F->P = P;
+    memset(F->V, 0, n*sizeof(float));
+    return F;
+}
+
 
 float * fim_constant(const size_t N, const float value)
 // Allocate and return an array of N floats sets to a constant value
@@ -1010,6 +1047,7 @@ void fim_conv1_vector_ut()
 
 void fim_LoG_ut()
 {
+    printf("-> fim_LoG_ut");
     struct timespec tstart, tend;
     size_t M = 12;
     size_t N = 12;
@@ -1120,50 +1158,6 @@ void fim_LoG_ut()
     free(T);
 }
 
-void fim_ut()
-{
-    fim_LoG_ut();
-    fim_conv1_vector_ut();
-    fim_conncomp6_ut();
-    exit(EXIT_SUCCESS);
-    fim_otsu_ut();
-    exit(EXIT_SUCCESS);
-    fim_flipall_ut();
-    shift_vector_ut();
-    size_t N = 0;
-    float sigma = 1;
-    float * K = gaussian_kernel(sigma, &N);
-    assert(N>0);
-    printf("gaussian_kernel, sigma=%f\n", sigma);
-    show_vec(K, N);
-    free(K);
-    sigma = 0.5;
-    K = gaussian_kernel(sigma, &N);
-    printf("gaussian_kernel, sigma=%f\n", sigma);
-    show_vec(K, N);
-
-    int nV = 10;
-    float * V = malloc(nV*sizeof(float));
-    for(int kk = 0; kk<nV; kk++)
-    {
-        V[kk] = kk;
-    }
-    printf("V=");
-    show_vec(V, nV);
-    fim_conv1_vector(V, 1, NULL, nV, K, N, 1);
-    printf("V*K = ");
-    show_vec(V, nV);
-
-    free(V);
-    free(K);
-
-    fim_cumsum_ut();
-    fim_local_sum_ut();
-    //exit(EXIT_FAILURE);
-    myfftw_start(1, 1, stdout);
-    fim_xcorr2_ut();
-    myfftw_stop();
-}
 
 #if 0
 static size_t min_size_t(size_t a, size_t b)
@@ -1328,6 +1322,47 @@ static float * gaussian_kernel(float sigma, size_t * nK)
     nK[0] = N;
     return K;
 }
+
+static float * gaussian_kernel_d1(float sigma, size_t * nK)
+{
+    /* First derivative of a Gaussian kernel */
+
+    /* Determine the size so that most of the signal is captured */
+    int len = 1; /* The total number of elements will be at least 3 */
+    while(erf((len+1.0)/sigma) < 1.0-1e-8)
+    {
+        len++;
+    }
+    int N = 2*len + 1;
+
+    float * K = malloc(N*sizeof(float));
+    float mid = (N-1)/2;
+
+    float s2 = pow(sigma, 2);
+    for(int kk = 0; kk<N; kk++)
+    {
+        float x = (float) kk-mid;
+        K[kk] = exp(-0.5*pow(x,2)/s2);
+    }
+
+    /* Normalize the sum to 1 */
+    float sum = 0;
+    for(int kk = 0; kk<N; kk++)
+        sum+=K[kk];
+
+    for(int kk = 0; kk<N; kk++)
+        K[kk]/=sum;
+
+    for(int kk = 0; kk<N; kk++)
+    {
+        float x = (float) kk-mid;
+        K[kk] *= -x/s2;
+    }
+
+    nK[0] = N;
+    return K;
+}
+
 
 static float * gaussian_kernel_d2(float sigma, size_t * nK)
 {
@@ -2233,6 +2268,46 @@ float * fim_LoG_S(const float * V, const size_t M, const size_t N, const size_t 
 }
 
 
+/* Parital derivative in dimension dim */
+fim_t * fimt_partial(const fim_t * F, const int dim, const float sigma)
+{
+
+    if(F->P != 1)
+    {
+        fprintf(stderr, "fimt_partial only supports 2D images (please fix me)\n");
+        exit(EXIT_FAILURE);
+    }
+
+    size_t nG = 0;
+    float * G = gaussian_kernel(sigma, &nG);
+    size_t nD1;
+    float * D1 = gaussian_kernel_d1(sigma, &nD1);
+
+
+    fim_t * D = fimt_copy(F);
+    if(dim == 0)
+    {
+        fim_convn1(D->V, D->M, D->N, D->P, D1, nD1, 0, 0);
+        fim_convn1(D->V, D->M, D->N, D->P, G, nG, 1, 0);
+        free(D1);
+        free(G);
+        return D;
+    }
+    if(dim == 1)
+    {
+        fim_convn1(D->V, D->M, D->N, D->P, G, nG, 0, 0);
+        fim_convn1(D->V, D->M, D->N, D->P, D1, nD1, 1, 0);
+        free(D1);
+        free(G);
+        return D;
+    }
+
+    fprintf(stderr, "Something went wrong in fimt_partial dim=%d\n", dim);
+    exit(EXIT_FAILURE);
+
+
+}
+
 float * fim_LoG(const float * V, const size_t M, const size_t N, const size_t P,
                 const float sigmaxy, const float sigmaz)
 {
@@ -2417,6 +2492,19 @@ fim_t * fim_shiftdim(fim_t * I)
     return O;
 }
 
+/* 1st Eigenvalue of the matrix [a, c ; c, b]*/
+static float eig_sym_22_1st(float a, float b, float c)
+{
+    return 0.5*(a+b + sqrt(pow(a-b,2) + 4*pow(c,2)) );
+}
+
+/* 2nd Eigenvalue of the matrix [a, c ; c, b]*/
+static float eig_sym_22_2nd(float a, float b, float c)
+{
+    return 0.5*(a+b - sqrt(pow(a-b,2) + 4*pow(c,2)) );
+}
+
+
 ftab_t * fim_features_2d(const fim_t * fI)
 {
     if(fI->P != 1)
@@ -2426,16 +2514,16 @@ ftab_t * fim_features_2d(const fim_t * fI)
     }
     /* For varying sigmas */
     float sigmas[] = {0.3, 0.7, 1, 1.6, 3.5, 5, 10};
-    int nsigma = 7;
+    int nsigma = 2;
     int f_per_s = 7; /* Features per sigma */
 
     ftab_t * T = malloc(sizeof(ftab_t));
     T->nrow = fI->M*fI->N;
     T->ncol = nsigma*f_per_s;
     T->T = malloc(T->ncol*T->nrow*sizeof(float));
-    T->colnames = malloc(T->ncol*sizeof(char*));
+    T->nrow_alloc = T->nrow;
+    T->colnames = NULL;
 
-    const float * I = fI->V;
     const size_t M = fI->M;
     const size_t N = fI->N;
     const size_t P = 1;
@@ -2445,43 +2533,174 @@ ftab_t * fim_features_2d(const fim_t * fI)
     for(int ss = 0; ss<nsigma; ss++)
     {
         float sigma = sigmas[ss];
+        printf("sigma = %f\n", sigma);
 
-    /* Gaussian, 1f */
-        float * G = malloc(M*N*sizeof(float));
-        memcpy(G, I, M*N*sizeof(float));
-        fim_gsmooth(G, M, N, P, sigma);
-        ftab_set_coldata(T, col, G);
+        fim_t * G = fimt_copy(fI);
+
+        fim_gsmooth(G->V, M, N, P, sigma);
+
+        fim_t * dx = fimt_partial(fI, 0, sigma);
+        fim_t * dy = fimt_partial(fI, 1, sigma);
+        fim_t * ddx = fimt_partial(dx, 0, sigma);
+        fim_t * ddy = fimt_partial(dy, 1, sigma);
+        fim_t * dxdy = fimt_partial(dx, 1, sigma);
+
+        float * value = G->V;
+        /* Gaussian, 1f */
+        ftab_set_coldata(T, col, value);
         sprintf(sbuff, "s%.1f_Gaussian", sigma);
         ftab_set_colname(T, col++, sbuff);
 
-    /* LoG, 1f, ddx+ddy*/
+        /* LoG, 1f, ddx+ddy*/
+        for(size_t kk = 0; kk<M*N; kk++)
+        {
+            value[kk] = ddx->V[kk] + ddy->V[kk];
+        }
+        ftab_set_coldata(T, col, value);
         sprintf(sbuff, "s%.1f_LoG", sigma);
         ftab_set_colname(T, col++, sbuff);
 
-
     /* Gradient Magnitude, 1f (dx.^2 + dy.^2).^(1/2) */
+        for(size_t kk = 0; kk<M*N; kk++)
+        {
+            value[kk] = sqrt( pow(dx->V[kk], 2) + pow(dy->V[kk], 2));
+        }
+        ftab_set_coldata(T, col, value);
         sprintf(sbuff, "s%.1f_GM", sigma);
         ftab_set_colname(T, col++, sbuff);
 
-
     /* Eigenvalues of the Structure Tensor [dx*dx, dx*dy; dx*dy, dy*dy], 2f*/
+        for(size_t kk = 0; kk<M*N; kk++)
+        {
+            float a = dx->V[kk]*dx->V[kk];
+            float b = dy->V[kk]*dy->V[kk];
+            float c = dx->V[kk]*dy->V[kk];
+            value[kk] = eig_sym_22_1st(a, b, c);
+        }
+        ftab_set_coldata(T, col, value);
         sprintf(sbuff, "s%.1f_ST_EV_1", sigma);
         ftab_set_colname(T, col++, sbuff);
 
-
+        for(size_t kk = 0; kk<M*N; kk++)
+        {
+            float a = dx->V[kk]*dx->V[kk];
+            float b = dy->V[kk]*dy->V[kk];
+            float c = dx->V[kk]*dy->V[kk];
+            value[kk] = eig_sym_22_2nd(a, b, c);
+        }
+        ftab_set_coldata(T, col, value);
         sprintf(sbuff, "s%.1f_ST_EV_2", sigma);
         ftab_set_colname(T, col++, sbuff);
 
 
     /* Eigenvalues of the Hessian of Gaussians [ddx, dxdy; dxdy ddy], 2f */
+        for(size_t kk = 0; kk<M*N; kk++)
+        {
+            float a = ddx->V[kk];
+            float b = ddy->V[kk];
+            float c = dxdy->V[kk];
+            value[kk] = eig_sym_22_1st(a, b, c);
+        }
+        ftab_set_coldata(T, col, value);
         sprintf(sbuff, "s%.1f_HE_EV_1", sigma);
         ftab_set_colname(T, col++, sbuff);
 
-
+        for(size_t kk = 0; kk<M*N; kk++)
+        {
+            float a = ddx->V[kk];
+            float b = ddy->V[kk];
+            float c = dxdy->V[kk];
+            value[kk] = eig_sym_22_2nd(a, b, c);
+        }
+        ftab_set_coldata(T, col, value);
         sprintf(sbuff, "s%.1f_HE_EV_2", sigma);
         ftab_set_colname(T, col++, sbuff);
-
+        fim_free(dx);
+        fim_free(dy);
+        fim_free(ddx);
+        fim_free(ddy);
+        fim_free(dxdy);
+        fim_free(G);
     }
     free(sbuff); /* Free string buffer */
     return T;
+}
+
+void fim_features_2d_ut()
+{
+    printf("-> fim_features_2d_ut\n");
+    char file[] = "features_test.tif";
+    FILE * f = fopen(file, "r");
+    if(f == NULL)
+    {
+        printf("can't open %s aborting fim_features_2d_ut\n", file);
+        return;
+    }
+    fclose(f);
+
+    int64_t M = 0;
+    int64_t N = 0;
+    int64_t P = 0;
+
+    float * V = fim_tiff_read(file, NULL, &M, &N, &P, 0);
+    printf("%s is %ld %ld %ld image\n", file, M, N, P);
+    fim_t * I = malloc(sizeof(fim_t));
+    I->V = V;
+    I->M = M;
+    I->N = N;
+    I->P = P;
+    ftab_t * T = fim_features_2d(I);
+    T->nrow = 10;
+    ftab_print(stdout, T);
+    ftab_free(T);
+    fim_free(I);
+}
+
+
+
+void fim_ut()
+{
+    fim_features_2d_ut();
+    exit(EXIT_SUCCESS);
+    fim_LoG_ut();
+    fim_conv1_vector_ut();
+    fim_conncomp6_ut();
+    exit(EXIT_SUCCESS);
+    fim_otsu_ut();
+    exit(EXIT_SUCCESS);
+    fim_flipall_ut();
+    shift_vector_ut();
+    size_t N = 0;
+    float sigma = 1;
+    float * K = gaussian_kernel(sigma, &N);
+    assert(N>0);
+    printf("gaussian_kernel, sigma=%f\n", sigma);
+    show_vec(K, N);
+    free(K);
+    sigma = 0.5;
+    K = gaussian_kernel(sigma, &N);
+    printf("gaussian_kernel, sigma=%f\n", sigma);
+    show_vec(K, N);
+
+    int nV = 10;
+    float * V = malloc(nV*sizeof(float));
+    for(int kk = 0; kk<nV; kk++)
+    {
+        V[kk] = kk;
+    }
+    printf("V=");
+    show_vec(V, nV);
+    fim_conv1_vector(V, 1, NULL, nV, K, N, 1);
+    printf("V*K = ");
+    show_vec(V, nV);
+
+    free(V);
+    free(K);
+
+    fim_cumsum_ut();
+    fim_local_sum_ut();
+    //exit(EXIT_FAILURE);
+    myfftw_start(1, 1, stdout);
+    fim_xcorr2_ut();
+    myfftw_stop();
 }

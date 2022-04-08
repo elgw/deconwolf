@@ -443,10 +443,10 @@ int ftab_set_coldata(ftab_t * T, int col, const float * data)
         return EXIT_FAILURE;
     }
 
-    float * C = T->T+col;
+    float * C = T->T + col;
     for(size_t kk = 0; kk<T->nrow; kk++)
     {
-        C[kk*T->nrow] = data[kk];
+        C[kk*T->ncol] = data[kk];
     }
 
     return EXIT_SUCCESS;

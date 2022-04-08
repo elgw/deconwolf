@@ -19,7 +19,7 @@ dw_render: dw_render.c dw_render.h fim.c ftab.c fim_tiff.c
 
 # Test the float image module
 fim_ut: fim_ut.c fim.c fim.h
-	$(cc) -fopenmp fim_ut.c fft.c fim.c fim_tiff.c $(CFLAGS) -lm -o fim_ut -lfftw3f -lfftw3f_threads -ltiff
+	$(cc) -fopenmp fim_ut.c fft.c fim.c fim_tiff.c ftab.c $(CFLAGS) -lm -o fim_ut -lfftw3f -lfftw3f_threads -ltiff
 
 ftab_ut: ftab.c
 	$(cc) ftab_ut.c ftab.c $(CFLAGS) -o ftab_ut

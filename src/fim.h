@@ -55,6 +55,8 @@ typedef struct{
 
 /* Create a new object with a pointer to V */
 fim_t * fim_image_from_array(const float * V, size_t M, size_t N, size_t P);
+void fim_free(fim_t *);
+
 
 float fim_min(const float * A, size_t N);
 float fim_mean(const float * A, size_t N);
@@ -140,6 +142,8 @@ void fim_normalize_sum1(float * psf, int64_t M, int64_t N, int64_t P);
 /* Return a newly allocated copy of V */
 float * fim_copy(const float * restrict V, const size_t N);
 
+/* Return a new copy */
+fim_t * fimt_copy(const fim_t * );
 
 /* Allocate and return an array of N floats */
 float * fim_zeros(const size_t N);
@@ -312,6 +316,9 @@ double * fim_get_line_double(fim_t * Im,
 
 /* Similar to MATLABs shiftfim, [M,N,P] -> [N,P,M] */
 fim_t * fim_shiftdim(fim_t *);
+
+/* Partial derivative along dimension dim */
+fim_t * fimt_partial(const fim_t *, int dim, float sigma);
 
 /* Features for 2D image classification
  * the input image should be 2D.
