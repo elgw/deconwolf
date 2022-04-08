@@ -32,9 +32,9 @@ static double clockdiff(struct timespec* end, struct timespec * start)
 }
 
 
-fim_image_t * fim_image_from_array(const float * V, size_t M, size_t N, size_t P)
+fim_t * fim_image_from_array(const float * V, size_t M, size_t N, size_t P)
 {
-    fim_image_t * I = malloc(sizeof(fim_image_t));
+    fim_t * I = malloc(sizeof(fim_t));
     I->V = malloc(M*N*P*sizeof(float));
     memcpy(I->V, V, M*N*P*sizeof(float));
     I->M = M;
@@ -1025,10 +1025,10 @@ void fim_LoG_ut()
         V[kk] = kk % 100;
     }
 
-    fim_image_t * T = fim_image_from_array(V, M, N, P);
-    fim_image_t * S1 = fim_shiftdim(T);
-    fim_image_t * S2 = fim_shiftdim(S1);
-    fim_image_t * S3 = fim_shiftdim(S2);
+    fim_t * T = fim_image_from_array(V, M, N, P);
+    fim_t * S1 = fim_shiftdim(T);
+    fim_t * S2 = fim_shiftdim(S1);
+    fim_t * S3 = fim_shiftdim(S2);
     for(size_t kk = 0; kk<M*N*P; kk++)
     {
         if(T->V[kk] != S3->V[kk])
@@ -2146,18 +2146,18 @@ float * conv1_3(const float * V, size_t M, size_t N, size_t P,
     const int dim = 0;
     const int norm = 0;
 
-    fim_image_t * F = fim_image_from_array(V, M, N, P);
+    fim_t * F = fim_image_from_array(V, M, N, P);
 
     fim_convn1(F->V, F->M, F->N, F->P, K1, nK1, dim, norm);
-    fim_image_t * F2 = fim_shiftdim(F);
+    fim_t * F2 = fim_shiftdim(F);
     free(F->V);
     free(F);
     fim_convn1(F2->V, F2->M, F2->N, F2->P, K2, nK2, dim, norm);
-    fim_image_t * F3 = fim_shiftdim(F2);
+    fim_t * F3 = fim_shiftdim(F2);
     free(F2->V);
     free(F2);
     fim_convn1(F3->V, F3->M, F3->N, F3->P, K3, nK3, dim, norm);
-    fim_image_t * F4 = fim_shiftdim(F3);
+    fim_t * F4 = fim_shiftdim(F3);
     free(F3->V);
     free(F3);
     float * out = F4->V;
@@ -2326,7 +2326,7 @@ float * fim_LoG(const float * V, const size_t M, const size_t N, const size_t P,
     return LoG;
 }
 
-double * fim_get_line_double(fim_image_t * I,
+double * fim_get_line_double(fim_t * I,
                           int x, int y, int z,
                           int dim, int nPix)
 {
@@ -2369,7 +2369,7 @@ double * fim_get_line_double(fim_image_t * I,
     return L;
 }
 
-fim_image_t * fim_shiftdim(fim_image_t * I)
+fim_t * fim_shiftdim(fim_t * I)
 {
     const float * V = I->V;
     const size_t M = I->M;
@@ -2377,7 +2377,7 @@ fim_image_t * fim_shiftdim(fim_image_t * I)
     const size_t P = I->P;
 
     /* Output image */
-    fim_image_t * O = malloc(sizeof(fim_image_t));
+    fim_t * O = malloc(sizeof(fim_t));
     O->V = malloc(M*N*P*sizeof(float));
     O->M = N;
     O->N = P;

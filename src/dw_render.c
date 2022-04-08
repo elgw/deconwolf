@@ -250,7 +250,7 @@ static int file_exist(char * fname)
 
 
 
-cairo_surface_t * fim_image_to_cairo_surface(fim_image_t * I,
+cairo_surface_t * fim_to_cairo_surface(fim_t * I,
                                              float low, float high)
 {
     cairo_surface_t * result;
@@ -285,7 +285,7 @@ cairo_surface_t * fim_image_to_cairo_surface(fim_image_t * I,
     return result;
 }
 
-void render(opts * s, fim_image_t * I, ftab_t * T)
+void render(opts * s, fim_t * I, ftab_t * T)
 {
     printf("Creating max projection\n");
     float * M = fim_maxproj(I->V, I->M, I->N, I->P);
@@ -300,7 +300,7 @@ void render(opts * s, fim_image_t * I, ftab_t * T)
     float high = fim_histogram_percentile(H, s->phigh);
     printf("Using range [%f, %f]\n", low, high);
     fim_histogram_free(H);
-    cairo_surface_t * mip = fim_image_to_cairo_surface(I, low, high);
+    cairo_surface_t * mip = fim_to_cairo_surface(I, low, high);
 
     cairo_surface_t * surf = cairo_svg_surface_create (s->outfile,
                                                        I->M,
@@ -496,7 +496,7 @@ int dw_render(int argc, char ** argv)
 
     int64_t M = 0, N = 0, P = 0;
     float * A = fim_tiff_read(inFile, NULL, &M, &N, &P, s->verbose);
-    fim_image_t * I = fim_image_from_array(A, M, N, P);
+    fim_t * I = fim_image_from_array(A, M, N, P);
 
     ftab_t * T = NULL;
     if(s->dotfile != NULL)

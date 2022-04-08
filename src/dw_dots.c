@@ -238,7 +238,7 @@ static int file_exist(char * fname)
     }
 }
 
-static ftab_t * append_fwhm(opts * s, ftab_t * T, fim_image_t * V)
+static ftab_t * append_fwhm(opts * s, ftab_t * T, fim_t * V)
 {
     int xcol = ftab_get_col(T, "x");
     int ycol = ftab_get_col(T, "y");
@@ -420,7 +420,7 @@ int dw_dots(int argc, char ** argv)
     fprintf(s->log, "Suggested threshold (from %zu dots): %f\n", T->nrow, s->th);
     fim_histogram_free(H);
 
-    fim_image_t * fI = fim_image_from_array(feature, M, N, P);
+    fim_t * fI = fim_image_from_array(feature, M, N, P);
 
     if(s->fwhm)
     {

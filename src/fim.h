@@ -52,10 +52,10 @@ typedef struct{
     size_t M;
     size_t N;
     size_t P;
-} fim_image_t;
+} fim_t;
 
 /* Create a new object with a pointer to V */
-fim_image_t * fim_image_from_array(const float * V, size_t M, size_t N, size_t P);
+fim_t * fim_image_from_array(const float * V, size_t M, size_t N, size_t P);
 
 float fim_min(const float * A, size_t N);
 float fim_mean(const float * A, size_t N);
@@ -307,11 +307,11 @@ float * fim_LoG_S(const float * V, size_t M, size_t N, size_t P,
 
 
 /* Extract a line centered at (x, y, z) with nPix pixels along dimension dim */
-double * fim_get_line_double(fim_image_t * Im,
+double * fim_get_line_double(fim_t * Im,
                           int x, int y, int z,
                           int dim, int nPix);
 
 /* Similar to MATLABs shiftfim, [M,N,P] -> [N,P,M] */
-fim_image_t * fim_shiftdim(fim_image_t *);
+fim_t * fim_shiftdim(fim_t *);
 
 #endif /* _fim_h_ */
