@@ -270,7 +270,7 @@ static ftab_t * append_fwhm(opts * s, ftab_t * T, fim_t * V)
     ftab_t * T2 = ftab_new(T->ncol + 1);
     for(size_t cc = 0; cc<T->ncol; cc++)
     {
-        ftab_set_col_name(T2, cc, T->colnames[cc]);
+        ftab_set_colname(T2, cc, T->colnames[cc]);
     }
     float * row = malloc((T->nrow+1)*sizeof(float));
     for(size_t rr = 0; rr<T->nrow; rr++)
@@ -279,7 +279,7 @@ static ftab_t * append_fwhm(opts * s, ftab_t * T, fim_t * V)
         row[T->ncol] = fwhm[rr];
         ftab_insert(T2, row);
     }
-    ftab_set_col_name(T2, T->ncol, "fwhm");
+    ftab_set_colname(T2, T->ncol, "fwhm");
     ftab_free(T);
     free(row);
     free(fwhm);

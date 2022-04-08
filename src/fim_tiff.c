@@ -24,10 +24,7 @@
  * RowsPerStrip tag. A reader should not assume that each decoded strip contains a full set of rows in it.
  */
 
-//typedef float afloat __attribute__ ((__aligned__(16)));
-typedef float afloat;
-
-int fim_tiff_write_opt(const char * fName, const afloat * V,
+int fim_tiff_write_opt(const char * fName, const float * V,
                        ttags * T,
                        int64_t N, int64_t M, int64_t P, int scaling);
 
@@ -77,7 +74,7 @@ void fim_tiff_ut()
     //  printf("%s\n", fname);
     //  getchar();
     int64_t M = 1024, N = 2048, P = 2;
-    afloat * im = fim_zeros(M*N*P);
+    float * im = fim_zeros(M*N*P);
 
     size_t pos1 = 1111;
     size_t pos2 = 2222;
@@ -90,7 +87,7 @@ void fim_tiff_ut()
     fim_tiff_write(fname, im, NULL, M, N, P);
 
     int64_t M2 = 0, N2 = 0, P2 = 0;
-    afloat * im2 = fim_tiff_read(fname, NULL, &M2, &N2, &P2, 0);
+    float * im2 = fim_tiff_read(fname, NULL, &M2, &N2, &P2, 0);
     if(im2 == NULL)
     {
         printf("Could not read back the image\n");
@@ -121,7 +118,7 @@ void fim_tiff_ut()
 }
 
 
-void floatimage_normalize(afloat * restrict I, const size_t N)
+void floatimage_normalize(float * restrict I, const size_t N)
 {
     // Scale image to span the whole 16 bit range.
     float imax = I[0]; float imin = I[0];
@@ -152,7 +149,7 @@ void floatimage_normalize(afloat * restrict I, const size_t N)
 
 }
 
-void floatimage_show_stats(afloat * I, size_t N, size_t M, size_t P)
+void floatimage_show_stats(float * I, size_t N, size_t M, size_t P)
 {
     float isum = 0;
     float imin = I[0];
@@ -182,7 +179,7 @@ INLINED extern void sub2ind(size_t ind,
     m[0] = d.rem;
 }
 
-void readUint16_sub(TIFF * tfile, afloat * V,
+void readUint16_sub(TIFF * tfile, float * V,
                     const uint32_t ssize,
                     const uint32_t ndirs,
                     const uint32_t nstrips,
@@ -296,7 +293,7 @@ void readUint16(TIFF * tfile, float * V,
 }
 
 /*
-  void readFloat_sub(TIFF * tfile, afloat * V,
+  void readFloat_sub(TIFF * tfile, float * V,
   uint32_t ssize,
   uint32_t ndirs,
   uint32_t nstrips,
@@ -308,7 +305,7 @@ void readUint16(TIFF * tfile, float * V,
   }
 */
 
-void readFloat(TIFF * tfile, afloat * V,
+void readFloat(TIFF * tfile, float * V,
                uint32_t ssize,
                uint32_t ndirs,
                uint32_t nstrips,
@@ -674,7 +671,7 @@ int fim_tiff_write_zeros(const char * fName, int64_t N, int64_t M, int64_t P)
     return fim_tiff_write(fName, NULL, NULL, N, M, P);
 }
 
-int fim_tiff_write_float(const char * fName, const afloat * V,
+int fim_tiff_write_float(const char * fName, const float * V,
                          ttags * T,
                          int64_t N, int64_t M, int64_t P)
 {
@@ -755,7 +752,7 @@ int fim_tiff_write_float(const char * fName, const afloat * V,
     return 0;
 }
 
-int fim_tiff_write(const char * fName, const afloat * V,
+int fim_tiff_write(const char * fName, const float * V,
                    ttags * T,
                    int64_t N, int64_t M, int64_t P)
 {
@@ -763,7 +760,7 @@ int fim_tiff_write(const char * fName, const afloat * V,
     return fim_tiff_write_opt(fName, V, T, N, M, P, 1);
 }
 
-int fim_tiff_write_noscale(const char * fName, const afloat * V,
+int fim_tiff_write_noscale(const char * fName, const float * V,
                    ttags * T,
                    int64_t N, int64_t M, int64_t P)
 {
@@ -772,7 +769,7 @@ int fim_tiff_write_noscale(const char * fName, const afloat * V,
 }
 
 
-int fim_tiff_write_opt(const char * fName, const afloat * V,
+int fim_tiff_write_opt(const char * fName, const float * V,
                    ttags * T,
                        int64_t N, int64_t M, int64_t P, int scale)
 {
@@ -900,7 +897,7 @@ int fim_tiff_get_size(char * fname, int64_t * M, int64_t * N, int64_t * P)
 }
 
 
-afloat * fim_tiff_read(const char * fName,
+float * fim_tiff_read(const char * fName,
                        ttags * T,
                        int64_t * N0, int64_t * M0, int64_t * P0, int verbosity)
 {
@@ -1152,7 +1149,7 @@ void ttags_show(FILE * fout, ttags* T)
     return;
 }
 
-afloat * fim_tiff_read_sub(const char * fName,
+float * fim_tiff_read_sub(const char * fName,
                            ttags * T,
                            int64_t * M0, int64_t * N0, int64_t * P0, int verbosity,
                            int subregion,
@@ -1298,7 +1295,7 @@ afloat * fim_tiff_read_sub(const char * fName,
     // assert(M*N*BPS/8 == nstrips * ssize);
 
     //  size_t nel = nstrips * ssize * ndirs;
-    afloat * V = NULL;
+    float * V = NULL;
     size_t nel = M*N*ndirs;
     if(subregion)
     {
@@ -1401,7 +1398,7 @@ int main(int argc, char ** argv)
     int64_t M = 0, N = 0, P = 0;
 
     ttags * T = malloc(sizeof(ttags));
-    afloat * I = (afloat *) fim_tiff_read(inname, T, &M, &N, &P, 1);
+    float * I = (float *) fim_tiff_read(inname, T, &M, &N, &P, 1);
 
     ttags_show(stdout, T);
 

@@ -54,7 +54,7 @@ int ftab_print(FILE *, const ftab_t *);
 
 /* Set the name of a column
 * name can be freed */
-void ftab_set_col_name(ftab_t *, int col, const char * name);
+void ftab_set_colname(ftab_t *, int col, const char * name);
 
 /* Free a ftab and all associated data */
 void ftab_free(ftab_t * T);
@@ -68,5 +68,10 @@ int ftab_get_col(const ftab_t * T, const char * name);
 
 /* Some unit tests */
 int ftab_ut(void);
+
+/* Set the the data for one column. It is up to the caller to
+ * verify that the number of elements in data is T->nrow
+ */
+int ftab_set_coldata(ftab_t * T, int col, const float * data);
 
 #endif

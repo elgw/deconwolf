@@ -934,7 +934,7 @@ void fprint_peakMemory(FILE * fout)
 
 
 void benchmark_write(dw_opts * s, int iter, double fMSE,
-                     const afloat * x0, // current guess of work size
+                     const float * x0, // current guess of work size
                      const int64_t M, const int64_t N, const int64_t P,
                      const int64_t wM, const int64_t wN, const int64_t wP)
 {
@@ -943,7 +943,7 @@ void benchmark_write(dw_opts * s, int iter, double fMSE,
         return;
     }
 
-    afloat * x = fim_subregion(x0, wM, wN, wP, M, N, P);
+    float * x = fim_subregion(x0, wM, wN, wP, M, N, P);
 
     size_t MNP = M*N*P;
     double KL = 0;
@@ -993,7 +993,7 @@ float getErrorX(const float * restrict y, const float * restrict g, const int64_
 }
 
 
-float getError_idiv(const afloat * restrict y, const afloat * restrict g,
+float getError_idiv(const float * restrict y, const float * restrict g,
                     const int64_t M, const int64_t N, const int64_t P,
                     const int64_t wM, const int64_t wN, const int64_t wP)
 {
@@ -1030,7 +1030,7 @@ float getError_idiv(const afloat * restrict y, const afloat * restrict g,
 /* Return the "error" or distance between the input image and the
    current guess convolved with the PSF. Also known as the forward
    error */
-float getError(const afloat * restrict y, const afloat * restrict g,
+float getError(const float * restrict y, const float * restrict g,
                const int64_t M, const int64_t N, const int64_t P,
                const int64_t wM, const int64_t wN, const int64_t wP,
                dw_metric metric)
@@ -1055,7 +1055,7 @@ float getError(const afloat * restrict y, const afloat * restrict g,
     return error;
 }
 
-float get_fMSE(const afloat * restrict y, const afloat * restrict g,
+float get_fMSE(const float * restrict y, const float * restrict g,
                const int64_t M, const int64_t N, const int64_t P,
                const int64_t wM, const int64_t wN, const int64_t wP)
 {
@@ -1086,7 +1086,7 @@ float get_fMSE(const afloat * restrict y, const afloat * restrict g,
     return (double) mse;
 }
 
-float get_fIdiv(const afloat * restrict y, const afloat * restrict g,
+float get_fIdiv(const float * restrict y, const float * restrict g,
                 const int64_t M, const int64_t N, const int64_t P,
                 const int64_t wM, const int64_t wN, const int64_t wP)
 {
@@ -1176,7 +1176,7 @@ fftwf_complex * initial_guess(const int64_t M, const int64_t N, const int64_t P,
 
     assert(wM >= M); assert(wN >= N); assert(wP >= P);
 
-    afloat * one = fim_zeros(wM*wN*wP);
+    float * one = fim_zeros(wM*wN*wP);
 
 #pragma omp parallel for shared(one)
     for(int64_t cc = 0; cc < P; cc++) {
@@ -1845,7 +1845,7 @@ void flatfieldCorrection(dw_opts * s, float * im, int64_t M, int64_t N, int64_t 
     printf("Experimental: applying flat field correction using %s\n", s->flatfieldFile);
     ttags * T = ttags_new();
     int64_t m = 0, n = 0, p = 0;
-    afloat * C = fim_tiff_read(s->flatfieldFile, T, &m, &n, &p, s->verbosity);
+    float * C = fim_tiff_read(s->flatfieldFile, T, &m, &n, &p, s->verbosity);
     ttags_free(&T);
 
     assert(m == M);
@@ -1945,7 +1945,7 @@ int dw_run(dw_opts * s)
     }
 
 
-    afloat * im = NULL;
+    float * im = NULL;
     ttags * T = ttags_new();
 
     if(tiling == 0)

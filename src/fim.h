@@ -28,7 +28,6 @@
 #include <time.h>
 
 #include "fft.h"
-typedef float afloat;
 #include "fim_tiff.h"
 #include "ftab.h"
 
@@ -186,13 +185,13 @@ void shift_vector_buf(float * restrict V,
     int64_t k, float * restrict buffer);
 
 /* Shift vector by interpolation */
-void shift_vector_float_buf(afloat * restrict V, // data
+void shift_vector_float_buf(float * restrict V, // data
                             const int64_t S, // stride
                             const int64_t N, // elements
                             int n, // integer shift
-                            afloat * restrict kernel, // centered kernel used for sub pixels shift
+                            float * restrict kernel, // centered kernel used for sub pixels shift
                             const int nkernel, // kernel size (odd!)
-                            afloat * restrict buffer);
+                            float * restrict buffer);
 
 /* Multiply a float array of size N by x */
 void fim_mult_scalar(float * fim, size_t N, float x);
@@ -313,5 +312,12 @@ double * fim_get_line_double(fim_t * Im,
 
 /* Similar to MATLABs shiftfim, [M,N,P] -> [N,P,M] */
 fim_t * fim_shiftdim(fim_t *);
+
+/* Features for 2D image classification
+ * the input image should be 2D.
+ * Uses similar features a Ilastic
+ * Returns one row per pixel
+ */
+ftab_t * fim_features_2d(const fim_t *);
 
 #endif /* _fim_h_ */

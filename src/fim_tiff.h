@@ -87,7 +87,7 @@ int fim_tiff_write(const char * fName, const float * V,
     int64_t M, int64_t N, int64_t P);
 
 /* Don't scale data */
-int fim_tiff_write_noscale(const char * fName, const afloat * V,
+int fim_tiff_write_noscale(const char * fName, const float * V,
                            ttags * T,
                            int64_t N, int64_t M, int64_t P);
 

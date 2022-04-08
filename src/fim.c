@@ -16,9 +16,6 @@
 
 #include "fim.h"
 
-//typedef float afloat __attribute__ ((__aligned__(16)));
-
-
 static float * gaussian_kernel(float sigma, size_t * nK);
 static void cumsum_array(float * A, size_t N, size_t stride);
 static void fim_show(float * A, size_t M, size_t N, size_t P);
@@ -43,7 +40,7 @@ fim_t * fim_image_from_array(const float * V, size_t M, size_t N, size_t P)
     return I;
 }
 
-int fim_maxAtOrigo(const afloat * restrict V, const int64_t M, const int64_t N, const int64_t P)
+int fim_maxAtOrigo(const float * restrict V, const int64_t M, const int64_t N, const int64_t P)
 /* Check that the MAX of the fim is in the middle
  * returns 1 on success.
  * Returns 0 if any of the image dimensions are even
@@ -122,7 +119,7 @@ void fim_argmax(const float * I,
     _aP[0] = aP;
 }
 
-float fim_sum(const afloat * restrict A, size_t N)
+float fim_sum(const float * restrict A, size_t N)
 {
     double sum = 0;
 #pragma omp parallel for shared(A) reduction(+:sum)
@@ -147,12 +144,12 @@ float fim_sum_double(const double * restrict A, size_t N)
 }
 
 
-float fim_mean(const afloat * A, size_t N)
+float fim_mean(const float * A, size_t N)
 {
     return fim_sum(A, N)/(float) N;
 }
 
-float fim_min(const afloat * A, size_t N)
+float fim_min(const float * A, size_t N)
 {
     float amin = INFINITY;
     for(size_t kk = 0; kk<N; kk++)
@@ -163,9 +160,9 @@ float fim_min(const afloat * A, size_t N)
     return amin;
 }
 
-void fim_div(afloat * restrict  A,
-             const afloat * restrict B,
-             const afloat * restrict C,
+void fim_div(float * restrict  A,
+             const float * restrict B,
+             const float * restrict C,
              const size_t N)
 /* A = B/C */
 {
@@ -181,9 +178,9 @@ void fim_div(afloat * restrict  A,
 
 
 
-void fim_minus(afloat * restrict  A,
-               const afloat * restrict B,
-               const afloat * restrict C,
+void fim_minus(float * restrict  A,
+               const float * restrict B,
+               const float * restrict C,
                const size_t N)
 /* A = B - C */
 {
@@ -198,7 +195,7 @@ void fim_minus(afloat * restrict  A,
 }
 
 void fim_add(float * restrict  A,
-               const afloat * restrict B,
+               const float * restrict B,
                const size_t N)
 /* A[kk] += B[kk] */
 {
@@ -213,7 +210,7 @@ void fim_add(float * restrict  A,
 }
 
 
-float fim_max(const afloat * A, size_t N)
+float fim_max(const float * A, size_t N)
 {
     float amax = A[0];
 #pragma omp parallel for reduction(max:amax)
@@ -226,7 +223,7 @@ float fim_max(const afloat * A, size_t N)
 }
 
 
-void fim_stats(const afloat * A, const size_t N)
+void fim_stats(const float * A, const size_t N)
 {
     printf("min: %f mean: %f, max: %f\n",
            fim_min(A, N),
@@ -235,7 +232,7 @@ void fim_stats(const afloat * A, const size_t N)
     return;
 }
 
-float fim_mse(afloat * A, afloat * B, size_t N)
+float fim_mse(float * A, float * B, size_t N)
 /* mean( (A(:)-B(:)).^(1/2) )
  */
 {
@@ -248,7 +245,7 @@ float fim_mse(afloat * A, afloat * B, size_t N)
     return mse/N;
 }
 
-void fim_flipall(afloat * restrict T, const afloat * restrict A, const int64_t a1, const int64_t a2, const int64_t a3)
+void fim_flipall(float * restrict T, const float * restrict A, const int64_t a1, const int64_t a2, const int64_t a3)
 /* Equivalent to T = flip(flip(flip(A,1),2),3) in matlab */
 {
 #pragma omp parallel for shared(T, A)
@@ -265,8 +262,8 @@ void fim_flipall(afloat * restrict T, const afloat * restrict A, const int64_t a
 }
 
 
-void fim_insert(afloat * restrict T, const int64_t t1, const int64_t t2, const int64_t t3,
-                const afloat * restrict F, const int64_t f1, const int64_t f2, const int64_t f3)
+void fim_insert(float * restrict T, const int64_t t1, const int64_t t2, const int64_t t3,
+                const float * restrict F, const int64_t f1, const int64_t f2, const int64_t f3)
 /* Insert F [f1xf2xf3] into T [t1xt2xt3] in the "upper left" corner */
 {
     if(f3 > t3 || f2 > t2 || f1 > t1)
@@ -296,8 +293,8 @@ void fim_insert(afloat * restrict T, const int64_t t1, const int64_t t2, const i
     return;
 }
 
-void fim_insert_ref(afloat * T, int64_t t1, int64_t t2, int64_t t3,
-                    afloat * F, int64_t f1, int64_t f2, int64_t f3)
+void fim_insert_ref(float * T, int64_t t1, int64_t t2, int64_t t3,
+                    float * F, int64_t f1, int64_t f2, int64_t f3)
 /* Insert F [f1xf2xf3] into T [t1xt2xt3] in the "upper left" corner
  * Target, T is larger than F*/
 {
@@ -321,7 +318,7 @@ void fim_insert_ref(afloat * T, int64_t t1, int64_t t2, int64_t t3,
         {
             for(int64_t mm = 0; mm<f1; mm++)
             {
-                afloat x = F[mm + nn*f1 + pp*f1*f2];
+                float x = F[mm + nn*f1 + pp*f1*f2];
                 T[mm + nn*t1 + pp*t1*t2] = x;
             }
         }
@@ -330,7 +327,7 @@ void fim_insert_ref(afloat * T, int64_t t1, int64_t t2, int64_t t3,
 }
 
 
-afloat * fim_get_cuboid(afloat * restrict A, const int64_t M, const int64_t N, const int64_t P,
+float * fim_get_cuboid(float * restrict A, const int64_t M, const int64_t N, const int64_t P,
                         const int64_t m0, const int64_t m1, const int64_t n0, const int64_t n1, const int64_t p0, const int64_t p1)
 {
 
@@ -342,7 +339,7 @@ afloat * fim_get_cuboid(afloat * restrict A, const int64_t M, const int64_t N, c
     int64_t n = n1-n0+1;
     int64_t p = p1-p0+1;
 
-    afloat * C = fftwf_malloc(m*n*p*sizeof(float));
+    float * C = fftwf_malloc(m*n*p*sizeof(float));
     assert(C != NULL);
 
 #pragma omp parallel for shared(C, A)
@@ -367,12 +364,12 @@ afloat * fim_get_cuboid(afloat * restrict A, const int64_t M, const int64_t N, c
     return C;
 }
 
-afloat * fim_subregion(const afloat * restrict A, const int64_t M, const int64_t N, const int64_t P, const int64_t m, const int64_t n, const int64_t p)
+float * fim_subregion(const float * restrict A, const int64_t M, const int64_t N, const int64_t P, const int64_t m, const int64_t n, const int64_t p)
 {
     ((void) P);
 
     /* Extract sub region starting at (0,0,0) */
-    afloat * S = fftwf_malloc(m*n*p*sizeof(float));
+    float * S = fftwf_malloc(m*n*p*sizeof(float));
     assert(S != NULL);
 #pragma omp parallel for shared(S, A)
     for(int64_t pp = 0; pp<p; pp++)
@@ -392,10 +389,10 @@ afloat * fim_subregion(const afloat * restrict A, const int64_t M, const int64_t
     return S;
 }
 
-afloat * fim_subregion_ref(afloat * A, int64_t M, int64_t N, int64_t P, int64_t m, int64_t n, int64_t p)
+float * fim_subregion_ref(float * A, int64_t M, int64_t N, int64_t P, int64_t m, int64_t n, int64_t p)
 {
     ((void) P);
-    afloat * S = fftwf_malloc(m*n*p*sizeof(float));
+    float * S = fftwf_malloc(m*n*p*sizeof(float));
     assert(S != NULL);
     for(int64_t mm = 0; mm<m; mm++)
     {
@@ -414,7 +411,7 @@ afloat * fim_subregion_ref(afloat * A, int64_t M, int64_t N, int64_t P, int64_t 
     return S;
 }
 
-void fim_set_min_to_zero(afloat * I, size_t N)
+void fim_set_min_to_zero(float * I, size_t N)
 {
     float min = fim_min(I, N);
 #pragma omp parallel for shared(I)
@@ -424,7 +421,7 @@ void fim_set_min_to_zero(afloat * I, size_t N)
     }
 }
 
-void fim_mult_scalar(afloat * I, size_t N, float x)
+void fim_mult_scalar(float * I, size_t N, float x)
 {
 #pragma omp parallel for shared(I)
     for(size_t kk = 0; kk < N ; kk++)
@@ -433,7 +430,7 @@ void fim_mult_scalar(afloat * I, size_t N, float x)
     }
 }
 
-void fim_normalize_sum1(afloat * psf, int64_t M, int64_t N, int64_t P)
+void fim_normalize_sum1(float * psf, int64_t M, int64_t N, int64_t P)
 /*
  * MATLAB:
  * Y = X/max(X(:))
@@ -450,27 +447,27 @@ void fim_normalize_sum1(afloat * psf, int64_t M, int64_t N, int64_t P)
     { psf[kk]/=psf_sum; }
 }
 
-afloat * fim_copy(const afloat * restrict V, const size_t N)
+float * fim_copy(const float * restrict V, const size_t N)
 // Return a newly allocated copy of V
 {
-    afloat * C = fftwf_malloc(N*sizeof(float));
+    float * C = fftwf_malloc(N*sizeof(float));
     memcpy(C, V, N*sizeof(float));
     return C;
 }
 
-afloat * fim_zeros(const size_t N)
+float * fim_zeros(const size_t N)
 // Allocate and return an array of N floats
 {
-    afloat * A = fftwf_malloc(N*sizeof(float));
+    float * A = fftwf_malloc(N*sizeof(float));
     assert(A != NULL);
     memset(A, 0, N*sizeof(float));
     return A;
 }
 
-afloat * fim_constant(const size_t N, const float value)
+float * fim_constant(const size_t N, const float value)
 // Allocate and return an array of N floats sets to a constant value
 {
-    afloat * A = fftwf_malloc(N*sizeof(float));
+    float * A = fftwf_malloc(N*sizeof(float));
 #pragma omp parallel for shared(A)
     for(size_t kk = 0; kk<N; kk++)
     {
@@ -479,7 +476,7 @@ afloat * fim_constant(const size_t N, const float value)
     return A;
 }
 
-void fim_circshift(afloat * restrict A,
+void fim_circshift(float * restrict A,
                    const int64_t M, const int64_t N, const int64_t P,
                    const int64_t sm, const int64_t sn, const int64_t sp)
 /* Shift the image A [MxNxP] by sm, sn, sp in each dimension */
@@ -497,7 +494,7 @@ void fim_circshift(afloat * restrict A,
     }
 
     const size_t bsize = fmax(fmax(M, N), P);
-    afloat * restrict buf = malloc(bsize*sizeof(float)*nThreads);
+    float * restrict buf = malloc(bsize*sizeof(float)*nThreads);
 
 
     /* Dimension 1 */
@@ -576,7 +573,7 @@ static float * kernel_linear_shift(float delta, int * _N)
 
 /* Shift the image A [MxNxP] by dm, dn, dp in each dimension,
  * What is outside of the image is interpreted as zero */
-void fim_shift(afloat * restrict A,
+void fim_shift(float * restrict A,
                const int64_t M, const int64_t N, const int64_t P,
                const float dm, const float dn, const float dp)
 {
@@ -609,7 +606,7 @@ void fim_shift(afloat * restrict A,
     }
 
     const size_t bsize = fmax(fmax(M, N), P);
-    afloat * restrict buf = malloc(bsize*sizeof(float)*nThreads);
+    float * restrict buf = malloc(bsize*sizeof(float)*nThreads);
 
 
     /* Dimension 1 */
@@ -688,13 +685,13 @@ INLINED static int64_t mod_int(const int64_t a, const int64_t b)
 
 
 /* Shift vector by interpolation */
-void shift_vector_float_buf(afloat * restrict V, // data
+void shift_vector_float_buf(float * restrict V, // data
                             const int64_t S, // stride
                             const int64_t N, // elements
                             int n, // integer shift
-                            afloat * restrict kernel, // centered kernel used for sub pixels shift
+                            float * restrict kernel, // centered kernel used for sub pixels shift
                             const int nkernel, // kernel size (odd!)
-                            afloat * restrict buffer)
+                            float * restrict buffer)
 {
     // 1. Sub pixel shift by convolution (conv1) of signal and kernel
     // 2. Integer part of the shift
@@ -729,11 +726,11 @@ void shift_vector_float_buf(afloat * restrict V, // data
 }
 
 
-void shift_vector_buf(afloat * restrict V, // data
+void shift_vector_buf(float * restrict V, // data
                       const int64_t S, // stride
                       const int64_t N, // elements
                       int64_t k, // shift
-                      afloat * restrict buffer)
+                      float * restrict buffer)
 /* Circular shift of a vector of length N with stride S by step k */
 {
 
@@ -749,21 +746,21 @@ void shift_vector_buf(afloat * restrict V, // data
     return;
 }
 
-void shift_vector(afloat * restrict V,
+void shift_vector(float * restrict V,
                   const int64_t S,
                   const int64_t N,
                   const int64_t k)
 /* Circular shift of a vector of length N with stride S by step k */
 {
 
-    afloat * buffer = malloc(N*sizeof(float));
+    float * buffer = malloc(N*sizeof(float));
     shift_vector_buf(V, S, N, k, buffer);
     free(buffer);
     return;
 }
 
 
-afloat * fim_expand(const afloat * restrict in,
+float * fim_expand(const float * restrict in,
                     const int64_t pM, const int64_t pN, const int64_t pP,
                     const int64_t M, const int64_t N, const int64_t P)
 /* "expand an image" by making it larger
@@ -775,7 +772,7 @@ afloat * fim_expand(const afloat * restrict in,
     assert(pN<=N);
     assert(pP<=P);
 
-    afloat * out = fftwf_malloc(M*N*P*sizeof(float));
+    float * out = fftwf_malloc(M*N*P*sizeof(float));
     assert(in != NULL);
     assert(out != NULL);
     for(size_t kk = 0; kk < (size_t) M*N*P; kk++)
@@ -1789,10 +1786,10 @@ float strel333_max(const float * I, size_t M, size_t N,
 ftab_t * fim_lmax(const float * I, size_t M, size_t N, size_t P)
 {
     ftab_t * T = ftab_new(4);
-    ftab_set_col_name(T, 0, "x");
-    ftab_set_col_name(T, 1, "y");
-    ftab_set_col_name(T, 2, "z");
-    ftab_set_col_name(T, 3, "value");
+    ftab_set_colname(T, 0, "x");
+    ftab_set_colname(T, 1, "y");
+    ftab_set_colname(T, 2, "z");
+    ftab_set_colname(T, 3, "value");
 
     /* 3x3x3 structuring element with 26-connectivity */
     float * strel = malloc(27*sizeof(float));
@@ -2418,4 +2415,73 @@ fim_t * fim_shiftdim(fim_t * I)
     }
 
     return O;
+}
+
+ftab_t * fim_features_2d(const fim_t * fI)
+{
+    if(fI->P != 1)
+    {
+        fprintf(stderr, "fim_features_2d can only work with 2D images\n");
+        exit(EXIT_FAILURE);
+    }
+    /* For varying sigmas */
+    float sigmas[] = {0.3, 0.7, 1, 1.6, 3.5, 5, 10};
+    int nsigma = 7;
+    int f_per_s = 7; /* Features per sigma */
+
+    ftab_t * T = malloc(sizeof(ftab_t));
+    T->nrow = fI->M*fI->N;
+    T->ncol = nsigma*f_per_s;
+    T->T = malloc(T->ncol*T->nrow*sizeof(float));
+    T->colnames = malloc(T->ncol*sizeof(char*));
+
+    const float * I = fI->V;
+    const size_t M = fI->M;
+    const size_t N = fI->N;
+    const size_t P = 1;
+
+    int col = 0;
+    char * sbuff = malloc(1024);
+    for(int ss = 0; ss<nsigma; ss++)
+    {
+        float sigma = sigmas[ss];
+
+    /* Gaussian, 1f */
+        float * G = malloc(M*N*sizeof(float));
+        memcpy(G, I, M*N*sizeof(float));
+        fim_gsmooth(G, M, N, P, sigma);
+        ftab_set_coldata(T, col, G);
+        sprintf(sbuff, "s%.1f_Gaussian", sigma);
+        ftab_set_colname(T, col++, sbuff);
+
+    /* LoG, 1f, ddx+ddy*/
+        sprintf(sbuff, "s%.1f_LoG", sigma);
+        ftab_set_colname(T, col++, sbuff);
+
+
+    /* Gradient Magnitude, 1f (dx.^2 + dy.^2).^(1/2) */
+        sprintf(sbuff, "s%.1f_GM", sigma);
+        ftab_set_colname(T, col++, sbuff);
+
+
+    /* Eigenvalues of the Structure Tensor [dx*dx, dx*dy; dx*dy, dy*dy], 2f*/
+        sprintf(sbuff, "s%.1f_ST_EV_1", sigma);
+        ftab_set_colname(T, col++, sbuff);
+
+
+        sprintf(sbuff, "s%.1f_ST_EV_2", sigma);
+        ftab_set_colname(T, col++, sbuff);
+
+
+    /* Eigenvalues of the Hessian of Gaussians [ddx, dxdy; dxdy ddy], 2f */
+        sprintf(sbuff, "s%.1f_HE_EV_1", sigma);
+        ftab_set_colname(T, col++, sbuff);
+
+
+        sprintf(sbuff, "s%.1f_HE_EV_2", sigma);
+        ftab_set_colname(T, col++, sbuff);
+
+    }
+    free(sbuff); /* Free string buffer */
+    return T;
 }

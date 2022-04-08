@@ -361,7 +361,7 @@ static int parse_floats(char * l, float * row, int nval)
     return 1;
 }
 
-void ftab_set_col_name(ftab_t * T, int col, const char * name)
+void ftab_set_colname(ftab_t * T, int col, const char * name)
 {
     // TODO check that only valid chars are used
     if(col < 0 || col >= (int) T->ncol)
@@ -394,10 +394,10 @@ int ftab_ut()
 {
     ftab_t * T = ftab_new(4);
     printf("T: %zu x %zu\n", T->nrow, T->ncol);
-    ftab_set_col_name(T, 0, "x");
-    ftab_set_col_name(T, 1, "y");
-    ftab_set_col_name(T, 2, "z");
-    ftab_set_col_name(T, 3, "value");
+    ftab_set_colname(T, 0, "x");
+    ftab_set_colname(T, 1, "y");
+    ftab_set_colname(T, 2, "z");
+    ftab_set_colname(T, 3, "value");
     ftab_print(stdout, T);
 
     float row[4] = {1, 2, 3, 1.23};
@@ -429,5 +429,25 @@ int ftab_ut()
     ftab_print(stdout, T);
     ftab_free(T);
     ftab_free(T2);
+    return EXIT_SUCCESS;
+}
+
+int ftab_set_coldata(ftab_t * T, int col, const float * data)
+{
+    if(T == NULL)
+    {
+        return EXIT_FAILURE;
+    }
+    if(col < 0 || (size_t) col >= T->ncol)
+    {
+        return EXIT_FAILURE;
+    }
+
+    float * C = T->T+col;
+    for(size_t kk = 0; kk<T->nrow; kk++)
+    {
+        C[kk*T->nrow] = data[kk];
+    }
+
     return EXIT_SUCCESS;
 }

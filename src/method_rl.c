@@ -1,13 +1,28 @@
-#include "method_eve.h"
+/*    Copyright (C) 2020 Erik L. G. Wernersson
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation, either version 3 of the License, or
+ *    (at your option) any later version.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
+#include "method_eve.h"
 
 /* One RL iteration */
  float iter_rl(
-                afloat ** xp, // Output, f_(t+1) xkp1
+                float ** xp, // Output, f_(t+1) xkp1
                 const float * restrict im, // Input image
                 fftwf_complex * restrict fftPSF,
-                afloat * restrict f, // Current guess, xk
-                afloat * restrict W, // Bertero Weights
+                float * restrict f, // Current guess, xk
+                float * restrict W, // Bertero Weights
                 const int64_t wM, const int64_t wN, const int64_t wP, // expanded size
                 const int64_t M, const int64_t N, const int64_t P, // input image size
                 __attribute__((unused)) const dw_opts * s)
@@ -16,7 +31,7 @@
 
      fftwf_complex * F = fft(f, wM, wN, wP); /* FFT#1 */
      putdot(s);
-     afloat * y = fft_convolve_cc_f2(fftPSF, F, wM, wN, wP); /* FFT#2 */
+     float * y = fft_convolve_cc_f2(fftPSF, F, wM, wN, wP); /* FFT#2 */
      putdot(s);
      float error = getError(y, im, M, N, P, wM, wN, wP, s->metric);
 
@@ -55,7 +70,7 @@
      fftwf_complex * F_sn = fft(y, wM, wN, wP); /* FFT#3 */
      fftwf_free(y);
      putdot(s);
-     afloat * x = fft_convolve_cc_conj_f2(fftPSF, F_sn, wM, wN, wP); /* FFT#4 */
+     float * x = fft_convolve_cc_conj_f2(fftPSF, F_sn, wM, wN, wP); /* FFT#4 */
      putdot(s);
 
      /* Eq. 18 in Bertero */
@@ -79,8 +94,8 @@
  }
 
 
- float * deconvolve_rl(afloat * restrict im, const int64_t M, const int64_t N, const int64_t P,
-                        afloat * restrict psf, const int64_t pM, const int64_t pN, const int64_t pP,
+ float * deconvolve_rl(float * restrict im, const int64_t M, const int64_t N, const int64_t P,
+                        float * restrict psf, const int64_t pM, const int64_t pN, const int64_t pP,
                         dw_opts * s)
  {
 
@@ -177,7 +192,7 @@
      /* 1. Expand the PSF to the job size,
       *    transform it and free the original allocation
       */
-     afloat * Z = fftwf_malloc(wMNP*sizeof(float));
+     float * Z = fftwf_malloc(wMNP*sizeof(float));
      memset(Z, 0, wMNP*sizeof(float));
      /* Insert the psf into the bigger Z */
      fim_insert(Z, wM, wN, wP,
@@ -209,7 +224,7 @@
 
 
      /* Step 2. Create the Weight map for Bertero boundary handling  */
-     afloat * W = NULL;
+     float * W = NULL;
      if(s->borderQuality > 0)
      {
          /* F_one is 1 over the image domain */
@@ -241,8 +256,8 @@
      /* Step 3. */
      float sumg = fim_sum(im, M*N*P);
 
-     afloat * xp = fim_constant(wMNP, sumg/wMNP); /* Initial guess */
-     afloat * x = NULL;
+     float * xp = fim_constant(wMNP, sumg/wMNP); /* Initial guess */
+     float * x = NULL;
      /* We enter the iterative loop,
       * Input arrays:
       *  im:      input image,
@@ -261,7 +276,7 @@
          if(s->iterdump > 0){
              if(it->iter % s->iterdump == 0)
              {
-                 afloat * temp = fim_subregion(x, wM, wN, wP, M, N, P);
+                 float * temp = fim_subregion(x, wM, wN, wP, M, N, P);
                  char * outname = gen_iterdump_name(s, it->iter);
                  //fulldump(s, temp, M, N, P, outname);
                  if(s->outFormat == 32)
@@ -327,7 +342,7 @@
      fftwf_free(fftPSF);
 
      /* Extract the observed region from the last iteration */
-     afloat * out = fim_subregion(x, wM, wN, wP, M, N, P);
+     float * out = fim_subregion(x, wM, wN, wP, M, N, P);
      fftwf_free(x);
 
      return out;
