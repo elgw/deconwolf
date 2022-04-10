@@ -17,9 +17,11 @@ fft_ut:
 dw_render: dw_render.c dw_render.h fim.c ftab.c fim_tiff.c
 	$(cc) $(cflags) -DSTANDALONE dw_render.c fim.c fim_tiff.c fft.c ftab.c $(ldflags) -o dw_render
 
-dw_otsu: dw_otsu.c fim.c ftab.c fim_tiff.c
-	$(cc) $(cflags) -DSTANDALONE dw_otsu.c fim.c fim_tiff.c fft.c ftab.c $(ldflags) -o dw_otsu
+dw_nuclei: dw_nuclei.c fim.c ftab.c fim_tiff.c prf_forest.o
+	$(cc) $(cflags) -DSTANDALONE dw_nuclei.c fim.c fim_tiff.c fft.c ftab.c prf_*.o qsort.o $(ldflags) -o dw_nuclei
 
+prf_forest.o: random_forest/prf_forest.c
+	$(cc) -c $(cflags) random_forest/prf*.c random_forest/qsort.c
 
 # Test the float image module
 fim_ut: fim_ut.c fim.c fim.h

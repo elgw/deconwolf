@@ -1,5 +1,5 @@
-#ifndef _dw_otsu_h_
-#define _dw_otsu_h_
+#ifndef _dw_nuclei_h_
+#define _dw_nuclei_h_
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,8 +13,8 @@
 #include "fim.h"
 #include "fim_tiff.h"
 #include "dw_version.h"
+#include "random_forest/prf_forest.h"
 
-
-int dw_otsu(int argc, char ** argv);
+int dw_nuclei(int argc, char ** argv);
 
 #endif

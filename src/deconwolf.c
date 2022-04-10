@@ -31,10 +31,10 @@ int main(int argc, char ** argv)
         {
             return dw_imshift(argc-1, argv+1);
         }
-        #ifdef __dw_otsu_h__
-        if(strcmp(argv[1], "otsu") == 0)
+        #ifdef __dw_nuclei_h__
+        if(strcmp(argv[1], "nuclei") == 0)
         {
-            return dw_otsu(argc-1, argv+1);
+            return dw_nuclei(argc-1, argv+1);
         }
         #endif
         #ifdef __dw_dots_h__

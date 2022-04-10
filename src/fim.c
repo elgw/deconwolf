@@ -2516,9 +2516,10 @@ ftab_t * fim_features_2d(const fim_t * fI)
         exit(EXIT_FAILURE);
     }
     /* For varying sigmas */
-    //float sigmas[] = {0.3, 0.7, 1, 1.6, 3.5, 5, 10};
-    float sigmas[] = {1.5};
-    int nsigma = 1;
+    float sigmas[] = {0.3, 0.7, 1, 1.6, 3.5, 5, 10};
+    int nsigma = 7;
+    //float sigmas[] = {1.5};
+    //int nsigma = 1;
     int f_per_s = 7; /* Features per sigma */
     int nfeatures = nsigma*f_per_s;
 

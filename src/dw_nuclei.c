@@ -1,4 +1,4 @@
-#include "dw_otsu.h"
+#include "dw_nuclei.h"
 
 typedef struct{
     int overwrite;
@@ -10,6 +10,7 @@ typedef struct{
     char * anno_label;
     char * anno_image;
     int nthreads;
+    int ntree; /* Number of trees in random forest classifier */
 } opts;
 
 static opts * opts_new();
@@ -45,6 +46,7 @@ static opts * opts_new()
     s->nthreads = dw_get_threads();
     s->anno_image = NULL;
     s->anno_label = NULL;
+    s->ntree = 50;
     return s;
 }
 
@@ -194,6 +196,67 @@ static void argparsing(int argc, char ** argv, opts * s)
 }
 
 
+float * transpose(const float * X, size_t M, size_t N)
+{
+    float * Y = malloc(M*N*sizeof(float));
+    size_t pos = 0;
+    for(size_t nn = 0; nn<N; nn++)
+    {
+        for(size_t mm = 0; mm<M; mm++)
+        {
+            Y[pos++] = X[nn+mm*N];
+        }
+    }
+    return Y;
+}
+
+/* Append a column with nrow elements to a table with nrow*ncol values
+ * A should not be freed after this call as it is replaced by the
+ * returned pointer */
+float * cm_append_column(float * A, size_t nrow, size_t ncol, const float * B)
+{
+    A = realloc(A, nrow*(ncol+1)*sizeof(float));
+    float * C = A+nrow*ncol; /* last, still unset column */
+    for(size_t kk = 0; kk<nrow; kk++)
+    {
+        C[kk] = B[kk];
+    }
+    return A;
+}
+
+float * subset_cm(float * A,
+                  float * V,
+                  size_t nrow, size_t ncol,
+                  size_t * nrow_out, size_t * ncol_out)
+{
+    /* Count how many of the rows to use */
+    size_t rows = 0;
+    for(size_t kk = 0; kk<nrow; kk++)
+    {
+        V[kk] > 0 ? rows++ : 0;
+    }
+
+    if(rows == 0)
+    {
+        *nrow_out = 0;
+        *ncol_out = 0;
+        return NULL;
+    }
+
+    float * S = malloc(rows*ncol*sizeof(float));
+    size_t writepos = 0;
+    for(size_t cc = 0; cc<ncol; cc++)
+    {
+        for(size_t rr = 0; rr<nrow; rr++)
+        {
+            V[rr] > 0 ? S[writepos++] = A[cc*nrow + rr] : 0;
+        }
+    }
+    *nrow_out = rows;
+    *ncol_out = ncol;
+    return S;
+}
+
 static int file_exist(char * fname)
 {
     if( access( fname, F_OK ) != -1 ) {
@@ -203,16 +266,85 @@ static int file_exist(char * fname)
     }
 }
 
+void random_forest_pipeline(opts * s)
+{
+    /* Read annotated image */
+    fim_t * anno = fim_png_read_green_red(s->anno_label);
+
+    /* Read corresponding raw image */
+    int64_t M = 0; int64_t N = 0; int64_t P = 0;
+    float * _anno_raw = fim_tiff_read(s->anno_image, NULL, &M, &N, &P, 0);
+    fim_t * anno_raw = malloc(sizeof(fim_t));
+    anno_raw->V = _anno_raw;
+    anno_raw->M = M;
+    anno_raw->N = N;
+    anno_raw->P = P;
+    if(P != 1)
+    {
+        fprintf(stderr, "The raw annotated image should have only one slice\n");
+        exit(EXIT_FAILURE);
+    }
+    /* Extract features */
+    ftab_t * features = fim_features_2d(anno_raw);
+
+    /* Transpose to column-major */
+    float * features_cm = transpose(features->T,
+                                    features->nrow, features->ncol);
+
+    /* Append one columns for the annotations */
+    features_cm = cm_append_column(features_cm, features->nrow, features->ncol, anno->V);
+    size_t cols = features->ncol+1;
+
+    /* Extract the data there anno->V > 0 to a separate array */
+    size_t ncol_train = 0;
+    size_t nrow_train = 0;
+    float * features_cm_train = subset_cm(features_cm,
+                                          anno->V,
+                                          features->nrow, cols,
+                                          &nrow_train, &ncol_train);
+
+
+    /* Train classifier */
+    // Use prf_forest from pixel_random_forest
+    PrfForest * F = prf_forest_new(s->ntree);
+    F->nthreads = s->nthreads;
+
+    if(prf_forest_train(F, features_cm_train, nrow_train, ncol_train))
+    {
+        printf("dw_nuclei: Failed to train the random forest\n");
+        exit(EXIT_FAILURE);
+    }
+
+    /* Now apply it to all pixels */
+    int * class = prf_forest_classify_table(F, features_cm, anno->M*anno->N,
+                                            features->ncol);
+    prf_forest_free(F);
+
+    float * result = malloc(anno->M*anno->N*sizeof(float));
+    for(size_t kk = 0; kk < anno->M*anno->N; kk++)
+    {
+        if(class[kk] == 2)
+        {
+            result[kk] = 1;
+        } else {
+            result[kk] = 0;
+        }
+    }
+    fim_tiff_write_noscale("training_classification.tif", result, NULL,
+                           anno->M, anno->N, 1);
+    return;
+}
+
 
 #ifdef STANDALONE
 int main(int argc, char ** argv)
 {
-    return dw_otsu(argc, argv);
+    return dw_nuclei(argc, argv);
 }
 #endif
 
 
-int dw_otsu(int argc, char ** argv)
+int dw_nuclei(int argc, char ** argv)
 {
 
     fim_tiff_init();
@@ -264,37 +396,14 @@ int dw_otsu(int argc, char ** argv)
     float * A = fim_tiff_read(inFile, NULL, &M, &N, &P, s->verbose);
     if(s->anno_label != NULL && s->anno_image != NULL)
     {
-        /* Read annotated image */
-        fim_t * anno = fim_png_read_green_red(s->anno_label);
-
-        /* Read corresponding raw image */
-        int64_t M = 0; int64_t N = 0; int64_t P = 0;
-        float * _anno_raw = fim_tiff_read(s->anno_image, NULL, &M, &N, &P, 0);
-        fim_t * anno_raw = malloc(sizeof(fim_t));
-        anno_raw->V = _anno_raw;
-        anno_raw->M = M;
-        anno_raw->N = N;
-        anno_raw->P = P;
-        if(P != 1)
-        {
-            fprintf(stderr, "The raw annotated image should have only one slice\n");
-            exit(EXIT_FAILURE);
-        }
-        /* Extract features */
-        ftab_t * features = fim_features_2d(anno_raw);
-
-        // Insert annotations into table.
-        // ftab_insert(features, ftab_get_col("class"), anno->V);
-
-        /* Train classifier */
-        // Use prf_forest from pixel_random_forest
-        fprintf(stderr, "Pipeline not finished!\n");
-        exit(EXIT_FAILURE);
+        random_forest_pipeline(s);
     }
+
     if(s->verbose > 0)
     {
         printf("Max projection\n");
     }
+
     float * Mproj = fim_maxproj(A, M, N, P);
     free(A);
     if(s->verbose > 0)
