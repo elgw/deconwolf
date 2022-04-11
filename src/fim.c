@@ -1997,6 +1997,84 @@ float * fim_otsu(float * Im, size_t M, size_t N)
     return B;
 }
 
+float * fim_fill_holes(float * im, size_t M, size_t N, float max_size)
+{
+    /* Any region in !im that is not connected to the boundary
+     * is a hole
+     */
+    float * nim = malloc(sizeof(float)*M*N);
+    for(size_t kk = 0 ; kk<M*N; kk++)
+    {
+        nim[kk] = (im[kk] == 0);
+    }
+    int * L = fim_conncomp6(nim, M, N);
+    free(nim);
+
+    /* Count the number of components
+     * or actually the largest label used
+     */
+
+    int ncomp = 0;
+    for(size_t kk = 0; kk<M*N; kk++)
+    {
+        L[kk] > ncomp ? ncomp = L[kk] : 0;
+    }
+    printf("%d potential holes\n", ncomp);
+
+    /* Find regions connected to the boundary */
+    int * boundary = calloc(ncomp+1, sizeof(int));
+
+    for(size_t kk = 0; kk<M; kk++)
+    {
+        boundary[L[kk]] = 1;
+        boundary[L[kk + (N-1)*M]] = 1;
+    }
+    for(size_t kk = 0; kk<N; kk++)
+    {
+        boundary[L[kk*M]] = 1;
+        boundary[L[kk*M + (M-1)]] = 1;
+    }
+    /* Clear all labels connected to boundary */
+    for(size_t kk = 0; kk<M*N; kk++)
+    {
+        if(boundary[L[kk]] == 1)
+        {
+            L[kk] = 0;
+        }
+    }
+    free(boundary);
+
+    /* Histogram on the number of pixels per label */
+    uint32_t * H = calloc((ncomp+1), sizeof(uint32_t));
+    for(size_t kk = 0; kk<M*N; kk++)
+    {
+        H[L[kk]]++;
+    }
+
+    /* Finally, return a copy of the input where
+     * the regions corresponding to labeled component
+     * in the inverted image that are not connected to the
+     * boundary are set to zero. */
+    size_t nfilled = 0;
+    float * out = malloc(M*N*sizeof(float));
+    for(size_t kk = 0; kk<M*N; kk++)
+    {
+        out[kk] = im[kk];
+        if(im[kk] == 0)
+        {
+            if( (L[kk] > 0) & (H[L[kk]] < max_size))
+            {
+                out[kk] = 2;
+                nfilled++;
+            }
+        }
+    }
+    printf("Filled %zu pixels\n", nfilled);
+    free(H);
+    free(L);
+    return out;
+}
+
 int * fim_conncomp6(float * im, size_t M, size_t N)
 {
     int * lab = calloc(M*N, sizeof(float));
@@ -2516,13 +2594,15 @@ ftab_t * fim_features_2d(const fim_t * fI)
         exit(EXIT_FAILURE);
     }
     /* For varying sigmas */
-    float sigmas[] = {0.3, 0.7, 1, 1.6, 3.5, 5, 10};
-    int nsigma = 7;
+    //float sigmas[] = {0.3, 0.7, 1, 1.6, 3.5, 5, 10};
+    //int nsigma = 7;
+    float sigmas[] = {0.3, 1, 3.5, 10};
+    int nsigma = 4;
     //float sigmas[] = {1.5};
     //int nsigma = 1;
     int f_per_s = 7; /* Features per sigma */
     int nfeatures = nsigma*f_per_s;
-
+    printf("Will produce %d features\n", nfeatures);
     ftab_t * T = malloc(sizeof(ftab_t));
     T->nrow = fI->M*fI->N;
     T->ncol = nfeatures;
@@ -2539,13 +2619,13 @@ ftab_t * fim_features_2d(const fim_t * fI)
     {
         debug_image = malloc(M*N*nfeatures*sizeof(float));
     }
-
+    printf("Extracting features ... \n");
     int col = 0;
     char * sbuff = malloc(1024);
     for(int ss = 0; ss<nsigma; ss++)
     {
         float sigma = sigmas[ss];
-        printf("sigma = %f\n", sigma);
+        printf("%f ", sigma); fflush(stdout);
 
         fim_t * G = fimt_copy(fI);
 
@@ -2644,6 +2724,7 @@ ftab_t * fim_features_2d(const fim_t * fI)
         fim_free(G);
     }
     free(sbuff); /* Free string buffer */
+    printf("\n");
     if(debug)
     {
         fim_tiff_write_float(debug_image_name,

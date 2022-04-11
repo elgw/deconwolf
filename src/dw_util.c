@@ -123,3 +123,41 @@ size_t get_peakMemoryKB(void)
 }
 #endif
 #endif
+
+
+float dw_read_scaling(char * file)
+{
+    float scaling = 1.0;
+    char * logfile = malloc(strlen(file)+32);
+    sprintf(logfile, "%s.log.txt", file);
+    if( ! dw_file_exist(logfile))
+    {
+        goto leave;
+    }
+
+    FILE * fid = fopen(logfile, "r");
+    if(fid == NULL)
+    {
+        goto leave;
+    }
+
+    char * line = NULL;
+    size_t len = 0;
+
+    while( getline(&line, &len, fid) > 0)
+    {
+        if(strlen(line) > 8)
+        {
+            if(strncmp(line, "scaling:", 8) == 0)
+            {
+                scaling = atof(line + 8);
+            }
+        }
+    }
+
+    free(line);
+    fclose(fid);
+leave:
+    free(logfile);
+    return scaling;
+}

@@ -215,6 +215,7 @@ void prf_forest_print(FILE * f, PrfForest * F)
     return;
 }
 
+/* X is of size NxM i.e. M includes the labels */
 int prf_forest_train(PrfForest * F, const float * X, const size_t N, const size_t M)
 {
     printf("Training a forest with %zu vectors of length %zu\n", N, M);
@@ -228,7 +229,7 @@ int prf_forest_train(PrfForest * F, const float * X, const size_t N, const size_
     }
     if(F->features_per_tree == PRF_AUTOMATIC)
     {
-        F->features_per_tree = ceil(sqrt(M));
+        F->features_per_tree = ceil(sqrt(M-1));
     }
 
     if(F->trees == NULL)
@@ -241,8 +242,10 @@ int prf_forest_train(PrfForest * F, const float * X, const size_t N, const size_
         prf_forest_print(stdout, F);
     }
 
-    int64_t maxClass = -1;
+
     const float * L = X + (M-1)*N;
+    float maxClass = L[0];
+    float minClass = L[0];
     for(size_t kk = 0; kk<N; kk++)
     {
         if(L[kk] != (int) L[kk])
@@ -251,12 +254,11 @@ int prf_forest_train(PrfForest * F, const float * X, const size_t N, const size_
                     "%zu is %f which isn't an integer\n", kk, L[kk]);
             return EXIT_FAILURE;
         }
-        if(L[kk] > maxClass)
-        {
-            maxClass = L[kk];
-        }
+        L[kk] > maxClass ? maxClass = L[kk] : 0;
+        L[kk] < minClass ? minClass = L[kk] : 0;
     }
-    F->maxClass = maxClass;
+    printf("Classes: [%f, %f]\n", minClass, maxClass);
+    F->maxClass = (int64_t) maxClass;
 
     if(F->nthreads > 1)
     {
@@ -398,7 +400,7 @@ void * prf_forest_classify_table_thread(void * p)
     float * XF = malloc(M*sizeof(float));
     for(size_t kk = D->thread; kk < D->N; kk += D->F->nthreads)
     {
-        copy_row(XF, 1, X+kk, N, M-1);
+        copy_row(XF, 1, X+kk, N, M);
         C[kk] = prf_forest_classify_thread(F, XF, thread);
     }
     free(XF);
@@ -414,7 +416,7 @@ int * prf_forest_classify_table(PrfForest * F, float * X, size_t N, size_t M)
         float * XF = malloc(M*sizeof(float));
         for(size_t kk = 0; kk<N; kk++)
         {
-            copy_row(XF, 1, X+kk, N, M-1);
+            copy_row(XF, 1, X+kk, N, M);
             C[kk] = prf_forest_classify(F, XF);
         }
         free(XF);

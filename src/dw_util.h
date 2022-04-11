@@ -48,4 +48,7 @@ float timespec_diff(struct timespec* end, struct timespec * start);
 * returns 0 under windows */
 size_t get_peakMemoryKB(void);
 
+/* Read the scaling of file from the .log.txt file if exists */
+float dw_read_scaling(char * file);
+
 #endif

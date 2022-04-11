@@ -208,7 +208,7 @@ int main(int argc, char ** argv)
 
     float * X = NULL;
     size_t M = 7;
-    size_t N = 1000000;
+    size_t N = 100000;
     if(argc > 1)
     {
         N = atoi(argv[1]);

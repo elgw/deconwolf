@@ -261,6 +261,8 @@ void fim_histogram_free(fim_histogram_t * H);
  * wu2005optimizing for something smarter. */
 int * fim_conncomp6(float * Im, size_t M, size_t N);
 
+/* 2D hole filling using fim_conncomp6 */
+float * fim_fill_holes(float * im, size_t M, size_t N, float max_size);
 
 /* Find local maxima in I */
 //ftab_t * fim_lmax(const float * I, size_t M, size_t N, size_t P);
