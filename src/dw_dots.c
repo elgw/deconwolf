@@ -406,7 +406,6 @@ int dw_dots(int argc, char ** argv)
 
     ftab_free(T);
 
-
     opts_free(s);
     return EXIT_SUCCESS;
 }

@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <time.h>
+#include "../dw_util.h"
 
 // For Column-Major
 
@@ -43,11 +44,7 @@ void copy_row(float * A, const size_t sA,
 /* Replace one feature by random values */
 void scramble_feature(float * X, const size_t N, const size_t M, const int f);
 
-float timespec_diff(struct timespec* end, struct timespec * start);
 void vector_show(float * v, int n);
-
-/* Get peak memory usage from system */
-size_t get_peakMemoryKB(void);
 
 /* Print a section header to the terminal */
 void print_section(char * msg);

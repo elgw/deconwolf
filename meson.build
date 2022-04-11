@@ -9,6 +9,7 @@ project('deconwolf', 'c',
                  default_options : ['c_std=gnu11'])
 
 subdir('src/')
+subdir('src/random_forest/')
 subdir('doc/')
 
 
