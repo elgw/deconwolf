@@ -43,6 +43,7 @@
 #include <mkl.h>
 #endif
 
+#include "dw_util.h"
 #include "dw_maxproj.h"
 #include "dw_imshift.h"
 #include "dw_version.h"

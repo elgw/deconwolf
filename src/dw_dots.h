@@ -8,6 +8,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "dw_util.h"
 #include "fim.h"
 #include "fim_tiff.h"
 #include "ftab.h"

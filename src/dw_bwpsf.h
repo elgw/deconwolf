@@ -37,6 +37,7 @@
 #include <locale.h>
 #include <gsl/gsl_integration.h>
 
+#include "dw_util.h"
 #include "fim_tiff.h"
 #include "dw_version.h"
 #include "lanczos.h"

@@ -17,9 +17,6 @@
 
 #include "dw.h"
 
-#define tictoc struct timespec tictoc_start, tictoc_end;
-#define tic clock_gettime(CLOCK_REALTIME, &tictoc_start);
-#define toc(X) clock_gettime(CLOCK_REALTIME, &tictoc_end); printf(#X); printf(" %f s\n", timespec_diff(&tictoc_end, &tictoc_start)); fflush(stdout);
 
 
 /* GLOBALS */
@@ -149,19 +146,6 @@ void dw_iterator_free(dw_iterator_t * it)
 }
 
 
-static int dw_get_threads(void)
-{
-    int nThreads = 4;
-#ifndef WINDOWS
-/* Reports #threads, typically 2x#cores */
-    nThreads = sysconf(_SC_NPROCESSORS_ONLN)/2;
-#endif
-#ifdef OMP
-/* Reports number of cores */
-    nThreads = omp_get_num_procs();
-#endif
-    return nThreads;
-}
 
 dw_opts * dw_opts_new(void)
 {
@@ -243,13 +227,6 @@ void dw_show_iter(dw_opts * s, int it, int nIter, float err)
     }
 }
 
-void nullfree(void * p)
-{
-    if(p != NULL)
-    {
-        free(p);
-    }
-}
 
 char * gen_iterdump_name(
                          __attribute__((unused)) const dw_opts * s,
@@ -272,16 +249,16 @@ int64_t int64_t_max(int64_t a, int64_t b)
 void dw_opts_free(dw_opts ** sp)
 {
     dw_opts * s = sp[0];
-    nullfree(s->imFile);
-    nullfree(s->psfFile);
-    nullfree(s->outFile);
-    nullfree(s->logFile);
-    nullfree(s->flatfieldFile);
-    nullfree(s->prefix);
-    nullfree(s->commandline);
-    nullfree(s->ref);
-    nullfree(s->refFile);
-    nullfree(s->tsvFile);
+    dw_nullfree(s->imFile);
+    dw_nullfree(s->psfFile);
+    dw_nullfree(s->outFile);
+    dw_nullfree(s->logFile);
+    dw_nullfree(s->flatfieldFile);
+    dw_nullfree(s->prefix);
+    dw_nullfree(s->commandline);
+    dw_nullfree(s->ref);
+    dw_nullfree(s->refFile);
+    dw_nullfree(s->tsvFile);
     if(s->tsv != NULL)
     {
         fclose(s->tsv);
@@ -412,21 +389,6 @@ void warning(FILE * fid)
     return;
 }
 
-static double timespec_diff(struct timespec* end, struct timespec * start)
-{
-    double elapsed = (end->tv_sec - start->tv_sec);
-    elapsed += (end->tv_nsec - start->tv_nsec) / 1000000000.0;
-    return elapsed;
-}
-
-int file_exist(char * fname)
-{
-    if( access( fname, F_OK ) != -1 ) {
-        return 1; // File exist
-    } else {
-        return 0;
-    }
-}
 
 void fulldump(dw_opts * s, float * A, size_t M, size_t N, size_t P, char * name)
 {
@@ -800,7 +762,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
 
     if(! s->iterdump)
     {
-        if( s->overwrite == 0 && file_exist(s->outFile))
+        if( s->overwrite == 0 && dw_file_exist(s->outFile))
         {
             printf("%s already exist. Doing nothing\n", s->outFile);
             exit(0);
@@ -853,74 +815,6 @@ void fsetzeros(const char * fname, size_t N)
     free(buffer);
 }
 
-#ifdef WINDOWS
-size_t get_peakMemoryKB(void)
-{
-    return 0;
-}
-#else
-
-#ifdef __APPLE__
-size_t get_peakMemoryKB(void)
-{
-    struct rusage r_usage;
-    getrusage(RUSAGE_SELF, &r_usage);
-    return (size_t) round((double) r_usage.ru_maxrss/1024.0);
-}
-#endif
-
-#ifndef __APPLE__
-size_t get_peakMemoryKB(void)
-{
-    char * statfile = malloc(100*sizeof(char));
-    sprintf(statfile, "/proc/%d/status", getpid());
-    FILE * sf = fopen(statfile, "r");
-    if(sf == NULL)
-    {
-        fprintf(stderr, "Failed to open %s\n", statfile);
-        free(statfile);
-        return 0;
-    }
-
-    char * peakline = NULL;
-
-    char * line = NULL;
-    size_t len = 0;
-
-    while( getline(&line, &len, sf) > 0)
-    {
-        if(strlen(line) > 6)
-        {
-            if(strncmp(line, "VmPeak", 6) == 0)
-            {
-                peakline = strdup(line);
-            }
-        }
-    }
-    free(line);
-    fclose(sf);
-    free(statfile);
-
-    // Parse the line starting with "VmPeak"
-    // Seems like it is always in kB
-    // (reference: fs/proc/task_mmu.c)
-    // actually in kiB i.e., 1024 bytes
-    // since the last three characters are ' kb' we can skip them and parse in between
-    size_t peakMemoryKB = 0;
-    //  printf("peakline: '%s'\n", peakline);
-    if(strlen(peakline) > 11)
-    {
-        peakline[strlen(peakline) -4] = '\0';
-
-        //    printf("peakline: '%s'\n", peakline+7);
-        peakMemoryKB = (size_t) atol(peakline+7);
-    }
-
-    free(peakline);
-    return peakMemoryKB;
-}
-#endif
-#endif
 
 void fprint_peakMemory(FILE * fout)
 {
@@ -931,7 +825,6 @@ void fprint_peakMemory(FILE * fout)
 
     return;
 }
-
 
 void benchmark_write(dw_opts * s, int iter, double fMSE,
                      const float * x0, // current guess of work size

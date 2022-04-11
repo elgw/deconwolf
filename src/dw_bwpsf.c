@@ -161,12 +161,6 @@ void bw_conf_free(bw_conf ** _conf)
     return;
 }
 
-static double timespec_diff(struct timespec* end, struct timespec * start)
-{
-    double elapsed = (end->tv_sec - start->tv_sec);
-    elapsed += (end->tv_nsec - start->tv_nsec) / 1000000000.0;
-    return elapsed;
-}
 
 void getCmdLine(int argc, char ** argv, bw_conf * s)
 {
@@ -185,16 +179,6 @@ void getCmdLine(int argc, char ** argv, bw_conf * s)
         pos += strlen(argv[kk])+1;
     }
     s->cmd[pos-1] = '\0';
-}
-
-
-int file_exist(char * fname)
-{
-    if( access( fname, F_OK ) != -1 ) {
-        return 1; // File exist
-    } else {
-        return 0;
-    }
 }
 
 void fprint_time(FILE * f)
@@ -770,7 +754,7 @@ int main(int argc, char ** argv)
     bw_conf * conf = bw_conf_new();
     bw_argparsing(argc, argv, conf);
 
-    if( conf->overwrite == 0 && file_exist(conf->outFile))
+    if( conf->overwrite == 0 && dw_file_exist(conf->outFile))
     {
         printf("%s already exist. Doing nothing\n", conf->outFile);
         bw_conf_free(&conf);

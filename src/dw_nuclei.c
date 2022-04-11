@@ -17,22 +17,6 @@ static opts * opts_new();
 static void opts_free(opts * s);
 static void usage(__attribute__((unused)) int argc, char ** argv);
 static void argparsing(int argc, char ** argv, opts * s);
-static int file_exist(char * fname);
-
-static int dw_get_threads(void)
-{
-    int nThreads = 4;
-#ifndef WINDOWS
-/* Reports #threads, typically 2x#cores */
-    nThreads = sysconf(_SC_NPROCESSORS_ONLN)/2;
-#endif
-#ifdef OMP
-/* Reports number of cores */
-    nThreads = omp_get_num_procs();
-#endif
-    return nThreads;
-}
-
 
 static opts * opts_new()
 {
@@ -257,14 +241,6 @@ float * subset_cm(float * A,
     return S;
 }
 
-static int file_exist(char * fname)
-{
-    if( access( fname, F_OK ) != -1 ) {
-        return 1; // File exist
-    } else {
-        return 0;
-    }
-}
 
 void random_forest_pipeline(opts * s)
 {
@@ -369,7 +345,7 @@ int dw_nuclei(int argc, char ** argv)
     char * inFile = s->image;
     char * outFile = s->out;
 
-    if(!file_exist(inFile))
+    if(!dw_file_exist(inFile))
     {
         printf("Can't open %s!\n", inFile);
         exit(1);
@@ -385,7 +361,7 @@ int dw_nuclei(int argc, char ** argv)
         fprintf(stdout, "Ouput file: %s\n", outFile);
     }
 
-    if(s->overwrite == 0 && file_exist(outFile))
+    if(s->overwrite == 0 && dw_file_exist(outFile))
     {
         printf("%s exists, skipping.\n", outFile);
         exit(EXIT_SUCCESS);

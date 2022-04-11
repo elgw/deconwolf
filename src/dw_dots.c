@@ -22,30 +22,6 @@ static opts * opts_new();
 static void opts_free(opts * s);
 static void usage(__attribute__((unused)) int argc, char ** argv);
 static void argparsing(int argc, char ** argv, opts * s);
-static int file_exist(char * fname);
-
-static int dw_get_threads(void)
-{
-    int nThreads = 4;
-#ifndef WINDOWS
-/* Reports #threads, typically 2x#cores */
-    nThreads = sysconf(_SC_NPROCESSORS_ONLN)/2;
-#endif
-#ifdef OMP
-/* Reports number of cores */
-    nThreads = omp_get_num_procs();
-#endif
-    return nThreads;
-}
-
-static double clockdiff(struct timespec* end, struct timespec * start)
-{
-    double elapsed = (end->tv_sec - start->tv_sec);
-    elapsed += (end->tv_nsec - start->tv_nsec) / 1000000000.0;
-    return elapsed;
-}
-
-
 
 static opts * opts_new()
 {
@@ -69,19 +45,12 @@ static opts * opts_new()
     return s;
 }
 
-static void nullfree(void * p)
-{
-    if(p != NULL)
-    {
-        free(p);
-    }
-}
 
 static void opts_free(opts * s)
 {
-    nullfree(s->outfile);
-    nullfree(s->image);
-    nullfree(s->logfile);
+    dw_nullfree(s->outfile);
+    dw_nullfree(s->image);
+    dw_nullfree(s->logfile);
     if(s->log != NULL)
     {
         fclose(s->log);
@@ -164,11 +133,11 @@ static void argparsing(int argc, char ** argv, opts * s)
             s->LoG = 1;
             break;
         case 'L':
-            nullfree(s->logfile);
+            dw_nullfree(s->logfile);
             s->logfile = strdup(optarg);
             break;
         case 'O':
-            nullfree(s->outfile);
+            dw_nullfree(s->outfile);
             s->outfile = strdup(optarg);
             break;
         case 'a':
@@ -228,16 +197,6 @@ static void argparsing(int argc, char ** argv, opts * s)
     return;
 }
 
-
-static int file_exist(char * fname)
-{
-    if( access( fname, F_OK ) != -1 ) {
-        return 1; // File exist
-    } else {
-        return 0;
-    }
-}
-
 static ftab_t * append_fwhm(opts * s, ftab_t * T, fim_t * V)
 {
     int xcol = ftab_get_col(T, "x");
@@ -260,7 +219,7 @@ static ftab_t * append_fwhm(opts * s, ftab_t * T, fim_t * V)
         fwhm[kk] = fwhm_lateral(V, row[xcol], row[ycol], row[zcol], s->verbose);
     }
     clock_gettime(CLOCK_REALTIME, &tend);
-    double t = clockdiff(&tend, &tstart);
+    double t = timespec_diff(&tend, &tstart);
     if(s->verbose > 1)
     {
         printf(" took %.4f s\n", t);
@@ -312,7 +271,7 @@ int dw_dots(int argc, char ** argv)
     char * inFile = s->image;
     char * outFile = s->outfile;
 
-    if(!file_exist(inFile))
+    if(!dw_file_exist(inFile))
     {
         fprintf(stderr, "Can't open %s!\n", inFile);
         exit(1);
@@ -328,7 +287,7 @@ int dw_dots(int argc, char ** argv)
         fprintf(stdout, "Ouput file: %s\n", outFile);
     }
 
-    if(s->overwrite == 0 && file_exist(outFile))
+    if(s->overwrite == 0 && dw_file_exist(outFile))
     {
         printf("%s exists, skipping.\n", outFile);
         exit(EXIT_SUCCESS);

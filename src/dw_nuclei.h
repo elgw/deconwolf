@@ -12,6 +12,7 @@
 
 #include "fim.h"
 #include "fim_tiff.h"
+#include "dw_util.h"
 #include "dw_version.h"
 #include "random_forest/prf_forest.h"
 
