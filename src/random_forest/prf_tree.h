@@ -11,7 +11,6 @@
 #include <malloc.h>
 #include "qsort.h"
 
-
 #define PRF_AUTOMATIC -1
 #define PRF_NODE_NO_CLASS -1
 
@@ -89,8 +88,9 @@ size_t prf_tree_enumerate(PrfTree * T);
 void prf_node_free(PrfNode * N);
 
 
-/* A more compact form 196-bit */
-// TODO
+/* When the tree is built it can be converted to a more
+ * compact form, which might be faster to use for classification
+ */
 
 typedef struct{
     uint32_t left;
@@ -102,13 +102,15 @@ typedef struct{
 
 typedef struct{
     size_t Nrows;
-    PrfNodeRow * TT;
+    PrfNodeRow * Rows;
 } PrfTreeTable;
 
-PrfTreeTable * prf_tree_to_tree_table(PrfTree);
+/* Convert a PrfTree to a PrfTreeTable */
+PrfTreeTable * prf_tree_to_tree_table(PrfTree *);
 void prf_tree_table_free(PrfTreeTable *);
 int prf_tree_table_classify(PrfTreeTable *, float * X);
-// Read a tree-table from disk
+
+/* Read a tree-table from disk */
 PrfTreeTable * prf_tree_table_from_file(FILE *);
 void prf_tree_table_to_file(PrfTreeTable *, FILE *);
 

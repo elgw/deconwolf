@@ -93,15 +93,15 @@ float * read_raw(char * file, size_t N, size_t M)
 void preview_data(float * X, size_t N, size_t M)
 {
     printf("Input data:\n");
-    int nrows = 10;
+    size_t nrows = 10;
     if(nrows > N)
     {
         nrows = N;
     }
     for(int kk = 0; kk<10; kk++)
     {
-        printf(" %d, ", kk);
-        for(int rr = 0; rr<M; rr++)
+        printf(" %d :  ", kk);
+        for(size_t rr = 0; rr<M; rr++)
         {
             printf("% f ", X[kk + rr*N]);
         }
@@ -138,7 +138,7 @@ void preview_data(float * X, size_t N, size_t M)
     float * v = malloc((M-1)*sizeof(float));
     for(size_t kk = 0; kk<N; kk++)
     {
-        for(int ii = 0; ii < (M-1); ii++)
+        for(size_t ii = 0; ii < (M-1); ii++)
         {
             v[ii] = X[kk + N*ii];
         }
@@ -160,16 +160,44 @@ void preview_data(float * X, size_t N, size_t M)
     }
     free(v);
     printf("%zu/%zu correctly classified\n", ncorrect, N);
-
-
     clock_gettime(CLOCK_REALTIME, &tictoc_end);
     printf(" Classification took %f s\n", timespec_diff(&tictoc_end, &tictoc_start));
 
-    if(verbose > 0)
+
+    printf("-> Classifying using PrfTreeTable\n");
+    PrfTreeTable * TT = prf_tree_to_tree_table(T);
+    clock_gettime(CLOCK_REALTIME, &tictoc_start);
+    ncorrect = 0;
+    v = malloc((M-1)*sizeof(float));
+    for(size_t kk = 0; kk<N; kk++)
     {
-        //size_t nnodes = prf_tree_enumerate(C);
-        //printf("The tree has %zu nodes\n", nnodes);
+        for(size_t ii = 0; ii < (M-1); ii++)
+        {
+            v[ii] = X[kk + N*ii];
+        }
+
+        int class = prf_tree_table_classify(TT, v);
+        if(verbose > 0)
+        {
+            if(kk<10){
+                printf("X = "); vector_show(v, (M-1));
+                printf("row %zu : x = %f class = %f classification = %d\n",
+                       kk, X[kk], X[kk+(M-1)*N], class);
+            }
+        }
+        if(class == X[kk+(M-1)*N])
+        {
+            ncorrect++;
+        }
+
     }
+    free(v);
+
+    printf("%zu/%zu correctly classified\n", ncorrect, N);
+    clock_gettime(CLOCK_REALTIME, &tictoc_end);
+    printf(" Classification took %f s\n", timespec_diff(&tictoc_end, &tictoc_start));
+
+    prf_tree_table_free(TT);
 
     prf_tree_free(T);
     }
@@ -178,20 +206,51 @@ int main(int argc, char ** argv)
 {
     struct timespec tictoc_start, tictoc_end;
 
-    char file[] = "../prototype/X150001x14.float"; size_t N = 150001; size_t M = 14;
+    float * X = NULL;
+    size_t M = 7;
+    size_t N = 1000000;
+    if(argc > 1)
+    {
+        N = atoi(argv[1]);
+    }
 
-    //char file[] = "../prototype/X15001x3.float"; size_t N = 15001; size_t M = 3;
-    //char file[] = "../prototype/X1500001x15.float"; size_t N = 1500001; size_t M = 15;
-    //char file [] = "/home/erikw/code/pixelClassifier/ieg728_60x_50_iter_test/X22521x51.float"; size_t N = 22521; size_t M = 51;
-    //char file [] = "/home/erikw/code/pixelClassifier/ieg728_60x_50_iter_test/X2816x10.float"; size_t N = 2816; size_t M = 10;
+    /* Generate some random test data */
+    if(M > 0)
+    {
+        X = malloc(M*N*sizeof(float));
+        for(size_t kk = 0; kk<N*(M-1); kk++)
+        {
+            X[kk] = (float) rand() / (float) RAND_MAX;
+        }
+        /* Two classes */
+        for(size_t kk = N*(M-1); kk< N*M; kk++)
+        {
+            X[kk] = 1 + (kk % 2);
+        }
+    }
+
+    if(X == NULL)
+    {
+        char file[] = "../prototype/X150001x14.float";
+        N = 150001;
+        M = 14;
+        X = read_raw(file, N, M);
+    }
+
 
     print_section("Input data");
-    float * X = read_raw(file, N, M);
+
     preview_data(X, N, M);
 
     print_section("testing PrfTree");
     test_one_tree(X, N, M);
     printf("Peak Memory %zu kb\n", get_peakMemoryKB());
+
+    if(argc > 2 && atoi(argv[2]) == 1)
+    {
+        free(X);
+        return EXIT_SUCCESS;
+    }
 
     print_todo("Cross-validation");
 

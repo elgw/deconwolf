@@ -1,13 +1,12 @@
 #include "prf_tree.h"
 
-//
-// Internal functions / Forward declarations
-//
+/*
+ * Forward declarations of internal functions
+ */
 
 PrfNode * prf_node_new();
 
-
-// Gini from a vector of classes
+/* Gini from a vector of classes */
 float gini_from_C(const float * C, size_t N, int nclass);
 
 float gini_from_VC(float * VC, size_t N, float * g, size_t * nL, size_t * nR, float * lgini, float * rgini);
@@ -18,6 +17,7 @@ float gini_from_H(size_t nL, size_t * HL,
 int most_common_class(const float * C, const size_t N, const int nclass);
 float squaresum(size_t * V, size_t T, size_t N);
 
+/* Functions */
 
 PrfTree * prf_tree_new()
 {
@@ -139,7 +139,6 @@ float prf_tree_classify(const PrfTree * TT, const float * X)
 
 int float_cmp(const void * a, const void * b, __attribute__((unused)) void * p)
 {
-
     if (*(float*)a > *(float*)b)
     {
         return 1;
@@ -152,7 +151,6 @@ int float_cmp(const void * a, const void * b, __attribute__((unused)) void * p)
     {
         return 0;
     }
-
 }
 
 void prf_node_set_defaults(PrfNode * N)
@@ -541,8 +539,6 @@ PrfNode * prf_tree_train_with_parent(PrfTree * T, PrfNode * parent,
         root->var = T->feature_map[best_var];
     }
 
-
-
 //    size_t nL = best_nL;
 //    size_t nR = best_nR;
 
@@ -552,9 +548,6 @@ PrfNode * prf_tree_train_with_parent(PrfTree * T, PrfNode * parent,
 
     float lgini = best_lgini;
     float rgini = best_rgini;
-
-
-
 
     // If one size has zero elements we run into infinite recursion.
     if(nL == 0 || nR == 0)
@@ -761,4 +754,67 @@ float gini_from_VC(float * VC, size_t N,
     free(HR);
 
     return minth;
+}
+
+/* Recursively go through the nodes and populate TT */
+void set_rows(PrfNode * n, PrfTreeTable * TT)
+{
+    /* Insert this node in the table
+     * If it has left and right children,
+     * insert them as well. */
+    size_t pos = n->id;
+    if(n->class < 0) /* If not final node */
+    {
+        TT->Rows[pos].left = n->left->id;
+        set_rows(n->left, TT);
+        TT->Rows[pos].right = n->right->id;
+        set_rows(n->right, TT);
+        TT->Rows[pos].th = n->th;
+        TT->Rows[pos].var = n->var;
+        TT->Rows[pos].class = 0;
+    } else {
+        TT->Rows[pos].class = n->class;
+    }
+    return;
+}
+
+PrfTreeTable * prf_tree_to_tree_table(PrfTree * T)
+{
+    /* Enumerate the nodes */
+    size_t n_nodes = prf_tree_enumerate(T);
+    printf("Enumerated %zu nodes\n", n_nodes);
+    PrfTreeTable * TT = malloc(sizeof(PrfTreeTable));
+    TT->Nrows = T->n_nodes;
+    TT->Rows = malloc(TT->Nrows*sizeof(PrfNodeRow));
+    set_rows(T->nodes_root, TT);
+    return TT;
+}
+
+void prf_tree_table_free(PrfTreeTable * TT)
+{
+    if(TT == NULL)
+    {
+        return;
+    }
+    if(TT->Rows != NULL)
+    {
+        free(TT->Rows);
+    }
+    free(TT);
+    return;
+}
+
+int prf_tree_table_classify(PrfTreeTable * TT, float * x)
+{
+    PrfNodeRow R = TT->Rows[0];
+    while(R.class < 1)
+    {
+        if(x[R.var] > R.th)
+        {
+            R = TT->Rows[R.right];
+        } else {
+            R = TT->Rows[R.left];
+        }
+    }
+    return R.class;
 }
