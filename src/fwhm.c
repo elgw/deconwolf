@@ -369,7 +369,7 @@ exit2:
 }
 
 
-#ifdef STANDALONE
+#ifdef STANDALONE_FWHM
 static void createGaussian(
     double * x,
     double * y,

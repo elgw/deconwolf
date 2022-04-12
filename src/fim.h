@@ -259,10 +259,14 @@ void fim_histogram_free(fim_histogram_t * H);
 
 /* 2D connected components using 6-connectivity. TODO: see
  * wu2005optimizing for something smarter. */
-int * fim_conncomp6(float * Im, size_t M, size_t N);
+int * fim_conncomp6(const float * Im, size_t M, size_t N);
 
 /* 2D hole filling using fim_conncomp6 */
-float * fim_fill_holes(float * im, size_t M, size_t N, float max_size);
+float * fim_fill_holes(const float * im, size_t M, size_t N, float max_size);
+/* 2D remove small objects, only keep those that has at least
+ * min_pixels  */
+float * fim_remove_small(const float * im, size_t M, size_t N,
+                         float min_pixels);
 
 /* Find local maxima in I */
 //ftab_t * fim_lmax(const float * I, size_t M, size_t N, size_t P);

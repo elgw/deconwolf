@@ -20,6 +20,13 @@ dw_render: dw_render.c dw_render.h fim.c ftab.c fim_tiff.c
 dw_nuclei: dw_nuclei.c fim.c ftab.c fim_tiff.c prf_forest.o
 	$(cc) $(cflags) -DSTANDALONE dw_nuclei.c fim.c dw_util.c fim_tiff.c fft.c ftab.c prf_forest.o prf_tree.o prf_util.o qsort.o $(ldflags) -o dw_nuclei
 
+dw_dots_files=dw_dots.c fim.c ftab.c fim_tiff.c fwhm.c dw_util.c fft.c
+dots_ldflags=$(ldflags) `pkg-config --libs gsl`
+dots_cflags=$(cflags) `pkg-config --cflags  gsl`
+dw_dots: $(dw_dots_files)
+	$(cc) $(dots_cflags) -DSTANDALONE $(dw_dots_files) $(dots_ldflags) -o dw_dots
+
+
 prf_forest.o: random_forest/prf_forest.c
 	$(cc) -c $(cflags) random_forest/prf*.c random_forest/qsort.c
 

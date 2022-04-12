@@ -69,8 +69,8 @@ struct my_f_params {
 double my_f(double , void * );
 int findmin(double , double , gsl_spline *, gsl_interp_accel *, double * , double * );
 
-#ifdef STANDALONE
-static void createGaussian(double * , float * , size_t , float );
+#ifdef STANDALONE_FWHM
+static void createGaussian(double * , double * , size_t , float );
 #endif
 
 

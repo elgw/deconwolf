@@ -11,6 +11,7 @@ typedef struct{
     char * anno_image;
     int nthreads;
     int ntree; /* Number of trees in random forest classifier */
+    int train_loop;
 } opts;
 
 static opts * opts_new();
@@ -31,6 +32,7 @@ static opts * opts_new()
     s->anno_image = NULL;
     s->anno_label = NULL;
     s->ntree = 50;
+    s->train_loop = 0;
     return s;
 }
 
@@ -121,11 +123,12 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
     printf("usage: %s [<options>] --aimage input.tif --alabel labels.png file1.tif ... \n", argv[0]);
     printf("Options:\n");
     printf(" --aimage file.tif\n\t (raw) annotated image\n");
-    printf(" --alabel file.png\n\t Annotated image where nuclei is green, bg is red\n");
+    printf(" --alabel file.png\n\t "
+           "Annotated image where nuclei is marked green, background is marked red\n");
     printf(" --overwrite\n\t Overwrite existing files\n");
+    printf(" --loop\n\t Enter training loop\n");
     printf(" --help\n\t Show this message\n");
 }
-
 
 static void argparsing(int argc, char ** argv, opts * s)
 {
@@ -135,6 +138,7 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"file", required_argument, NULL, 'f'},
         {"help", no_argument, NULL, 'h'},
         {"image", required_argument, NULL, 'i'},
+        {"loop", no_argument, NULL, 'l'},
         {"overwrite", no_argument, NULL, 'o'},
         {"out",     required_argument, NULL, 'p'},
         {"threads", required_argument, NULL, 't'},
@@ -152,6 +156,9 @@ static void argparsing(int argc, char ** argv, opts * s)
             break;
         case 'f':
             s->image = strdup(optarg);
+            break;
+        case 'l':
+            s->train_loop = 1;
             break;
         case 'o':
             s->overwrite = 1;
@@ -193,18 +200,14 @@ float * transpose(const float * X, size_t M, size_t N)
     return Y;
 }
 
-/* Append a column with nrow elements to a table with nrow*ncol values
- * A should not be freed after this call as it is replaced by the
- * returned pointer */
+/* Return a newly allocated array AA = [A ; B] */
 float * cm_append_column(float * A, size_t nrow, size_t ncol, const float * B)
 {
-    A = realloc(A, nrow*(ncol+1)*sizeof(float));
-    float * C = A+nrow*ncol; /* last, still unset column */
-    for(size_t kk = 0; kk<nrow; kk++)
-    {
-        C[kk] = B[kk];
-    }
-    return A;
+    float * AA = malloc(nrow*(ncol+1)*sizeof(float));
+    memcpy(AA, A,
+           nrow*ncol*sizeof(float));
+    memcpy(AA+nrow*ncol, B, nrow*sizeof(float));
+    return AA;
 }
 
 float * subset_cm(float * A,
@@ -303,27 +306,150 @@ void segment_image_rf(opts * s, PrfForest * F, char * file)
         }
     }
 
-    /* TODO Label, Fill holes, remove debris etc */
+
     int fill_holes = 1;
-    float max_hole_size = 1000;
+    float max_hole_size = pow(25, 2);
     if(fill_holes)
     {
+        printf("Filling holes up to %.1f pixels large\n", max_hole_size);
         float * result2 = fim_fill_holes(result, M, N, max_hole_size);
         free(result);
         result = result2;
     }
+
+    /* remove debris */
+    int remove_small = 1;
+    /* something like everything < 1/4 of the expected
+     *  might make sense */
+    float min_size = pow(40, 2);
+    printf("Removing objects with < %.1f pixels\n", min_size-1);
+    if(remove_small)
+    {
+        float * result2 = fim_remove_small(result, M, N, min_size);
+        free(result);
+        result = result2;
+    }
+
+    /* TODO: split large? */
+
+    /* TODO: export properties to tsv */
+
+    /* label */
+    int * L = fim_conncomp6(result, M, N);
+    for(size_t kk = 0; kk<(size_t) (M*N); kk++)
+    {
+        result[kk] = L[kk];
+    }
+    free(L);
 
     fim_tiff_write_noscale(outfile, result, NULL,
                            M, N, 1);
     return;
 }
 
+PrfForest * loop_training_data(opts * s, float * features_cm,
+                               size_t nsamples, size_t nfeatures)
+{
+
+    PrfForest * F = NULL;
+    int done = 0;
+    while(done == 0)
+    {
+        if(F != NULL)
+        {
+            free(F);
+        }
+
+        /* Read annotated image */
+        fim_t * anno = fim_png_read_green_red(s->anno_label);
+
+        /* Append one columns for the annotations */
+
+        float * features_cma = cm_append_column(features_cm,
+                                        nsamples, nfeatures,
+                                        anno->V);
+        /* Extract the data there anno->V > 0 to a separate array */
+        size_t ncol_train = 0;
+        size_t nrow_train = 0;
+        float * features_cma_train = subset_cm(features_cma,
+                                               anno->V,
+                                               nsamples, nfeatures+1,
+                                               &nrow_train, &ncol_train);
+
+
+        /* Train classifier */
+        // Use prf_forest from pixel_random_forest
+        F = prf_forest_new(200); //s->ntree);
+        F->nthreads = s->nthreads;
+
+        if(prf_forest_train(F, features_cma_train, nrow_train, ncol_train))
+        {
+            printf("dw_nuclei: Failed to train the random forest\n");
+            exit(EXIT_FAILURE);
+        }
+
+        printf("Validating the training data\n");
+        int * class = prf_forest_classify_table(F, features_cma_train, nrow_train,
+                                                ncol_train);
+
+        size_t ncorrect = 0;
+        for(size_t kk = 0; kk<nrow_train; kk++)
+        {
+            if(class[kk] == features_cma_train[nrow_train*(ncol_train-1)+kk])
+            {
+                ncorrect++;
+            }
+        }
+        printf("%zu / %zu training pixels correctly classified\n", ncorrect, nrow_train);
+
+        /* Now apply it to all pixels */
+        class = prf_forest_classify_table(F, features_cm, anno->M*anno->N,
+                                          nfeatures);
+
+
+        float * result = malloc(anno->M*anno->N*sizeof(float));
+        for(size_t kk = 0; kk < anno->M*anno->N; kk++)
+        {
+            if(class[kk] == 2)
+            {
+                result[kk] = 0;
+            } else {
+                result[kk] = 1;
+            }
+        }
+
+        if(s->train_loop)
+        {
+            printf("Writing to training_classification.tif\n");
+            fim_tiff_write_noscale("training_classification.tif", result, NULL,
+                                   anno->M, anno->N, 1);
+            printf("Please inspect the image.\n");
+            printf("Satisfied? type y<enter>\n");
+            printf("Else, modify %s and press <enter> to try again\n",
+                   s->anno_label);
+            int ret = fgetc(stdin);
+            if(ret == 'y')
+            {
+                done = 1;
+            } else {
+                printf("Trying again\n");
+            }
+        } else {
+            done = 1;
+        }
+        free(features_cma);
+        free(features_cma_train);
+        free(anno);
+        free(result);
+    }
+
+    return F;
+}
+
 void random_forest_pipeline(opts * s, int argc, char ** argv)
 {
-    /* Read annotated image */
-    fim_t * anno = fim_png_read_green_red(s->anno_label);
 
-    /* Read corresponding raw image */
+    /* Read raw image */
     int64_t M = 0; int64_t N = 0; int64_t P = 0;
     printf("Reading tif: %s\n", s->anno_image);
     float * _anno_raw = fim_tiff_read(s->anno_image, NULL, &M, &N, &P, 0);
@@ -347,6 +473,8 @@ void random_forest_pipeline(opts * s, int argc, char ** argv)
     anno_raw->V = mp;
     anno_raw->P = 1;
 
+
+
     /* Extract features */
     ftab_t * features = fim_features_2d(anno_raw);
 
@@ -354,64 +482,11 @@ void random_forest_pipeline(opts * s, int argc, char ** argv)
     float * features_cm = transpose(features->T,
                                     features->nrow, features->ncol);
 
-    /* Append one columns for the annotations */
-    float * features_cma = malloc(features->nrow*features->ncol*sizeof(float));
-    memcpy(features_cma, features_cm, features->nrow*features->ncol*sizeof(float));
-    features_cma = cm_append_column(features_cma, features->nrow, features->ncol,
-                                   anno->V);
 
-    /* Extract the data there anno->V > 0 to a separate array */
-    size_t ncol_train = 0;
-    size_t nrow_train = 0;
-    float * features_cma_train = subset_cm(features_cma,
-                                          anno->V,
-                                          features->nrow, features->ncol+1,
-                                          &nrow_train, &ncol_train);
+    PrfForest * F = loop_training_data(s,
+                                       features_cm,
+                                       features->nrow, features->ncol);
 
-
-    /* Train classifier */
-    // Use prf_forest from pixel_random_forest
-    PrfForest * F = prf_forest_new(200); //s->ntree);
-    F->nthreads = s->nthreads;
-
-    if(prf_forest_train(F, features_cma_train, nrow_train, ncol_train))
-    {
-        printf("dw_nuclei: Failed to train the random forest\n");
-        exit(EXIT_FAILURE);
-    }
-
-    printf("Validating the training data\n");
-    int * class = prf_forest_classify_table(F, features_cma_train, nrow_train,
-                                            ncol_train);
-
-    size_t ncorrect = 0;
-    for(size_t kk = 0; kk<nrow_train; kk++)
-    {
-        if(class[kk] == features_cma_train[nrow_train*(ncol_train-1)+kk])
-        {
-            ncorrect++;
-        }
-    }
-    printf("%zu / %zu training pixels correctly classified\n", ncorrect, nrow_train);
-
-    /* Now apply it to all pixels */
-    class = prf_forest_classify_table(F, features_cm, anno->M*anno->N,
-                                            features->ncol);
-
-
-    float * result = malloc(anno->M*anno->N*sizeof(float));
-    for(size_t kk = 0; kk < anno->M*anno->N; kk++)
-    {
-        if(class[kk] == 2)
-        {
-            result[kk] = 0;
-        } else {
-            result[kk] = 1;
-        }
-    }
-    printf("Writing to training_classification.tif\n");
-    fim_tiff_write_noscale("training_classification.tif", result, NULL,
-                           anno->M, anno->N, 1);
 
     for(size_t kk = s->optpos; kk < (size_t) argc; kk++)
     {
@@ -442,42 +517,22 @@ int dw_nuclei(int argc, char ** argv)
 
     omp_set_num_threads(s->nthreads);
 
-    if(s->anno_label != NULL && s->anno_image != NULL)
+    if(s->anno_image == NULL)
     {
-        random_forest_pipeline(s, argc, argv);
+        printf("No --aimage specified, can't continue\n");
+        goto done;
     }
 
-#if 0
-    if(s->verbose > 0)
+    if(s->anno_label == NULL)
     {
-        printf("Max projection\n");
+        printf("No --alabel image specified.\n");
+        printf("Please create one and run again.\n");
+        goto done;
     }
 
-    float * Mproj = fim_maxproj(A, M, N, P);
-    free(A);
-    if(s->verbose > 0)
-    {
-        printf("Thresholding\n");
-    }
-    float * B = fim_otsu(Mproj, M, N);
-    free(Mproj);
-    if(s->verbose > 0)
-    {
-        printf("Labelling\n");
-    }
+    random_forest_pipeline(s, argc, argv);
 
-    int * L = fim_conncomp6(B, M, N);
-    float * fL = malloc(M*N*sizeof(float));
-    for(size_t kk = 0; kk< (size_t) M*N; kk++)
-    {
-        fL[kk] = L[kk];
-    }
-    free(L);
-
-    fim_tiff_write_noscale(outFile, fL, NULL, M, N, 1);
-
-    free(fL);
-#endif
+ done:
     opts_free(s);
     return 0;
 }

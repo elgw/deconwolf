@@ -180,7 +180,7 @@ int ftab_get_col(const ftab_t * T, const char * name)
             ret = kk;
         }
     }
-    printf("%s is column %d\n", name, ret);
+    //printf("%s is column %d\n", name, ret);
     return ret;
 }
 

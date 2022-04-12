@@ -1997,7 +1997,47 @@ float * fim_otsu(float * Im, size_t M, size_t N)
     return B;
 }
 
-float * fim_fill_holes(float * im, size_t M, size_t N, float max_size)
+float * fim_remove_small(const float * im,
+                         size_t M, size_t N,
+                         float min_pixels)
+{
+    int * L = fim_conncomp6(im, M, N);
+    int ncomp = 0;
+    for(size_t kk = 0; kk<M*N; kk++)
+    {
+        L[kk] > ncomp ? ncomp = L[kk] : 0;
+    }
+    printf("%d objects\n", ncomp);
+
+    /* Histogram on the number of pixels per label */
+    uint32_t * H = calloc((ncomp+1), sizeof(uint32_t));
+    for(size_t kk = 0; kk<M*N; kk++)
+    {
+        H[L[kk]]++;
+    }
+
+    /* Set  */
+    size_t npix = 0;
+    float * out = malloc(M*N*sizeof(float));
+    for(size_t kk = 0; kk<M*N; kk++)
+    {
+        out[kk] = im[kk];
+        if((L[kk] > 0) & (out[kk] > 0))
+        {
+            if(H[L[kk]] < min_pixels)
+            {
+                out[kk] = 0;
+                npix++;
+            }
+        }
+    }
+    printf("Cleared %zu pixels\n", npix);
+    free(H);
+    free(L);
+    return out;
+}
+
+float * fim_fill_holes(const float * im, size_t M, size_t N, float max_size)
 {
     /* Any region in !im that is not connected to the boundary
      * is a hole
@@ -2062,9 +2102,9 @@ float * fim_fill_holes(float * im, size_t M, size_t N, float max_size)
         out[kk] = im[kk];
         if(im[kk] == 0)
         {
-            if( (L[kk] > 0) & (H[L[kk]] < max_size))
+            if( (L[kk] > 0) & (H[L[kk]] < max_size) )
             {
-                out[kk] = 2;
+                out[kk] = 1;
                 nfilled++;
             }
         }
@@ -2075,7 +2115,7 @@ float * fim_fill_holes(float * im, size_t M, size_t N, float max_size)
     return out;
 }
 
-int * fim_conncomp6(float * im, size_t M, size_t N)
+int * fim_conncomp6(const float * im, size_t M, size_t N)
 {
     int * lab = calloc(M*N, sizeof(float));
     int label = 0;
@@ -2085,7 +2125,7 @@ int * fim_conncomp6(float * im, size_t M, size_t N)
     for(size_t nn = 0; nn<N; nn++)
     {
         int currlabel = 0;
-        float * Aim = im + nn*M;
+        const float * Aim = im + nn*M;
         int * Alab = lab + nn*M;
         for(size_t mm = 0; mm<M; mm++)
         {
@@ -2594,10 +2634,10 @@ ftab_t * fim_features_2d(const fim_t * fI)
         exit(EXIT_FAILURE);
     }
     /* For varying sigmas */
-    //float sigmas[] = {0.3, 0.7, 1, 1.6, 3.5, 5, 10};
-    //int nsigma = 7;
-    float sigmas[] = {0.3, 1, 3.5, 10};
-    int nsigma = 4;
+    float sigmas[] = {0.3, 0.7, 1, 1.6, 3.5, 5, 10};
+    int nsigma = 7;
+    //float sigmas[] = {0.3, 1, 3.5, 10};
+    //int nsigma = 4;
     //float sigmas[] = {1.5};
     //int nsigma = 1;
     int f_per_s = 7; /* Features per sigma */
