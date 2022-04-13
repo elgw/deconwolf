@@ -1860,7 +1860,7 @@ fim_histogram_t * fim_histogram(const float * Im, size_t N)
 {
     float min = fim_min(Im, N);
     float max = fim_max(Im, N);
-    size_t nbin = pow(2, 16);
+    size_t nbin = pow(2, 16)+1;
     float delta = (max-min) / ((float) nbin);
     float left = min - 0.5*delta-1e-6;
     float right = max + 0.5*delta+1e-6;
@@ -1882,7 +1882,10 @@ fim_histogram_t * fim_histogram(const float * Im, size_t N)
         assert(fbin >= 0);
         //printf("v=%f, bin=%f\n", v, fbin);
         size_t bin = round(fbin);
-
+        if(bin >= (size_t) nbin)
+        {
+            bin = nbin-1;
+        }
         H->C[bin]++;
     }
     return H;
@@ -2622,6 +2625,33 @@ static float eig_sym_22_2nd(float a, float b, float c)
     return 0.5*(a+b - sqrt(pow(a-b,2) + 4*pow(c,2)) );
 }
 
+static float total_gm(const float * I0, size_t M, size_t N, float sigma)
+{
+    fim_t * I = fim_image_from_array(I0, M, N, 1);
+    fim_t * dx = fimt_partial(I, 0, sigma);
+    fim_t * dy = fimt_partial(I, 1, sigma);
+    fim_free(I);
+
+    double gm = 0;
+    for(size_t kk = 0; kk<M*N; kk++)
+    {
+        gm += sqrt( pow(dx->V[kk], 2) + pow(dy->V[kk], 2));
+    }
+
+    fim_free(dx);
+    fim_free(dy);
+    return (float) gm;
+}
+
+float * fim_focus_gm(const fim_t * I, float sigma)
+{
+    float * gm = malloc(I->P*sizeof(float));
+    for(size_t kk = 0; kk<I->P; kk++)
+    {
+        gm[kk] = total_gm(I->V + kk*I->M*I->N, I->M, I->N, sigma);
+    }
+    return gm;
+}
 
 ftab_t * fim_features_2d(const fim_t * fI)
 {
@@ -2630,16 +2660,17 @@ ftab_t * fim_features_2d(const fim_t * fI)
 
     if(fI->P != 1)
     {
-        fprintf(stderr, "fim_features_2d can only work with 2D images\n");
+        fprintf(stderr, "fim_features_2d can only work with 2D images, supplied image was %zu x %zu x %zu\n",
+                fI->M, fI->N, fI->P);
         exit(EXIT_FAILURE);
     }
     /* For varying sigmas */
-    float sigmas[] = {0.3, 0.7, 1, 1.6, 3.5, 5, 10};
-    int nsigma = 7;
+    //float sigmas[] = {0.3, 0.7, 1, 1.6, 3.5, 5, 10};
+    //int nsigma = 7;
     //float sigmas[] = {0.3, 1, 3.5, 10};
     //int nsigma = 4;
-    //float sigmas[] = {1.5};
-    //int nsigma = 1;
+    float sigmas[] = {3.5};
+    int nsigma = 1;
     int f_per_s = 7; /* Features per sigma */
     int nfeatures = nsigma*f_per_s;
     printf("Will produce %d features\n", nfeatures);

@@ -26,29 +26,6 @@ static void usage(__attribute__((unused)) int argc, char ** argv);
 static void argparsing(int argc, char ** argv, opts * s);
 static int file_exist(char * fname);
 
-static int dw_get_threads(void)
-{
-    int nThreads = 4;
-#ifndef WINDOWS
-/* Reports #threads, typically 2x#cores */
-    nThreads = sysconf(_SC_NPROCESSORS_ONLN)/2;
-#endif
-#ifdef OMP
-/* Reports number of cores */
-    nThreads = omp_get_num_procs();
-#endif
-    return nThreads;
-}
-
-static double clockdiff(struct timespec* end, struct timespec * start)
-{
-    double elapsed = (end->tv_sec - start->tv_sec);
-    elapsed += (end->tv_nsec - start->tv_nsec) / 1000000000.0;
-    return elapsed;
-}
-
-
-
 static opts * opts_new()
 {
     opts * s = malloc(sizeof(opts));
@@ -73,19 +50,12 @@ static opts * opts_new()
     return s;
 }
 
-static void nullfree(void * p)
-{
-    if(p != NULL)
-    {
-        free(p);
-    }
-}
 
 static void opts_free(opts * s)
 {
-    nullfree(s->outfile);
-    nullfree(s->image);
-
+    dw_nullfree(s->outfile);
+    dw_nullfree(s->image);
+    dw_nullfree(s->dotfile);
     free(s);
 }
 
@@ -171,7 +141,7 @@ static void argparsing(int argc, char ** argv, opts * s)
             s->drawtext = 0;
             break;
         case 'O':
-            nullfree(s->outfile);
+            dw_nullfree(s->outfile);
             s->outfile = strdup(optarg);
             break;
         case 'T':
@@ -265,9 +235,9 @@ cairo_surface_t * fim_to_cairo_surface(fim_t * I,
     cairo_surface_flush(result);
     current_row = cairo_image_surface_get_data(result);
     stride = cairo_image_surface_get_stride(result);
-    for (int y = 0; y < I->M; y++) {
+    for (int y = 0; y < I->N; y++) {
         uint32_t *row = (void *) current_row;
-        for (int x = 0; x < I->N; x++) {
+        for (int x = 0; x < I->M; x++) {
             float v =  ((I->V[x + I->M*y])-low) / (high-low);
             v*=255;
             v > 255? v = 255 : 0;
@@ -285,26 +255,28 @@ cairo_surface_t * fim_to_cairo_surface(fim_t * I,
     return result;
 }
 
-void render(opts * s, fim_t * I, ftab_t * T)
+void render(opts * s, const fim_t * I, ftab_t * T)
 {
     printf("Creating max projection\n");
-    float * M = fim_maxproj(I->V, I->M, I->N, I->P);
-    I->V = M; I->P = 1;
+    float * m = fim_maxproj(I->V, I->M, I->N, I->P);
+    fim_t * M = fim_image_from_array(m, I->M, I->N, 1);
+    free(m);
+
     if(s->lsigma > 0)
     {
-        fim_gsmooth(M, I->M, I->N, 1, s->lsigma);
+        fim_gsmooth(M->V, M->M, M->N, 1, s->lsigma);
     }
 
-    fim_histogram_t * H = fim_histogram(I->V, I->M*I->N*I->P);
+    fim_histogram_t * H = fim_histogram(M->V, M->M*M->N*M->P);
     float low =  fim_histogram_percentile(H, s->plow);
     float high = fim_histogram_percentile(H, s->phigh);
     printf("Using range [%f, %f]\n", low, high);
     fim_histogram_free(H);
-    cairo_surface_t * mip = fim_to_cairo_surface(I, low, high);
+    cairo_surface_t * mip = fim_to_cairo_surface(M, low, high);
 
     cairo_surface_t * surf = cairo_svg_surface_create (s->outfile,
-                                                       I->M,
-                                                       I->N);
+                                                       M->M,
+                                                       M->N);
     //cairo_pattern_set_filter(cairo_get_source(cr), CAIRO_FILTER_NEAREST);
 //    cairo_pattern_set_filter(mip, CAIRO_FILTER_NEAREST);
 
@@ -315,8 +287,6 @@ void render(opts * s, fim_t * I, ftab_t * T)
     cairo_pattern_set_filter (cairo_get_source (cr), CAIRO_FILTER_NEAREST);
     cairo_paint(cr);
 
-
-
     cairo_set_line_width(cr, 1);
     cairo_set_source_rgb(cr, 1.0, 0.00, 0);
 
@@ -324,6 +294,7 @@ void render(opts * s, fim_t * I, ftab_t * T)
     int ycol = ftab_get_col(T, "y");
     int vcol = ftab_get_col(T, "value");
     int ucol = ftab_get_col(T, "use");
+
     if(s->dot_mode == DOT_MODE_AUTO)
     {
         if(ucol == -1)
@@ -448,7 +419,8 @@ void render(opts * s, fim_t * I, ftab_t * T)
     cairo_surface_destroy(surf);
     cairo_surface_destroy(mip);
     cairo_destroy(cr);
-
+    free(M->V);
+    free(M);
 }
 
 
@@ -492,11 +464,12 @@ int dw_render(int argc, char ** argv)
         printf("%s exists, skipping.\n", outFile);
         exit(EXIT_SUCCESS);
     }
-
+    printf("Will write to %s\n", outFile);
 
     int64_t M = 0, N = 0, P = 0;
     float * A = fim_tiff_read(inFile, NULL, &M, &N, &P, s->verbose);
     fim_t * I = fim_image_from_array(A, M, N, P);
+    free(A);
 
     ftab_t * T = NULL;
     if(s->dotfile != NULL)
@@ -536,8 +509,8 @@ int dw_render(int argc, char ** argv)
 
     ftab_free(T);
 
+    free(I->V);
     free(I);
-    free(A);
 
     opts_free(s);
     return EXIT_SUCCESS;

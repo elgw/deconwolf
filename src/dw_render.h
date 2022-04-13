@@ -14,7 +14,7 @@
 #include "ftab.h"
 #include "fim_tiff.h"
 #include "dw_version.h"
-
+#include "dw_util.h"
 
 int dw_render(int argc, char ** argv);
 

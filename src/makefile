@@ -14,8 +14,9 @@ tiling_ut:
 fft_ut:
 	$(cc) fft_ut.c fft.c fim.c $(CFLAGS) -lm -lfftw3f -lfftw3f_threads -o fft_ut
 
-dw_render: dw_render.c dw_render.h fim.c ftab.c fim_tiff.c
-	$(cc) $(cflags) -DSTANDALONE dw_render.c fim.c fim_tiff.c fft.c ftab.c $(ldflags) -o dw_render
+dw_render_files=dw_render.c dw_render.h fim.c ftab.c fim_tiff.c dw_util.c fft.c
+dw_render: $(dw_render_files)
+	$(cc) $(cflags) -DSTANDALONE $(dw_render_files) $(ldflags) -o dw_render
 
 dw_nuclei: dw_nuclei.c fim.c ftab.c fim_tiff.c prf_forest.o
 	$(cc) $(cflags) -DSTANDALONE dw_nuclei.c fim.c dw_util.c fim_tiff.c fft.c ftab.c prf_forest.o prf_tree.o prf_util.o qsort.o $(ldflags) -o dw_nuclei

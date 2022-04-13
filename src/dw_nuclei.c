@@ -1,5 +1,11 @@
 #include "dw_nuclei.h"
 
+typedef enum {
+    REDU_MAX,
+    REDU_MEAN,
+    REDU_FOCUS
+} reduction_type;
+
 typedef struct{
     int overwrite;
     int verbose;
@@ -12,10 +18,12 @@ typedef struct{
     int nthreads;
     int ntree; /* Number of trees in random forest classifier */
     int train_loop;
+    reduction_type redu;
 } opts;
 
 static opts * opts_new();
 static void opts_free(opts * s);
+static void opts_print(FILE * f, opts * s);
 static void usage(__attribute__((unused)) int argc, char ** argv);
 static void argparsing(int argc, char ** argv, opts * s);
 
@@ -33,7 +41,25 @@ static opts * opts_new()
     s->anno_label = NULL;
     s->ntree = 50;
     s->train_loop = 0;
+    s->redu = REDU_FOCUS;
     return s;
+}
+
+static void opts_print(FILE * f, opts * s)
+{
+    fprintf(f, "Overwrite: %d\n", s->overwrite);
+    switch(s->redu)
+    {
+    case REDU_MAX:
+        fprintf(f, "Reduction: Max projection\n");
+        break;
+    case REDU_FOCUS:
+        fprintf(f, "Reduction: Most in focus slice\n");
+        break;
+    case REDU_MEAN:
+        fprintf(f, "Reduction: Mean projection\n");
+        break;
+    }
 }
 
 static void nullfree(void * p)
@@ -243,6 +269,95 @@ float * subset_cm(float * A,
     return S;
 }
 
+static int float_arg_max(const float * v, size_t N)
+{
+    float max = v[0];
+    int argmax = 0;
+    for(size_t kk = 0; kk<N; kk++)
+    {
+        if(v[kk] > max)
+        {
+            max = v[kk];
+            argmax = kk;
+        }
+    }
+    return argmax;
+}
+
+fim_t * get_reduction(opts * s, char * file)
+{
+
+
+    int64_t M = 0; int64_t N = 0; int64_t P = 0;
+    if(s->verbose > 0)
+    {
+        printf("Reading tif: %s\n", file);
+    }
+    float * I = fim_tiff_read(file, NULL, &M, &N, &P, 0);
+    if(I == NULL)
+    {
+        printf("%s could not be read, unrecognizable format.\n", file);
+        return NULL;
+    }
+
+    /* Determine scaling */
+    if(s->verbose > 1)
+    {
+        printf("Looking for a scaling factor in the dw log file\n");
+        fflush(stdout);
+    }
+    float scaling = dw_read_scaling(file);
+    if(s->verbose > 0)
+    {
+        printf("Scaling by %f\n", 1.0/scaling);
+        fflush(stdout);
+    }
+    fim_mult_scalar(I, M*N*P, 1.0/scaling);
+
+    if(s->redu == REDU_MAX)
+    {
+        float * maxI = fim_maxproj(I, M, N, P);
+        free(I);
+        fim_t * result = fim_image_from_array(maxI, M, N, 1);
+        free(maxI);
+        return result;
+    }
+
+    if(s->redu == REDU_FOCUS)
+    {
+        if(s->verbose > 0)
+        {
+            printf("Finding focus\n"); fflush(stdout);
+        }
+        fim_t * II = fim_image_from_array(I, M, N, P);
+        free(I);
+        float sigma = 1;
+        float * gm = fim_focus_gm(II, sigma);
+        int slice = float_arg_max(gm, II->P);
+        fim_t * result = malloc(sizeof(fim_t));
+        result->M = M;
+        result->N = N;
+        result->P = 1;
+        result->V = malloc(M*N*sizeof(float));
+        memcpy(result->V, II->V+slice*M*N, M*N*sizeof(float));
+        fim_free(II);
+        if(s->verbose > 0)
+        {
+            printf("Returning slice %d\n", slice); fflush(stdout);
+        }
+        return result;
+    }
+
+    if(s->redu == REDU_MEAN)
+    {
+        fprintf(stderr, "Reduction: Mean projection is not implemented\n");
+        exit(EXIT_FAILURE);
+    }
+
+    fprintf(stderr, "Unknown reduction type\n");
+    exit(EXIT_FAILURE);
+    return NULL;
+}
 
 void segment_image_rf(opts * s, PrfForest * F, char * file)
 {
@@ -262,41 +377,23 @@ void segment_image_rf(opts * s, PrfForest * F, char * file)
     printf("\n");
 
     /* Read the image */
-    int64_t M = 0; int64_t N = 0; int64_t P = 0;
-    printf("Reading tif: %s\n", file);
-    float * I = fim_tiff_read(file, NULL, &M, &N, &P, 0);
-    if(I == NULL)
-    {
-        printf("%s could not be read, unrecognizable format.\n", file);
-        free(outfile);
-        return;
-    }
-
-    /* Determine scaling */
-    float scaling = dw_read_scaling(file);
-    printf("Scaling by %f\n", 1.0/scaling);
-    fim_mult_scalar(I, M*N*P, 1.0/scaling);
-
-    float * maxI = fim_maxproj(I, M, N, P);
-    free(I);
+    fim_t * redu = get_reduction(s, file);
+    printf("1\n"); fflush(stdout);
     /* Extract features */
-    fim_t * fmaxI = fim_image_from_array(maxI, M, N, 1);
-    free(maxI);
-    ftab_t * features = fim_features_2d(fmaxI);
-    fim_free(fmaxI);
-
+    ftab_t * features = fim_features_2d(redu);
+    printf("2\n"); fflush(stdout);
     /* Transpose to column-major */
     float * features_cm = transpose(features->T,
                                     features->nrow, features->ncol);
-
+    printf("3\n"); fflush(stdout);
     /* Classify */
     int * class = prf_forest_classify_table(F, features_cm,
-                                            M*N, features->ncol);
+                                            redu->M*redu->N, features->ncol);
     ftab_free(features);
     free(features_cm);
-
-    float * result = malloc(M*N*sizeof(float));
-    for(size_t kk = 0; kk < (size_t) (M*N); kk++)
+    printf("4\n"); fflush(stdout);
+    float * result = malloc(redu->M*redu->N*sizeof(float));
+    for(size_t kk = 0; kk < (size_t) (redu->M*redu->N); kk++)
     {
         if(class[kk] == 2)
         {
@@ -305,14 +402,13 @@ void segment_image_rf(opts * s, PrfForest * F, char * file)
             result[kk] = 1;
         }
     }
-
-
+    printf("5\n"); fflush(stdout);
     int fill_holes = 1;
     float max_hole_size = pow(25, 2);
     if(fill_holes)
     {
         printf("Filling holes up to %.1f pixels large\n", max_hole_size);
-        float * result2 = fim_fill_holes(result, M, N, max_hole_size);
+        float * result2 = fim_fill_holes(result, redu->M, redu->N, max_hole_size);
         free(result);
         result = result2;
     }
@@ -325,7 +421,7 @@ void segment_image_rf(opts * s, PrfForest * F, char * file)
     printf("Removing objects with < %.1f pixels\n", min_size-1);
     if(remove_small)
     {
-        float * result2 = fim_remove_small(result, M, N, min_size);
+        float * result2 = fim_remove_small(result, redu->M, redu->N, min_size);
         free(result);
         result = result2;
     }
@@ -335,15 +431,16 @@ void segment_image_rf(opts * s, PrfForest * F, char * file)
     /* TODO: export properties to tsv */
 
     /* label */
-    int * L = fim_conncomp6(result, M, N);
-    for(size_t kk = 0; kk<(size_t) (M*N); kk++)
+    int * L = fim_conncomp6(result, redu->M, redu->N);
+    for(size_t kk = 0; kk<(size_t) (redu->M*redu->N); kk++)
     {
         result[kk] = L[kk];
     }
     free(L);
 
     fim_tiff_write_noscale(outfile, result, NULL,
-                           M, N, 1);
+                           redu->M, redu->N, 1);
+    fim_free(redu);
     return;
 }
 
@@ -450,30 +547,7 @@ void random_forest_pipeline(opts * s, int argc, char ** argv)
 {
 
     /* Read raw image */
-    int64_t M = 0; int64_t N = 0; int64_t P = 0;
-    printf("Reading tif: %s\n", s->anno_image);
-    float * _anno_raw = fim_tiff_read(s->anno_image, NULL, &M, &N, &P, 0);
-    if(P == 1)
-    {
-        fprintf(stderr, "Please use a full 3D image as reference.\n");
-        exit(EXIT_FAILURE);
-    }
-    float scaling = dw_read_scaling(s->anno_image);
-    printf("Scaling by %f\n", 1.0/scaling);
-    fim_mult_scalar(_anno_raw, M*N*P, 1.0/scaling);
-
-    fim_t * anno_raw = malloc(sizeof(fim_t));
-    anno_raw->V = _anno_raw;
-    anno_raw->M = M;
-    anno_raw->N = N;
-    anno_raw->P = P;
-
-    float * mp = fim_maxproj(anno_raw->V, anno_raw->M, anno_raw->N, anno_raw->P);
-    free(anno_raw->V);
-    anno_raw->V = mp;
-    anno_raw->P = 1;
-
-
+    fim_t * anno_raw = get_reduction(s, s->anno_image);
 
     /* Extract features */
     ftab_t * features = fim_features_2d(anno_raw);
@@ -482,11 +556,9 @@ void random_forest_pipeline(opts * s, int argc, char ** argv)
     float * features_cm = transpose(features->T,
                                     features->nrow, features->ncol);
 
-
     PrfForest * F = loop_training_data(s,
                                        features_cm,
                                        features->nrow, features->ncol);
-
 
     for(size_t kk = s->optpos; kk < (size_t) argc; kk++)
     {
@@ -528,6 +600,11 @@ int dw_nuclei(int argc, char ** argv)
         printf("No --alabel image specified.\n");
         printf("Please create one and run again.\n");
         goto done;
+    }
+
+    if(s->verbose > 1)
+    {
+        opts_print(stdout, s);
     }
 
     random_forest_pipeline(s, argc, argv);

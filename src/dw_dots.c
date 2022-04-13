@@ -35,14 +35,14 @@ static opts * opts_new()
     s->outfile = NULL;
     s->nthreads = dw_get_threads();
     s->log = 0;
-    s->lsigma = 1;
-    s->asigma = 1;
+    s->lsigma = 0;
+    s->asigma = 0;
     s->ndots = -1; /* Auto */
     s->log = NULL;
     s->logfile = NULL;
     s->LoG = 0;
     s->fout = NULL;
-    s->fwhm = 0;
+    s->fwhm = 1;
     return s;
 }
 
@@ -59,9 +59,18 @@ static void opts_print(FILE * f, opts * s)
 {
     fprintf(f, "overwrite = %d\n", s->overwrite);
     fprintf(f, "verbose = %d\n", s->verbose);
-    fprintf(f, "image: %s\n", s->image);
-    fprintf(f, "outfile: %s\n", s->outfile);
-    fprintf(f, "logfile: %s\n", s->logfile);
+    if(s->image != NULL)
+    {
+        fprintf(f, "image: %s\n", s->image);
+    }
+    if(s->outfile != NULL)
+    {
+        fprintf(f, "outfile: %s\n", s->outfile);
+    }
+    if(s->logfile != NULL)
+    {
+        fprintf(f, "logfile: %s\n", s->logfile);
+    }
     fprintf(f, "nthreads = %d\n", s->nthreads);
     fprintf(f, "Lateral sigma: %.2f\n", s->lsigma);
     fprintf(f, "Axial sigma: %.2f\n", s->asigma);
@@ -102,6 +111,27 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
     printf("The log messages will be written to input.tif.log.txt\n");
     printf("Dots will be exported to input.tif.dots.tsv\n");
     free(s);
+}
+
+ftab_t * ftab_insert_col(ftab_t * T, float * C, char * cname)
+{
+    /* Create a new table with one extra column */
+    ftab_t * T2 = ftab_new(T->ncol + 1);
+    for(size_t cc = 0; cc<T->ncol; cc++)
+    {
+        ftab_set_colname(T2, cc, T->colnames[cc]);
+    }
+    float * row = malloc((T->nrow+1)*sizeof(float));
+    for(size_t rr = 0; rr<T->nrow; rr++)
+    {
+        memcpy(row, T->T+rr*T->ncol, T->ncol*sizeof(float));
+        row[T->ncol] = C[rr];
+        ftab_insert(T2, row);
+    }
+    free(row);
+    ftab_set_colname(T2, T->ncol, cname);
+    ftab_free(T);
+    return T2;
 }
 
 static void argparsing(int argc, char ** argv, opts * s)
@@ -202,24 +232,10 @@ static ftab_t * append_fwhm(opts * s, ftab_t * T, fim_t * V, char * cname)
         printf(" took %.4f s\n", t);
     }
 
-    /* Create a new table with one extra column */
-    ftab_t * T2 = ftab_new(T->ncol + 1);
-    for(size_t cc = 0; cc<T->ncol; cc++)
-    {
-        ftab_set_colname(T2, cc, T->colnames[cc]);
-    }
-    float * row = malloc((T->nrow+1)*sizeof(float));
-    for(size_t rr = 0; rr<T->nrow; rr++)
-    {
-        memcpy(row, T->T+rr*T->ncol, T->ncol*sizeof(float));
-        row[T->ncol] = fwhm[rr];
-        ftab_insert(T2, row);
-    }
-    ftab_set_colname(T2, T->ncol, cname);
-    ftab_free(T);
-    free(row);
+    T = ftab_insert_col(T, fwhm, cname);
+
     free(fwhm);
-    return T2;
+    return T;
 }
 
 
@@ -243,8 +259,10 @@ void detect_dots(opts * s, char * inFile)
     /* Set up the log file for this image */
     dw_nullfree(s->logfile);
     s->logfile = malloc(strlen(s->image) + 64);
-    sprintf(s->logfile, "%s.log.txt", s->image);
+    sprintf(s->logfile, "%sdots.log.txt", s->image);
     s->log = fopen(s->logfile, "w");
+    opts_print(s->log, s);
+
 
     /* Set up the name for the output file */
     dw_nullfree(s->outfile);
@@ -361,6 +379,14 @@ void detect_dots(opts * s, char * inFile)
     fprintf(s->log, "Suggested threshold (from %zu dots): %f\n", T->nrow, s->th);
     fim_histogram_free(H);
 
+    float * use = malloc(T->nrow*sizeof(float));
+    int vcol = ftab_get_col(T, "value");
+    for(size_t kk = 0; kk<T->nrow; kk++)
+    {
+        use[kk] = T->T[T->ncol*kk + vcol] > s->th;
+    }
+    T = ftab_insert_col(T, use, "use");
+
     fim_t * fI = fim_image_from_array(feature, M, N, P);
 
     if(s->fwhm)
@@ -408,7 +434,7 @@ int dw_dots(int argc, char ** argv)
 
     argparsing(argc, argv, s);
     omp_set_num_threads(s->nthreads);
-    if(s->verbose > 1)
+    if(s->verbose > 0)
     {
         opts_print(stdout, s);
     }
