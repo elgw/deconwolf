@@ -335,6 +335,6 @@ ftab_t * fim_features_2d(const fim_t *);
 
 /* Return a I->P long vector with the integral
  * gradient magnitude per slice in I */
-float * fim_focus_gm(const fim_t * I, float sigma);
+float * fim_focus_gm(const fim_t * image, float sigma);
 
 #endif /* _fim_h_ */
