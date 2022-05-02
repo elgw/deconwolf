@@ -234,6 +234,61 @@ void readUint16_sub(TIFF * tfile, float * V,
     _TIFFfree(buf);
 }
 
+void readUint8_sub(TIFF * tfile, float * V,
+                    const uint32_t ssize,
+                    const uint32_t ndirs,
+                    const uint32_t nstrips,
+                    const uint32_t perDirectory,
+                    int64_t M, int64_t N, int64_t P,
+                    int64_t sM, int64_t sN, int64_t sP,
+                    int64_t wM, int64_t wN, int64_t wP)
+{
+
+    // V should hold wM*wN*wP uint16
+
+    // Number of elements per strip
+    size_t nes = ssize/sizeof(uint8_t);
+    uint8_t * buf = _TIFFmalloc(ssize);
+    assert(buf != NULL);
+
+    for(size_t dd=0; dd < ndirs; dd++) {
+        TIFFSetDirectory(tfile, dd);
+        for(size_t kk=0; kk<nstrips; kk++) {
+            size_t strip = kk;
+            tsize_t read = TIFFReadEncodedStrip(tfile, strip, buf, (tsize_t) - 1);
+            assert(read>0);
+
+            for(size_t ii = 0; ii < read/sizeof(uint8_t); ii++) {
+                size_t ipos = ii+kk*nes + dd*perDirectory; // Input position
+
+                int64_t iM = 0; int64_t iN = 0; int64_t iP = 0;
+
+                sub2ind(ipos, M, N, P, &iM, &iN, &iP);
+
+                if(0){
+                    if(ipos % 100000 == 0){
+                        printf("%" PRId64 " %" PRId64 " %" PRId64 ", %zu -> (%" PRId64 ", %" PRId64 ", %" PRId64 ")\n", M, N, P, ipos, iM, iN, iP);
+                        getchar();
+                    }}
+
+                int64_t oM = (iM-sM);
+                int64_t oN = (iN-sN);
+                int64_t oP = (iP-sP);
+
+                if(oM >= 0 && oM < wM){
+                    if(oN >= 0 && oN < wN){
+                        if(oP >= 0 && oP < wP){
+                            size_t opos = oM + oN*wM + oP*wM*wN;
+                            V[opos] = (float) buf[ii];
+                        }
+                    }
+                }
+            }
+        }
+    }
+    _TIFFfree(buf);
+}
+
 
 void readUint16(TIFF * tfile, float * V,
                 const tsize_t ssize,
@@ -282,6 +337,63 @@ void readUint16(TIFF * tfile, float * V,
             }
             //printf("\r%lu/%lu", dd, kk); fflush(stdout);
             for(size_t ii = 0; ii < read/sizeof(uint16_t); ii++) {
+                size_t pos = (size_t)( ii+kk*nes + dd*perDirectory);
+                //printf("pos=%zu\n", pos);
+                V[pos] = buf[ii];
+            }
+        }
+    }
+
+    _TIFFfree(buf);
+}
+
+void readUint8(TIFF * tfile, float * V,
+                const tsize_t ssize,
+                const uint32_t ndirs,
+                const uint32_t nstrips,
+                const uint32_t perDirectory
+    )
+{
+    // Number of elements per strip
+    size_t nes = ssize/sizeof(uint8_t);
+    //  uint16_t * buf = _TIFFmalloc(ssize);
+    uint8_t * buf = malloc(ssize);
+
+    if(buf == NULL)
+    {
+        printf("Failed to allocate %" PRId64 " bytes of memory!", ssize);
+        fflush(stdout);
+        return;
+    }
+
+    for(int64_t dd=0; dd<ndirs; dd++) {
+        int ok = TIFFSetDirectory(tfile, dd);
+        if(ok == 0)
+        {
+            printf("Failed to choose directory %" PRIu64 "\n", dd);
+            printf("Either the file is corrupt or this program has a bug. "
+                   "Please verify with another program that the file is ok before "
+                   "filing a bug report.\n");
+            exit(EXIT_FAILURE);
+            fflush(stdout);
+        }
+        for(int64_t kk=0; kk<nstrips; kk++) {
+            int64_t strip = kk;
+            tsize_t read = TIFFReadEncodedStrip(tfile,
+                                                (tstrip_t) strip, // Strip number
+                                                (tdata_t) buf, // target
+                                                ssize); // The entire strip
+            if(read == -1)
+            {
+                printf("Failed to read from tif file\n");
+                fflush(stdout);
+            }
+            if(read > ssize)
+            {
+                printf("Read to much!\n"); fflush(stdout);
+            }
+            //printf("\r%lu/%lu", dd, kk); fflush(stdout);
+            for(size_t ii = 0; ii < read/sizeof(uint8_t); ii++) {
                 size_t pos = (size_t)( ii+kk*nes + dd*perDirectory);
                 //printf("pos=%zu\n", pos);
                 V[pos] = buf[ii];
@@ -1344,17 +1456,17 @@ float * fim_tiff_read_sub(const char * fName,
         }
         if(BPS == 8)
         {
-            perror("Can't read 8-bit images\n");
-            exit(-1);
-            /*
-              if(subregion)
-              {
-              readUint8_sub(tfile, V, ssize, ndirs, nstrips, M*N,
-              sM, sN, sP, wM, wN, wP);
-              } else {
-              readUint8(tfile, V, ssize, ndirs, nstrips, M*N);
-              }
-            */
+            if(subregion)
+            {
+                fprintf(fim_tiff_log, "%" PRId64 " %" PRId64 " %" PRId64 ", %"
+                        PRId64 " %" PRId64 " %" PRId64 ", %" PRId64 " %"
+                        PRId64 " %" PRId64 "\n",
+                        M, N, P, sM, sN, sP, wM, wN, wP);
+                readUint8_sub(tfile, V, ssize, ndirs, nstrips, M*N,
+                               M, N, (int) P, sM, sN, sP, wM, wN, wP);
+            } else {
+                readUint8(tfile, V, ssize, ndirs, nstrips, M*N);
+            }
         }
     }
 
