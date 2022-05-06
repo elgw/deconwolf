@@ -7,6 +7,9 @@ cflags+=`pkg-config cairo libpng --cflags`
 ldflags+=`pkg-config cairo libpng --libs`
 ldflags+=-lm -ltiff -lfftw3f -lfftw3f_threads
 
+gsl_ldflags=`pkg-config --libs gsl`
+gsl_cflags=`pkg-config --cflags  gsl`
+
 all: tiling_ut fft_ut fim_ut
 
 tiling_ut:
@@ -22,11 +25,16 @@ dw_nuclei: dw_nuclei.c fim.c ftab.c fim_tiff.c prf_forest.o
 	$(cc) $(cflags) -DSTANDALONE dw_nuclei.c fim.c dw_util.c fim_tiff.c fft.c ftab.c prf_forest.o prf_tree.o prf_util.o qsort.o $(ldflags) -o dw_nuclei
 
 dw_dots_files=dw_dots.c fim.c ftab.c fim_tiff.c fwhm.c dw_util.c fft.c
-dots_ldflags=$(ldflags) `pkg-config --libs gsl`
-dots_cflags=$(cflags) `pkg-config --cflags  gsl`
+dots_ldflags=$(ldflags) $(gsl_ldflags)
+dots_cflags=$(cflags) $(gsl_cflags)
 dw_dots: $(dw_dots_files)
 	$(cc) $(dots_cflags) -DSTANDALONE $(dw_dots_files) $(dots_ldflags) -o dw_dots
 
+psf_files = dw_psf.c fim.c ftab.c fim_tiff.c fwhm.c dw_util.c fft.c
+psf_ldflags=$(ldflags) $(gsl_ldflags)
+psf_cflags=$(cflags) $(gsl_cflags)
+dw_psf: $(psf_files)
+	$(cc) $(psf_cflags) -DSTANDALONE $(psf_files) $(psf_ldflags) -o dw_psf
 
 prf_forest.o: random_forest/prf_forest.c
 	$(cc) -c $(cflags) random_forest/prf*.c random_forest/qsort.c

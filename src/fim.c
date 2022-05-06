@@ -16,10 +16,18 @@
 
 #include "fim.h"
 
+static int fim_verbose = 0;
+
 static float * gaussian_kernel(float sigma, size_t * nK);
 static void cumsum_array(float * A, size_t N, size_t stride);
 static void fim_show(float * A, size_t M, size_t N, size_t P);
 static void fim_show_int(int * A, size_t M, size_t N, size_t P);
+
+
+void fim_set_verbose(int v)
+{
+    fim_verbose = v;
+}
 
 static double clockdiff(struct timespec* end, struct timespec * start)
 {
@@ -2319,7 +2327,7 @@ float * conv1_3(const float * V, size_t M, size_t N, size_t P,
     return out;
 }
 
-float * fim_LoG_S(const float * V, const size_t M, const size_t N, const size_t P,
+float * fim_LoG_S(const float * V0, const size_t M, const size_t N, const size_t P0,
                 const float sigmaxy, const float sigmaz)
 {
 
@@ -2334,12 +2342,35 @@ float * fim_LoG_S(const float * V, const size_t M, const size_t N, const size_t 
     float * aG = gaussian_kernel(sigmaz,  &naG);
     size_t na2;
     float * a2 = gaussian_kernel_d2(sigmaz,  &na2);
+
+    /* Padding */
+    int apad = (naG-1)/2;
+    int lpad = (nlG-1)/2;
+    if(fim_verbose > 1)
+    {
+        printf("fim_LoG_S, apad: %d, lpad: %d\n", apad, lpad);
+    }
+
+    /* Pad in Z-direction */
+    size_t P = P0 + 2*apad;
+    float * V = malloc(M*N*P*sizeof(float));
+    for(size_t kk = 0; kk< (size_t) apad; kk++)
+    {
+        memcpy(V+kk*M*N, V0, M*N*sizeof(float));
+    }
+    memcpy(V+apad*M*N, V0, M*N*P0*sizeof(float));
+    for(size_t kk = apad+P0; kk<P; kk++)
+    {
+        memcpy(V+kk*M*N, V0+M*N*(P0-1), M*N*sizeof(float));
+    }
+
     float * GGL = conv1_3(V, M, N, P,
                                 lG, nlG, lG, nlG, a2, na2);
     float * GLG = conv1_3(V, M, N, P,
                                 lG, nlG, l2, nl2, aG, naG);
     float * LGG = conv1_3(V, M, N, P,
                                 l2, nl2, lG, nlG, aG, naG);
+    free(V);
     float * LoG = GGL;
     for(size_t kk = 0; kk<M*N*P; kk++)
     {
@@ -2349,8 +2380,6 @@ float * fim_LoG_S(const float * V, const size_t M, const size_t N, const size_t 
     free(LGG);
 
     /* Set border to 0 */
-    int apad = (naG-1)/2;
-    int lpad = (nlG-1)/2;
     size_t pos = 0;
     for(int pp = 0; pp< (int) P; pp++)
     {
@@ -2385,7 +2414,12 @@ float * fim_LoG_S(const float * V, const size_t M, const size_t N, const size_t 
     free(lG);
     free(a2);
     free(l2);
-    return LoG;
+
+    /* Unpad in the axial direction */
+    float * uLoG = malloc(M*N*P0*sizeof(float));
+    memcpy(uLoG, LoG+M*N*apad, M*N*P0*sizeof(float));
+    free(LoG);
+    return uLoG;
 }
 
 

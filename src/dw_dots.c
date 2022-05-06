@@ -107,6 +107,7 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
            "based on the filtered image.\n", s->fwhm);
     printf(" --verbose v\n\t Verbosity level (default %d)\n", s->verbose);
     printf(" --nthreads n\n\t Set the number of computational threads\n");
+    printf(" --fout file.tif\n\t Write filtered image -- for debugging\n");
     printf("\n");
     printf("The log messages will be written to input.tif.log.txt\n");
     printf("Dots will be exported to input.tif.dots.tsv\n");
@@ -311,7 +312,10 @@ void detect_dots(opts * s, char * inFile)
         {
             printf("LoG filter, lsigma=%.2f asigma=%.2f\n", s->lsigma, s->asigma);
         }
+        fim_set_verbose(2);
         feature = fim_LoG_S(A, M, N, P, s->lsigma, s->asigma);
+        fim_set_verbose(0);
+
     } else {
         if(s->verbose > 1)
         {
@@ -343,6 +347,7 @@ void detect_dots(opts * s, char * inFile)
 
     if(s->verbose > 1)
     {
+        printf("Found %zu points\n", T->ncol);
         printf("Sorting the local maxima by value\n");
     }
 

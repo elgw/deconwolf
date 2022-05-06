@@ -46,6 +46,9 @@
  * tweaked or alternative versions.
  * */
 
+/* Set verbosity level, default = 0 */
+void fim_set_verbose(int);
+
 typedef struct{
     float * V;
     size_t M;
