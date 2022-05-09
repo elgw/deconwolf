@@ -1,3 +1,19 @@
+/* (C) 2022 Erik L. G. Wernersson
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation, either version 3 of the License, or
+ *    (at your option) any later version.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include "dw_psf.h"
 
 typedef struct{
@@ -18,6 +34,10 @@ typedef struct{
     int M;
     int P;
     optical_t optical;
+    /* How many times larger the calculation grid should be compared to images dimensions */
+    int xgrid;
+    /* Process at x times higher resolution and then average */
+    int oversampling;
 } opts;
 
 static opts * opts_new();
@@ -33,14 +53,18 @@ static opts * opts_new()
     s->overwrite = 0;
     s->verbose = 1;
     s->outfile = NULL;
+    s->logfile = NULL;
+    s->log = NULL;
     s->nthreads = dw_get_threads();
     s->optical.NA = 1.45;
     s->optical.ni = 1.515;
     s->optical.dx = 65;
     s->optical.dz = 200;
     s->optical.lambda = 460;
-    s->M = 7;
-    s->P = 7;
+    s->M = 181;
+    s->P = 181;
+    s->xgrid = 7;
+    s->oversampling = 1;
     return s;
 }
 
@@ -49,7 +73,10 @@ static void opts_free(opts * s)
 {
     dw_nullfree(s->outfile);
     dw_nullfree(s->logfile);
-    fclose(s->log);
+    if(s->log != NULL)
+    {
+        fclose(s->log);
+    }
     free(s);
 }
 
@@ -78,10 +105,13 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
     printf(" --dx dx\n\t Lateral pixel size\n");
     printf(" --dz dz\n\t Axial pixel size\n");
     printf(" --lambda l\n\t Emission wave length\n");
+    printf(" --size s\n\t Set the lateral size (pixels). Default: %d\n", s->M);
+    printf(" --nslice p\n\t Set the number of planes (pixels). Default: %d\n", s->P);
+    printf(" --xgrid x\n\t Set the factor for lateral image padding. Default: %d\n", s->xgrid);
+    printf(" --oversample x\n\t Process the PSF at x times higher resolution. Default: %d\n", s->oversampling);
     printf("General:\n");
     printf(" --overwrite\n\t Overwrite existing files\n");
     printf(" --help\n\t Show this message\n");
-    printf(" --notext\n\t Don't write any text on the image\n");
     printf(" --verbose v\n\t Verbosity level\n");
     printf("\n");
     opts_free(s);
@@ -90,28 +120,42 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
 
 static void argparsing(int argc, char ** argv, opts * s)
 {
+
     struct option longopts[] = {
-        {"lambda", required_argument, NULL, 'l'},
+        {"oversample", required_argument, NULL, 'O'},
+        {"xgrid", required_argument, NULL, 'g'},
+        {"lambda", required_argument, NULL, 'L'},
         {"NA",     required_argument, NULL, 'n'},
         {"dx",     required_argument, NULL, 'x'},
         {"dz",     required_argument, NULL, 'z'},
         {"ni",     required_argument, NULL, 'i'},
         {"help", no_argument, NULL, 'h'},
         {"overwrite", no_argument, NULL, 'o'},
+        {"nslice", required_argument, NULL, 'p'},
+        {"size", required_argument, NULL, 's'},
         {"threads", required_argument, NULL, 't'},
         {"verbose", required_argument, NULL, 'v'},
         {NULL, 0, NULL, 0}};
     int ch;
     while((ch = getopt_long(argc, argv,
-                            "l:n:x:z:i:hov:v:", longopts, NULL)) != -1)
+                            "O:g:L:n:x:z:i:hop:s:v:", longopts, NULL)) != -1)
     {
         switch(ch){
+        case 'O':
+            s->oversampling = atoi(optarg);
+            break;
+        case 'g':
+            s->xgrid = atoi(optarg);
+            break;
         case 'h':
             usage(argc, argv);
             exit(0);
             break;
         case 'i':
             s->optical.ni = atof(optarg);
+            break;
+        case 'L':
+            s->optical.lambda = atof(optarg);
             break;
         case 'o':
             s->overwrite = 1;
@@ -131,7 +175,34 @@ static void argparsing(int argc, char ** argv, opts * s)
         case 'n':
             s->optical.NA = atof(optarg);
             break;
+        case 'p':
+            s->P = atoi(optarg);
+            break;
+        case 's':
+            s->M = atoi(optarg);
+            break;
         }
+    }
+
+
+    if(s->xgrid < 1)
+    {
+        printf("%d is an invalid value for --xgrid, please use a value >= 1\n", s->xgrid);
+        exit(EXIT_FAILURE);
+    }
+    if(s->xgrid % 2 == 0)
+    {
+        s->xgrid++;
+    }
+    /* We work with odd number of pixels */
+    if(s->M % 2 == 0)
+    {
+        s->M++;
+    }
+
+    if(s->P % 2 == 0)
+    {
+        s->P++;
     }
 
     if(optind == argc)
@@ -141,6 +212,10 @@ static void argparsing(int argc, char ** argv, opts * s)
                 "psf_NA%.2f_ni%.2f_lambda%.0f_dx%.0f_dz%.0f.tif",
                 s->optical.NA, s->optical.ni, s->optical.lambda,
                 s->optical.dx, s->optical.dz);
+        if(s->verbose > 0)
+        {
+            printf("Will write to %s\n", s->outfile);
+        }
     } else {
         s->outfile = strdup(argv[optind]);
     }
@@ -162,6 +237,17 @@ static void argparsing(int argc, char ** argv, opts * s)
     {
         fprintf(stderr, "Failed to open %s for writing\n", s->logfile);
         exit(EXIT_FAILURE);
+    }
+
+    for(int kk = 0; kk< argc; kk++)
+    {
+        fprintf(s->log, "%s", argv[kk]);
+        if(kk+1 != argc)
+        {
+            fprintf(stdout, " ");
+        } else {
+            fprintf(stdout, "\n");
+        }
     }
 
     opts_print(s->log, s);
@@ -230,13 +316,13 @@ void shift_complex(fftw_complex * V, int N, int stride, int shift)
 void ifftshift2_double(double * ph, int M)
 {
     /* Assuming ph is MxM */
-
-    // Shift in dimension 1
+    assert(M%2 == 1);
+    /* Shift in dimension 1 */
     for(int kk = 0; kk<M; kk++)
     {
         shift_double(ph+kk*M, M, 1, (M-1)/2);
     }
-    // Shift in dimension 2
+    /* Shift in dimension 2 */
     for(int kk = 0; kk<M; kk++)
     {
         shift_double(ph+kk, M, M, (M-1)/2);
@@ -245,12 +331,14 @@ void ifftshift2_double(double * ph, int M)
 
 void ifftshift2_complex(fftw_complex * ph, int M)
 {
-    // Shift in dimension 1
+    assert(M%2 == 1);
+
+    /* Shift in dimension 1 */
     for(int kk = 0; kk<M; kk++)
     {
         shift_complex(ph+kk*M, M, 1, (M-1)/2);
     }
-    // Shift in dimension 2
+    /* Shift in dimension 2 */
     for(int kk = 0; kk<M; kk++)
     {
         shift_complex(ph+kk, M, M, (M-1)/2);
@@ -260,17 +348,49 @@ void ifftshift2_complex(fftw_complex * ph, int M)
 
 void fftshift2_complex(fftw_complex * ph, int M)
 {
-    // Shift in dimension 1
+    /* Shift in dimension 1 */
     for(int kk = 0; kk<M; kk++)
     {
         shift_complex(ph+kk*M, M, 1, (M-1)/2);
     }
-    // Shift in dimension 2
+    /* Shift in dimension 2 */
     for(int kk = 0; kk<M; kk++)
     {
         shift_complex(ph+kk, M, M, (M-1)/2);
     }
 
+}
+
+static void downsample_integrate(float * A, float * B, int nA, int nB)
+{
+    int factor = nB/nA;
+    int mf = (factor-1)/2; /* Offset to hit the middle of the factor x factor regions */
+    //printf("Integrating over %dx%d pixels\n", factor, factor);
+    /* Reset A */
+    memset(A, 0, nA*nA*sizeof(float));
+
+    float * K = malloc(sizeof(float)*factor);
+    for(int kk = 0; kk<factor; kk++)
+    {
+        K[kk] = 1;
+    }
+
+    /* Convolution */
+    fim_convn1(B, nB, nB, 1,
+              K, factor, 0, 0);
+    fim_convn1(B, nB, nB, 1,
+              K, factor, 1, 0);
+
+
+    /* Subsample */
+    for(int ll = 0; ll<nA; ll++)
+    {
+        for(int kk = 0; kk<nA; kk++)
+        {
+            A[kk + nA*ll] = B[kk*factor+mf + nB*ll*factor +nB+mf];
+        }
+    }
+    free(K);
 }
 
 
@@ -280,15 +400,16 @@ static void dw_psf(opts * s)
      * output in single precision */
     if(s->verbose > 2) { printf("Allocating for output\n"); fflush(stdout); }
 
+    double optical_dx = s->optical.dx/s->oversampling;
+
     fim_tiff_init();
-    fim_t * PSF = fimt_zeros(s->M, s->M, s->P);
+    fim_t * PSF = fimt_zeros(s->M*s->oversampling, s->M*s->oversampling, s->P);
 
-
-    double Fs = 1/s->optical.dx;
+    double Fs = 1/optical_dx;
     double Fn = Fs/2;
 
     /* Larger lateral grid than PSF */
-    int grid_factor = 1;
+    int grid_factor = s->xgrid;
     size_t XM = PSF->M*grid_factor;
 
     /* Phase of Phase Propagator */
@@ -345,12 +466,23 @@ static void dw_psf(opts * s)
     /* TODO: apply moments */
 
     if(s->verbose > 2) { printf("Calculating\n"); fflush(stdout); }
+
     fftw_complex * h = fftw_malloc(XM*XM*sizeof(fftw_complex));
     fftw_complex * H = fftw_malloc(XM*XM*sizeof(fftw_complex));
+    fftw_plan plan = fftw_plan_dft_2d(XM, XM,
+                                      h, /* In */
+                                      H, /* Out */
+                                      FFTW_FORWARD, FFTW_ESTIMATE);
+
+    printf("\n");
     for(int zz = 0; zz < (int) PSF->P; zz++)
     {
         double z = (zz - ((int) PSF->P-1)/2)*s->optical.dz;
-        printf("z = %f\n", z);
+        if(s->verbose > 0)
+        {
+            printf("\rplane %d/%zu (z = %.0f nm)        ", zz+1, PSF->P, z);
+            fflush(stdout);
+        }
         for(size_t kk = 0; kk < XM*XM; kk++)
         {
             double x = 2*M_PI*ph[kk]*z;
@@ -358,35 +490,62 @@ static void dw_psf(opts * s)
             h[kk][1] = pu[kk][0]*sin(x) + pu[kk][1]*cos(x);
         }
 
-
-        fftw_plan plan = fftw_plan_dft_2d(XM, XM,
-                                          h, /* In */
-                                          H, /* Out */
-                                          FFTW_FORWARD, FFTW_ESTIMATE);
         fftw_execute(plan);
-        fftw_destroy_plan(plan);
 
         fftshift2_complex(H, XM);
+        /* Copy the central MxM region to the PSF */
+        int skip = (XM - PSF->M)/2;
         for(int kk = 0; kk < (int) PSF->M; kk++)
         {
             for(int ll = 0; ll < (int) PSF->N; ll++)
             {
+                int kkx = kk+skip;
+                int llx = ll+skip;
                 PSF->V[zz*PSF->M*PSF->N + kk + ll*PSF->M] =
-                    pow(H[kk + XM*ll][0], 2) + pow(H[kk + XM*ll][1], 2);
+                    pow(H[kkx + XM*llx][0], 2) + pow(H[kkx + XM*llx][1], 2);
             }
         }
     }
+    if(s->verbose > 0)
+    {
+        printf("\r done.                         ");
+    }
+    fftw_destroy_plan(plan);
 
-    ttags * TTAGS = NULL; /* TODO */
+    if(s->oversampling > 1)
+    {
+        float * Vout = malloc(s->M*s->M*s->P*sizeof(double));
+        for(int pp = 0; pp< (int) PSF->P; pp++)
+        {
+            downsample_integrate(Vout + pp*s->M*s->M,
+                       PSF->V + pp*PSF->M*PSF->M,
+                       s->M, PSF->M);
+        }
+        free(PSF->V);
+        PSF->V = Vout;
+        PSF->M /= s->oversampling;
+        PSF->N /= s->oversampling;
+    }
 
     if(s->verbose > 0)
     {
         printf("Writing to %s\n", s->outfile);
     }
-    fim_tiff_write_float(s->outfile, PSF->V,
-                         TTAGS,
-                         PSF->M, PSF->N, PSF->P);
+    float sum = fimt_sum(PSF);
+    fim_mult_scalar(PSF->V, fimt_nel(PSF), 1.0/sum);
 
+    ttags * T = ttags_new();
+    char * swstring = malloc(1024);
+    sprintf(swstring, "deconwolf %s", deconwolf_version);
+    ttags_set_software(T, swstring);
+    ttags_set_imagesize(T, PSF->M, PSF->N, PSF->P);
+    ttags_set_pixelsize(T, s->optical.dx, s->optical.dx, s->optical.dz);
+    free(swstring);
+
+    fim_tiff_write_float(s->outfile, PSF->V,
+                         T,
+                         PSF->M, PSF->N, PSF->P);
+    ttags_free(&T);
 }
 
 int dw_psf_cli(int argc, char ** argv)
@@ -395,6 +554,10 @@ int dw_psf_cli(int argc, char ** argv)
     opts * s = opts_new();
     /* Parse command line and open log file etc */
     argparsing(argc, argv, s);
+    if(s->verbose > 2)
+    {
+        printf("Command lined parsed, continuing\n"); fflush(stdout);
+    }
     /* Ready to go */
     dw_psf(s);
     /* Clean up */

@@ -31,18 +31,24 @@ int main(int argc, char ** argv)
         {
             return dw_imshift(argc-1, argv+1);
         }
-        #ifdef __dw_nuclei_h__
+#ifdef __dw_nuclei_h__
         if(strcmp(argv[1], "nuclei") == 0)
         {
             return dw_nuclei(argc-1, argv+1);
         }
-        #endif
-        #ifdef __dw_dots_h__
+#endif
+#ifdef __dw_dots_h__
         if(strcmp(argv[1], "dots") == 0)
         {
             return dw_dots(argc-1, argv+1);
         }
-        #endif
+#endif
+#ifdef __dw_psf_h__
+        if(strcmp(argv[1], "psf") == 0)
+        {
+            return dw_psf_cli(argc-1, argv+1);
+        }
+#endif
     }
 
     dw_opts * s = dw_opts_new(); /* Load default settings and initialize */

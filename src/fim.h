@@ -89,6 +89,10 @@ ftab_t * fim_features_2d(const fim_t *);
  * gradient magnitude per slice in I */
 float * fim_focus_gm(const fim_t * image, float sigma);
 
+/* Number of elements */
+size_t fimt_nel(fim_t * );
+/* Sum of elements */
+float fimt_sum(fim_t * );
 
 /*
  * API not using fim_t

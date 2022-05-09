@@ -509,6 +509,21 @@ fim_t * fimt_zeros(const size_t M, const size_t N, const size_t P)
     return F;
 }
 
+size_t fimt_nel(fim_t * F)
+{
+    return F->M*F->N*F->P;
+}
+
+float fimt_sum(fim_t * F)
+{
+    double sum = 0;
+    const size_t N = fimt_nel(F);
+    for(size_t kk = 0; kk<N; kk++)
+    {
+        sum += F->V[kk];
+    }
+    return (float) sum;
+}
 
 float * fim_constant(const size_t N, const float value)
 // Allocate and return an array of N floats sets to a constant value

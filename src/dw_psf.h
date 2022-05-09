@@ -1,5 +1,5 @@
-#ifndef _dw_psf_h_
-#define _dw_psf_h_
+#ifndef __dw_psf_h__
+#define __dw_psf_h__
 
 
 #include <getopt.h>
