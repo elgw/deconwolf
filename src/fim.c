@@ -36,6 +36,7 @@ static double clockdiff(struct timespec* end, struct timespec * start)
     return elapsed;
 }
 
+
 void fim_free(fim_t * F)
 {
     if(F != NULL)

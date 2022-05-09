@@ -56,10 +56,43 @@ typedef struct{
     size_t P;
 } fim_t;
 
-/* Create a new object with a pointer to V */
-fim_t * fim_image_from_array(const float * V, size_t M, size_t N, size_t P);
 void fim_free(fim_t *);
 
+fim_t * fimt_zeros(size_t M, size_t N, size_t P);
+
+/* Create a new object with a pointer to V */
+fim_t * fim_image_from_array(const float * V, size_t M, size_t N, size_t P);
+
+
+/* Return a new copy */
+fim_t * fimt_copy(const fim_t * );
+
+/* Extract a line centered at (x, y, z) with nPix pixels along dimension dim */
+double * fim_get_line_double(fim_t * Im,
+                             int x, int y, int z,
+                             int dim, int nPix);
+
+/* Similar to MATLABs shiftfim, [M,N,P] -> [N,P,M] */
+fim_t * fim_shiftdim(fim_t *);
+
+/* Partial derivative along dimension dim */
+fim_t * fimt_partial(const fim_t *, int dim, float sigma);
+
+/* Features for 2D image classification
+ * the input image should be 2D.
+ * Uses similar features a Ilastic
+ * Returns one row per pixel
+ */
+ftab_t * fim_features_2d(const fim_t *);
+
+/* Return a I->P long vector with the integral
+ * gradient magnitude per slice in I */
+float * fim_focus_gm(const fim_t * image, float sigma);
+
+
+/*
+ * API not using fim_t
+ */
 
 float fim_min(const float * A, size_t N);
 float fim_mean(const float * A, size_t N);
@@ -145,8 +178,6 @@ void fim_normalize_sum1(float * psf, int64_t M, int64_t N, int64_t P);
 /* Return a newly allocated copy of V */
 float * fim_copy(const float * restrict V, const size_t N);
 
-/* Return a new copy */
-fim_t * fimt_copy(const fim_t * );
 
 /* Allocate and return an array of N floats */
 float * fim_zeros(const size_t N);
@@ -318,26 +349,5 @@ float * fim_LoG_S(const float * V, size_t M, size_t N, size_t P,
                 float sigmaxy, float sigmaz);
 
 
-/* Extract a line centered at (x, y, z) with nPix pixels along dimension dim */
-double * fim_get_line_double(fim_t * Im,
-                          int x, int y, int z,
-                          int dim, int nPix);
-
-/* Similar to MATLABs shiftfim, [M,N,P] -> [N,P,M] */
-fim_t * fim_shiftdim(fim_t *);
-
-/* Partial derivative along dimension dim */
-fim_t * fimt_partial(const fim_t *, int dim, float sigma);
-
-/* Features for 2D image classification
- * the input image should be 2D.
- * Uses similar features a Ilastic
- * Returns one row per pixel
- */
-ftab_t * fim_features_2d(const fim_t *);
-
-/* Return a I->P long vector with the integral
- * gradient magnitude per slice in I */
-float * fim_focus_gm(const fim_t * image, float sigma);
 
 #endif /* _fim_h_ */

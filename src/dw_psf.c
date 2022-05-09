@@ -39,8 +39,8 @@ static opts * opts_new()
     s->optical.dx = 65;
     s->optical.dz = 200;
     s->optical.lambda = 460;
-    s->M = 181;
-    s->P = 183;
+    s->M = 7;
+    s->P = 7;
     return s;
 }
 
@@ -145,6 +145,16 @@ static void argparsing(int argc, char ** argv, opts * s)
         s->outfile = strdup(argv[optind]);
     }
 
+    if(s->overwrite == 0)
+    {
+        if(file_exist(s->outfile))
+        {
+            printf("%s exists, leaving\n", s->outfile);
+            printf("if you don't care, use --overwrite\n");
+            exit(EXIT_FAILURE); /* TODO */
+        }
+    }
+
     s->logfile = malloc(strlen(s->outfile) + 32);
     sprintf(s->logfile, "%s.log.txt", s->outfile);
     s->log = fopen(s->logfile, "w");
@@ -172,9 +182,211 @@ static int file_exist(char * fname)
     }
 }
 
+void shift_double(double * V, int N, int stride, int shift)
+{
+    double * buff = malloc(N*sizeof(double));
+    for(int kk = 0; kk<N; kk++)
+    {
+        buff[kk] = V[kk*stride];
+    }
+    shift = shift - N;
+    for(int kk = 0; kk<N; kk++)
+    {
+        int to = kk;
+        int from = ((kk - shift) % N);
+        //printf("%d -> %d\n", from, to); fflush(stdout);
+        assert(to >= 0);
+        assert(to < N);
+        assert(from >= 0);
+        assert(from < N);
+        V[to*stride] = buff[from];
+    }
+
+    free(buff);
+}
+
+void shift_complex(fftw_complex * V, int N, int stride, int shift)
+{
+    fftw_complex * buff = malloc(N*sizeof(fftw_complex));
+    for(int kk = 0; kk<N; kk++)
+    {
+        buff[kk][0] = V[kk*stride][0];
+        buff[kk][1] = V[kk*stride][1];
+    }
+    shift = shift - N;
+    for(int kk = 0; kk<N; kk++)
+    {
+        int to = kk;
+        int from = ((kk - shift) % N);
+        //printf("%d -> %d\n", from, to); fflush(stdout);
+        V[to*stride][0] = buff[from][0];
+        V[to*stride][1] = buff[from][1];
+    }
+
+    free(buff);
+}
+
+
+void ifftshift2_double(double * ph, int M)
+{
+    /* Assuming ph is MxM */
+
+    // Shift in dimension 1
+    for(int kk = 0; kk<M; kk++)
+    {
+        shift_double(ph+kk*M, M, 1, (M-1)/2);
+    }
+    // Shift in dimension 2
+    for(int kk = 0; kk<M; kk++)
+    {
+        shift_double(ph+kk, M, M, (M-1)/2);
+    }
+}
+
+void ifftshift2_complex(fftw_complex * ph, int M)
+{
+    // Shift in dimension 1
+    for(int kk = 0; kk<M; kk++)
+    {
+        shift_complex(ph+kk*M, M, 1, (M-1)/2);
+    }
+    // Shift in dimension 2
+    for(int kk = 0; kk<M; kk++)
+    {
+        shift_complex(ph+kk, M, M, (M-1)/2);
+    }
+
+}
+
+void fftshift2_complex(fftw_complex * ph, int M)
+{
+    // Shift in dimension 1
+    for(int kk = 0; kk<M; kk++)
+    {
+        shift_complex(ph+kk*M, M, 1, (M-1)/2);
+    }
+    // Shift in dimension 2
+    for(int kk = 0; kk<M; kk++)
+    {
+        shift_complex(ph+kk, M, M, (M-1)/2);
+    }
+
+}
+
+
 static void dw_psf(opts * s)
 {
-    // TODO from here :)
+    /* Internal calculations in double precision,
+     * output in single precision */
+    if(s->verbose > 2) { printf("Allocating for output\n"); fflush(stdout); }
+
+    fim_tiff_init();
+    fim_t * PSF = fimt_zeros(s->M, s->M, s->P);
+
+
+    double Fs = 1/s->optical.dx;
+    double Fn = Fs/2;
+
+    /* Larger lateral grid than PSF */
+    int grid_factor = 1;
+    size_t XM = PSF->M*grid_factor;
+
+    /* Phase of Phase Propagator */
+    if(s->verbose > 2) { printf("Setting up phase propagator\n"); fflush(stdout); }
+    double * ph = malloc(XM*XM*sizeof(double));
+    memset(ph, 0, XM*XM*sizeof(double));
+    for(int kk = 0; kk< (int) XM; kk++)
+    {
+        for(int ll = 0; ll< (int) XM; ll++)
+        {
+            /* Max radius in pixels */
+            float rmax = ( (float)XM-1.0)/2.0;
+            float dx = (float) kk - rmax;
+            float dy = (float) ll - rmax;
+            float r = Fn*sqrt(pow(dx/rmax, 2) + pow(dy/rmax, 2));
+            float f = pow(s->optical.ni/s->optical.lambda, 2) - pow(r, 2);
+            if(f > 0)
+            {
+                ph[kk+XM*ll] = sqrt(f);
+            }
+        }
+    }
+    ifftshift2_double(ph, XM);
+
+    if(s->verbose > 2) { printf("Setting up pupil function\n"); fflush(stdout); }
+
+    /* Pupil function */
+    fftw_complex * pu = fftw_malloc(XM*XM*sizeof(fftw_complex));
+
+    double pur2 = pow(s->optical.NA/s->optical.lambda, 2);
+    for(int kk = 0; kk< (int) XM; kk++)
+    {
+        for(int ll = 0; ll< (int) XM; ll++)
+        {
+            float rmax = ( (float)XM-1.0)/2.0;
+            float dx = (float) kk - rmax;
+            float dy = (float) ll - rmax;
+            float r2 = pow(Fn,2)*(pow(dx/rmax, 2) + pow(dy/rmax, 2));
+
+            if(r2 <= pur2 )
+            {
+                pu[kk+XM*ll][0] = 1;
+                pu[kk+XM*ll][1] = 0;
+            } else {
+                pu[kk+XM*ll][0] = 0;
+                pu[kk+XM*ll][1] = 0;
+            }
+        }
+    }
+
+
+    ifftshift2_complex(pu, XM);
+
+    /* TODO: apply moments */
+
+    if(s->verbose > 2) { printf("Calculating\n"); fflush(stdout); }
+    fftw_complex * h = fftw_malloc(XM*XM*sizeof(fftw_complex));
+    fftw_complex * H = fftw_malloc(XM*XM*sizeof(fftw_complex));
+    for(int zz = 0; zz < (int) PSF->P; zz++)
+    {
+        double z = (zz - ((int) PSF->P-1)/2)*s->optical.dz;
+        printf("z = %f\n", z);
+        for(size_t kk = 0; kk < XM*XM; kk++)
+        {
+            double x = 2*M_PI*ph[kk]*z;
+            h[kk][0] = pu[kk][0]*cos(x) - pu[kk][1]*sin(x);
+            h[kk][1] = pu[kk][0]*sin(x) + pu[kk][1]*cos(x);
+        }
+
+
+        fftw_plan plan = fftw_plan_dft_2d(XM, XM,
+                                          h, /* In */
+                                          H, /* Out */
+                                          FFTW_FORWARD, FFTW_ESTIMATE);
+        fftw_execute(plan);
+        fftw_destroy_plan(plan);
+
+        fftshift2_complex(H, XM);
+        for(int kk = 0; kk < (int) PSF->M; kk++)
+        {
+            for(int ll = 0; ll < (int) PSF->N; ll++)
+            {
+                PSF->V[zz*PSF->M*PSF->N + kk + ll*PSF->M] =
+                    pow(H[kk + XM*ll][0], 2) + pow(H[kk + XM*ll][1], 2);
+            }
+        }
+    }
+
+    ttags * TTAGS = NULL; /* TODO */
+
+    if(s->verbose > 0)
+    {
+        printf("Writing to %s\n", s->outfile);
+    }
+    fim_tiff_write_float(s->outfile, PSF->V,
+                         TTAGS,
+                         PSF->M, PSF->N, PSF->P);
+
 }
 
 int dw_psf_cli(int argc, char ** argv)

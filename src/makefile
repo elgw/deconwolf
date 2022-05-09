@@ -5,7 +5,7 @@ CFLAGS2=-lm -Wno-unknown-pragmas -Wall -O3 -flto -march=native -ftree-vectorize
 cflags+=-fopenmp -Wall -Wextra -g
 cflags+=`pkg-config cairo libpng --cflags`
 ldflags+=`pkg-config cairo libpng --libs`
-ldflags+=-lm -ltiff -lfftw3f -lfftw3f_threads
+ldflags+=-lm -ltiff -lfftw3f -lfftw3f_threads -lfftw3 -lfftw3_threads
 
 gsl_ldflags=`pkg-config --libs gsl`
 gsl_cflags=`pkg-config --cflags  gsl`

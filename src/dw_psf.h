@@ -1,12 +1,15 @@
 #ifndef _dw_psf_h_
 #define _dw_psf_h_
 
+
 #include <getopt.h>
 #include <libgen.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <fftw3.h>
+
 
 #include "fim.h"
 #include "ftab.h"
