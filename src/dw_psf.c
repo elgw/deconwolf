@@ -98,9 +98,9 @@ static void opts_print(FILE * f, opts * s)
     fprintf(f, "Emission lambda=%f nm\n", s->optical.lambda);
     if(s->optical.lambda2 > 0)
     {
-        printf("Excitation lambda: %f nm\n", s->optical.lambda2);
-        printf("Pinhole size %f AU\n", s->optical.pinhole);
-        printf("Pinhole shape: square\n");
+        fprintf(f, "Excitation lambda: %f nm\n", s->optical.lambda2);
+        fprintf(f, "Pinhole size %f AU\n", s->optical.pinhole);
+        fprintf(f, "Pinhole shape: square\n");
     }
     return;
 }
@@ -273,9 +273,9 @@ static void argparsing(int argc, char ** argv, opts * s)
         fprintf(s->log, "%s", argv[kk]);
         if(kk+1 != argc)
         {
-            fprintf(stdout, " ");
+            fprintf(s->log, " ");
         } else {
-            fprintf(stdout, "\n");
+            fprintf(s->log, "\n");
         }
     }
 
@@ -718,10 +718,10 @@ static void pinhole_convolution(opts * s, fim_t * PSF)
         }
     }
 
-    fim_tiff_write_float("pinhole.tif", P, NULL, PSF->M, PSF->N, 1);
+    //fim_tiff_write_float("pinhole.tif", P, NULL, PSF->M, PSF->N, 1);
 
     fftshift2_float(P, PSF->M);;
-    fim_tiff_write_float("pinhole_shifted.tif", P, NULL, PSF->M, PSF->N, 1);
+    //fim_tiff_write_float("pinhole_shifted.tif", P, NULL, PSF->M, PSF->N, 1);
 
     /* We assume that the image close to the edges will not be used */
     for(size_t pp = 0; pp<PSF->P; pp++)
@@ -745,6 +745,11 @@ static void dw_psf(opts * s)
 {
     /* Internal calculations in double precision,
      * output in single precision */
+    if(s->verbose > 0)
+    {
+        printf("Calculating emission PSF\n");
+    }
+    printf("")
     fim_t * PSF = gen_psf(s, s->optical.lambda);
     if(s->optical.lambda2 != 0)
     {
@@ -753,11 +758,15 @@ static void dw_psf(opts * s)
 
         /* Convolve PSF with the pinhole */
 
-        printf("Convolving with pinhole\n");
+        //printf("Convolving with pinhole\n");
         pinhole_convolution(s, PSF);
 
+        if(s->verbose > 0)
+        {
+            printf("Calculating excitation PSF\n");
+        }
         fim_t * PSF2 = gen_psf(s, s->optical.lambda2);
-        printf("Multiplying PSFs\n");
+        //printf("Multiplying PSFs\n");
         for(size_t kk = 0; kk<fimt_nel(PSF); kk++)
         {
             PSF->V[kk] *= PSF2->V[kk];
