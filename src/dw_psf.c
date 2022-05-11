@@ -22,6 +22,8 @@ typedef struct{
     double dx;
     double dz;
     double lambda;
+    double lambda2;
+    double pinhole;
 } optical_t;
 
 typedef struct{
@@ -61,6 +63,8 @@ static opts * opts_new()
     s->optical.dx = 65;
     s->optical.dz = 200;
     s->optical.lambda = 460;
+    s->optical.lambda2 = 0;
+    s->optical.pinhole = 1; /* Airy Units, 1.22*lambda/NA */
     s->M = 181;
     s->P = 181;
     s->xgrid = 7;
@@ -91,7 +95,13 @@ static void opts_print(FILE * f, opts * s)
     fprintf(f, "ni=%f\n", s->optical.ni);
     fprintf(f, "dx=%f nm\n", s->optical.dx);
     fprintf(f, "dz=%f nm\n", s->optical.dz);
-    fprintf(f, "lambda=%f nm\n", s->optical.lambda);
+    fprintf(f, "Emission lambda=%f nm\n", s->optical.lambda);
+    if(s->optical.lambda2 > 0)
+    {
+        printf("Excitation lambda: %f nm\n", s->optical.lambda2);
+        printf("Pinhole size %f AU\n", s->optical.pinhole);
+        printf("Pinhole shape: square\n");
+    }
     return;
 }
 
@@ -105,6 +115,8 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
     printf(" --dx dx\n\t Lateral pixel size\n");
     printf(" --dz dz\n\t Axial pixel size\n");
     printf(" --lambda l\n\t Emission wave length\n");
+    printf(" --lambda2 l\n\t Excitation wave length\n");
+    printf(" --pinhole p\n\t Pinhole size in AU\n");
     printf(" --size s\n\t Set the lateral size (pixels). Default: %d\n", s->M);
     printf(" --nslice p\n\t Set the number of planes (pixels). Default: %d\n", s->P);
     printf(" --xgrid x\n\t Set the factor for lateral image padding. Default: %d\n", s->xgrid);
@@ -125,6 +137,7 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"oversample", required_argument, NULL, 'O'},
         {"xgrid", required_argument, NULL, 'g'},
         {"lambda", required_argument, NULL, 'L'},
+        {"lambda2", required_argument, NULL, '2'},
         {"NA",     required_argument, NULL, 'n'},
         {"dx",     required_argument, NULL, 'x'},
         {"dz",     required_argument, NULL, 'z'},
@@ -132,13 +145,14 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"help", no_argument, NULL, 'h'},
         {"overwrite", no_argument, NULL, 'o'},
         {"nslice", required_argument, NULL, 'p'},
+        {"pinhole", required_argument, NULL, 'P'},
         {"size", required_argument, NULL, 's'},
         {"threads", required_argument, NULL, 't'},
         {"verbose", required_argument, NULL, 'v'},
         {NULL, 0, NULL, 0}};
     int ch;
     while((ch = getopt_long(argc, argv,
-                            "O:g:L:n:x:z:i:hop:s:v:", longopts, NULL)) != -1)
+                            "O:g:L:2:n:x:z:i:hop:s:v:P:", longopts, NULL)) != -1)
     {
         switch(ch){
         case 'O':
@@ -156,6 +170,9 @@ static void argparsing(int argc, char ** argv, opts * s)
             break;
         case 'L':
             s->optical.lambda = atof(optarg);
+            break;
+        case '2':
+            s->optical.lambda2 = atof(optarg);
             break;
         case 'o':
             s->overwrite = 1;
@@ -177,6 +194,9 @@ static void argparsing(int argc, char ** argv, opts * s)
             break;
         case 'p':
             s->P = atoi(optarg);
+            break;
+        case 'P':
+            s->optical.pinhole = atof(optarg);
             break;
         case 's':
             s->M = atoi(optarg);
@@ -208,10 +228,19 @@ static void argparsing(int argc, char ** argv, opts * s)
     if(optind == argc)
     {
         s->outfile = malloc(1024);
+        if(s->optical.lambda2 == 0)
+        {
         sprintf(s->outfile,
                 "psf_NA%.2f_ni%.2f_lambda%.0f_dx%.0f_dz%.0f.tif",
                 s->optical.NA, s->optical.ni, s->optical.lambda,
                 s->optical.dx, s->optical.dz);
+        } else {
+            sprintf(s->outfile,
+                    "cpsf_NA%.2f_ni%.2f_lambda%.0f_lambda2%.0f_dx%.0f_dz%.0f.tif",
+                    s->optical.NA, s->optical.ni,
+                    s->optical.lambda, s->optical.lambda2,
+                    s->optical.dx, s->optical.dz);
+        }
         if(s->verbose > 0)
         {
             printf("Will write to %s\n", s->outfile);
@@ -291,6 +320,30 @@ void shift_double(double * V, int N, int stride, int shift)
     free(buff);
 }
 
+void shift_float(float * V, int N, int stride, int shift)
+{
+    float * buff = malloc(N*sizeof(float));
+    for(int kk = 0; kk<N; kk++)
+    {
+        buff[kk] = V[kk*stride];
+    }
+    shift = shift - N;
+    for(int kk = 0; kk<N; kk++)
+    {
+        int to = kk;
+        int from = ((kk - shift) % N);
+        //printf("%d -> %d\n", from, to); fflush(stdout);
+        assert(to >= 0);
+        assert(to < N);
+        assert(from >= 0);
+        assert(from < N);
+        V[to*stride] = buff[from];
+    }
+
+    free(buff);
+}
+
+
 void shift_complex(fftw_complex * V, int N, int stride, int shift)
 {
     fftw_complex * buff = malloc(N*sizeof(fftw_complex));
@@ -329,6 +382,25 @@ void ifftshift2_double(double * ph, int M)
     }
 }
 
+
+
+void ifftshift2_float(float * ph, int M)
+{
+    /* Assuming ph is MxM */
+    assert(M%2 == 1);
+    /* Shift in dimension 1 */
+    for(int kk = 0; kk<M; kk++)
+    {
+        shift_float(ph+kk*M, M, 1, (M-1)/2);
+    }
+    /* Shift in dimension 2 */
+    for(int kk = 0; kk<M; kk++)
+    {
+        shift_float(ph+kk, M, M, (M-1)/2);
+    }
+}
+
+
 void ifftshift2_complex(fftw_complex * ph, int M)
 {
     assert(M%2 == 1);
@@ -360,6 +432,24 @@ void fftshift2_complex(fftw_complex * ph, int M)
     }
 
 }
+
+void fftshift2_float(float * ph, int M)
+{
+    /* Assuming ph is MxM */
+    assert(M%2 == 1);
+    /* Shift in dimension 1 */
+    for(int kk = 0; kk<M; kk++)
+    {
+        shift_float(ph+kk*M, M, 1, (M+1)/2);
+    }
+    /* Shift in dimension 2 */
+    for(int kk = 0; kk<M; kk++)
+    {
+        shift_float(ph+kk, M, M, (M+1)/2);
+    }
+}
+
+
 
 static void downsample_integrate(float * A, float * B, int nA, int nB)
 {
@@ -393,11 +483,8 @@ static void downsample_integrate(float * A, float * B, int nA, int nB)
     free(K);
 }
 
-
-static void dw_psf(opts * s)
-{
-    /* Internal calculations in double precision,
-     * output in single precision */
+fim_t * gen_psf(opts * s, double lambda)
+    {
     if(s->verbose > 2) { printf("Allocating for output\n"); fflush(stdout); }
 
     double optical_dx = s->optical.dx/s->oversampling;
@@ -425,7 +512,7 @@ static void dw_psf(opts * s)
             float dx = (float) kk - rmax;
             float dy = (float) ll - rmax;
             float r = Fn*sqrt(pow(dx/rmax, 2) + pow(dy/rmax, 2));
-            float f = pow(s->optical.ni/s->optical.lambda, 2) - pow(r, 2);
+            float f = pow(s->optical.ni/lambda, 2) - pow(r, 2);
             if(f > 0)
             {
                 ph[kk+XM*ll] = sqrt(f);
@@ -439,7 +526,7 @@ static void dw_psf(opts * s)
     /* Pupil function */
     fftw_complex * pu = fftw_malloc(XM*XM*sizeof(fftw_complex));
 
-    double pur2 = pow(s->optical.NA/s->optical.lambda, 2);
+    double pur2 = pow(s->optical.NA/lambda, 2);
     for(int kk = 0; kk< (int) XM; kk++)
     {
         for(int ll = 0; ll< (int) XM; ll++)
@@ -527,6 +614,158 @@ static void dw_psf(opts * s)
         PSF->N /= s->oversampling;
     }
 
+
+    return PSF;
+    }
+
+static double max_double(double a, double b)
+{
+    if(a>b)
+        return a;
+    return b;
+}
+
+static double min_double(double a, double b)
+{
+    if(a<b)
+        return a;
+    return b;
+}
+double square_overlap(double x0, double x1, double y0, double y1,
+                      double X0, double X1, double Y0, double Y1)
+{
+    /* Overlap between two squares, first covers [x0,x1]x[y0,y1] */
+
+
+    double sx = max_double(x0, X0);
+    double ex = min_double(x1, X1);
+    double sy = max_double(y0, Y0);
+    double ey = min_double(y1, Y1);
+
+    if( (sx < ex) & (sy < ey) )
+    {
+        double AI = (ex-sx)*(ey-sy);
+
+        return AI;
+    } else {
+        return 0;
+    }
+}
+
+/* Convolve two images of the same size */
+static float * conv2d_float(float * A, float * B,
+                            size_t M, size_t N)
+{
+    fftwf_complex * FA = fftw_malloc(M*N*sizeof(fftwf_complex));
+    fftwf_complex * FB = fftw_malloc(M*N*sizeof(fftwf_complex));
+
+    fftwf_plan plan1 = fftwf_plan_dft_r2c_2d(M, N,
+                                      A, /* In */
+                                      FA, /* Out */
+                                      FFTW_ESTIMATE);
+    fftwf_execute(plan1);
+    fftwf_destroy_plan(plan1);
+    fftwf_plan plan2 = fftwf_plan_dft_r2c_2d(M, N,
+                                             B, /* In */
+                                             FB, /* Out */
+                                             FFTW_ESTIMATE);
+    fftwf_execute(plan2);
+    fftwf_destroy_plan(plan2);
+
+    for(size_t kk = 0; kk<M*N; kk++)
+    {
+        float ra = FA[kk][0];
+        float ca = FA[kk][1];
+        float rb = FB[kk][0];
+        float cb = FB[kk][1];
+        FA[kk][0] = ra*rb - ca*cb;
+        FA[kk][1] = ra*cb + rb*ca;
+    }
+
+    float * out = fftwf_malloc(M*N*sizeof(float));
+    fftwf_plan plan3 = fftwf_plan_dft_c2r_2d(M, N,
+                                             FA, /* In */
+                                             out, /* Out */
+                                             FFTW_ESTIMATE);
+    fftwf_execute(plan3);
+    fftwf_destroy_plan(plan3);
+    return out;
+}
+
+
+static void pinhole_convolution(opts * s, fim_t * PSF)
+{
+    /* Convolve PSF by a square filter */
+    double pinhole_nm = s->optical.pinhole*1.22*s->optical.lambda/s->optical.NA;
+    double pinhole_px = pinhole_nm / s->optical.dx;
+    printf("Pinhole size: %.2f AU / %.0f nm / %.1f pixels\n",
+           s->optical.pinhole, pinhole_nm, pinhole_px);
+    float * P = malloc(PSF->M*PSF->N*sizeof(float));
+    for(int aa = 0; aa < (int) PSF->M; aa++)
+    {
+        for(int bb = 0; bb < (int) PSF->N; bb++)
+        {
+            double apos = (double) aa - (PSF->M -1)/2.0;
+            double bpos = (double) bb - (PSF->M -1)/2.0;
+            double x0 = apos*s->optical.dx - s->optical.dx/2.0;
+            double x1 = x0 + s->optical.dx;
+            double y0 = bpos*s->optical.dx - s->optical.dx/2.0;
+            double y1 = y0 + s->optical.dx;
+
+            P[bb+aa*PSF->M] = square_overlap(-pinhole_nm/2.0, pinhole_nm/2.0,
+                                             -pinhole_nm/2.0, pinhole_nm/2.0,
+                                             x0, x1, y0, y1);
+        }
+    }
+
+    fim_tiff_write_float("pinhole.tif", P, NULL, PSF->M, PSF->N, 1);
+
+    fftshift2_float(P, PSF->M);;
+    fim_tiff_write_float("pinhole_shifted.tif", P, NULL, PSF->M, PSF->N, 1);
+
+    /* We assume that the image close to the edges will not be used */
+    for(size_t pp = 0; pp<PSF->P; pp++)
+    {
+        float * plane = PSF->V + pp*PSF->M*PSF->N;
+        float * C = conv2d_float(plane, P, PSF->M, PSF->N);
+
+        for(size_t kk = 0; kk<PSF->M*PSF->N; kk++)
+        {
+            plane[kk] = C[kk];
+        }
+        free(C);
+    }
+
+
+
+    return;
+}
+
+static void dw_psf(opts * s)
+{
+    /* Internal calculations in double precision,
+     * output in single precision */
+    fim_t * PSF = gen_psf(s, s->optical.lambda);
+    if(s->optical.lambda2 != 0)
+    {
+        /* We will generate a PSF for a confocal microscope with
+        * square-shaped pin-hole */
+
+        /* Convolve PSF with the pinhole */
+
+        printf("Convolving with pinhole\n");
+        pinhole_convolution(s, PSF);
+
+        fim_t * PSF2 = gen_psf(s, s->optical.lambda2);
+        printf("Multiplying PSFs\n");
+        for(size_t kk = 0; kk<fimt_nel(PSF); kk++)
+        {
+            PSF->V[kk] *= PSF2->V[kk];
+        }
+        fim_free(PSF2);
+    }
+
+
     if(s->verbose > 0)
     {
         printf("Writing to %s\n", s->outfile);
@@ -542,10 +781,12 @@ static void dw_psf(opts * s)
     ttags_set_pixelsize(T, s->optical.dx, s->optical.dx, s->optical.dz);
     free(swstring);
 
+
     fim_tiff_write_float(s->outfile, PSF->V,
                          T,
                          PSF->M, PSF->N, PSF->P);
     ttags_free(&T);
+    fim_free(PSF);
 }
 
 int dw_psf_cli(int argc, char ** argv)
