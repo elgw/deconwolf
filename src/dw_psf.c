@@ -132,6 +132,17 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
 
 static void argparsing(int argc, char ** argv, opts * s)
 {
+    if(argc == 1)
+    {
+        printf("Deconwolf %s PSF generator.\n", deconwolf_version);
+        printf("See `dw psf --help` or `man dw`.\n");
+        exit(EXIT_SUCCESS);
+    }
+    int hasNA = 0;
+    int hasni = 0;
+    int hasdx = 0;
+    int hasdz = 0;
+    int haslambda = 0;
 
     struct option longopts[] = {
         {"oversample", required_argument, NULL, 'O'},
@@ -167,9 +178,11 @@ static void argparsing(int argc, char ** argv, opts * s)
             break;
         case 'i':
             s->optical.ni = atof(optarg);
+            hasni = 1;
             break;
         case 'L':
             s->optical.lambda = atof(optarg);
+            haslambda = 1;
             break;
         case '2':
             s->optical.lambda2 = atof(optarg);
@@ -185,12 +198,15 @@ static void argparsing(int argc, char ** argv, opts * s)
             break;
         case 'x':
             s->optical.dx = atof(optarg);
+            hasdx = 1;
             break;
         case 'z':
             s->optical.dz = atof(optarg);
+            hasdz = 1;
             break;
         case 'n':
             s->optical.NA = atof(optarg);
+            hasNA = 1;
             break;
         case 'p':
             s->P = atoi(optarg);
@@ -203,7 +219,39 @@ static void argparsing(int argc, char ** argv, opts * s)
             break;
         }
     }
+    int ok = 1;
+    if(haslambda == 0)
+    {
+        fprintf(stderr, "Emission wave length not specified (--lambda)\n");
+        ok = 0;
+    }
+    if(hasni == 0)
+    {
+        fprintf(stderr, "Refractive index not specified (--ni)\n");
+        ok = 0;
+    }
+    if(hasNA == 0)
+    {
+        fprintf(stderr, "Numerical Aperture not specified (--NA)\n");
+        ok = 0;
+    }
 
+    if(hasdx == 0)
+    {
+        fprintf(stderr, "Lateral pixel size not specified (--dx)\n");
+        ok = 0;
+    }
+
+    if(hasdz == 0)
+    {
+        fprintf(stderr, "Axial pixel size not specified (--dz)\n");
+        ok = 0;
+    }
+
+    if(ok == 0)
+    {
+        exit(EXIT_FAILURE);
+    }
 
     if(s->xgrid < 1)
     {
@@ -749,7 +797,7 @@ static void dw_psf(opts * s)
     {
         printf("Calculating emission PSF\n");
     }
-    printf("")
+
     fim_t * PSF = gen_psf(s, s->optical.lambda);
     if(s->optical.lambda2 != 0)
     {
