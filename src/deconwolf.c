@@ -16,6 +16,8 @@
 
 /* Command line interface for deconwolf */
 
+/* Extra modules can be enabled by un-commenting in
+ * the header file. */
 #include "dw.h"
 
 int main(int argc, char ** argv)

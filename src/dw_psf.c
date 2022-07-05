@@ -16,6 +16,8 @@
 
 #include "dw_psf.h"
 
+enum PINHOLE_SHAPE {PINHOLE_SQUARE, PINHOLE_DISK};
+
 typedef struct{
     double NA;
     double ni;
@@ -24,6 +26,7 @@ typedef struct{
     double lambda;
     double lambda2;
     double pinhole;
+    enum PINHOLE_SHAPE pinhole_shape;
 } optical_t;
 
 typedef struct{
@@ -65,6 +68,7 @@ static opts * opts_new()
     s->optical.lambda = 460;
     s->optical.lambda2 = 0;
     s->optical.pinhole = 1; /* Airy Units, 1.22*lambda/NA */
+    s->optical.pinhole_shape = PINHOLE_SQUARE;
     s->M = 181;
     s->P = 181;
     s->xgrid = 7;
@@ -100,7 +104,15 @@ static void opts_print(FILE * f, opts * s)
     {
         fprintf(f, "Excitation lambda: %f nm\n", s->optical.lambda2);
         fprintf(f, "Pinhole size %f AU\n", s->optical.pinhole);
-        fprintf(f, "Pinhole shape: square\n");
+        switch(s->optical.pinhole_shape)
+        {
+        case PINHOLE_SQUARE:
+            fprintf(f, "Pinhole shape: square\n");
+            break;
+        case PINHOLE_DISK:
+            fprintf(f, "Pinhole shape: disk\n");
+            break;
+        }
     }
     return;
 }
@@ -117,6 +129,7 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
     printf(" --lambda l\n\t Emission wave length\n");
     printf(" --lambda2 l\n\t Excitation wave length\n");
     printf(" --pinhole p\n\t Pinhole size in AU\n");
+    printf(" --pinhole_disk \n\t Set the pinhole shape to a disk, default is square\n");
     printf(" --size s\n\t Set the lateral size (pixels). Default: %d\n", s->M);
     printf(" --nslice p\n\t Set the number of planes (pixels). Default: %d\n", s->P);
     printf(" --xgrid x\n\t Set the factor for lateral image padding. Default: %d\n", s->xgrid);
@@ -156,6 +169,7 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"help", no_argument, NULL, 'h'},
         {"overwrite", no_argument, NULL, 'o'},
         {"nslice", required_argument, NULL, 'p'},
+        {"pinhole_disk", no_argument, NULL, 'd'},
         {"pinhole", required_argument, NULL, 'P'},
         {"size", required_argument, NULL, 's'},
         {"threads", required_argument, NULL, 't'},
@@ -163,9 +177,12 @@ static void argparsing(int argc, char ** argv, opts * s)
         {NULL, 0, NULL, 0}};
     int ch;
     while((ch = getopt_long(argc, argv,
-                            "O:g:L:2:n:x:z:i:hop:s:v:P:", longopts, NULL)) != -1)
+                            "dO:g:L:2:n:x:z:i:hop:s:v:P:", longopts, NULL)) != -1)
     {
         switch(ch){
+        case 'd':
+            s->optical.pinhole_shape = PINHOLE_DISK;
+            break;
         case 'O':
             s->oversampling = atoi(optarg);
             break;
@@ -284,7 +301,7 @@ static void argparsing(int argc, char ** argv, opts * s)
                 s->optical.dx, s->optical.dz);
         } else {
             sprintf(s->outfile,
-                    "cpsf_NA%.2f_ni%.2f_lambda%.0f_lambda2%.0f_dx%.0f_dz%.0f.tif",
+                    "cpsf_NA%.2f_ni%.2f_lambda%.0f_exlambda%.0f_dx%.0f_dz%.0f.tif",
                     s->optical.NA, s->optical.ni,
                     s->optical.lambda, s->optical.lambda2,
                     s->optical.dx, s->optical.dz);
@@ -559,7 +576,9 @@ fim_t * gen_psf(opts * s, double lambda)
             float rmax = ( (float)XM-1.0)/2.0;
             float dx = (float) kk - rmax;
             float dy = (float) ll - rmax;
-            float r = Fn*sqrt(pow(dx/rmax, 2) + pow(dy/rmax, 2));
+            float r = Fn*sqrt(
+                              pow(dx/rmax, 2) + pow(dy/rmax, 2)
+                              );
             float f = pow(s->optical.ni/lambda, 2) - pow(r, 2);
             if(f > 0)
             {
@@ -571,7 +590,7 @@ fim_t * gen_psf(opts * s, double lambda)
 
     if(s->verbose > 2) { printf("Setting up pupil function\n"); fflush(stdout); }
 
-    /* Pupil function */
+    /* Pupil function, limited by the NA */
     fftw_complex * pu = fftw_malloc(XM*XM*sizeof(fftw_complex));
 
     double pur2 = pow(s->optical.NA/lambda, 2);
@@ -743,7 +762,8 @@ static float * conv2d_float(float * A, float * B,
 
 static void pinhole_convolution(opts * s, fim_t * PSF)
 {
-    /* Convolve PSF by a square filter */
+    /* Convolve PSF by a square filter. The specified pinhole is the
+       diameter. */
     double pinhole_nm = s->optical.pinhole*1.22*s->optical.lambda/s->optical.NA;
     double pinhole_px = pinhole_nm / s->optical.dx;
     printf("Pinhole size: %.2f AU / %.0f nm / %.1f pixels\n",
@@ -755,18 +775,34 @@ static void pinhole_convolution(opts * s, fim_t * PSF)
         {
             double apos = (double) aa - (PSF->M -1)/2.0;
             double bpos = (double) bb - (PSF->M -1)/2.0;
-            double x0 = apos*s->optical.dx - s->optical.dx/2.0;
-            double x1 = x0 + s->optical.dx;
-            double y0 = bpos*s->optical.dx - s->optical.dx/2.0;
-            double y1 = y0 + s->optical.dx;
 
+            /* Exact overlap for squares */
+            if(s->optical.pinhole_shape == PINHOLE_SQUARE)
+            {
+                double x0 = apos*s->optical.dx - s->optical.dx/2.0;
+                double x1 = x0 + s->optical.dx;
+                double y0 = bpos*s->optical.dx - s->optical.dx/2.0;
+                double y1 = y0 + s->optical.dx;
             P[bb+aa*PSF->M] = square_overlap(-pinhole_nm/2.0, pinhole_nm/2.0,
                                              -pinhole_nm/2.0, pinhole_nm/2.0,
                                              x0, x1, y0, y1);
+            }
+            /* error function approximation for disks */
+            if(s->optical.pinhole_shape == PINHOLE_DISK)
+            {
+                double r_px = sqrt(pow(apos,2) + pow(bpos,2));
+                double sharpness = 2;
+                P[bb+aa*PSF->M] = 1.0 - erf( sharpness*(r_px - pinhole_px/2) );
+            }
         }
     }
 
-    //fim_tiff_write_float("pinhole.tif", P, NULL, PSF->M, PSF->N, 1);
+    if(s->verbose > 2)
+    {
+        printf("verbose > 2: writing pinhole to pinhole.tif\n");
+        fim_tiff_write_float("pinhole.tif", P, NULL, PSF->M, PSF->N, 1);
+    }
+
 
     fftshift2_float(P, PSF->M);;
     //fim_tiff_write_float("pinhole_shifted.tif", P, NULL, PSF->M, PSF->N, 1);
