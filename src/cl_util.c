@@ -106,6 +106,7 @@ fimcl_t * fimcl_new(clu_env_t * clu, int ffted, int fullsize,
                                         0, // num_events_in_wait_list
                                         NULL,
                                         &Y->wait_ev ) );
+        fimcl_sync(Y);
     }
     if(ffted == 1)
     {
@@ -138,6 +139,7 @@ fimcl_t * fimcl_copy(fimcl_t * G)
                      0, //cl_uint num_events_in_wait_list,
                      NULL, //const cl_event* event_wait_list,
                      &H->wait_ev)); //cl_event* event);
+        fimcl_sync(H);
     } else {
         fprintf(stderr, "fimcl_copy for transformed objects is not implemented \n");
         exit(EXIT_FAILURE);
@@ -214,7 +216,6 @@ static fimcl_t * _fimcl_convolve(fimcl_t * X, fimcl_t * Y, int mode, int conj)
     {
         clock_gettime(CLOCK_MONOTONIC, &tk0);
         fimcl_complex_mul(X, Y, X, conj);
-        fimcl_sync(X);
         clock_gettime(CLOCK_MONOTONIC, &tk1);
         fimcl_free(Y);
 
@@ -291,6 +292,7 @@ fimcl_t * fimcl_convolve_conj(fimcl_t * X, fimcl_t * Y, int mode)
 void fimcl_sync(fimcl_t * X)
 {
     check_CL( clu_wait_for_event(X->wait_ev, 10000));
+    clFinish(X->clu->command_queue);
     return;
 }
 
@@ -334,6 +336,7 @@ void fimcl_complex_mul(fimcl_t * X, fimcl_t * Y, fimcl_t * Z, int conj)
                                      0,
                                      NULL,
                                      &Z->wait_ev) );
+    fimcl_sync(Z);
     return;
 }
 
@@ -398,6 +401,7 @@ void fimcl_ifft_inplace(fimcl_t * X)
                                       NULL)); // temp buffer
 
     X->transformed = 0;
+    fimcl_sync(X);
     return;
 }
 
@@ -447,6 +451,7 @@ fimcl_t * fimcl_fft(fimcl_t * X)
                                       &X->buf, // Input buffer
                                       &fX->buf, // output buffer
                                       X->clu->clfft_buffer)); // temp buffer
+    fimcl_sync(fX);
     return fX;
 }
 
@@ -492,7 +497,7 @@ void fimcl_fft_inplace(fimcl_t * X)
                                       &X->buf, // Input buffer
                                       &X->buf, // output buffer
                                       NULL)); // temp buffer
-
+    fimcl_sync(X);
     X->transformed = 1;
     return;
 }

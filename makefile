@@ -26,7 +26,7 @@ CFLAGS += -fno-math-errno
 DESTDIR?=/usr/local/bin
 DEBUG?=0
 ifeq ($(DEBUG),1)
-    CFLAGS += -g3 -DDEBUG
+    CFLAGS += -g3 -O -DDEBUG
 else
    #CFLAGS +=  -g -O2 -ftree-vectorize -Wno-unknown-pragmas -flto
    CFLAGS +=  -O3 -Wno-unknown-pragmas -flto -DNDEBUG
