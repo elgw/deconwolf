@@ -73,6 +73,9 @@ typedef enum {
     DW_METHOD_ID, /* Identity/nothing. For checking image loading/saving. */
     DW_METHOD_AVE, /* Biggs-Andrews Additive Vector Extrapolation */
     DW_METHOD_SHB, /* Wang and Miller, Scaled Heavy Ball */
+    #ifdef OPENCL
+    DW_METHOD_SHBCL,
+    #endif
 } dw_method;
 
 typedef enum {
@@ -281,10 +284,15 @@ void dw_iterator_set_error(dw_iterator_t *, float);
 void dw_iterator_show(dw_iterator_t *, const dw_opts *);
 void dw_iterator_free(dw_iterator_t * );
 
+#ifdef OPENCL
+#include "method_shb_cl.h"
+#endif
+
 #include "method_eve.h"
 #include "method_identity.h"
 #include "method_rl.h"
 #include "method_ave.h"
 #include "method_shb.h"
+
 
 #endif

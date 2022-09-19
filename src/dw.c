@@ -229,8 +229,8 @@ void dw_show_iter(dw_opts * s, int it, int nIter, float err)
 
 
 char * gen_iterdump_name(
-                         __attribute__((unused)) const dw_opts * s,
-                         int it)
+    __attribute__((unused)) const dw_opts * s,
+    int it)
 {
     // Generate a name for the an iterdump file
     // at iteration it
@@ -301,6 +301,11 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
     case DW_METHOD_SHB:
         fprintf(f, "method: Scaled Heavy Ball (SHB)\n");
         break;
+#ifdef OPENCL
+    case DW_METHOD_SHBCL:
+        fprintf(f, "method: Scaled Heavy Ball (SHB)\n");
+        break;
+#endif
     }
     switch(s->metric)
     {
@@ -454,6 +459,10 @@ void dw_fprint_info(FILE * f, dw_opts * s)
 
 #ifdef _OPENMP
     fprintf(f, "OpenMP: YES\n");
+#endif
+
+#ifdef OPENCL
+    fprintf(f, "OpenCL: YES\n");
 #endif
 
     fprintf(f, "\n");
@@ -633,7 +642,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
                 s->method = DW_METHOD_EVE;
                 if(prefix_set == 0)
                 {
-                sprintf(s->prefix, "eve");
+                    sprintf(s->prefix, "eve");
                 }
                 s->fun = &deconvolve_eve;
                 known_method = 1;
@@ -678,6 +687,18 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
                 s->fun = &deconvolve_shb;
                 known_method = 1;
             }
+            #ifdef OPENCL
+            if(strcmp(optarg, "shbcl") == 0)
+            {
+                s->method = DW_METHOD_SHBCL;
+                if(prefix_set == 0)
+                {
+                    sprintf(s->prefix, "shbcl");
+                }
+                s->fun = &deconvolve_shb_cl;
+                known_method = 1;
+            }
+            #endif
             if(known_method == 0)
             {
                 fprintf(stderr, "--method %s is unknown. Please specify ave, eve (default), shb, rl or id\n", optarg);
@@ -1058,34 +1079,6 @@ float getError_ref(const float * restrict y,
 }
 
 
-fftwf_complex * initial_guess(const int64_t M, const int64_t N, const int64_t P,
-                              const int64_t wM, const int64_t wN, const int64_t wP)
-{
-    /* Create initial guess: the fft of an image that is 1 in MNP and 0 outside
-     * M, N, P is the dimension of the microscopic image
-     *
-     * Possibly more stable to use the mean of the input image rather than 1
-     */
-
-    assert(wM >= M); assert(wN >= N); assert(wP >= P);
-
-    float * one = fim_zeros(wM*wN*wP);
-
-#pragma omp parallel for shared(one)
-    for(int64_t cc = 0; cc < P; cc++) {
-        for(int64_t bb = 0; bb < N; bb++) {
-            for(int64_t aa = 0; aa < M; aa++) {
-                one[aa + wM*bb + wM*wN*cc] = 1;
-            }
-        }
-    }
-    //  writetif("one.tif", one, wM, wN, wP);
-
-    fftwf_complex * Fone = fft(one, wM, wN, wP);
-
-    fftwf_free(one);
-    return Fone;
-}
 
 void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opts * s)
 {
@@ -2070,4 +2063,33 @@ int dw_run(dw_opts * s)
     dw_opts_free(&s);
 
     return 0;
+}
+
+fftwf_complex * initial_guess(const int64_t M, const int64_t N, const int64_t P,
+                                 const int64_t wM, const int64_t wN, const int64_t wP)
+{
+    /* Create initial guess: the fft of an image that is 1 in MNP and 0 outside
+     * M, N, P is the dimension of the microscopic image
+     *
+     * Possibly more stable to use the mean of the input image rather than 1
+     */
+
+    assert(wM >= M); assert(wN >= N); assert(wP >= P);
+
+    float * one = fim_zeros(wM*wN*wP);
+
+#pragma omp parallel for shared(one)
+    for(int64_t cc = 0; cc < P; cc++) {
+        for(int64_t bb = 0; bb < N; bb++) {
+            for(int64_t aa = 0; aa < M; aa++) {
+                one[aa + wM*bb + wM*wN*cc] = 1;
+            }
+        }
+    }
+    //  writetif("one.tif", one, wM, wN, wP);
+
+    fftwf_complex * Fone = fft(one, wM, wN, wP);
+
+    fftwf_free(one);
+    return Fone;
 }
