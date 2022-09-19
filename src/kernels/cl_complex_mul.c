@@ -1,4 +1,4 @@
-__kernel void cl_complex_mul(__global float *A, __global float * B, __global float * C)
+__kernel void cl_complex_mul(__global float * A, __global float * B, __global float * C)
 {
     // C = A.*B
     const int id = get_global_id(0);

@@ -121,7 +121,7 @@ fimcl_t * fimcl_copy(fimcl_t * G)
 {
     if(G->clu->verbose > 1)
     {
-        printf("fimcl_convolve\n");
+        printf("fimcl_copy\n");
     }
     fimcl_t * H = NULL;
     if(G->transformed == 0)
@@ -151,7 +151,8 @@ void fimcl_free(fimcl_t * G)
     free(G);
 }
 
-fimcl_t * fimcl_convolve(fimcl_t * X, fimcl_t * Y, int mode)
+
+static fimcl_t * _fimcl_convolve(fimcl_t * X, fimcl_t * Y, int mode, int conj)
 {
     struct timespec tk0, tk1, tfft0, tfft1, tifft0, tifft1;
     if(X->clu->verbose > 1)
@@ -201,7 +202,7 @@ fimcl_t * fimcl_convolve(fimcl_t * X, fimcl_t * Y, int mode)
         assert(Z->transformed == 1);
 
         clock_gettime(CLOCK_MONOTONIC, &tk1);
-        fimcl_complex_mul(X, Y, Z, 0);
+        fimcl_complex_mul(X, Y, Z, conj);
 
         clock_gettime(CLOCK_MONOTONIC, &tk1);
         fimcl_ifft(Z);
@@ -212,7 +213,7 @@ fimcl_t * fimcl_convolve(fimcl_t * X, fimcl_t * Y, int mode)
     if(mode == CLU_DROP_ALL)
     {
         clock_gettime(CLOCK_MONOTONIC, &tk0);
-        fimcl_complex_mul(X, Y, X, 0);
+        fimcl_complex_mul(X, Y, X, conj);
         fimcl_sync(X);
         clock_gettime(CLOCK_MONOTONIC, &tk1);
         fimcl_free(Y);
@@ -246,7 +247,7 @@ fimcl_t * fimcl_convolve(fimcl_t * X, fimcl_t * Y, int mode)
     if(mode == CLU_KEEP_2ND)
     {
         clock_gettime(CLOCK_MONOTONIC, &tk0);
-        fimcl_complex_mul(X, Y, X, 0);
+        fimcl_complex_mul(X, Y, X, conj);
         clock_gettime(CLOCK_MONOTONIC, &tk1);
 
         fimcl_t * fX = NULL;
@@ -275,6 +276,16 @@ fimcl_t * fimcl_convolve(fimcl_t * X, fimcl_t * Y, int mode)
     }
     assert(NULL);
     return NULL;
+}
+
+fimcl_t * fimcl_convolve(fimcl_t * X, fimcl_t * Y, int mode)
+{
+    return _fimcl_convolve(X, Y, mode, 0);
+}
+
+fimcl_t * fimcl_convolve_conj(fimcl_t * X, fimcl_t * Y, int mode)
+{
+    return _fimcl_convolve(X, Y, mode, 1);
 }
 
 void fimcl_sync(fimcl_t * X)
@@ -615,7 +626,7 @@ clu_env_t * clu_new(int verbose)
     check_CL( clGetPlatformIDs(1, &env->platform_id, &ret_num_platforms) );
 
 
-    if(env->verbose > 0)
+    if(env->verbose > 1)
     {
         printf("Found %d CL platforms\n", ret_num_platforms);
     }
@@ -628,7 +639,7 @@ clu_env_t * clu_new(int verbose)
                              &env->device_id,
                              &ret_num_devices));
 
-    if(env->verbose > 0)
+    if(env->verbose > 1)
     {
         printf("Found %d CL devices\n", ret_num_devices);
     }
@@ -654,7 +665,7 @@ clu_env_t * clu_new(int verbose)
                                               0,
                                               &ret);
     check_CL(ret);
-    if(env->verbose > 0)
+    if(env->verbose > 1)
     {
         printf("CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS=%u\n",
                CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS);

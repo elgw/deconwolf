@@ -83,6 +83,7 @@ float * fimcl_download(fimcl_t *);
  * Returns an object which has transformed == 0, i.e. real data
  */
 fimcl_t * fimcl_convolve(fimcl_t * A, fimcl_t * B, int flags);
+fimcl_t * fimcl_convolve_conj(fimcl_t * A, fimcl_t * B, int flags);
 
 /* Assumes that the input is real.
  * The output will be complex hermitian.
