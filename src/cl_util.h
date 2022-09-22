@@ -2,7 +2,10 @@
 #define __cl_util_h__
 
 /* This is tailored for a single FFT size. Doing it that way we can
- * do much initialization in bulk at the beginning. */
+ * do much initialization in bulk at the beginning.
+ * Notes:
+ * -
+*/
 
 #include <assert.h>
 #include <stdio.h>
@@ -11,6 +14,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#define CLFFT_REQUEST_LIB_NOMEMALLOC
 #define CL_TARGET_OPENCL_VERSION 300
 #include <CL/cl.h>
 #include <clFFT.h>
@@ -45,6 +49,12 @@ typedef struct{
     size_t M; size_t N; size_t P;
     clu_kernel_t kern_mul;
     clu_kernel_t kern_mul_conj;
+    clu_kernel_t kern_mul_inplace;
+    clu_kernel_t kern_mul_conj_inplace;
+
+    size_t nb_allocated;
+    size_t n_release;
+    size_t n_alloc;
 } clu_env_t;
 
 
@@ -53,9 +63,10 @@ typedef struct{
     size_t N;
     size_t P;
     cl_mem buf;
-    size_t buf_size; // Number of floats, not bytes
+    size_t buf_size_nf; // Number of floats, not bytes
     int transformed; /* 0=real or 1=hermitian */
     int fullsize; /* If the buffer is large enough for in-place fft */
+    int padded; /* Ready for inplace transform ? */
     clu_env_t * clu;
     cl_event wait_ev; // Check this before data is used
 } fimcl_t;
@@ -102,9 +113,13 @@ fimcl_t * fimcl_copy(fimcl_t * );
  * wait event on fZ */
 void fimcl_complex_mul(fimcl_t * fX, fimcl_t * fY, fimcl_t * fZ, int conj);
 
+/* fY = fX .* fY */
+void fimcl_complex_mul_inplace(fimcl_t * fX, fimcl_t * fY, int conj);
+
 /* Wait until the object is available.
  * To be used after fft, ifft, complex_mul etc ...*/
 void fimcl_sync(fimcl_t * X);
+
 
 #define check_CL(x) if(x != CL_SUCCESS)                             \
     {                                                               \

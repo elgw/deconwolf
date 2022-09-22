@@ -26,11 +26,11 @@ CFLAGS += -fno-math-errno
 DESTDIR?=/usr/local/bin
 DEBUG?=0
 ifeq ($(DEBUG),1)
-    CFLAGS += -g3 -O -DDEBUG
+    CFLAGS += -g3 -O1 -DNDEBUG -fno-inline
 else
-   #CFLAGS +=  -g -O2 -ftree-vectorize -Wno-unknown-pragmas -flto
-   CFLAGS +=  -O3 -Wno-unknown-pragmas -flto -DNDEBUG
-   #-fno-math-errno no relevant performance gain
+    #CFLAGS +=  -g -O2 -ftree-vectorize -Wno-unknown-pragmas -flto
+    CFLAGS += -O3 -Wno-unknown-pragmas -flto -DNDEBUG
+    #-fno-math-errno no relevant performance gain
 endif
 
 dw_LIBRARIES =  -lm -ltiff
@@ -89,6 +89,7 @@ endif
 ## OpenMP
 OMP?=1
 ifeq ($(OMP), 1)
+$(info OMP enabled)
 ifeq ($(UNAME_S), Darwin)
 dw_LIBRARIES += -Xpreprocessor -lomp
 else
@@ -96,11 +97,13 @@ CFLAGS += -fopenmp
 endif
 else
 CFLAGS += -fno-openmp
+$(info OMP disabled)
 endif
 
 ## OpenCL
 OPENCL?=0
 ifeq ($(OPENCL), 1)
+$(info OpenCL enabled)
 CFLAGS+=-DOPENCL
 CFLAGS+=-I/opt/nvidia/hpc_sdk/Linux_x86_64/21.3/cuda/11.2/targets/x86_64-linux/include/
 LDFLAGS=-L/opt/nvidia/hpc_sdk/Linux_x86_64/21.3/cuda/11.2/targets/x86_64-linux/lib/
@@ -158,10 +161,18 @@ kernels:
 	cp src/kernels/cl_complex_mul.c cl_complex_mul
 	xxd -i cl_complex_mul > src/kernels/cl_complex_mul.h
 	rm cl_complex_mul
+	# cl_complex_mul_inplace
+	cp src/kernels/cl_complex_mul_inplace.c cl_complex_mul_inplace
+	xxd -i cl_complex_mul_inplace > src/kernels/cl_complex_mul_inplace.h
+	rm cl_complex_mul_inplace
 	# cl_complex_mul_conj
 	cp src/kernels/cl_complex_mul_conj.c cl_complex_mul_conj
 	xxd -i cl_complex_mul_conj > src/kernels/cl_complex_mul_conj.h
 	rm cl_complex_mul_conj
+	# cl_complex_mul_conj_inplace
+	cp src/kernels/cl_complex_mul_conj_inplace.c cl_complex_mul_conj_inplace
+	xxd -i cl_complex_mul_conj_inplace > src/kernels/cl_complex_mul_conj_inplace.h
+	rm cl_complex_mul_conj_inplace
 
 
 install:

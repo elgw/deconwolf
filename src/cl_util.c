@@ -3,9 +3,22 @@
 
 #include "kernels/cl_complex_mul.h" // corresponds to cl_complex_mul
 #include "kernels/cl_complex_mul_conj.h" // corresponds to cl_complex_mul_conj
+#include "kernels/cl_complex_mul_inplace.h"
+#include "kernels/cl_complex_mul_conj_inplace.h"
+
 
 static char * read_program(const char * fname, size_t * size);
 static double clockdiff(struct timespec* start, struct timespec * finish);
+
+/* Number of complex values required for Hermitian representation */
+
+static size_t fimcl_ncx(fimcl_t * X);
+static size_t fimcl_hM(fimcl_t * X);
+static size_t fimcl_hN(fimcl_t * X);
+static size_t fimcl_hP(fimcl_t * X);
+static size_t M_r2h(size_t M);
+static size_t N_r2h(size_t N);
+static size_t P_r2h(size_t P);
 
 void clu_exit_error(cl_int err,
                     const char * file,
@@ -15,7 +28,7 @@ void clu_exit_error(cl_int err,
 {
     fprintf(stderr, "\n");
     fprintf(stderr, "ERROR!\n");
-    fprintf(stderr, "There was an unrecoverable problem in %s/%s at line %d\n",
+    fprintf(stderr, "There was an unrecoverable problem in %s (%s) at line %d\n",
             file, function, line);
 
     const char * err_cl = clGetErrorString(err);
@@ -33,26 +46,122 @@ void clu_exit_error(cl_int err,
     exit(EXIT_FAILURE);
 }
 
+#if 1
+static size_t M_r2h(size_t M)
+{
+    return (1+M/2);
+}
+static size_t N_r2h(size_t N)
+{
+    return N;
+}
+static size_t P_r2h(size_t P)
+{
+    return P;
+}
+#endif
+
+#if 0
+static size_t M_r2h(size_t M)
+{
+    return M;
+}
+static size_t N_r2h(size_t N)
+{
+    return N;
+}
+static size_t P_r2h(size_t P)
+{
+    return (1+P/2);
+}
+#endif
+
+
+static size_t fimcl_hM(fimcl_t * X)
+{
+    return M_r2h(X->M);
+}
+static size_t fimcl_hN(fimcl_t * X)
+{
+    return N_r2h(X->N);
+}
+
+static size_t fimcl_hP(fimcl_t * X)
+{
+    return P_r2h(X->P);
+}
+
+
+static size_t fimcl_ncx(fimcl_t * X)
+{
+    return fimcl_hM(X)*fimcl_hN(X)*fimcl_hP(X);
+}
 
 float * fimcl_download(fimcl_t * gX)
 {
-    size_t MNP = gX->M*gX->N*gX->P;
-    float * X = malloc(MNP*sizeof(float));
-    assert(X != NULL);
-    assert(gX->transformed == 0);
 
-    check_CL( clEnqueueReadBuffer( gX->clu->command_queue,
-                                   gX->buf,
-                                   CL_TRUE,
-                                   0,
-                                   MNP * sizeof( float ),
-                                   X,
-                                   0,
-                                   NULL,
-                                   &gX->wait_ev ));
+    if(gX->transformed == 0)
+    {
+        size_t MNP = gX->M*gX->N*gX->P;
+        if(gX->clu->verbose > 1)
+        {
+            printf("Downloading real data %zu x %zu x %zu (%zu floats)\n",
+                   gX->M, gX->N, gX->P, MNP);
+        }
 
-    fimcl_sync(gX);
-    return X;
+        float * X = calloc(MNP, sizeof(float));
+        if(X == NULL)
+        {
+            fprintf(stderr, "Failed to allocate memory in %s/%s/%d\n", __FILE__,
+                    __FUNCTION__,
+                    __LINE__);
+            exit(EXIT_FAILURE);
+        }
+        assert(X != NULL);
+        check_CL( clEnqueueReadBuffer( gX->clu->command_queue,
+                                       gX->buf,
+                                       CL_TRUE, // blocking
+                                       0, // offset
+                                       MNP * sizeof( float ), // size
+                                       X,
+                                       0,
+                                       NULL,
+                                       &gX->wait_ev ));
+        fimcl_sync(gX); // todo remove
+        return X;
+    }
+    if(gX->transformed == 1)
+    {
+        size_t cMNP = fimcl_ncx(gX);
+        if(gX->clu->verbose > 1)
+        {
+            printf("Downloading transformed data %zu x %zu x %zu (%zu floats)\n",
+                   fimcl_hM(gX), fimcl_hN(gX), fimcl_hP(gX), cMNP*2);
+        }
+
+        float * X = malloc(cMNP*2*sizeof(float));
+        if(X == NULL)
+        {
+            fprintf(stderr, "Failed to allocate memory in %s/%s/%d\n", __FILE__,
+                    __FUNCTION__,
+                    __LINE__);
+            exit(EXIT_FAILURE);
+        }
+
+        check_CL( clEnqueueReadBuffer( gX->clu->command_queue,
+                                       gX->buf,
+                                       CL_TRUE, // blocking
+                                       0, // offset
+                                       cMNP *2* sizeof( float ), // size
+                                       X,
+                                       0,
+                                       NULL,
+                                       &gX->wait_ev ));
+        fimcl_sync(gX); // todo remove
+        return X;
+    }
+    assert(0);
+    return NULL;
 }
 
 fimcl_t * fimcl_new(clu_env_t * clu, int ffted, int fullsize,
@@ -76,15 +185,17 @@ fimcl_t * fimcl_new(clu_env_t * clu, int ffted, int fullsize,
     {
         Y->buf = clCreateBuffer(clu->context,
                                 CL_MEM_READ_WRITE,
-                                M*N*P *  sizeof(float),
+                                M*N*P* sizeof(float),
                                 NULL, &ret );
-        Y->buf_size = M*N*P;
+        Y->buf_size_nf = M*N*P;
+        clu->nb_allocated += M*N*P*sizeof(float);
     } else {
+        Y->buf_size_nf = fimcl_ncx(Y)*2;
         Y->buf = clCreateBuffer(clu->context,
                                 CL_MEM_READ_WRITE,
-                                (1+M/2)*N*P *2*  sizeof(float),
+                                Y->buf_size_nf*sizeof(float),
                                 NULL, &ret );
-        Y->buf_size = (1+M/2)*N*P*2;
+        clu->nb_allocated += Y->buf_size_nf*sizeof(float);
         Y->fullsize = 1;
     }
     check_CL(ret);
@@ -97,9 +208,28 @@ fimcl_t * fimcl_new(clu_env_t * clu, int ffted, int fullsize,
     if(ffted == 0)
     {
 
+        if(fullsize)
+        {
+            /* Until we get the padding correct we fill the whole memory region,
+             * which is larger than the image data, with zeros  */
+            if(clu->verbose > 2)
+            {
+                printf("Clearing the clBuffer before uploading\n");
+            }
+            float zero_pattern[1] = {0.0};
+            check_CL ( clEnqueueFillBuffer (clu->command_queue, //  command_queue ,
+                                            Y->buf, // cl_mem  buffer ,
+                                            &zero_pattern, // const void  *pattern ,
+                                            sizeof(float), // size_t  pattern_size ,
+                                            0, // size_t  offset ,
+                                            Y->buf_size_nf*sizeof(float), // size_t  size ,
+                                            0, // cl_uint  num_events_in_wait_list ,
+                                            NULL, // const cl_event  *event_wait_list ,
+                                            &Y->wait_ev)); // cl_event  *event
+        }
         check_CL( clEnqueueWriteBuffer( clu->command_queue,
                                         Y->buf,
-                                        CL_FALSE, // blocking_write
+                                        CL_TRUE, // blocking_write
                                         0,
                                         M*N*P* sizeof( float ),
                                         X,
@@ -128,7 +258,9 @@ fimcl_t * fimcl_copy(fimcl_t * G)
     if(G->transformed == 0)
     {
         H = fimcl_new(G->clu, 0, G->fullsize, NULL, G->M, G->N, G->P);
+
         fimcl_sync(G);
+        fimcl_sync(H);
         check_CL(clEnqueueCopyBuffer(
                      G->clu->command_queue,//cl_command_queue command_queue,
                      G->buf, //cl_mem src_buffer,
@@ -149,7 +281,9 @@ fimcl_t * fimcl_copy(fimcl_t * G)
 
 void fimcl_free(fimcl_t * G)
 {
-    clReleaseMemObject(G->buf);
+    fimcl_sync(G);
+    check_CL(clReleaseMemObject(G->buf));
+    G->clu->n_release++;
     free(G);
 }
 
@@ -161,7 +295,7 @@ static fimcl_t * _fimcl_convolve(fimcl_t * X, fimcl_t * Y, int mode, int conj)
     {
         printf("fimcl_convolve\n");
     }
-
+    clFinish(X->clu->command_queue);
     if(X->transformed == 0)
     {
         if(X->clu->verbose > 1)
@@ -178,7 +312,7 @@ static fimcl_t * _fimcl_convolve(fimcl_t * X, fimcl_t * Y, int mode, int conj)
         }
         clock_gettime(CLOCK_MONOTONIC, &tfft1);
     }
-
+    clFinish(X->clu->command_queue);
     if(Y->transformed == 0)
     {
         if(X->clu->verbose > 1)
@@ -194,7 +328,7 @@ static fimcl_t * _fimcl_convolve(fimcl_t * X, fimcl_t * Y, int mode, int conj)
         }
         clock_gettime(CLOCK_MONOTONIC, &tfft1);
     }
-
+    clFinish(X->clu->command_queue);
     assert(X->transformed == 1);
     assert(Y->transformed == 1);
 
@@ -215,7 +349,7 @@ static fimcl_t * _fimcl_convolve(fimcl_t * X, fimcl_t * Y, int mode, int conj)
     if(mode == CLU_DROP_ALL)
     {
         clock_gettime(CLOCK_MONOTONIC, &tk0);
-        fimcl_complex_mul(X, Y, X, conj);
+        fimcl_complex_mul_inplace(Y, Y, conj);
         clock_gettime(CLOCK_MONOTONIC, &tk1);
         fimcl_free(Y);
 
@@ -241,14 +375,14 @@ static fimcl_t * _fimcl_convolve(fimcl_t * X, fimcl_t * Y, int mode, int conj)
             printf("- Multiplication took %f s\n", dtk);
             printf("- Inverse fft took %f s\n", difft);
         }
+        clFinish(X->clu->command_queue);
         return fX;
-
     }
 
     if(mode == CLU_KEEP_2ND)
     {
         clock_gettime(CLOCK_MONOTONIC, &tk0);
-        fimcl_complex_mul(X, Y, X, conj);
+        fimcl_complex_mul_inplace(Y, X, conj);
         clock_gettime(CLOCK_MONOTONIC, &tk1);
 
         fimcl_t * fX = NULL;
@@ -260,6 +394,7 @@ static fimcl_t * _fimcl_convolve(fimcl_t * X, fimcl_t * Y, int mode, int conj)
             clock_gettime(CLOCK_MONOTONIC, &tifft1);
         } else {
             fX = fimcl_ifft(X);
+            fimcl_sync(fX);
             fimcl_free(X);
         }
 
@@ -272,9 +407,10 @@ static fimcl_t * _fimcl_convolve(fimcl_t * X, fimcl_t * Y, int mode, int conj)
             printf("- Multiplication took %f s\n", dtk);
             printf("- Inverse fft took %f s\n", difft);
         }
-        return fX;
 
+        return fX;
     }
+
     assert(NULL);
     return NULL;
 }
@@ -283,7 +419,6 @@ fimcl_t * fimcl_convolve(fimcl_t * X, fimcl_t * Y, int mode)
 {
     return _fimcl_convolve(X, Y, mode, 0);
 }
-
 fimcl_t * fimcl_convolve_conj(fimcl_t * X, fimcl_t * Y, int mode)
 {
     return _fimcl_convolve(X, Y, mode, 1);
@@ -307,7 +442,7 @@ void fimcl_complex_mul(fimcl_t * X, fimcl_t * Y, fimcl_t * Z, int conj)
         kernel = X->clu->kern_mul_conj.kernel;
     }
 
-    size_t cMNP = (1+X->M/2)*X->N*X->P;
+    size_t cMNP = fimcl_ncx(X);
 
     check_CL( clSetKernelArg(kernel,
                              0, // argument index
@@ -340,6 +475,49 @@ void fimcl_complex_mul(fimcl_t * X, fimcl_t * Y, fimcl_t * Z, int conj)
     return;
 }
 
+void fimcl_complex_mul_inplace(fimcl_t * X, fimcl_t * Y, int conj)
+{
+    size_t global_work_offset[] = {0, 0, 0};
+    size_t local_work_size[] = {1,1,1};
+
+    cl_kernel kernel = X->clu->kern_mul_inplace.kernel;
+    if(conj == 1)
+    {
+        kernel = X->clu->kern_mul_conj_inplace.kernel;
+    }
+
+    size_t cMNP = fimcl_ncx(X);
+
+    fimcl_sync(X);
+    fimcl_sync(Y);
+
+
+    check_CL( clSetKernelArg(kernel,
+                             0, // argument index
+                             sizeof(cl_mem), // argument size
+                             (void *) &X->buf) ); // argument value
+
+    check_CL( clSetKernelArg(kernel,
+                             1, // argument index
+                             sizeof(cl_mem), // argument size
+                             (void *) &Y->buf) ); // argument value
+
+
+    check_CL( clEnqueueNDRangeKernel(X->clu->command_queue,
+                                     kernel,
+                                     1, //3,
+                                     global_work_offset,
+                                     &cMNP, //global_work_size,
+                                     local_work_size,
+                                     0,
+                                     NULL,
+                                     &Y->wait_ev) );
+
+    fimcl_sync(Y);
+    return;
+}
+
+
 fimcl_t * fimcl_ifft(fimcl_t * fX)
 {
     if(fX->clu->verbose > 1)
@@ -362,20 +540,23 @@ fimcl_t * fimcl_ifft(fimcl_t * fX)
                             CL_MEM_READ_WRITE,
                             fX->M*fX->N*fX->P *  sizeof(float),
                             NULL, &ret );
+    fX->clu->nb_allocated += fX->M*fX->N*fX->P *  sizeof(float);
     check_CL(ret);
 
     /* And back again */
+    clFinish(X->clu->command_queue);
     check_clFFT(clfftEnqueueTransform(fX->clu->h2r_plan, // XXX
                                       CLFFT_BACKWARD,
                                       1, // numQueuesAndEcents
                                       &fX->clu->command_queue, // commQueues
                                       0, // numWaitEvents
                                       NULL, // waitEvents
-                                      &fX->wait_ev, // cl_event * outEvents
+                                      &X->wait_ev, // cl_event * outEvents
                                       &fX->buf, // Input buffer
                                       &X->buf, // output buffer
                                       fX->clu->clfft_buffer)); // temp buffer
-    fimcl_sync(fX);
+    clFinish(X->clu->command_queue);
+    fimcl_sync(X);
 
     return X;
 }
@@ -391,15 +572,15 @@ void fimcl_ifft_inplace(fimcl_t * X)
     fimcl_sync(X);
     check_clFFT(clfftEnqueueTransform(X->clu->h2r_inplace_plan,
                                       CLFFT_BACKWARD,
-                                      1, // numQueuesAndEcents
+                                      1, // numQueuesAndEvents
                                       &X->clu->command_queue, // commQueues
                                       0, // numWaitEvents
                                       NULL, // waitEvents
                                       &X->wait_ev, // cl_event * outEvents
                                       &X->buf, // Input buffer
-                                      &X->buf, // output buffer
+                                      NULL, // output buffer
                                       NULL)); // temp buffer
-
+    clFinish(X->clu->command_queue);
     X->transformed = 0;
     fimcl_sync(X);
     return;
@@ -415,16 +596,8 @@ fimcl_t * fimcl_fft(fimcl_t * X)
     assert(X->transformed == 0);
     fimcl_sync(X);
 
-    /* Number of elements in real domain */
-    size_t M = X->M;
-    size_t N = X->N;
-    size_t P = X->P;
-
     /* Number of complex elements in the FFT */
-    size_t cM = 1 + M/2;
-    size_t cN = N;
-    size_t cP = P;
-    size_t cMNP = cM*cN*cP;
+    size_t cMNP = fimcl_ncx(X);
 
     fimcl_t * fX = calloc(1, sizeof(fimcl_t));
     fX->M = X->M;
@@ -434,11 +607,12 @@ fimcl_t * fimcl_fft(fimcl_t * X)
     fX->clu = X->clu;
 
     cl_int ret;
-    fX->buf_size = cMNP * 2;
+    fX->buf_size_nf = cMNP * 2;
     fX->buf = clCreateBuffer(X->clu->context,
                              CL_MEM_READ_WRITE,
-                             fX->buf_size *  sizeof(float),
+                             fX->buf_size_nf *  sizeof(float),
                              NULL, &ret );
+    X->clu->nb_allocated += fX->buf_size_nf *  sizeof(float);
     check_CL(ret);
 
     check_clFFT(clfftEnqueueTransform(X->clu->r2h_plan,
@@ -463,25 +637,16 @@ void fimcl_fft_inplace(fimcl_t * X)
     }
     assert(X->transformed == 0);
 
-
-    /* Number of elements in real domain */
-    size_t M = X->M;
-    size_t N = X->N;
-    size_t P = X->P;
-
     /* Number of complex elements in the FFT */
-    size_t cM = 1 + M/2;
-    size_t cN = N;
-    size_t cP = P;
-    size_t cMNP = cM*cN*cP;
+    size_t cMNP = fimcl_ncx(X);
 
-    if(X->buf_size < cMNP * 2)
+    if(X->buf_size_nf < cMNP * 2)
     {
         fprintf(stderr,
                 "fimcl_fft_inplace: the object does not have a "
                 "large enough buffer for in-place fft\n"
                 "current size: %zu required size: %zu\n",
-                X->buf_size, cMNP*2);
+                X->buf_size_nf, cMNP*2);
 
         exit(EXIT_FAILURE);
     }
@@ -495,8 +660,8 @@ void fimcl_fft_inplace(fimcl_t * X)
                                       NULL, // waitEvents
                                       &X->wait_ev, // cl_event * outEvents
                                       &X->buf, // Input buffer
-                                      &X->buf, // output buffer
-                                      NULL)); // temp buffer
+                                      NULL, // output buffer
+                                      X->clu->clfft_buffer)); // temp buffer
     fimcl_sync(X);
     X->transformed = 1;
     return;
@@ -508,7 +673,7 @@ float * clu_convolve(clu_env_t * clu,
                      float * X, float * Y,
                      size_t M, size_t N, size_t P)
 {
-    size_t cMNP = (1+M/2)*N*P;
+    size_t cMNP = M_r2h(M)*N_r2h(N)*P_r2h(P);
     if(clu->verbose > 1)
     {
         size_t buf_mem = 2*cMNP*2*sizeof(float)/1000000;
@@ -623,13 +788,14 @@ clu_env_t * clu_new(int verbose)
 {
     clu_env_t * env = calloc(1, sizeof(clu_env_t));
     env->verbose = verbose;
+    env->clfft_buffer = NULL;
     env->clfft_buffer_size = 0;
     env->clFFT_loaded = 0;
+
     cl_uint ret_num_devices;
     cl_uint ret_num_platforms;
 
     check_CL( clGetPlatformIDs(1, &env->platform_id, &ret_num_platforms) );
-
 
     if(env->verbose > 1)
     {
@@ -681,6 +847,11 @@ clu_env_t * clu_new(int verbose)
 
 void clu_prepare_fft(clu_env_t * env, size_t M, size_t N, size_t P)
 {
+    if(env->verbose > 1)
+    {
+        printf("Preparing for convolutions of size %zu x %zu x %zu\n",
+               M, N, P);
+    }
     assert(env->clFFT_loaded == 0);
 
     /* Setup clFFT. */
@@ -697,6 +868,7 @@ void clu_prepare_fft(clu_env_t * env, size_t M, size_t N, size_t P)
     /* Create clFFT plans for this particular size */
     env->r2h_plan = gen_r2h_plan(env, M, N, P);
     env->r2h_inplace_plan = gen_r2h_inplace_plan(env, M, N, P);
+
     env->h2r_plan = gen_h2r_plan(env, M, N, P);
     env->h2r_inplace_plan = gen_h2r_inplace_plan(env, M, N, P);
 
@@ -707,10 +879,20 @@ void clu_prepare_fft(clu_env_t * env, size_t M, size_t N, size_t P)
                                     cl_complex_mul_len,
                                     "cl_complex_mul");
     env->kern_mul_conj = *clu_kernel_new(env,
-                                    NULL, //"cl_complex_mul_conj.c",
-                                    (const char *) cl_complex_mul_conj,
-                                    cl_complex_mul_conj_len,
-                                    "cl_complex_mul_conj");
+                                         NULL, //"cl_complex_mul_conj.c",
+                                         (const char *) cl_complex_mul_conj,
+                                         cl_complex_mul_conj_len,
+                                         "cl_complex_mul_conj");
+    env->kern_mul_inplace = *clu_kernel_new(env,
+                                            NULL,
+                                            (const char *) cl_complex_mul_inplace,
+                                            cl_complex_mul_inplace_len,
+                                            "cl_complex_mul_inplace");
+    env->kern_mul_conj_inplace = *clu_kernel_new(env,
+                                                 NULL,
+                                                 (const char *) cl_complex_mul_conj_inplace,
+                                                 cl_complex_mul_conj_inplace_len,
+                                                 "cl_complex_mul_conj_inplace");
     env->clFFT_loaded = 1;
     return;
 }
@@ -728,12 +910,12 @@ void clu_destroy(clu_env_t * clu)
         /* Teardown */
         check_clFFT(clfftDestroyPlan( &clu->r2h_plan ));
         check_clFFT(clfftDestroyPlan( &clu->h2r_plan ));
-        clfftTeardown( );
+        check_clFFT(clfftTeardown());
 
         /* Free memory */
         if(clu->clfft_buffer_size > 0)
         {
-            clReleaseMemObject(clu->clfft_buffer);
+            check_CL(clReleaseMemObject(clu->clfft_buffer));
         }
     }
 
@@ -820,10 +1002,7 @@ clu_kernel_t * clu_kernel_new(clu_env_t * env,
                                         build_log_len,
                                         buff_erro,
                                         NULL);
-        if (errcode) {
-            printf("clGetProgramBuildInfo failed at line %d\n", __LINE__);
-            exit(-3);
-        }
+        check_CL(errcode);
 
         fprintf(stderr,"Build log: \n%s\n", buff_erro); //Be careful with  the fprint
         free(buff_erro);
@@ -849,6 +1028,15 @@ void clu_kernel_destroy(clu_kernel_t kern)
 
 cl_uint clu_wait_for_event(cl_event clev, size_t ns)
 {
+    /* Always use a clFinish afterwards since ...
+       "Using clGetEventInfo to determine if a command identified by
+       event has finished execution
+       (i.e. CL_EVENT_COMMAND_EXECUTION_STATUS returns CL_COMPLETE) is
+       not a synchronization point. There are no guarantees that the
+       memory objects being modified by command associated with event
+       will be visible to other enqueued commands".
+    */
+
     cl_uint ret = CL_SUCCESS;
     size_t param_value_size = sizeof(cl_int);
     size_t param_value_size_ret = 0;
@@ -954,8 +1142,8 @@ const char * get_clfft_error_string(clfftStatus error)
 clfftPlanHandle  gen_r2h_plan(clu_env_t * clu,
                               size_t M, size_t N, size_t P)
 {
-    size_t cM = 1 + M/2;
-    size_t cN = N;
+    size_t cM = M_r2h(M);
+    size_t cN = N_r2h(N);
 
     clfftPlanHandle planHandle;
     size_t real_size[3] = {M, N, P};
@@ -974,7 +1162,7 @@ clfftPlanHandle  gen_r2h_plan(clu_env_t * clu,
                                        CLFFT_OUTOFPLACE));
 
 
-    size_t inStride[3] = {1, M, M*N};
+    size_t inStride[3] =  {1, M, M*N};
     size_t outStride[3] = {1, cM, cM*cN};
 
     check_clFFT(clfftSetPlanInStride(planHandle,  CLFFT_3D, inStride));
@@ -1003,8 +1191,8 @@ clfftPlanHandle  gen_r2h_plan(clu_env_t * clu,
 clfftPlanHandle  gen_r2h_inplace_plan(clu_env_t * clu,
                                       size_t M, size_t N, size_t P)
 {
-    size_t cM = 1 + M/2;
-    size_t cN = N;
+    size_t cM = M_r2h(M);
+    size_t cN = N_r2h(N);;
 
     clfftPlanHandle planHandle;
     size_t real_size[3] = {M, N, P};
@@ -1019,9 +1207,9 @@ clfftPlanHandle  gen_r2h_inplace_plan(clu_env_t * clu,
     check_clFFT(clfftSetLayout(planHandle,
                                CLFFT_REAL,
                                CLFFT_HERMITIAN_INTERLEAVED));
+
     check_clFFT(clfftSetResultLocation(planHandle,
                                        CLFFT_INPLACE));
-
 
     size_t inStride[3] = {1, M, M*N};
     size_t outStride[3] = {1, cM, cM*cN};
@@ -1033,6 +1221,7 @@ clfftPlanHandle  gen_r2h_inplace_plan(clu_env_t * clu,
     check_clFFT(clfftBakePlan(planHandle, 1,
                               &clu->command_queue,
                               NULL, NULL));
+
     check_CL(clFinish(clu->command_queue));
 
     size_t clfft_buffersize = 0;
@@ -1056,30 +1245,31 @@ clfftPlanHandle  gen_r2h_inplace_plan(clu_env_t * clu,
 cl_int clu_increase_clfft_buffer(clu_env_t * clu, size_t req_size)
 {
     cl_int ret = CL_SUCCESS;
-    if(clu->verbose > 2)
-    {
-        printf("clu_increase_clfft_buffer: warning -- function disabled for testing\n");
-    }
-    return ret;
 
     if(req_size <= clu->clfft_buffer_size)
     {
         return ret;
     }
-    clReleaseMemObject( clu->clfft_buffer);
+    if(clu->clfft_buffer_size > 0)
+    {
+        check_CL(clReleaseMemObject( clu->clfft_buffer));
+    }
     clu->clfft_buffer = clCreateBuffer(clu->context,
                                        CL_MEM_READ_WRITE,
                                        req_size,
                                        NULL, &ret );
+    clu->nb_allocated += req_size;
     check_CL(ret);
+    clu->clfft_buffer_size = req_size;
+
     return ret;
 }
 
 clfftPlanHandle  gen_h2r_plan(clu_env_t * clu,
                               size_t M, size_t N, size_t P)
 {
-    size_t cM = 1 + M/2;
-    size_t cN = N;
+    size_t cM = M_r2h(M);
+    size_t cN = N_r2h(N);;
 
     /* From Hermitian to Real of size MxNxP */
     clfftPlanHandle planHandle;
@@ -1117,14 +1307,15 @@ clfftPlanHandle  gen_h2r_plan(clu_env_t * clu,
     {
         printf("Will require a buffer of size: %zu\n", clfft_buffersize);
     }
+    clu_increase_clfft_buffer(clu, clfft_buffersize);
     return planHandle;
 }
 
 clfftPlanHandle  gen_h2r_inplace_plan(clu_env_t * clu,
                                       size_t M, size_t N, size_t P)
 {
-    size_t cM = 1 + M/2;
-    size_t cN = N;
+    size_t cM = M_r2h(M);
+    size_t cN = N_r2h(N);;
 
     /* From Hermitian to Real of size MxNxP */
     clfftPlanHandle planHandle;
@@ -1162,52 +1353,73 @@ clfftPlanHandle  gen_h2r_inplace_plan(clu_env_t * clu,
     {
         if(clfft_buffersize > 0)
         {
-            printf("gen_h2r_inplace_plan: requires a buffer of size: %zu\n", clfft_buffersize);
+            printf("gen_h2r_inplace_plan: requires a buffer of size: %zu\n",
+                   clfft_buffersize);
         } else {
             printf("gen_h2r_inplace_plan: no buffer required\n");
         }
     }
+    clu_increase_clfft_buffer(clu, clfft_buffersize);
     return planHandle;
 }
 
 void clu_benchmark_transfer(clu_env_t * clu)
 {
 
-    size_t buf_size = 1024*1024*1024;
+    size_t buf_size_nf = 1024*1024*1024;
     /* Got the same performance for the WRITE_ONLY and READ_ONLY */
     cl_mem_flags mem_flag = CL_MEM_READ_WRITE;
 
-    printf(" -> Testing transfer rates using a buffer of %zu B\n", buf_size);
-    uint8_t * buf = calloc(buf_size, 1);
+    printf(" -> Testing transfer rates using a buffer of %zu B\n", buf_size_nf*sizeof(float));
+    uint8_t * buf = calloc(buf_size_nf, sizeof(float));
+    uint8_t * buf_copy = calloc(buf_size_nf, sizeof(float));
+
+    for(size_t kk = 0; kk<buf_size_nf; kk++)
+    {
+        buf[kk] = rand() % 256;
+    }
     struct timespec t0, t1;
     cl_int ret;
     cl_mem buf_gpu = clCreateBuffer(clu->context,
-                                 mem_flag,
-                                 buf_size,
-                                 NULL, &ret );
+                                    mem_flag,
+                                    buf_size_nf*sizeof(float),
+                                    NULL, &ret );
+    clu->nb_allocated += buf_size_nf*sizeof(float);
     check_CL(ret);
     clock_gettime(CLOCK_MONOTONIC, &t0);
-    check_CL( clEnqueueWriteBuffer( clu->command_queue, buf_gpu, CL_TRUE, 0,
-                                    buf_size, buf, 0,
+    check_CL( clEnqueueWriteBuffer( clu->command_queue,
+                                    buf_gpu,
+                                    CL_TRUE, // block
+                                    0,
+                                    buf_size_nf*sizeof(float), buf, 0,
                                     NULL, NULL));
     clock_gettime(CLOCK_MONOTONIC, &t1);
     float dt = clockdiff(&t0, &t1);
-    printf("    Upload speed: %f GB/s\n", 1.0/dt);
+    printf("    Upload speed: %f GB/s\n", sizeof(float) * 1.0/dt);
 
     clock_gettime(CLOCK_MONOTONIC, &t0);
     check_CL( clEnqueueReadBuffer( clu->command_queue,
                                    buf_gpu,
-                                   CL_TRUE,
+                                   CL_TRUE, // block
                                    0,
-                                   buf_size,
-                                   buf,
+                                   buf_size_nf*sizeof(float),
+                                   buf_copy,
                                    0,
                                    NULL,
                                    NULL));
     clock_gettime(CLOCK_MONOTONIC, &t1);
     dt = clockdiff(&t0, &t1);
-    printf("    Download speed: %f GB/s\n", 1.0/dt);
+    printf("    Download speed: %f GB/s\n", sizeof(float)*1.0/dt);
+    for(size_t kk = 0; kk<buf_size_nf; kk++)
+    {
+        if(buf[kk] != buf_copy[kk])
+        {
+            fprintf(stderr, "ERROR: downloaded data does not match the original data! buf[%zu] = %u buf_copy[%zu= %u]\n", kk, buf[kk], kk, buf_copy[kk]);
+        }
+    }
+
     free(buf);
-    clReleaseMemObject(buf_gpu);
+    free(buf_copy);
+    check_CL(clReleaseMemObject(buf_gpu));
     return;
 }

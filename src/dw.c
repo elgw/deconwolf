@@ -701,7 +701,11 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             #endif
             if(known_method == 0)
             {
-                fprintf(stderr, "--method %s is unknown. Please specify ave, eve (default), shb, rl or id\n", optarg);
+                fprintf(stderr, "--method %s is unknown. Please specify ",  optarg);
+                #ifdef OPENCL
+                fprintf(stderr, "shbcl, ");
+                #endif
+                fprintf(stderr, "ave, eve (default), shb, rl or id\n");
                 exit(EXIT_FAILURE);
             }
             break;

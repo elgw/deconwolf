@@ -361,7 +361,10 @@ float * fim_get_cuboid(float * restrict A, const int64_t M, const int64_t N, con
     int64_t p = p1-p0+1;
 
     float * C = fftwf_malloc(m*n*p*sizeof(float));
-    assert(C != NULL);
+    if(C == NULL)
+    {
+        exit(EXIT_FAILURE);
+    }
 
 #pragma omp parallel for shared(C, A)
     for(int64_t aa = m0; aa <= m1; aa++)
@@ -391,7 +394,10 @@ float * fim_subregion(const float * restrict A, const int64_t M, const int64_t N
 
     /* Extract sub region starting at (0,0,0) */
     float * S = fftwf_malloc(m*n*p*sizeof(float));
-    assert(S != NULL);
+    if(S == NULL)
+    {
+        exit(EXIT_FAILURE);
+    }
 #pragma omp parallel for shared(S, A)
     for(int64_t pp = 0; pp<p; pp++)
     {
@@ -2070,6 +2076,10 @@ float * fim_fill_holes(const float * im, size_t M, size_t N, float max_size)
      * is a hole
      */
     float * nim = malloc(sizeof(float)*M*N);
+    if(nim == NULL)
+    {
+        exit(EXIT_FAILURE);
+    }
     for(size_t kk = 0 ; kk<M*N; kk++)
     {
         nim[kk] = (im[kk] == 0);
