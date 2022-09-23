@@ -1410,13 +1410,16 @@ float * psf_autocrop(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  // 
                      dw_opts * s)
 {
     float * p = psf;
-    // p = psf_autocrop_centerZ(p, pM, pN, pP, s);
     assert(pM[0] > 0);
     /* Crop the PSF if it is larger than necessary */
     p = psf_autocrop_byImage(p, pM, pN, pP, M, N, P, s);
     assert(pM[0] > 0);
-    // Crop the PSF by removing outer planes that has very little information
-    p = psf_autocrop_XY(p, pM, pN, pP, M, N, P, s);
+    /* Crop the PSF by removing outer planes that has very little information.
+     * Only if the PSF is larger than the image in some dimension. */
+    if(pM[0] > M || pN[0] > N)
+    {
+        p = psf_autocrop_XY(p, pM, pN, pP, M, N, P, s);
+    }
     assert(pM[0] > 0);
     assert(p != NULL);
     return p;

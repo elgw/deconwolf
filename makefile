@@ -5,6 +5,9 @@
 # For normal build
 # make -B
 
+# To enable the method shbcl use
+# make OPENCL=1
+
 UNAME_S := $(shell uname -s)
 $(info Host type: $(UNAME_S))
 
