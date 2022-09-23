@@ -52,10 +52,8 @@ static double timespec_diff(struct timespec* end, struct timespec * start)
 }
 
 
-// FFTW_MEASURE, FFTW_PATIENT or FFTW_EXHAUSTIVE
-//const unsigned int MYPLAN = FFTW_ESTIMATE;
-const unsigned int MYPLAN = FFTW_MEASURE;
-//const unsigned int MYPLAN = FFTW_PATIENT;
+/* Should only be changed with fft_set_plan */
+unsigned int FFTW3_PLANNING = FFTW_MEASURE;
 
 static int fft_nthreads;
 
@@ -144,6 +142,38 @@ void myfftw_start(__attribute__((unused)) const int nThreads,
 }
 #endif
 
+void fft_set_plan(unsigned int plan)
+{
+
+    int ok = 0;
+    switch(plan)
+    {
+    case FFTW_ESTIMATE:
+        ok = 1;
+        break;
+    case FFTW_MEASURE:
+        ok = 1;
+        break;
+    case FFTW_PATIENT:
+        ok = 1;
+        break;
+    case FFTW_EXHAUSTIVE:
+        ok = 1;
+        break;
+    default:
+        ;
+    }
+    if(ok)
+    {
+        FFTW3_PLANNING = plan;
+    } else {
+        fprintf(stderr, "ERROR: Unknown FFTW plan, please use FFTW_ESTIMATE, "
+                "FFTW_MEASURE, FFTW_PATIENT or FFTW_EXHAUSTIVE. %s %s %d\n",
+                __FILE__, __FUNCTION__, __LINE__);
+    }
+    return;
+}
+
 #ifndef CUDA
 void myfftw_start(const int nThreads, int verbose, FILE * log)
 {
@@ -211,7 +241,7 @@ fftwf_complex * fft(float * restrict in, const int n1, const int n2, const int n
     fftwf_plan p = fftwf_plan_dft_r2c_3d(n3, n2, n1,
                                          in, // Float
                                          out, // fftwf_complex
-                                         MYPLAN);
+                                         FFTW3_PLANNING);
     fftwf_execute(p);
     fftwf_destroy_plan(p);
     return out;
@@ -271,7 +301,7 @@ float * fft_convolve_cc_f2(fftwf_complex * A, fftwf_complex * B,
 
     fftwf_plan p = fftwf_plan_dft_c2r_3d(P, N, M,
                                          C, out,
-                                         MYPLAN);
+                                         FFTW3_PLANNING);
     fftwf_execute(p);
     fftwf_destroy_plan(p);
     fftwf_free(C);
@@ -303,7 +333,7 @@ float * fft_convolve_cc_conj_f2(fftwf_complex * A, fftwf_complex * B,
 
     fftwf_plan p = fftwf_plan_dft_c2r_3d(P, N, M,
                                          C, out,
-                                         MYPLAN);
+                                         FFTW3_PLANNING);
     fftwf_execute(p);
     fftwf_destroy_plan(p);
     fftwf_free(C);
@@ -330,7 +360,7 @@ float * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B,
 
     fftwf_plan p = fftwf_plan_dft_c2r_3d(P, N, M,
                                          C, out,
-                                         MYPLAN);
+                                         FFTW3_PLANNING);
     fftwf_execute(p);
     fftwf_destroy_plan(p);
     fftwf_free(C);
@@ -355,7 +385,7 @@ float * fft_convolve_cc_conj(fftwf_complex * A, fftwf_complex * B,
 
     fftwf_plan p = fftwf_plan_dft_c2r_3d(P, N, M,
                                          C, out,
-                                         MYPLAN);
+                                         FFTW3_PLANNING);
     fftwf_execute(p);
     fftwf_destroy_plan(p);
     fftwf_free(C);
@@ -394,7 +424,7 @@ void fft_train(const size_t M, const size_t N, const size_t P,
     }
     nThreads < 1 ? nThreads = 1 : 0;
 
-    if(MYPLAN == FFTW_ESTIMATE)
+    if(FFTW3_PLANNING == FFTW_ESTIMATE)
     {
         if(verbosity > 0)
         {
@@ -417,7 +447,7 @@ void fft_train(const size_t M, const size_t N, const size_t P,
     float * R = fftwf_malloc(MNP*sizeof(float));
 
     fftwf_plan p0 = fftwf_plan_dft_c2r_3d(P, N, M,
-                                          C, R, MYPLAN | FFTW_WISDOM_ONLY);
+                                          C, R, FFTW3_PLANNING  | FFTW_WISDOM_ONLY);
 
     if(p0 == NULL)
     {
@@ -427,7 +457,7 @@ void fft_train(const size_t M, const size_t N, const size_t P,
         }
         fprintf(log, "> generating fftw3 c2r plan\n");
         fftwf_plan p1 = fftwf_plan_dft_c2r_3d(P, N, M,
-                                              C, R, MYPLAN);
+                                              C, R, FFTW3_PLANNING);
         fftwf_execute(p1);
         fftwf_destroy_plan(p1);
         updatedWisdom = 1;
@@ -444,7 +474,7 @@ void fft_train(const size_t M, const size_t N, const size_t P,
     fftwf_destroy_plan(p0);
 
     p0 = fftwf_plan_dft_r2c_3d(P, N, M,
-                               R, C, MYPLAN | FFTW_WISDOM_ONLY);
+                               R, C, FFTW3_PLANNING | FFTW_WISDOM_ONLY);
 
     if(p0 == NULL)
     {
@@ -456,7 +486,7 @@ void fft_train(const size_t M, const size_t N, const size_t P,
             fprintf(log, "> generating fftw3 r2c plan\n");
         }
         fftwf_plan p2 = fftwf_plan_dft_r2c_3d(P, N, M,
-                                              R, C, MYPLAN);
+                                              R, C, FFTW3_PLANNING);
         fftwf_execute(p2);
         fftwf_destroy_plan(p2);
         updatedWisdom = 1;

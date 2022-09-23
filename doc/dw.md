@@ -85,6 +85,7 @@ format, see the log files for scaling factor used.
   iii/ **ave** Additive Vector Extrapolation by Biggs and Andrews.
   iv/ **eve** Exponential Vector Extrapolation by Biggs.
   v/ **shb** Scaled Heavy Ball.
+  vi/ **shbcl** Scaled Heavy Ball using OpenCl (not compiled by default)
 
 **\--mse**
 : Show the Mean Square Error between the input image and the current
@@ -95,6 +96,10 @@ format, see the log files for scaling factor used.
 : Pre-process the image and the PSF by convolving it by a 3-D isotropic
 Gaussian with sigma=s. This acts as a low pass filter.
 Have been found useful for very noisy image.
+
+**\--noplan**
+: disable FFTW3 planning. This means that FFTW3 uses the default plan
+  for the given problem size.
 
 **maxproj**
 : With *maxproj* as the first argument deconwolf will create max

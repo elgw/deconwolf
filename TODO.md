@@ -29,7 +29,6 @@ least one power of two. Or even better use **nextfastfft** from
 - [ ] Decide about default tiling settings based on the PSF.
 - [ ] Demos, for example on the effect of the tiling.
 - [ ] Implement the Gibson-Lanni PSF model.
-- [ ] Make `FFTW_ESTIMATE` an option.
 - [ ] Double check the tiling weights using gradients and other patterns.
 - [ ] Add information on the input image to the log -- especially
 detect saturated pixels.
@@ -43,6 +42,7 @@ fftw3 from source for `-march=native -mtune=native`.
 
 
 ## Done
+- [x] Make `FFTW_ESTIMATE` an option. This is set with the argument **--noplan**.
 - [x] Don't crop the PSF unless it is needed.
 - [x] OpenCL/clFFT for the FFTs: the method **shbcl** can be enabled
 during build with the flag **OPENCL=1**.

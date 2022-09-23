@@ -195,6 +195,7 @@ dw_opts * dw_opts_new(void)
     s->eve = 1;
     s->metric = DW_METRIC_IDIV;
     clock_gettime(CLOCK_REALTIME, &s->tstart);
+    s->fftw3_planning = FFTW_MEASURE;
     return s;
 }
 
@@ -385,6 +386,26 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
         fprintf(f, "DEBUG OPTION: ONETILE = TRUE (only first tile will be deconvolved)\n");
     }
     fprintf(f, "\n");
+
+    fprintf(f, "FFTW3 plan: ");
+    switch(s->fftw3_planning)
+    {
+    case FFTW_ESTIMATE:
+        fprintf(f, "FFTW_ESTIMATE (--noplan)\n");
+        break;
+    case FFTW_MEASURE:
+        fprintf(f, "FFTW_MEASURE\n");
+        break;
+    case FFTW_PATIENT:
+        fprintf(f, "FFTW_PATIENT\n");
+        break;
+    case FFTW_EXHAUSTIVE:
+        fprintf(f, "FFTW_EXHAUSTIVE\n");
+        break;
+    default:
+        fprintf(f, "UNKNOWN/Wrongly Set\n");
+        break;
+    }
 }
 
 void warning(FILE * fid)
@@ -498,6 +519,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
 
 
     struct option longopts[] = {
+        { "noplan",    no_argument,       NULL, 'a' },
         { "bg",        required_argument, NULL, 'b' },
         { "threads",   required_argument, NULL, 'c' },
         { "tsv",       required_argument, NULL, 'd' },
@@ -539,12 +561,15 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     int ch;
     int prefix_set = 0;
     while((ch = getopt_long(argc, argv,
-                            "a:b:c:f:ghil:m:n:o:p:r:s:tvwx:B:C:DFI:L:MR:TPQ:X:",
+                            "ab:c:f:ghil:m:n:o:p:r:s:tvwx:B:C:DFI:L:MR:TPQ:X:",
                             longopts, NULL)) != -1)
     {
         switch(ch) {
         case 'C':
             s->flatfieldFile = strdup(optarg);
+            break;
+        case 'a':
+            s->fftw3_planning = FFTW_ESTIMATE;
             break;
         case 'b':
             s->bg = atof(optarg);
@@ -815,7 +840,12 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         fprintf(s->tsv, "iteration\ttime\tKL\n");
     }
 
-    //  printf("Options received\n"); fflush(stdout);
+    /* Set the plan to be used with fftw3 */
+    fft_set_plan(s->fftw3_planning);
+    if(s->verbosity > 2)
+    {
+        printf("Command line arguments accepted\n");
+    }
 }
 
 
@@ -1118,7 +1148,7 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
     printf("max-projections of tif files can be created with:\n");
     printf("\t%s maxproj image.tif\n", argv[0]);
     printf("\tsee %s maxproj --help\n", argv[0]);
-
+    printf(" --noplan\n\t Disable FFT planning for fftw3\n");
     printf("\n");
     printf("Web page: https://www.github.com/elgw/deconwolf/\n");
 }

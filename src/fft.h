@@ -48,10 +48,13 @@ float * fft_convolve_cc_conj(fftwf_complex * A, fftwf_complex * B, int M, int N,
 float * fft_convolve_cc_f2(fftwf_complex * A, fftwf_complex * B, int M, int N, int P);
 float * fft_convolve_cc_conj_f2(fftwf_complex * A, fftwf_complex * B, int M, int N, int P);
 
+/* Set the plan to use, should only be called once before fft_train */
+void fft_set_plan(unsigned int plan);
+
 /* Generate FFTW plans for the specified size */
 void fft_train(size_t M, size_t N, size_t P,
                int verbosity, int nThreads,
-    FILE * log);
+               FILE * log);
 
 void fft_ut(void);
 

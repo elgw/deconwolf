@@ -124,8 +124,6 @@ struct _dw_opts{
 
     int verbosity;
     int showTime; /* For dev: show detailed timings */
-    fftwf_plan fft_plan;
-    fftwf_plan ifft_plan;
     int iterdump; /* Dump each iteration to file */
 
     float relax;
@@ -165,6 +163,9 @@ struct _dw_opts{
     int lookahead;
     int eve; /* Use Exponential vector extrapolation */
 
+    fftwf_plan fft_plan;
+    fftwf_plan ifft_plan;
+    int fftw3_planning;
     struct timespec tstart;
 };
 
