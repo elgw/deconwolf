@@ -149,7 +149,7 @@ void dw_iterator_free(dw_iterator_t * it)
 
 dw_opts * dw_opts_new(void)
 {
-    dw_opts * s = malloc(sizeof(dw_opts));
+    dw_opts * s = calloc(1, sizeof(dw_opts));
     s->nThreads = dw_get_threads();
 
     s->nThreads < 1 ? s->nThreads = 1 : 0;
@@ -519,6 +519,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
 
 
     struct option longopts[] = {
+        { "inplace",   no_argument,       NULL, '1' },
         { "noplan",    no_argument,       NULL, 'a' },
         { "bg",        required_argument, NULL, 'b' },
         { "threads",   required_argument, NULL, 'c' },
@@ -561,10 +562,13 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     int ch;
     int prefix_set = 0;
     while((ch = getopt_long(argc, argv,
-                            "ab:c:f:ghil:m:n:o:p:r:s:tvwx:B:C:DFI:L:MR:TPQ:X:",
+                            "1ab:c:f:ghil:m:n:o:p:r:s:tvwx:B:C:DFI:L:MR:TPQ:X:",
                             longopts, NULL)) != -1)
     {
         switch(ch) {
+        case '1':
+            s->fft_inplace = 1;
+            break;
         case 'C':
             s->flatfieldFile = strdup(optarg);
             break;
@@ -842,6 +846,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
 
     /* Set the plan to be used with fftw3 */
     fft_set_plan(s->fftw3_planning);
+    fft_set_inplace(s->fft_inplace);
     if(s->verbosity > 2)
     {
         printf("Command line arguments accepted\n");
@@ -1149,6 +1154,7 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
     printf("\t%s maxproj image.tif\n", argv[0]);
     printf("\tsee %s maxproj --help\n", argv[0]);
     printf(" --noplan\n\t Disable FFT planning for fftw3\n");
+    printf(" --inplace\n\t Save memory by doing in-place FFTs\n");
     printf("\n");
     printf("Web page: https://www.github.com/elgw/deconwolf/\n");
 }
@@ -1446,7 +1452,7 @@ float * psf_autocrop(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  // 
     assert(pM[0] > 0);
     /* Crop the PSF by removing outer planes that has very little information.
      * Only if the PSF is larger than the image in some dimension. */
-    if(pM[0] > M || pN[0] > N)
+    //if((pM[0] > M || pN[0] > N) && (s->borderQuality > 0))
     {
         p = psf_autocrop_XY(p, pM, pN, pP, M, N, P, s);
     }

@@ -1,5 +1,7 @@
 #include "method_shb.h"
 
+//#define here() printf("\n%s %s %d\n", __FILE__, __FUNCTION__, __LINE__);
+#define here() ;
 float * deconvolve_shb(float * restrict im,
                        const int64_t M, const int64_t N, const int64_t P,
                        float * restrict psf,
@@ -63,27 +65,14 @@ float * deconvolve_shb(float * restrict im,
         wP = int64_t_max(P, pP);
     }
 
-    if(wP %2 == 1)
-    {
-        /*  The jobb size is not divisable by 2.
-         * potentially it could be faster to extend the job by
-         * one slice in Z, but for some sizes, e.g. 85->86 it gets slower
-         * some benchmarking or prediction should guide this, not just a flag.
-         */
-        if(s->experimental1)
-        {
-            printf("      Adding one extra slice to the job for performance"
-                   " this is still experimental. \n");
-            // One slice of the "job" should be cleared every iterations.
-            wP++;
-        }
-    }
-
     /* Total number of pixels */
     size_t wMNP = wM*wN*wP;
 
     if(s->verbosity > 0)
-    { printf("image: [%" PRId64 "x%" PRId64 "x%" PRId64 "], psf: [%" PRId64 "x%" PRId64 "x%" PRId64 "], job: [%" PRId64 "x%" PRId64 "x%" PRId64 "]\n",
+    {
+        printf("image: [%" PRId64 "x%" PRId64 "x%" PRId64 "], "
+               "psf: [%" PRId64 "x%" PRId64 "x%" PRId64 "], "
+               "job: [%" PRId64 "x%" PRId64 "x%" PRId64 "]\n",
              M, N, P, pM, pN, pP, wM, wN, wP);
     }
     if(s->verbosity > 1)
@@ -106,7 +95,7 @@ float * deconvolve_shb(float * restrict im,
     }
 
     // cK : "full size" fft of the PSF
-   float * Z = fftwf_malloc(wMNP*sizeof(float));
+    float * Z = fftwf_malloc(wMNP*sizeof(float));
     memset(Z, 0, wMNP*sizeof(float));
     /* Insert the psf into the bigger Z */
     fim_insert(Z, wM, wN, wP,
@@ -132,33 +121,9 @@ float * deconvolve_shb(float * restrict im,
         fim_tiff_write_float("fullPSF.tif", Z, NULL, wM, wN, wP);
     }
 
-    fftwf_complex * cK = fft(Z, wM, wN, wP);
-    //fim_tiff_write("Z.tif", Z, wM, wN, wP);
-    fftwf_free(Z);
-
-    putdot(s);
-
-    /* <-- This isn't needed ...
-       fftwf_complex * cKr = NULL;
-       float * Zr = fftwf_malloc(wMNP*sizeof(float));
-       memset(Zr, 0, wMNP*sizeof(float));
-       float * psf_flipped = malloc(wMNP*sizeof(float));
-       memset(psf_flipped, 0, sizeof(float)*wMNP);
-       fim_flipall(psf_flipped, psf, pM, pN, pP);
-       fim_insert(Zr, wM, wN, wP, psf_flipped, pM, pN, pP);
-       free(psf_flipped);
-       fim_circshift(Zr, wM, wN, wP, -(pM-1)/2, -(pN-1)/2, -(pP-1)/2);
-       cKr = fft(Zr, wM, wN, wP);
-       // Not needed since f(-x) = ifft(conf(fft(f)))
-       fftwf_free(Zr);
-       --> */
-
-
-
-    //printf("P1\n");
-    //fim_stats(P1, pM*pN*pP);
-    //  writetif("P1.tif", P1, wM, wN, wP);
-
+    here();
+    fftwf_complex * cK = fft_and_free(Z, wM, wN, wP);
+    here();
     putdot(s);
 
     float * W = NULL;
@@ -166,7 +131,9 @@ float * deconvolve_shb(float * restrict im,
     if(s->borderQuality > 0)
     {
         fftwf_complex * F_one = initial_guess(M, N, P, wM, wN, wP);
-        float * P1 = fft_convolve_cc_conj_f2(cK, F_one, wM, wN, wP); // can't replace this one with cK!
+        here();
+        float * P1 = fft_convolve_cc_conj_f2(cK, F_one, wM, wN, wP);
+        here();
         float sigma = 0.01; // Until 2021.11.25 used 0.001
 #pragma omp parallel for shared(P1)
         for(size_t kk = 0; kk<wMNP; kk++)
@@ -181,31 +148,19 @@ float * deconvolve_shb(float * restrict im,
         W = P1;
     }
 
-
-
     float sumg = fim_sum(im, M*N*P);
-
-
 
     /* x is the initial guess, initially the previous iteration,
      *  xp is
      *  set to be the same */
 
     float * x = fim_constant(wMNP, sumg/wMNP);
-
-    if(0)
-    {
-        printf("EXPERIMENTAL\n");
-        /* If only few iterations can be afforded it makes sense to
-         * start with the observed images as the starting guess */
-        fim_insert(x, wM, wN, wP, im, M, N, P);
-    }
     float * xp = fim_copy(x, wMNP);
 
     dw_iterator_t * it = dw_iterator_new(s);
     while(dw_iterator_next(it) >= 0)
     {
-
+        here();
         if(s->iterdump > 0){
             if(it->iter % s->iterdump == 0)
             {
@@ -230,8 +185,6 @@ float * deconvolve_shb(float * restrict im,
         double alpha = ((float) it->iter-1.0)/((float) it->iter+2.0);
         //alpha /= 1.5;
         alpha < 0 ? alpha = 0: 0;
-
-
 
 #pragma omp parallel for shared(p, x, xp)
             /* To be interpreted as p^k in Eq. 7 of SHB */
@@ -258,7 +211,9 @@ float * deconvolve_shb(float * restrict im,
             wM, wN, wP, // Expanded size
             M, N, P, // Original size
             s);
-        fftwf_free(p); // i.e. p
+        here();
+        free(p);
+        here();
         dw_iterator_set_error(it, err);
         if(1){
             /* Swap so that the current is named x */
@@ -279,7 +234,7 @@ float * deconvolve_shb(float * restrict im,
                 }
             }
         }
-
+        here();
         putdot(s);
         dw_iterator_show(it, s);
         benchmark_write(s, it->iter, it->error, x, M, N, P, wM, wN, wP);
@@ -338,15 +293,15 @@ float iter_shb(
     const int64_t M, const int64_t N, const int64_t P, // input image size
     __attribute__((unused)) const dw_opts * s)
 {
-    // We could reduce memory even further by using
-    // the allocation for xp
     const size_t wMNP = wM*wN*wP;
 
     fftwf_complex * Pk = fft(pk, wM, wN, wP);
+
     putdot(s);
     float * y = fft_convolve_cc_f2(cK, Pk, wM, wN, wP); // Pk is freed
     float error = getError(y, im, M, N, P, wM, wN, wP, s->metric);
     putdot(s);
+
 
     const double mindiv = 1e-6; /* Smallest allowed divisor */
 #pragma omp parallel for shared(y, im)
@@ -367,11 +322,11 @@ float iter_shb(
         }
     }
 
-    fftwf_complex * Y = fft(y, wM, wN, wP);
-    fftwf_free(y);
-
+    here();
+    fftwf_complex * Y = fft_and_free(y, wM, wN, wP);
+    here();
     float * x = fft_convolve_cc_conj_f2(cK, Y, wM, wN, wP); // Y is freed
-
+    here();
     /* Eq. 18 in Bertero */
     if(W != NULL)
     {
@@ -387,7 +342,7 @@ float iter_shb(
             x[cc] *= pk[cc];
         }
     }
-
+    here();
     xp[0] = x;
     return error;
 }

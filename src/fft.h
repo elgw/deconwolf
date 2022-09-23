@@ -19,10 +19,25 @@
 
 #include <fftw3.h>
 #include <stdint.h>
+#include <malloc.h>
 
-/* Call this before any other commands
+
+/*
+ * Initialization commands.
+ *
+ */
+/* Set the plan to use, call before myfftw_start */
+void fft_set_plan(unsigned int plan);
+
+/* Set fft to use in-place transformations when possible
+* call before myfftw_start*/
+void fft_set_inplace(int use_inplace);
+
+/* Initialize, run before any other commands futher down.
  * log can be NULL */
 void myfftw_start(int nThreads, int verbosity, FILE * log);
+
+
 /* Call this when you are done. */
 void myfftw_stop(void);
 
@@ -32,7 +47,32 @@ void dim3_real_float_inverse(fftwf_complex * in, float * out,
 void dim3_real_float(float * in, fftwf_complex* out,
     const int n1, const int n2, const int n3);
 
+
+/* Return the FFT of X. X is also freed (or re-used for in-place
+ * transformations)
+*/
+fftwf_complex * fft_and_free(float * restrict X,
+                             const int n1, const int n2, const int n3);
+
+float * ifft_and_free(fftwf_complex * F,
+                      const size_t n1, const size_t n2, const size_t n3);
+
+/* Fast Fourier Transform */
 fftwf_complex * fft(float * in, int n1, int n2, int n3);
+
+/* In-Place fft can be faster for small problems but is slower for
+ * large ones The time it takes to pad the data can be neglected.
+ * After return the input pointer should not be used and does not need
+ * to be freed.
+ */
+fftwf_complex * fft_inplace(float * X,
+                            const size_t M, const size_t N, const size_t P);
+
+
+float * ifft(fftwf_complex * fX,
+             size_t M, size_t N, size_t P);
+float * ifft_inplace(fftwf_complex * fX,
+                     const size_t M, const size_t N, const size_t P);
 
 void fft_mul(fftwf_complex * restrict C,
     fftwf_complex * restrict A,
@@ -48,8 +88,6 @@ float * fft_convolve_cc_conj(fftwf_complex * A, fftwf_complex * B, int M, int N,
 float * fft_convolve_cc_f2(fftwf_complex * A, fftwf_complex * B, int M, int N, int P);
 float * fft_convolve_cc_conj_f2(fftwf_complex * A, fftwf_complex * B, int M, int N, int P);
 
-/* Set the plan to use, should only be called once before fft_train */
-void fft_set_plan(unsigned int plan);
 
 /* Generate FFTW plans for the specified size */
 void fft_train(size_t M, size_t N, size_t P,

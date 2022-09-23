@@ -27,6 +27,83 @@
 #include "fim.h"
 
 
+/*
+ * Settings
+ */
+
+/* Should only be changed with fft_set_plan() */
+static unsigned int FFTW3_PLANNING = FFTW_MEASURE;
+static int fft_nthreads = 1;
+/* Enable with fft_set_inplace() */
+static int use_inplace = 0;
+
+
+/*
+ * Forward declarations
+ */
+/* Pad data for inplace FFT transforms  */
+static void fft_inplace_pad(float ** pX,
+                            const size_t M,
+                            const size_t N,
+                            const size_t P);
+
+/* Reverse the effect of fft_inplace_pad  */
+static void fft_inplace_unpad(float ** pX,
+                              const size_t M,
+                              const size_t N,
+                              const size_t P);
+
+/* Number of complex floats required for the
+ * Hermitian representation  */
+static size_t nch(size_t M, size_t N, size_t P);
+
+static void fft_inplace_pad(float ** pX,
+                         const size_t M,
+                         const size_t N,
+                         const size_t P)
+{
+
+    const size_t nchunk = M*N;
+    const size_t chunk_size = P*sizeof(float);
+    *pX = realloc(*pX, 2*nch(M, N, P) * sizeof(float));
+    assert(*pX != NULL);
+
+    // Think twice before trying to parallelize!
+    for(size_t c = nchunk-1; c != (size_t) -1; c--)
+    {
+        memcpy(*pX+c*(P+2), *pX + c*P, chunk_size);
+    }
+
+    return;
+}
+
+/* Reverse the effect of fft_inplace_pad  */
+static void fft_inplace_unpad(float ** pX,
+                         const size_t M,
+                         const size_t N,
+                         const size_t P)
+{
+    const size_t nchunk = M*N;
+    const size_t chunk_size = P*sizeof(float);
+    // Think twice before trying to parallelize!
+    for(size_t c = 0; c < nchunk; c++)
+    {
+        memcpy(*pX + c*P, *pX+c*(P+2), chunk_size);
+    }
+    *pX = realloc(*pX, M*N*P * sizeof(float));
+    assert(*pX != NULL);
+    return;
+}
+
+
+
+
+static size_t nch(size_t M, size_t N, size_t P)
+{
+    return (1+M/2)*N*P;
+}
+
+
 #ifdef WINDOWS
 #include <direct.h>
 #include <sysinfoapi.h>
@@ -52,10 +129,6 @@ static double timespec_diff(struct timespec* end, struct timespec * start)
 }
 
 
-/* Should only be changed with fft_set_plan */
-unsigned int FFTW3_PLANNING = FFTW_MEASURE;
-
-static int fft_nthreads;
 
 static int isdir(char * dir)
 {
@@ -231,6 +304,30 @@ void myfftw_stop(void)
     // Note: wisdom is only exported by fft_train
 }
 
+float * ifft(fftwf_complex * fX, size_t M, size_t N, size_t P)
+{
+
+    float * X = fftwf_malloc(M*N*P*sizeof(float));
+
+    assert(X != NULL);
+
+    fftwf_plan plan_c2r = fftwf_plan_dft_c2r_3d(P, N, M,
+                                                fX,
+                                                X,
+                                                FFTW3_PLANNING);
+
+    fftwf_execute(plan_c2r); fftwf_destroy_plan(plan_c2r);
+
+
+#pragma omp parallel for shared(X)
+    for(size_t kk = 0 ; kk < M*N*P; kk++)
+    {
+        X[kk] /= (float) (M*N*P);
+    }
+
+    return X;
+}
+
 
 fftwf_complex * fft(float * restrict in, const int n1, const int n2, const int n3)
 {
@@ -265,6 +362,24 @@ void fft_mul(fftwf_complex * restrict C,
     return;
 }
 
+void fft_mul_inplace(fftwf_complex * restrict A,
+             fftwf_complex * restrict B,
+             const size_t n1, const size_t n2, const size_t n3)
+{
+    size_t N = (n1+3)/2*n2*n3;
+    /* C = A*B */
+#pragma omp parallel for shared(A,B)
+    for(size_t kk = 0; kk<N; kk++)
+    {
+        float a = A[kk][0]; float ac = A[kk][1];
+        float b = B[kk][0]; float bc = B[kk][1];
+        B[kk][0] = a*b - ac*bc;
+        B[kk][1] = a*bc + b*ac;
+    }
+    return;
+}
+
+
 
 void fft_mul_conj(fftwf_complex * restrict C,
                   fftwf_complex * restrict A,
@@ -292,67 +407,48 @@ void fft_mul_conj(fftwf_complex * restrict C,
 float * fft_convolve_cc_f2(fftwf_complex * A, fftwf_complex * B,
                             const int M, const int N, const int P)
 {
-    size_t n = (M+3)/2*N*P;
-    fftwf_complex * C = fftwf_malloc(n*sizeof(fftwf_complex));
-    fft_mul(C, A, B, M, N, P);
-    fftwf_free(B);
-
-    float * out = fftwf_malloc(M*N*P*sizeof(float));
-
-    fftwf_plan p = fftwf_plan_dft_c2r_3d(P, N, M,
-                                         C, out,
-                                         FFTW3_PLANNING);
-    fftwf_execute(p);
-    fftwf_destroy_plan(p);
-    fftwf_free(C);
-
-    const size_t MNP = M*N*P;
-
-#pragma omp parallel for shared(out)
-    for(size_t kk = 0; kk < MNP; kk++)
-    {
-        out[kk]/=(MNP);
-    }
-
+    fft_mul_inplace(A, B, M, N, P);
+    float * out = ifft_and_free(B, M, N, P);
     return out;
 }
+
+void fft_mul_conj_inplace(fftwf_complex * restrict A,
+                          fftwf_complex * restrict B,
+                          const size_t n1, const size_t n2, const size_t n3)
+/* Multiply and conjugate the elements in the array A
+ * i.e. C = conj(A)*B
+ * All inputs should have the same size [n1 x n2 x n3]
+ * */
+{
+    //size_t N = nch(n1, n2, n3);
+    size_t N = (n1+3)/2*n2*n3;
+    // C = A*B
+    size_t kk = 0;
+#pragma omp parallel for shared(A, B)
+    for(kk = 0; kk<N; kk++)
+    {
+        float a = A[kk][0]; float ac = -A[kk][1];
+        float b = B[kk][0]; float bc = B[kk][1];
+        B[kk][0] = a*b - ac*bc;
+        B[kk][1] = a*bc + b*ac;
+    }
+    return;
+}
+
 
 float * fft_convolve_cc_conj_f2(fftwf_complex * A, fftwf_complex * B,
                                  const int M, const int N, const int P)
 {
-
-    size_t n = (M+3)/2*N*P;
-    fftwf_complex * C = fftwf_malloc(n*sizeof(fftwf_complex));
-
-    fft_mul_conj(C, A, B, M, N, P);
-
-    // fft_mul(C, A, B, M, N, P); /* For symmetric PSFs this would give the same */
-    fftwf_free(B);
-
-    float * out = fftwf_malloc(M*N*P*sizeof(float));
-
-    fftwf_plan p = fftwf_plan_dft_c2r_3d(P, N, M,
-                                         C, out,
-                                         FFTW3_PLANNING);
-    fftwf_execute(p);
-    fftwf_destroy_plan(p);
-    fftwf_free(C);
-    const float MNP_float = (float) M*N*P;
-    const size_t MNP = M*N*P;
-#pragma omp parallel for shared(out)
-    for(size_t kk = 0; kk < MNP; kk++)
-    {
-        out[kk] /= MNP_float;
-    }
+    fft_mul_conj_inplace(A, B, M, N, P);
+    float * out = ifft_and_free(B, M, N, P);
     return out;
 }
-
 
 
 float * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B,
                          const int M, const int N, const int P)
 {
-    size_t n = (M+3)/2*N*P;
+    size_t n = nch(M, N, P);
     fftwf_complex * C = fftwf_malloc(n*sizeof(fftwf_complex));
     fft_mul(C, A, B, M, N, P);
 
@@ -377,7 +473,7 @@ float * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B,
 float * fft_convolve_cc_conj(fftwf_complex * A, fftwf_complex * B,
                               const int M, const int N, const int P)
 {
-    size_t n = (M+3)/2*N*P;
+    size_t n = nch(M, N, P);
     fftwf_complex * C = fftwf_malloc(n*sizeof(fftwf_complex));
     fft_mul_conj(C, A, B, M, N, P);
 
@@ -658,4 +754,82 @@ void fft_ut(void)
     // Free plans etc
     fftwf_cleanup();
     return;
+}
+
+fftwf_complex * fft_and_free(float * restrict in,
+                             const int n1, const int n2, const int n3)
+{
+    if(use_inplace == 1)
+    {
+        fftwf_complex * F = fft_inplace(in, n1, n2, n3);
+        return F;
+    } else {
+        fftwf_complex * F = fft(in, n1, n2, n3);
+        fftwf_free(in);
+        return F;
+    }
+}
+
+float * ifft_and_free(fftwf_complex * F,
+                      const size_t n1, const size_t n2, const size_t n3)
+{
+    if(use_inplace == 1)
+    {
+        float * f = ifft_inplace(F, n1, n2, n3);
+        return f;
+    } else {
+        float * f = ifft(F, n1, n2, n3);
+        fftwf_free(F);
+        return f;
+    }
+}
+
+void fft_set_inplace(int ip)
+{
+    if(ip == 1)
+    {
+        use_inplace = 1;
+        return;
+    }
+    if(ip == 0)
+    {
+        use_inplace = 0;
+        return;
+    }
+
+    fprintf(stderr,
+            "WARNING, %s %s %d, specified value(%d) is "
+            "not valid, use either 0 or 1\n",
+            __FILE__, __FUNCTION__, __LINE__, ip);
+    return;
+}
+
+fftwf_complex * fft_inplace(float * X, const size_t M, const size_t N, const size_t P)
+{
+    fft_inplace_pad(&X, P, N, M);
+    fftwf_plan plan_r2c = fftwf_plan_dft_r2c_3d(P, N, M,
+                                                X, /* Input */
+                                                (fftwf_complex*) X, /* Output */
+                                                FFTW3_PLANNING);
+    fftwf_execute(plan_r2c); fftwf_destroy_plan(plan_r2c);
+    return (fftwf_complex*) X;
+}
+
+float * ifft_inplace(fftwf_complex * fX, const size_t M, const size_t N, const size_t P)
+{
+    float * X = (float *) fX;
+    fftwf_plan plan_c2r = fftwf_plan_dft_c2r_3d(P, N, M,
+                                                fX,
+                                                X,
+                                                FFTW3_PLANNING);
+    fftwf_execute(plan_c2r);
+    fftwf_destroy_plan(plan_c2r);
+
+    fft_inplace_unpad(&X, P, N, M);
+#pragma omp parallel for shared(X)
+    for(size_t kk = 0 ; kk < M*N*P; kk++)
+    {
+        X[kk] /= (float) (M*N*P);
+    }
+    return X;
 }

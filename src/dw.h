@@ -166,6 +166,7 @@ struct _dw_opts{
     fftwf_plan fft_plan;
     fftwf_plan ifft_plan;
     int fftw3_planning;
+    int fft_inplace;
     struct timespec tstart;
 };
 
