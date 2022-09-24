@@ -32,7 +32,7 @@ ifeq ($(DEBUG),1)
     CFLAGS += -g3 -O1 -DNDEBUG -fno-inline
 else
     #CFLAGS +=  -g -O2 -ftree-vectorize -Wno-unknown-pragmas -flto
-    CFLAGS += -O3 -Wno-unknown-pragmas -flto -DNDEBUG
+    CFLAGS += -O1 -Wno-unknown-pragmas -flto -g #-DNDEBUG
     #-fno-math-errno no relevant performance gain
 endif
 

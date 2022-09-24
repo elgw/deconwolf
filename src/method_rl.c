@@ -14,7 +14,7 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "method_eve.h"
+#include "method_rl.h"
 
 /* One RL iteration */
  float iter_rl(
@@ -67,8 +67,8 @@
      }
 
 
-     fftwf_complex * F_sn = fft(y, wM, wN, wP); /* FFT#3 */
-     fftwf_free(y);
+     fftwf_complex * F_sn = fft_and_free(y, wM, wN, wP); /* FFT#3 */
+
      putdot(s);
      float * x = fft_convolve_cc_conj_f2(fftPSF, F_sn, wM, wN, wP); /* FFT#4 */
      putdot(s);
@@ -217,8 +217,7 @@
          fim_tiff_write_float("fulldump_PSF.tif", Z, NULL, wM, wN, wP);
      }
 
-     fftwf_complex * fftPSF = fft(Z, wM, wN, wP);
-     fftwf_free(Z);
+     fftwf_complex * fftPSF = fft_and_free(Z, wM, wN, wP);
 
      putdot(s);
 

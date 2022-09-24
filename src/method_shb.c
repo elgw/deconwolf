@@ -299,6 +299,7 @@ float iter_shb(
 
     putdot(s);
     float * y = fft_convolve_cc_f2(cK, Pk, wM, wN, wP); // Pk is freed
+
     float error = getError(y, im, M, N, P, wM, wN, wP, s->metric);
     putdot(s);
 
