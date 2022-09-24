@@ -26,10 +26,6 @@
 #include <sys/types.h>
 #include "fim.h"
 
-#define is_aligned(POINTER, BYTE_COUNT)                         \
-    (((uintptr_t)(const void *)(POINTER)) % (BYTE_COUNT) == 0)
-
-
 /*
  * Settings
  */

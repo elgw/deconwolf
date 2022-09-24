@@ -16,6 +16,21 @@
 
 #include "dw_util.h"
 
+int ptr_alignment_B(const void * p)
+{
+    int align = 1;
+    size_t address = (size_t) p;
+    if(address == 0)
+    {
+        return 0;
+    }
+    while(address % (align*2) == 0)
+    {
+        align*=2;
+    }
+    return align;
+}
+
 int dw_get_threads(void)
 {
     int nThreads = 4;

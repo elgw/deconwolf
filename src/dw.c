@@ -1255,18 +1255,30 @@ float * psf_autocrop_byImage(float * psf,/* psf and size */
                              dw_opts * s)
 {
 
-    /* Purpose: Crop the PSF if it is more
-       than 2x the size of the image in any dimension. */
+    /* Purpose:
+     * For bq=0
+     *  Crop the PSF so it is not larger than the image.
+     * For bq > 0
+     *   Crop the PSF if it is more
+     *   than 2x the size of the image in any dimension.
+     */
 
     const int64_t m = pM[0];
     const int64_t n = pN[0];
     const int64_t p = pP[0];
 
 
-    // Optimal size
+    /* Optimal size */
     int64_t mopt = (M-1)*2 + 1;
     int64_t nopt = (N-1)*2 + 1;
     int64_t popt = (P-1)*2 + 1;
+
+    if(s->borderQuality == 0)
+    {
+        mopt = M;
+        nopt = N;
+        popt = P;
+    }
 
     if(p < popt)
     {
@@ -1448,11 +1460,13 @@ float * psf_autocrop(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  // 
     float * p = psf;
     assert(pM[0] > 0);
     /* Crop the PSF if it is larger than necessary */
-    p = psf_autocrop_byImage(p, pM, pN, pP, M, N, P, s);
-    assert(pM[0] > 0);
+    p = psf_autocrop_byImage(p, pM, pN, pP,
+                             M, N, P,
+                             s);
+
     /* Crop the PSF by removing outer planes that has very little information.
      * Only if the PSF is larger than the image in some dimension. */
-    //if((pM[0] > M || pN[0] > N) && (s->borderQuality > 0))
+    if((s->borderQuality > 0))
     {
         p = psf_autocrop_XY(p, pM, pN, pP, M, N, P, s);
     }
