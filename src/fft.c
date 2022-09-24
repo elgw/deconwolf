@@ -104,17 +104,16 @@ static void fft_inplace_unpad(float ** pX,
 
     if(M%2 == 0)
     {
-    for(size_t c = 0; c < nchunk; c++)
-    {
-        memcpy(*pX + c*P, *pX+c*(P+2), chunk_size);
-    }
+        for(size_t c = 0; c < nchunk; c++)
+        {
+            memcpy(*pX + c*P, *pX+c*(P+2), chunk_size);
+        }
     } else {
         for(size_t c = 0; c < nchunk; c++)
         {
             memcpy(*pX + c*P, *pX+c*(P+1), chunk_size);
         }
     }
-
 
     *pX = realloc(*pX, M*N*P * sizeof(float));
     assert(*pX != NULL);
@@ -208,7 +207,12 @@ static char * get_swf_file_name(int nThreads)
     char * dir_home = getenv("HOME");
     char * dir_config = malloc(1024*sizeof(char));
     char * swf = malloc(1024*sizeof(char));
-    sprintf(swf, "fftw_wisdom_float_threads_%d.dat", nThreads);
+    if(use_inplace == 0)
+    {
+        sprintf(swf, "fftw_wisdom_float_threads_%d.dat", nThreads);
+    } else {
+        sprintf(swf, "fftw_wisdom_float_inplace_threads_%d.dat", nThreads);
+    }
 
     sprintf(dir_config, "%s/.config/", dir_home);
     // printf("dir_config = %s\n", dir_config);
@@ -565,24 +569,40 @@ void fft_train(const size_t M, const size_t N, const size_t P,
         fprintf(log, "--- fftw3 training ---\n");
     }
 
-    size_t MNP = M*N*P;
-    fftwf_complex * C = fftwf_malloc(MNP*sizeof(fftwf_complex));
-    float * R = fftwf_malloc(MNP*sizeof(float));
+    fftwf_complex * C = fftwf_malloc(nch(M, N, P)*sizeof(fftwf_complex));
+    float * R = fftwf_malloc(nch(M,N,P)*2*sizeof(float));
 
-    fftwf_plan p0 = fftwf_plan_dft_c2r_3d(P, N, M,
-                                          C, R, FFTW3_PLANNING  | FFTW_WISDOM_ONLY);
+    fftwf_plan plan_c2r;
 
-    if(p0 == NULL)
+    /* See if there is a plan already */
+    if(use_inplace == 0)
+    {
+        plan_c2r = fftwf_plan_dft_c2r_3d(P, N, M,
+                                         C, R, FFTW3_PLANNING  | FFTW_WISDOM_ONLY);
+    } else {
+        plan_c2r = fftwf_plan_dft_c2r_3d(P, N, M,
+                                         C, (float *) C, FFTW3_PLANNING  | FFTW_WISDOM_ONLY);
+    }
+
+    if(plan_c2r == NULL)
     {
         if(verbosity > 0)
         {
             printf("> generating fftw3 c2r plan\n");
         }
         fprintf(log, "> generating fftw3 c2r plan\n");
-        fftwf_plan p1 = fftwf_plan_dft_c2r_3d(P, N, M,
-                                              C, R, FFTW3_PLANNING);
-        fftwf_execute(p1);
-        fftwf_destroy_plan(p1);
+
+        if(use_inplace == 0)
+        {
+            plan_c2r = fftwf_plan_dft_c2r_3d(P, N, M,
+                                             C, R, FFTW3_PLANNING);
+        } else {
+            plan_c2r = fftwf_plan_dft_c2r_3d(P, N, M,
+                                             C, (float *) C, FFTW3_PLANNING);
+        }
+        fftwf_execute(plan_c2r);
+
+
         updatedWisdom = 1;
     } else {
         if(verbosity > 1)
@@ -594,12 +614,20 @@ void fft_train(const size_t M, const size_t N, const size_t P,
             fprintf(log, "Using cached fftw3 c2r plan\n");
         }
     }
-    fftwf_destroy_plan(p0);
 
-    p0 = fftwf_plan_dft_r2c_3d(P, N, M,
-                               R, C, FFTW3_PLANNING | FFTW_WISDOM_ONLY);
+    fftwf_plan plan_r2c;
+    if(use_inplace == 0)
+    {
+        plan_r2c = fftwf_plan_dft_r2c_3d(P, N, M,
+                                         R, C,
+                                         FFTW3_PLANNING | FFTW_WISDOM_ONLY);
+    } else {
+        plan_r2c = fftwf_plan_dft_r2c_3d(P, N, M,
+                                         (float*) C, C,
+                                         FFTW3_PLANNING | FFTW_WISDOM_ONLY);
+    }
 
-    if(p0 == NULL)
+    if(plan_r2c  == NULL)
     {
         if(verbosity > 0){
             printf("> generating fftw3 r2c plan \n");
@@ -608,10 +636,17 @@ void fft_train(const size_t M, const size_t N, const size_t P,
         {
             fprintf(log, "> generating fftw3 r2c plan\n");
         }
-        fftwf_plan p2 = fftwf_plan_dft_r2c_3d(P, N, M,
-                                              R, C, FFTW3_PLANNING);
-        fftwf_execute(p2);
-        fftwf_destroy_plan(p2);
+
+        if(use_inplace == 0)
+        {
+            plan_r2c = fftwf_plan_dft_r2c_3d(P, N, M,
+                                             R, C,
+                                             FFTW3_PLANNING);
+        } else {
+            plan_r2c = fftwf_plan_dft_r2c_3d(P, N, M,
+                                             (float*) C, C,
+                                             FFTW3_PLANNING);
+        }
         updatedWisdom = 1;
     } else {
         if(verbosity > 1)
@@ -620,10 +655,9 @@ void fft_train(const size_t M, const size_t N, const size_t P,
         }
         fprintf(log, "Using cached fftw3 r2c plan\n");
     }
-    fftwf_destroy_plan(p0);
 
-    fftwf_free(R);
     fftwf_free(C);
+    fftwf_free(R);
 
     if(updatedWisdom)
     {
@@ -646,6 +680,9 @@ void fft_train(const size_t M, const size_t N, const size_t P,
             free(swf);
         }
     }
+
+    fftwf_destroy_plan(plan_r2c);
+    fftwf_destroy_plan(plan_c2r);
 
     return;
 }
