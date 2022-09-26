@@ -979,7 +979,7 @@ float getError_idiv(const float * restrict y, const float * restrict g,
                 float est = g[a + b*M + c * M*N];
                 if(est > 0)
                 {
-                    idiv += obs*log(obs/est) - obs + est;
+                    idiv += obs*logf(obs/est) - obs + est;
                 }
             }
         }
@@ -1072,7 +1072,7 @@ float get_fIdiv(const float * restrict y, const float * restrict g,
                 double gval = g[a + b*M + c * M*N];
                 if(yval > 0 && gval > 0)
                 {
-                    I += gval*log(gval/yval) - (gval-yval);
+                    I += gval*logf(gval/yval) - (gval-yval);
                 }
             }
         }

@@ -14,8 +14,9 @@ all: tiling_ut fft_ut fim_ut
 
 tiling_ut:
 	$(cc) tiling_ut.c tiling.c fim_tiff.c fim.c $(CFLAGS) -ltiff -lfftw3f -o tiling_ut
-fft_ut:
-	$(cc) fft_ut.c fft.c fim.c $(CFLAGS) -lm -lfftw3f -lfftw3f_threads -o fft_ut
+
+fft_ut: fft_ut.c fft.c fim.c ftab.c fim_tiff.c
+	$(cc) fft_ut.c fft.c fim.c fim_tiff.c ftab.c $(CFLAGS) -lm -lfftw3f -lfftw3f_threads -fopenmp -ltiff -o fft_ut
 
 dw_render_files=dw_render.c dw_render.h fim.c ftab.c fim_tiff.c dw_util.c fft.c
 dw_render: $(dw_render_files)
