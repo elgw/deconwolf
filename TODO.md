@@ -12,8 +12,7 @@ move when write is complete to avoid bad luck.
 - [ ] Get documentation up to date.
 - [ ] Set default PSF size in `dw_bw` based on the geometry of the PSF
 and expected sample thickness.
-- [ ] fftw3 in-place FFTs for memory saving. Then a higher abstraction
-around the FFT would be nice to have.
+- [ ] Wrap image pointers in some abstraction.
 - [ ] When using clFFT that does not support all sizes, crop the image
 if needed when using **--bq 0**
 - [ ] Why is **-O1** required for building?
@@ -42,6 +41,7 @@ fftw3 from source for `-march=native -mtune=native`.
 
 
 ## Done
+- [x] fftw3 in-place FFTs for memory saving.
 - [x] Make `FFTW_ESTIMATE` an option. This is set with the argument **--noplan**.
 - [x] Don't crop the PSF unless it is needed.
 - [x] OpenCL/clFFT for the FFTs: the method **shbcl** can be enabled

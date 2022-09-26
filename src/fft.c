@@ -26,6 +26,15 @@
 #include <sys/types.h>
 #include "fim.h"
 
+/* This provides some utility functions for using fftw3.
+ *
+ * Note about memory fftw3 requires that array are aligned by
+ * MIN_ALIGNMENT, relevant files to look at are: fftw3/kernel/kalloc.c
+ * and fftw3/api/malloc.c On linux posix_memalign/free is used but
+ * that can not be assumed.
+ */
+
+
 /*
  * Settings
  */
@@ -62,25 +71,26 @@ void fft_inplace_pad(float ** pX,
                      const size_t P)
 {
 
-    const size_t nchunk = M*N;
-    const size_t chunk_size = P*sizeof(float);
+    const size_t nchunk = N*P;
+    const size_t chunk_size = M*sizeof(float);
 
-    *pX = realloc(*pX, 2*nch(P, N, M) * sizeof(float));
+    /* WARNING TODO will not work on windows */
+    *pX = realloc(*pX, 2*nch(M, N, P) * sizeof(float));
 
     assert(*pX != NULL);
 
     // Think twice before trying to parallelize!
 
-    if(M%2 == 0)
+    if(P%2 == 0)
     {
         for(size_t c = nchunk-1; c != (size_t) -1; c--)
         {
-            memcpy(*pX+c*(P+2), *pX + c*P, chunk_size);
+            memcpy(*pX+c*(M+2), *pX + c*M, chunk_size);
         }
     } else {
         for(size_t c = nchunk-1; c != (size_t) -1; c--)
         {
-            memcpy(*pX+c*(P+1), *pX + c*P, chunk_size);
+            memcpy(*pX+c*(M+1), *pX + c*M, chunk_size);
         }
     }
 
@@ -94,23 +104,24 @@ static void fft_inplace_unpad(float ** pX,
                               const size_t P)
 {
 
-    const size_t nchunk = M*N;
-    const size_t chunk_size = P*sizeof(float);
+    const size_t nchunk = N*P;
+    const size_t chunk_size = M*sizeof(float);
     // Think twice before trying to parallelize!
 
-    if(M%2 == 0)
+    if(P%2 == 0)
     {
         for(size_t c = 0; c < nchunk; c++)
         {
-            memcpy(*pX + c*P, *pX+c*(P+2), chunk_size);
+            memcpy(*pX + c*M, *pX+c*(M+2), chunk_size);
         }
     } else {
         for(size_t c = 0; c < nchunk; c++)
         {
-            memcpy(*pX + c*P, *pX+c*(P+1), chunk_size);
+            memcpy(*pX + c*M, *pX+c*(M+1), chunk_size);
         }
     }
 
+    /* WARNING TODO Will not work on Windows */
     *pX = realloc(*pX, M*N*P * sizeof(float));
     assert(*pX != NULL);
     return;
@@ -746,7 +757,7 @@ double * fft_bench_1d(int64_t from, int64_t to, int niter)
 
     struct timespec tictoc_start, tictoc_end;
 
-    double * t = malloc(sizeof(double) * (to + 1 - from));
+    double * t = fftwf_malloc(sizeof(double) * (to + 1 - from));
     memset(t, 0, sizeof(double)*(to+1-from));
     for(int kk = 0; kk<niter; kk++)
     {
@@ -867,7 +878,7 @@ void fft_set_inplace(int ip)
 fftwf_complex * fft_inplace(float * X, const size_t M, const size_t N, const size_t P)
 {
 
-    fft_inplace_pad(&X, P, N, M);
+    fft_inplace_pad(&X, M, N, P);
     fftwf_plan plan_r2c = fftwf_plan_dft_r2c_3d(P, N, M,
                                                 X, /* Input */
                                                 (fftwf_complex*) X, /* Output */
@@ -886,7 +897,7 @@ float * ifft_inplace(fftwf_complex * fX, const size_t M, const size_t N, const s
     fftwf_execute(plan_c2r);
     fftwf_destroy_plan(plan_c2r);
 
-    fft_inplace_unpad(&X, P, N, M);
+    fft_inplace_unpad(&X, M, N, P);
 #pragma omp parallel for shared(X)
     for(size_t kk = 0 ; kk < M*N*P; kk++)
     {

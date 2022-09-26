@@ -17,8 +17,6 @@
 #ifndef __method_shb_h__
 #define __method_shb_h__
 
-#include "cl_util.h"
-
 #include "dw.h"
 
 /* Wang and Miller Scaled Heavy Ball */
