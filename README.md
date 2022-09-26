@@ -70,25 +70,33 @@ If these libraries are available for your platform, chances are that that it can
 be built. FFTW can also be replaced by Intel MKL or NVIDIA CUFFTW.
 
 
-### Ubuntu 20.04
-Install required packages:
+### Ubuntu 20.04 (or Windows with WSL)
+For other platforms, see [INSTALL.md](INSTALL.md).
+
+First install the required packages:
 
 ``` shell
 sudo apt-get update
 # find out actual names with command like
 # sudo apt-cache search fftw
+sudo apt-get install gcc
+sudo apt-get install pkg-config
 sudo apt-get install libfftw3-single3
 sudo apt-get install libfftw3-dev
 sudo apt-get install openmp
 sudo apt-get install tiff-5     # or possibly the next line
 sudo apt-get install libtiff-dev
 sudo apt-get install libgsl-dev
+sudo apt-get install libpng-dev
 ```
 
-Build and install deconwolf:
+Build, to build and install deconwolf:
 ``` shell
 make -B
-sudo make install
+./makedeb
+sudo apt-install ./deconwolf_*.deb
+# to remove
+# sudo apt remove deconwolf
 ```
 
 ## Minimal usage example

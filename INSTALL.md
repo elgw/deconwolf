@@ -47,8 +47,13 @@ make -B
 sudo make install
 ```
 
-
 ## Windows 10
+Although it might be possible to build native windows executables, it
+is suggested that WSL is used.
+
+With the following instructions it was possible to build deconwolf
+0.1.0 on Windows 10 (the --inplace option might not work on the
+current version).
 
 The simplest way to build native windows binaries seems to be using msys2.
 Follow all steps of the [msys2](https://www.msys2.org/) installation guide,

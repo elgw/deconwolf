@@ -98,7 +98,8 @@ typedef float * (*dw_function) (float * restrict im, const int64_t M, const int6
                               dw_opts * s);
 
 struct _dw_opts{
-    int nThreads;
+    int nThreads_FFT;
+    int nThreads_OMP;
 
     char * imFile;
     char * psfFile;

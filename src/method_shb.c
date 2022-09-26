@@ -86,7 +86,7 @@ float * deconvolve_shb(float * restrict im,
     fflush(s->log);
 
     fft_train(wM, wN, wP,
-              s->verbosity, s->nThreads,
+              s->verbosity, s->nThreads_FFT,
               s->log);
 
     if(s->verbosity > 0)

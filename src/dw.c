@@ -150,9 +150,12 @@ void dw_iterator_free(dw_iterator_t * it)
 dw_opts * dw_opts_new(void)
 {
     dw_opts * s = calloc(1, sizeof(dw_opts));
-    s->nThreads = dw_get_threads();
+    s->nThreads_FFT = dw_get_threads();
+    s->nThreads_OMP = s->nThreads_FFT;
 
-    s->nThreads < 1 ? s->nThreads = 1 : 0;
+    s->nThreads_FFT < 1 ? s->nThreads_FFT = 1 : 0;
+    s->nThreads_OMP < 1 ? s->nThreads_OMP = 1 : 0;
+
     s->nIter = 1; /* Always overwritten if used */
     s->maxiter = 250;
     s->err_rel = 0.02;
@@ -281,7 +284,8 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
     fprintf(f, "output: %s\n", s->outFile);
     fprintf(f, "log file: %s\n", s->logFile);
     fprintf(f, "nIter:  %d\n", s->nIter);
-    fprintf(f, "nThreads: %d\n", s->nThreads);
+    fprintf(f, "nThreads for FFT: %d\n", s->nThreads_FFT);
+    fprintf(f, "nThreads for OMP: %d\n", s->nThreads_OMP);
     fprintf(f, "verbosity: %d\n", s->verbosity);
     fprintf(f, "background level: %f\n", s->bg);
 
@@ -520,6 +524,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
 
     struct option longopts[] = {
         { "inplace",   no_argument,       NULL, '1' },
+        { "ompthreads", required_argument, NULL, '2' },
         { "noplan",    no_argument,       NULL, 'a' },
         { "bg",        required_argument, NULL, 'b' },
         { "threads",   required_argument, NULL, 'c' },
@@ -562,12 +567,15 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     int ch;
     int prefix_set = 0;
     while((ch = getopt_long(argc, argv,
-                            "1ab:c:f:ghil:m:n:o:p:r:s:tvwx:B:C:DFI:L:MR:TPQ:X:",
+                            "12ab:c:f:ghil:m:n:o:p:r:s:tvwx:B:C:DFI:L:MR:TPQ:X:",
                             longopts, NULL)) != -1)
     {
         switch(ch) {
         case '1':
             s->fft_inplace = 1;
+            break;
+        case '2':
+            s->nThreads_OMP = atoi(optarg);
             break;
         case 'C':
             s->flatfieldFile = strdup(optarg);
@@ -634,7 +642,8 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             s->iter_type = DW_ITER_FIXED;
             break;
         case 'c':
-            s->nThreads = atoi(optarg);
+            s->nThreads_FFT = atoi(optarg);
+            s->nThreads_OMP = atoi(optarg);
             break;
         case 'i':
             s->iterdump = 1;
@@ -823,10 +832,10 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         }
     }
 
-    if(s->nThreads < 1)
+    if(s->nThreads_FFT < 1 || s->nThreads_OMP < 1)
     {
         printf("Invalid number of threads (%d), "
-               "please verify your command line\n", s->nThreads);
+               "please verify your command line\n", s->nThreads_FFT);
         exit(EXIT_FAILURE);
     }
 
@@ -1832,11 +1841,11 @@ int dw_run(dw_opts * s)
 
 #ifdef _OPENMP
 #ifdef MKL
-    mkl_set_num_threads(s->nThreads);
-    fprintf(s->log, "Set the number of MKL threads to %d\n", s->nThreads);
+    mkl_set_num_threads(s->nThreads_FFT);
+    fprintf(s->log, "Set the number of MKL threads to %d\n", s->nThreads_FFT);
 #else
-    omp_set_num_threads(s->nThreads);
-    fprintf(s->log, "Set the number of OMP threads to %d\n", s->nThreads);
+    omp_set_num_threads(s->nThreads_OMP);
+    fprintf(s->log, "Set the number of OMP threads to %d\n", s->nThreads_OMP);
     /* Fastest of static, dynamic and guided in limited tests */
     omp_set_dynamic(false);
     omp_set_schedule(omp_sched_static, 0);
@@ -2012,7 +2021,7 @@ int dw_run(dw_opts * s)
         printf("Output: %s(.log.txt)\n", s->outFile);
     }
 
-    myfftw_start(s->nThreads, s->verbosity, s->log);
+    myfftw_start(s->nThreads_FFT, s->verbosity, s->log);
 
     float * out = NULL;
 

@@ -29,10 +29,10 @@ CFLAGS += -fno-math-errno
 DESTDIR?=/usr/local/bin
 DEBUG?=0
 ifeq ($(DEBUG),1)
-    CFLAGS += -g3 -O1 -DNDEBUG -fno-inline
+    CFLAGS += -g3 -O3 -DNDEBUG
 else
     #CFLAGS +=  -g -O2 -ftree-vectorize -Wno-unknown-pragmas -flto
-    CFLAGS += -O1 -Wno-unknown-pragmas -flto -g #-DNDEBUG
+    CFLAGS += -O3 -Wno-unknown-pragmas -flto  #-DNDEBUG
     #-fno-math-errno no relevant performance gain
 endif
 
@@ -152,8 +152,7 @@ $(dwbw): $(dwbw_OBJECTS)
 	$(CC) -c $<
 
 clean:
-	rm -f $(dw) $(dw_OBJECTS)
-	rm -f $(dwbw) $(dwbw_OBJECTS)
+	rm -f *.o
 
 kernels:
 	# cl_complex_square
@@ -189,9 +188,9 @@ install:
 
 
 uninstall:
-	rm $(DESTDIR)/dw
-	rm $(DESTDIR)/dw_bw
-	rm $(DESTDIR)/dw_batch
-	rm $(MANPATH)/dw.1
-	rm $(MANPATH)/deconwolf.1
-	rm $(MANPATH)/dw_bw.1
+	rm -f $(DESTDIR)/dw
+	rm -f $(DESTDIR)/dw_bw
+	rm -f $(DESTDIR)/dw_batch
+	rm -f $(MANPATH)/dw.1
+	rm -f $(MANPATH)/deconwolf.1
+	rm -f $(MANPATH)/dw_bw.1

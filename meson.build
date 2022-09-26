@@ -107,11 +107,6 @@ if omp_deps.found()
    dw_bw_deps += omp_deps
 endif
 
-omp_deps = dependency('omp', required : false)
-if omp_deps.found()
-   dw_deps += omp_deps
-   dw_bw_deps += omp_deps
-endif
 
 
 os = host_machine.system()
