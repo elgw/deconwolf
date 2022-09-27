@@ -68,18 +68,16 @@ If you have 16 GB of RAM, images up to [1024x1024x60] pixels should
 work without tiling. If deconwolf crashes because it runs of out
 memory you can:
 
- 1. Use the *--inplace** flag (FFTs will be just slightly slower while
-    memory will be reduced).
- 2. Use fewer threads, i.e. specify **--threads N**.
- 3. Consider switching to a lower quality on the boundaries with
+ 1. Use fewer threads, i.e. specify **--threads N**.
+ 2. Consider switching to a lower quality on the boundaries with
     **--bq 1**. The option **--bq 0** is not recommended for normal
     images (since it assumes that the image repeats itself around the
     edges which is bad particularly in the axial direction).
 
 Accordingly the lowest memory usage will be when you combine these
-things i.e. calling dw with **--inplace --threads 1 --bq 1**. If that
-still uses too much memory you have to tell dw to process the image in
-tiles with the **--tilesize N** option.
+things i.e. calling dw with **--threads 1 --bq 1**. If that still uses
+too much memory you have to tell dw to process the image in tiles with
+the **--tilesize N** option.
 
 The peak memory usage is written at the end of the log file.
 

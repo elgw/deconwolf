@@ -97,66 +97,72 @@ OPTIONS
 	      disable  FFTW3 planning.	This means that FFTW3 uses the default
 	      plan for the given problem size.
 
+       --no-inplace
+	      disable the use of  in-place  FFT	 transformations  with	fftw3.
+	      This  will cause fftw3 to use more memory and is typically slow‐
+	      er.  This option is mostly for debugging.	 On some platforms  it
+	      is expected that deconwolf will only work with this flag.
+
        maxproj
-	      With maxproj as the first argument  deconwolf  will  create  max
+	      With  maxproj  as	 the  first argument deconwolf will create max
 	      projections of all following tif files.  Output will be prefixed
 	      with max_.
 
 While running
-       At normal verbosity deconwolf will put one green dot  per  FFT.	 After
-       each  iteration the Idiv or MSE (with --mse) is shown, not that this is
-       not a measurement on the final image quality.   Warnings	 are  prefixed
+       At  normal  verbosity  deconwolf will put one green dot per FFT.	 After
+       each iteration the Idiv or MSE (with --mse) is shown, not that this  is
+       not  a  measurement  on the final image quality.	 Warnings are prefixed
        with ’ ! ’.  More information can be found in the log file.
 
 INPUT
-       dw  reads  16-bit  (unsigned  integers)	or 32-bit (floating point) tif
-       files.  It does not understand compressed files or any  dimensions  ex‐
-       cept  x,y,z,  so only one color per image etc.  To test if dw reads and
+       dw reads 16-bit (unsigned integers)  or	32-bit	(floating  point)  tif
+       files.	It  does not understand compressed files or any dimensions ex‐
+       cept x,y,z, so only one color per image etc.  To test if dw  reads  and
        writes your files, try the --method id option.  In general, if an image
        is saved by ImageJ dw should be able to read it.
 
 OUTPUT
-       Without	specifying  the output file name, the output file will be pre‐
+       Without specifying the output file name, the output file will  be  pre‐
        fixed with dw_, e.g, if you deconvolve file.tif the output file will be
-       called  dw_file.tif.   Please  pay  attention to the log file that also
+       called dw_file.tif.  Please pay attention to the	 log  file  that  also
        will be created (as dw_file.tif.log.txt).
 
-       Unless --float was specified the output images will be  scaled  to  use
+       Unless  --float	was  specified the output images will be scaled to use
        the full dynamic range of the 16 bit format.  The scaling factor can be
        found in the log file.
 
 PERFORMANCE
-       Without specifying any arguments to dw it will use one thread  per  cpu
-       core  in the host machine.  This is typically the fastest way to decon‐
-       volve one image.	 For maximal throughput it is better  to  run  several
-       copies  of  dw  using fewer cores each.	E.g.  on an 8-core machine the
-       maximal throughput can be reached by deconvolving eight images in  par‐
+       Without	specifying  any arguments to dw it will use one thread per cpu
+       core in the host machine.  This is typically the fastest way to	decon‐
+       volve  one  image.   For maximal throughput it is better to run several
+       copies of dw using fewer cores each.  E.g.  on an  8-core  machine  the
+       maximal	throughput can be reached by deconvolving eight images in par‐
        allel using one core each (if enough RAM is available).
 
 Tiling
-       In  order  to  use less RAM and deconvolve really large scans deconwolf
-       can process images in a memory efficient	 way  by  dividing  them  into
-       smaller	portions, or tiles.  This process is completely transparent to
+       In order to use less RAM and deconvolve really  large  scans  deconwolf
+       can  process  images  in	 a  memory efficient way by dividing them into
+       smaller portions, or tiles.  This process is completely transparent  to
        the user although the –tilesize T parameter has to be set explicitly.
 
-       Tile processing would typically be slow and introduce artifacts at  the
-       boundaries.   To	 reduce the boundary artifacts tiles are overlapped by
-       up to –tilepad p pixels.	 This  artifact	 remedy	 does,	unfortunately,
+       Tile  processing would typically be slow and introduce artifacts at the
+       boundaries.  To reduce the boundary artifacts tiles are	overlapped  by
+       up  to  –tilepad	 p  pixels.  This artifact remedy does, unfortunately,
        slow down the processing even more.
 
        Internally the tile processing performs the following steps:
 
-       1. The  tif  input  image is written to disk as raw float data, without
+       1. The tif input image is written to disk as raw	 float	data,  without
 	  loading the full image to RAM.
 
-       2. A tiling grid is set up which divides the lateral domain of the  im‐
+       2. A  tiling grid is set up which divides the lateral domain of the im‐
 	  age into tiles of size at most TxT.
 
-       3. Each	tile then is loaded from disk, including extra padding p where
+       3. Each tile then is loaded from disk, including extra padding p	 where
 	  it isn’t in contact with the edge.  The tile is then deconvolved and
 	  the data is written to disk.
 
-       4. Where	 the  padding  is  overlapping another tile, the image data is
+       4. Where the padding is overlapping another tile,  the  image  data  is
 	  weighted linearly to reduce artifacts.
 
        5. The raw output images is converted to tif, again without loading the
@@ -165,7 +171,7 @@ Tiling
        Tiling is enabled only when –tilesize is specified.
 
 SEE ALSO
-       dw_bw  for  generation of point spread functions according to the Born-
+       dw_bw for generation of point spread functions according to  the	 Born-
        Wolf model.
 
 WEB PAGE
@@ -176,11 +182,11 @@ REPORTING BUGS
 
 COPYRIGHT
        Copyright © 2022 Erik Wernersson.  License GPLv3+: GNU GPL version 3 or
-       later  <https://gnu.org/licenses/gpl.html>.  This is free software: you
-       are free to change and redistribute it.	There is NO WARRANTY,  to  the
+       later <https://gnu.org/licenses/gpl.html>.  This is free software:  you
+       are  free  to change and redistribute it.  There is NO WARRANTY, to the
        extent permitted by law.
 
 AUTHORS
        Erik Wernersson.
 
-dw 0.1.1			     2022			  DECONWOLF(1)
+dw DW_VERSION_MAJOR		     2022			  DECONWOLF(1)

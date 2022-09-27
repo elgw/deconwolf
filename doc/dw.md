@@ -101,6 +101,12 @@ Have been found useful for very noisy image.
 : disable FFTW3 planning. This means that FFTW3 uses the default plan
   for the given problem size.
 
+**\--no-inplace**
+: disable the use of in-place FFT transformations with fftw3. This
+  will cause fftw3 to use more memory and is typically slower. This
+  option is mostly for debugging. On some platforms it is expected
+  that deconwolf will only work with this flag.
+
 **maxproj**
 : With *maxproj* as the first argument deconwolf will create max
 projections of all following tif files. Output will be prefixed with `max_`.

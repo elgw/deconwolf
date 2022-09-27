@@ -156,6 +156,8 @@ dw_opts * dw_opts_new(void)
     s->nThreads_FFT < 1 ? s->nThreads_FFT = 1 : 0;
     s->nThreads_OMP < 1 ? s->nThreads_OMP = 1 : 0;
 
+    s->fft_inplace = 1;
+
     s->nIter = 1; /* Always overwritten if used */
     s->maxiter = 250;
     s->err_rel = 0.02;
@@ -523,7 +525,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
 
 
     struct option longopts[] = {
-        { "inplace",   no_argument,       NULL, '1' },
+        { "no-inplace",   no_argument,       NULL, '1' },
         { "ompthreads", required_argument, NULL, '2' },
         { "noplan",    no_argument,       NULL, 'a' },
         { "bg",        required_argument, NULL, 'b' },
@@ -572,7 +574,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     {
         switch(ch) {
         case '1':
-            s->fft_inplace = 1;
+            s->fft_inplace = 0;
             break;
         case '2':
             s->nThreads_OMP = atoi(optarg);
@@ -1163,7 +1165,8 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
     printf("\t%s maxproj image.tif\n", argv[0]);
     printf("\tsee %s maxproj --help\n", argv[0]);
     printf(" --noplan\n\t Disable FFT planning for fftw3\n");
-    printf(" --inplace\n\t Save memory by doing in-place FFTs\n");
+    printf(" --no-inplace\n\t Disable in-place FFTs (for fftw3), uses more "
+           "memory but could potentially be faster for some problem sizes.\n");
     printf("\n");
     printf("Web page: https://www.github.com/elgw/deconwolf/\n");
 }
