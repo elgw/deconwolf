@@ -51,6 +51,7 @@ typedef struct{
     clu_kernel_t kern_mul_conj;
     clu_kernel_t kern_mul_inplace;
     clu_kernel_t kern_mul_conj_inplace;
+    clu_kernel_t kern_error_idiv;
 
     size_t nb_allocated;
     size_t n_release;
@@ -103,6 +104,8 @@ fimcl_t * fimcl_fft(fimcl_t * A);
 void fimcl_fft_inplace(fimcl_t * X);
 fimcl_t * fimcl_ifft(fimcl_t * A);
 void fimcl_ifft_inplace(fimcl_t * A);
+
+float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image);
 
 /* B = copy(A)
  * non-blocking */

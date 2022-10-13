@@ -8,32 +8,6 @@
 #define here(x) ;
 
 
-float getError_gpu(fimcl_t * forward, fimcl_t * image)
-{
-    // TODO with OpenCL:
-/*     float idiv = 0;
-       #pragma omp parallel for reduction(+: idiv)
-       for(int64_t c = 0; c<P; c++)
-       {
-       for(int64_t b = 0; b<N; b++)
-       {
-       for(int64_t a = 0; a<M; a++)
-       {
-       float obs =  y[a + b*wM + c*wM*wN];
-       float est = g[a + b*M + c * M*N];
-       if(est > 0)
-       {
-       idiv += obs*logf(obs/est) - obs + est;
-       }
-       }
-       }
-       }
-
-       float idiv_mean = idiv / (float) (M*N*P);
- */
-    return 0;
-}
-
 static fimcl_t  * initial_guess_cl(clu_env_t * clu,
                             const int64_t M, const int64_t N, const int64_t P,
                             const int64_t wM, const int64_t wN, const int64_t wP)
@@ -420,13 +394,14 @@ float iter_shb_cl2(clu_env_t * clu,
     fimcl_t * gy = fimcl_convolve(Pk, cK, CLU_KEEP_2ND);
     here();
     float * y = fimcl_download(gy);
-    float error_gpu = getError_gpu(gy, im_gpu);
+    float error_gpu = fimcl_error_idiv(gy, im_gpu);
     here();
     fimcl_free(gy);
     here();
 
     /* consumes something like 9% of the total lift over to GPU! */
     float error = getError(y, im, M, N, P, wM, wN, wP, s->metric);
+    printf("\nerror = %f, error_gpu = %f\n", error, error_gpu);
     assert(fabs(error-error_gpu) < 1e-4);
     putdot(s);
 

@@ -5,17 +5,21 @@
 #include "kernels/cl_complex_mul_conj.h" // corresponds to cl_complex_mul_conj
 #include "kernels/cl_complex_mul_inplace.h"
 #include "kernels/cl_complex_mul_conj_inplace.h"
+#include "kernels/cl_error_idiv.h"
 
 
 static char * read_program(const char * fname, size_t * size);
 static double clockdiff(struct timespec* start, struct timespec * finish);
 
+/* Number of floats */
+static size_t fimcl_nreal(fimcl_t * X);
 /* Number of complex values required for Hermitian representation */
-
 static size_t fimcl_ncx(fimcl_t * X);
+
 static size_t fimcl_hM(fimcl_t * X);
 static size_t fimcl_hN(fimcl_t * X);
 static size_t fimcl_hP(fimcl_t * X);
+
 static size_t M_r2h(size_t M);
 static size_t N_r2h(size_t N);
 static size_t P_r2h(size_t P);
@@ -95,6 +99,11 @@ static size_t fimcl_hP(fimcl_t * X)
 static size_t fimcl_ncx(fimcl_t * X)
 {
     return fimcl_hM(X)*fimcl_hN(X)*fimcl_hP(X);
+}
+
+static size_t fimcl_nreal(fimcl_t * X)
+{
+    return X->M * X->N * X->P;
 }
 
 float * fimcl_download(fimcl_t * gX)
@@ -517,6 +526,71 @@ void fimcl_complex_mul_inplace(fimcl_t * X, fimcl_t * Y, int conj)
     return;
 }
 
+float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
+{
+    /* This has to be done in two steps:
+    * 1/ per element error, E = idiv(a,b) ...
+    * 2/ Reduction on N -> N/2 -> N/4 ... 1
+    * How can we handle odd sizes ?
+    * see https://stackoverflow.com/questions/15161575/reduction-for-sum-of-vector-when-size-is-not-power-of-2
+    */
+    size_t global_work_offset[] = {0, 0, 0};
+    size_t local_work_size[] = {1,1,1};
+
+    cl_kernel kernel = forward->clu->kern_error_idiv.kernel;
+
+    size_t MNP = fimcl_nreal(forward);
+    printf("Will run the kernel for %zu elements\n", MNP);
+    fimcl_sync(forward);
+    fimcl_sync(image);
+
+    /* The image is assumed to be smaller or the same size
+     * as the forward projection (which might be extended). */
+    assert(image->M <= forward->M);
+    assert(image->N <= forward->N);
+    assert(image->P <= forward->P);
+
+    /* a buffer for passing array sizes and returning the value */
+    float argbuff[7] = {forward->M, forward->N, forward->P,
+        image->M, image->N, image->P, 0};
+
+    fimcl_t * g_argbuff = fimcl_new(forward->clu, 0, 0, argbuff, 7, 1, 1);
+
+    check_CL( clSetKernelArg(kernel,
+                             0, // argument index
+                             sizeof(cl_mem), // argument size
+                             (void *) &forward->buf) ); // argument value
+
+    check_CL( clSetKernelArg(kernel,
+                             1, // argument index
+                             sizeof(cl_mem), // argument size
+                             (void *) &image->buf) ); // argument value
+
+    check_CL( clSetKernelArg(kernel,
+                             2, // argument index
+                             sizeof(cl_mem), // argument size
+                             (void *) &g_argbuff->buf) ); // argument value
+
+    check_CL( clEnqueueNDRangeKernel(forward->clu->command_queue,
+                                     kernel,
+                                     1, //3,
+                                     global_work_offset,
+                                     &MNP, //global_work_size,
+                                     local_work_size,
+                                     0,
+                                     NULL,
+                                     &g_argbuff->wait_ev) );
+
+    fimcl_sync(g_argbuff);
+    // Download the result
+    float * res = fimcl_download(g_argbuff);
+    // return it
+    fimcl_free(g_argbuff);
+    float idiv = res[6];
+    free(res);
+    return idiv;
+}
+
 
 fimcl_t * fimcl_ifft(fimcl_t * fX)
 {
@@ -873,26 +947,38 @@ void clu_prepare_fft(clu_env_t * env, size_t M, size_t N, size_t P)
     env->h2r_inplace_plan = gen_h2r_inplace_plan(env, M, N, P);
 
     /* Create the OpenCL kernels that we will use*/
-    env->kern_mul = *clu_kernel_new(env,
-                                    NULL, //"cl_complex_mul.c",
-                                    (const char *) cl_complex_mul,
-                                    cl_complex_mul_len,
-                                    "cl_complex_mul");
-    env->kern_mul_conj = *clu_kernel_new(env,
-                                         NULL, //"cl_complex_mul_conj.c",
-                                         (const char *) cl_complex_mul_conj,
-                                         cl_complex_mul_conj_len,
-                                         "cl_complex_mul_conj");
-    env->kern_mul_inplace = *clu_kernel_new(env,
-                                            NULL,
-                                            (const char *) cl_complex_mul_inplace,
-                                            cl_complex_mul_inplace_len,
-                                            "cl_complex_mul_inplace");
-    env->kern_mul_conj_inplace = *clu_kernel_new(env,
-                                                 NULL,
-                                                 (const char *) cl_complex_mul_conj_inplace,
-                                                 cl_complex_mul_conj_inplace_len,
-                                                 "cl_complex_mul_conj_inplace");
+    env->kern_mul =
+        *clu_kernel_new(env,
+                        NULL, //"cl_complex_mul.c",
+                        (const char *) cl_complex_mul,
+                        cl_complex_mul_len,
+                        "cl_complex_mul");
+
+    env->kern_mul_conj =
+        *clu_kernel_new(env,
+                        NULL, //"cl_complex_mul_conj.c",
+                        (const char *) cl_complex_mul_conj,
+                        cl_complex_mul_conj_len,
+                        "cl_complex_mul_conj");
+    env->kern_mul_inplace =
+        *clu_kernel_new(env,
+                        NULL,
+                        (const char *) cl_complex_mul_inplace,
+                        cl_complex_mul_inplace_len,
+                        "cl_complex_mul_inplace");
+    env->kern_mul_conj_inplace =
+        *clu_kernel_new(env,
+                        NULL,
+                        (const char *) cl_complex_mul_conj_inplace,
+                        cl_complex_mul_conj_inplace_len,
+                        "cl_complex_mul_conj_inplace");
+    env->kern_error_idiv =
+        *clu_kernel_new(env,
+                        NULL,
+                        (const char *) cl_error_idiv,
+                        cl_error_idiv_len,
+                        "cl_error_idiv");
+
     env->clFFT_loaded = 1;
     return;
 }

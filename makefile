@@ -162,6 +162,7 @@ $(dwbw): $(dwbw_OBJECTS)
 clean:
 	rm -f *.o
 
+# the kernels are included by cl_util.c
 kernels:
 	# cl_complex_square
 	cp src/kernels/cl_complex_square.c cl_complex_square
@@ -183,6 +184,10 @@ kernels:
 	cp src/kernels/cl_complex_mul_conj_inplace.c cl_complex_mul_conj_inplace
 	xxd -i cl_complex_mul_conj_inplace > src/kernels/cl_complex_mul_conj_inplace.h
 	rm cl_complex_mul_conj_inplace
+	# cl_complex_mul_conj_inplace
+	cp src/kernels/cl_error_idiv.c cl_error_idiv
+	xxd -i cl_error_idiv > src/kernels/cl_error_idiv.h
+	rm cl_error_idiv
 
 
 install:
