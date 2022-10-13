@@ -310,7 +310,10 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
         break;
 #ifdef OPENCL
     case DW_METHOD_SHBCL:
-        fprintf(f, "method: Scaled Heavy Ball (SHB)\n");
+        fprintf(f, "method: Scaled Heavy Ball + OpenCL for FFT (SHBCL)\n");
+        break;
+    case DW_METHOD_SHBCL2:
+        fprintf(f, "method: Scaled Heavy Ball + OpenCL (SHBCL2)\n");
         break;
 #endif
     }
@@ -738,14 +741,24 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
                 s->fun = &deconvolve_shb_cl;
                 known_method = 1;
             }
+            if(strcmp(optarg, "shbcl2") == 0)
+            {
+                s->method = DW_METHOD_SHBCL2;
+                if(prefix_set == 0)
+                {
+                    sprintf(s->prefix, "shbcl2");
+                }
+                s->fun = &deconvolve_shb_cl2;
+                known_method = 1;
+            }
             #endif
             if(known_method == 0)
             {
                 fprintf(stderr, "--method %s is unknown. Please specify ",  optarg);
                 #ifdef OPENCL
-                fprintf(stderr, "shbcl, ");
+                fprintf(stderr, "shbcl, shbcl2, ");
                 #endif
-                fprintf(stderr, "ave, eve (default), shb, rl or id\n");
+                fprintf(stderr, "ave, eve, shb (default), rl or id\n");
                 exit(EXIT_FAILURE);
             }
             break;

@@ -119,7 +119,7 @@ CFLAGS+=-DOPENCL
 CFLAGS+=-I/opt/nvidia/hpc_sdk/Linux_x86_64/21.3/cuda/11.2/targets/x86_64-linux/include/
 LDFLAGS=-L/opt/nvidia/hpc_sdk/Linux_x86_64/21.3/cuda/11.2/targets/x86_64-linux/lib/
 dw_LIBRARIES+=-lclFFT -lOpenCL
-dw_OBJECTS+=method_shb_cl.o cl_util.o
+dw_OBJECTS+=method_shb_cl.o method_shb_cl2.o cl_util.o
 endif
 
 ifneq ($(UNAME_S),Darwin)

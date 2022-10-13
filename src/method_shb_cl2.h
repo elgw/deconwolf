@@ -14,21 +14,21 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef __method_shb_cl_h__
-#define __method_shb_cl_h__
+#ifndef __method_shb_cl2_h__
+#define __method_shb_cl2_h__
 
 #include "dw.h"
 #include "cl_util.h"
 
 /* Wang and Miller Scaled Heavy Ball */
 
-float * deconvolve_shb_cl(float * restrict im,
+float * deconvolve_shb_cl2(float * restrict im,
                        const int64_t M, const int64_t N, const int64_t P,
                        float * restrict psf,
                        const int64_t pM, const int64_t pN, const int64_t pP,
                        dw_opts * s);
 
-float iter_shb_cl(
+float iter_shb_cl2(
     clu_env_t * clu,
     float ** xp, // Output, f_(t+1)
     const float * restrict im, // Input image

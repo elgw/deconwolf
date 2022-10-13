@@ -7,7 +7,7 @@
 //#define here(x) printf("%s %s %d\n", __FILE__, __FUNCTION__, __LINE__);
 #define here(x) ;
 
-fimcl_t  * initial_guess_cl(clu_env_t * clu,
+static fimcl_t  * initial_guess_cl(clu_env_t * clu,
                             const int64_t M, const int64_t N, const int64_t P,
                             const int64_t wM, const int64_t wN, const int64_t wP)
 {
@@ -41,7 +41,7 @@ fimcl_t  * initial_guess_cl(clu_env_t * clu,
 }
 
 
-float * deconvolve_shb_cl(float * restrict im,
+float * deconvolve_shb_cl2(float * restrict im,
                           const int64_t M, const int64_t N, const int64_t P,
                           float * restrict psf,
                           const int64_t pM, const int64_t pN, const int64_t pP,
@@ -274,7 +274,7 @@ float * deconvolve_shb_cl(float * restrict im,
 
         putdot(s);
 
-        double err = iter_shb_cl(
+        double err = iter_shb_cl2(
                                  clu,
                                  &xp, // xp is updated to the next guess
                                  im,
@@ -358,7 +358,7 @@ float * deconvolve_shb_cl(float * restrict im,
 }
 
 
-float iter_shb_cl(clu_env_t * clu,
+float iter_shb_cl2(clu_env_t * clu,
                   float ** xp, // Output, f_(t+1)
                   const float * restrict im, // Input image
                   fimcl_t * restrict cK, // fft(psf)

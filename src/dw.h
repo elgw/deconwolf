@@ -74,7 +74,8 @@ typedef enum {
     DW_METHOD_AVE, /* Biggs-Andrews Additive Vector Extrapolation */
     DW_METHOD_SHB, /* Wang and Miller, Scaled Heavy Ball */
     #ifdef OPENCL
-    DW_METHOD_SHBCL,
+    DW_METHOD_SHBCL, /* GPU used only for FFT */
+    DW_METHOD_SHBCL2, /* GPU used as much as possible */
     #endif
 } dw_method;
 
@@ -289,6 +290,7 @@ void dw_iterator_free(dw_iterator_t * );
 
 #ifdef OPENCL
 #include "method_shb_cl.h"
+#include "method_shb_cl2.h"
 #endif
 
 #include "method_eve.h"
