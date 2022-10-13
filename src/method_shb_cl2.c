@@ -7,6 +7,33 @@
 //#define here(x) printf("%s %s %d\n", __FILE__, __FUNCTION__, __LINE__);
 #define here(x) ;
 
+
+float getError_gpu(fimcl_t * forward, fimcl_t * image)
+{
+    // TODO with OpenCL:
+/*     float idiv = 0;
+       #pragma omp parallel for reduction(+: idiv)
+       for(int64_t c = 0; c<P; c++)
+       {
+       for(int64_t b = 0; b<N; b++)
+       {
+       for(int64_t a = 0; a<M; a++)
+       {
+       float obs =  y[a + b*wM + c*wM*wN];
+       float est = g[a + b*M + c * M*N];
+       if(est > 0)
+       {
+       idiv += obs*logf(obs/est) - obs + est;
+       }
+       }
+       }
+       }
+
+       float idiv_mean = idiv / (float) (M*N*P);
+ */
+    return 0;
+}
+
 static fimcl_t  * initial_guess_cl(clu_env_t * clu,
                             const int64_t M, const int64_t N, const int64_t P,
                             const int64_t wM, const int64_t wN, const int64_t wP)
@@ -175,6 +202,8 @@ float * deconvolve_shb_cl2(float * restrict im,
         fim_tiff_write_float("fullPSF.tif", Z, NULL, wM, wN, wP);
     }
 
+    fimcl_t * im_gpu = fimcl_new(clu, 0, 0, im, M, N, P);
+
     //fftwf_complex * fftPSF = fft(Z, wM, wN, wP);
     fimcl_t * _clfftPSF = fimcl_new(clu, 0, 0,
                                     Z, wM, wN, wP);
@@ -278,6 +307,7 @@ float * deconvolve_shb_cl2(float * restrict im,
                                  clu,
                                  &xp, // xp is updated to the next guess
                                  im,
+                                 im_gpu,
                                  clfftPSF, // FFT of PSF
                                  p, // Current guess
                                  //p,
@@ -315,6 +345,8 @@ float * deconvolve_shb_cl2(float * restrict im,
 
     } /* End of main loop */
     dw_iterator_free(it);
+
+    fimcl_free(im_gpu);
 
     {
         /* Swap back so that x is the final iteration */
@@ -361,6 +393,7 @@ float * deconvolve_shb_cl2(float * restrict im,
 float iter_shb_cl2(clu_env_t * clu,
                   float ** xp, // Output, f_(t+1)
                   const float * restrict im, // Input image
+                   fimcl_t * restrict im_gpu, // as above, on GPU
                   fimcl_t * restrict cK, // fft(psf)
                   float * restrict pk, // p_k, estimation of the gradient
                   float * restrict W, // Bertero Weights
@@ -387,13 +420,14 @@ float iter_shb_cl2(clu_env_t * clu,
     fimcl_t * gy = fimcl_convolve(Pk, cK, CLU_KEEP_2ND);
     here();
     float * y = fimcl_download(gy);
+    float error_gpu = getError_gpu(gy, im_gpu);
     here();
     fimcl_free(gy);
     here();
 
     /* consumes something like 9% of the total lift over to GPU! */
     float error = getError(y, im, M, N, P, wM, wN, wP, s->metric);
-
+    assert(fabs(error-error_gpu) < 1e-4);
     putdot(s);
 
     /* fimcl_t * im = fimcl_new(clu, ...) // outside of the loop

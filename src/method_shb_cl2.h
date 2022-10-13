@@ -32,6 +32,7 @@ float iter_shb_cl2(
     clu_env_t * clu,
     float ** xp, // Output, f_(t+1)
     const float * restrict im, // Input image
+    fimcl_t * restrict im_gpu, // same as im, but on GPU
     fimcl_t * restrict cK, // fft(psf)
     float * restrict pk, // Current guess
     float * restrict W, // Bertero Weights
