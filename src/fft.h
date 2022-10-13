@@ -57,8 +57,8 @@ fftwf_complex * fft_and_free(float * restrict X,
 float * ifft_and_free(fftwf_complex * F,
                       const size_t n1, const size_t n2, const size_t n3);
 
-/* Fast Fourier Transform */
-fftwf_complex * fft(float * in, int n1, int n2, int n3);
+/* Fast Fourier Transform, out of place */
+fftwf_complex * fft(const float * in, int n1, int n2, int n3);
 
 /* In-Place fft can be faster for small problems but is slower for
  * large ones The time it takes to pad the data can be neglected.
@@ -69,7 +69,7 @@ fftwf_complex * fft_inplace(float * X,
                             const size_t M, const size_t N, const size_t P);
 
 
-float * ifft(fftwf_complex * fX,
+float * ifft(const fftwf_complex * fX,
              size_t M, size_t N, size_t P);
 float * ifft_inplace(fftwf_complex * fX,
                      const size_t M, const size_t N, const size_t P);

@@ -981,7 +981,7 @@ void fim_xcorr2_ut()
     A[M+2] = 0.5;
     for(size_t kk = 0; kk<M*N; kk++)
     {
-        A[kk] = (float) rand()/RAND_MAX;
+        A[kk] = (float) rand()/ (float) RAND_MAX;
         T[kk] = A[kk];
     }
     printf("A=\n");

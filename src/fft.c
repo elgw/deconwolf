@@ -354,19 +354,23 @@ void myfftw_stop(void)
     // Note: wisdom is only exported by fft_train
 }
 
-float * ifft(fftwf_complex * fX, size_t M, size_t N, size_t P)
+float * ifft(const fftwf_complex * fX, size_t M, size_t N, size_t P)
 {
 
     float * X = fftwf_malloc(M*N*P*sizeof(float));
 
     assert(X != NULL);
 
+    /* the planning should not alter fX since planning either is
+     * already performed or isn't used. Hence the typecast (to
+     * suppress compiler warnings) should be fine. */
     fftwf_plan plan_c2r = fftwf_plan_dft_c2r_3d(P, N, M,
-                                                fX,
+                                                (fftwf_complex*) fX,
                                                 X,
                                                 FFTW3_PLANNING);
 
-    fftwf_execute(plan_c2r); fftwf_destroy_plan(plan_c2r);
+    fftwf_execute(plan_c2r);
+    fftwf_destroy_plan(plan_c2r);
 
 
 #pragma omp parallel for shared(X)
@@ -379,14 +383,15 @@ float * ifft(fftwf_complex * fX, size_t M, size_t N, size_t P)
 }
 
 
-fftwf_complex * fft(float * restrict in, const int n1, const int n2, const int n3)
+fftwf_complex * fft(const float * restrict in, const int n1, const int n2, const int n3)
 {
     size_t N = nch(n1, n2, n3);
     fftwf_complex * out = fftwf_malloc(N*sizeof(fftwf_complex));
     memset(out, 0, N*sizeof(fftwf_complex));
 
+    /* See the note in ifft about the typecasting of in */
     fftwf_plan p = fftwf_plan_dft_r2c_3d(n3, n2, n1,
-                                         in, // Float
+                                         (float *) in, // Float
                                          out, // fftwf_complex
                                          FFTW3_PLANNING);
     fftwf_execute(p);
@@ -809,7 +814,7 @@ float fim_compare(const float * X, const float * Y,
                   size_t M, size_t N, size_t P)
 {
     float rel_err_max = -1;
-    size_t tol = 1e-5;
+    float tol = 1e-5;
     for(size_t kk = 0 ; kk<M*N*P; kk++)
     {
         if( fabs(X[kk])> tol)

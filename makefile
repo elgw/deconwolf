@@ -7,6 +7,11 @@
 
 # To enable the method shbcl use
 # make OPENCL=1
+#
+# To build with clang, specify CC=clang
+
+CC?=gcc
+# CC=clang # also requires the package libomp-14-dev
 
 UNAME_S := $(shell uname -s)
 $(info Host type: $(UNAME_S))
@@ -97,6 +102,9 @@ ifeq ($(UNAME_S), Darwin)
 dw_LIBRARIES += -Xpreprocessor -lomp
 else
 CFLAGS += -fopenmp
+ifeq ($(CC),clang)
+CFLAGS+=-fopenmp=libiomp5
+endif
 endif
 else
 CFLAGS += -fno-openmp
@@ -129,7 +137,7 @@ ifeq ($(UNAME_S),Darwin)
 endif
 
 
-CC = cc $(CFLAGS)
+CCF = $(CC) $(CFLAGS)
 SRCDIR = src/
 
 dw_OBJECTS += fim.o tiling.o fft.o fim_tiff.o dw.o deconwolf.o dw_maxproj.o dw_util.o method_eve.o method_identity.o method_rl.o method_ave.o method_shb.o dw_imshift.o fft.o dw_nuclei.o dw_dots.o fwhm.o ftab.o dw_psf.o
@@ -143,13 +151,13 @@ all: $(dw) $(dwtm) $(dwbw)
 
 
 $(dw): $(dw_OBJECTS)
-	$(CC) -o $@ $^ $(dw_LIBRARIES)
+	$(CCF) -o $@ $^ $(dw_LIBRARIES)
 
 $(dwbw): $(dwbw_OBJECTS)
-	$(CC) -o $@ $^ $(dwbw_LIBRARIES)
+	$(CCF) -o $@ $^ $(dwbw_LIBRARIES)
 
 %.o: $(SRCDIR)%.c
-	$(CC) -c $<
+	$(CCF) -c $<
 
 clean:
 	rm -f *.o
