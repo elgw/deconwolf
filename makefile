@@ -21,7 +21,7 @@ dwbw = bin/dw_bw
 
 CFLAGS = -Wall -Wextra -std=gnu99
 
-CC_VERSION = "$(shell gcc --version | head -n 1)"
+CC_VERSION = "$(shell $(CC) --version | head -n 1)"
 GIT_VERSION = "$(shell git log --pretty=format:'%aD:%H' -n 1)"
 
 CFLAGS += -DCC_VERSION=\"$(CC_VERSION)\"
