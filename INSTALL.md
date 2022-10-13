@@ -177,3 +177,15 @@ To set the number of threads, set the environmental variable
 export MKL_NUM_THREADS=8
 dw ...
 ```
+
+## Arch/ Manjaro
+
+``` shell
+# remember to update system
+sudo pacman -Suuyy
+# install dependencies
+sudo pacman -S fftw, gsl, openmp, libtiff
+make
+sudo make install
+
+```
