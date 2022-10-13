@@ -10,3 +10,16 @@ This `src/`-folder contains:
  * `makefile` generates unit tests for various components.
  * `tiling.c/h` Process images in tiles
  * `fft.c/h` Some FFT operations on the images.
+ * `cl_util.c/h` GPU abstraction code.
+
+Implemented methods:
+ * `method_rl.c/h` Standard Richardson Lucy
+ * `method_shb.c/h` RL accelerated by the Scaled Heavy Ball algorithm
+ * `method_shb_cl.c/h` as above, using clFFT for the FFTs.
+ * `method_shb_cl2.c/h` as above, but with as much as possible of the
+   calculations on the GPU. If there is enough memory this should be
+   the fastest alternative. (TODO).
+
+Extra stuff under development:
+ * `dw_dots.c/h` for dot detection.
+ * `dw_maxproj.c/h` for max projections of tif files.
