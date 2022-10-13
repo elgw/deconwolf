@@ -985,7 +985,8 @@ fftwf_complex * fft_inplace(float * X, const size_t M, const size_t N, const siz
                                                 X, /* Input */
                                                 (fftwf_complex*) X, /* Output */
                                                 FFTW3_PLANNING);
-    fftwf_execute(plan_r2c); fftwf_destroy_plan(plan_r2c);
+    fftwf_execute(plan_r2c);
+    fftwf_destroy_plan(plan_r2c);
     return (fftwf_complex*) X;
 }
 
