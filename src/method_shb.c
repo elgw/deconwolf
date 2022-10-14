@@ -85,6 +85,8 @@ float * deconvolve_shb(float * restrict im,
             M, N, P, pM, pN, pP, wM, wN, wP, wMNP);
     fflush(s->log);
 
+    //myfftw_stop(); nope that was not the problem
+    //myfftw_start(s->nThreads_FFT, s->verbosity, s->log);
     fft_train(wM, wN, wP,
               s->verbosity, s->nThreads_FFT,
               s->log);

@@ -1177,7 +1177,7 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
     printf("max-projections of tif files can be created with:\n");
     printf("\t%s maxproj image.tif\n", argv[0]);
     printf("\tsee %s maxproj --help\n", argv[0]);
-    printf(" --noplan\n\t Disable FFT planning for fftw3\n");
+    printf(" --noplan\n\t Don't use any planning optimization for fftw3\n");
     printf(" --no-inplace\n\t Disable in-place FFTs (for fftw3), uses more "
            "memory but could potentially be faster for some problem sizes.\n");
     printf("\n");

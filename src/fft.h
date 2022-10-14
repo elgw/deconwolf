@@ -14,13 +14,16 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+/* Provides some abstraction over fftw. Please note that this module
+ * is not thread safe since it has some global data
+ */
+
 #ifndef fft_h
 #define fft_h
 
 #include <fftw3.h>
 #include <stdint.h>
 #include <malloc.h>
-
 
 /*
  * Initialization commands.
@@ -30,7 +33,7 @@
 void fft_set_plan(unsigned int plan);
 
 /* Set fft to use in-place transformations when possible
-* call before myfftw_start*/
+ * call before myfftw_start*/
 void fft_set_inplace(int use_inplace);
 
 /* Initialize, run before any other commands futher down.
@@ -42,15 +45,15 @@ void myfftw_start(int nThreads, int verbosity, FILE * log);
 void myfftw_stop(void);
 
 void dim3_real_float_inverse(fftwf_complex * in, float * out,
-    const int n1, const int n2, const int n3);
+                             const int n1, const int n2, const int n3);
 
 void dim3_real_float(float * in, fftwf_complex* out,
-    const int n1, const int n2, const int n3);
+                     const int n1, const int n2, const int n3);
 
 
 /* Return the FFT of X. X is also freed (or re-used for in-place
  * transformations)
-*/
+ */
 fftwf_complex * fft_and_free(float * restrict X,
                              const int n1, const int n2, const int n3);
 
@@ -75,9 +78,9 @@ float * ifft_inplace(fftwf_complex * fX,
                      const size_t M, const size_t N, const size_t P);
 
 void fft_mul(fftwf_complex * restrict C,
-    fftwf_complex * restrict A,
-    fftwf_complex * restrict B,
-    const size_t n1, const size_t n2, const size_t n3);
+             fftwf_complex * restrict A,
+             fftwf_complex * restrict B,
+             const size_t n1, const size_t n2, const size_t n3);
 
 /* Y = ifft(A*B) */
 float * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B, int M, int N, int P);

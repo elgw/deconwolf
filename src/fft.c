@@ -46,6 +46,12 @@ static int fft_nthreads = 1;
 static int use_inplace = 0;
 
 
+fftwf_plan plan_r2c = NULL;
+fftwf_plan plan_c2r = NULL;
+fftwf_plan plan_r2c_inplace = NULL;
+fftwf_plan plan_c2r_inplace = NULL;
+
+
 /*
  * Forward declarations
  */
@@ -129,7 +135,9 @@ static void fft_inplace_unpad(float ** pX,
 
     /* WARNING TODO Will not work on Windows */
     size_t add_0 = (size_t) pX;
+
     *pX = realloc(*pX, M*N*P * sizeof(float));
+
     assert(*pX != NULL);
     size_t add_1 = (size_t) pX;
     if(add_0 != add_1)
@@ -288,7 +296,7 @@ void fft_set_plan(unsigned int plan)
     }
     if(ok)
     {
-        FFTW3_PLANNING = plan;
+        FFTW3_PLANNING = plan |  FFTW_UNALIGNED;
     } else {
         fprintf(stderr, "ERROR: Unknown FFTW plan, please use FFTW_ESTIMATE, "
                 "FFTW_MEASURE, FFTW_PATIENT or FFTW_EXHAUSTIVE. %s %s %d\n",
@@ -348,6 +356,10 @@ void myfftw_start(const int nThreads, int verbose, FILE * log)
 void myfftw_stop(void)
 {
 #ifndef CUDA
+    fftwf_destroy_plan(plan_r2c);
+    fftwf_destroy_plan(plan_c2r);
+    fftwf_destroy_plan(plan_r2c_inplace);
+    fftwf_destroy_plan(plan_c2r_inplace);
     fftwf_cleanup_threads();
 #endif
     fftwf_cleanup();
@@ -361,17 +373,7 @@ float * ifft(const fftwf_complex * fX, size_t M, size_t N, size_t P)
 
     assert(X != NULL);
 
-    /* the planning should not alter fX since planning either is
-     * already performed or isn't used. Hence the typecast (to
-     * suppress compiler warnings) should be fine. */
-    fftwf_plan plan_c2r = fftwf_plan_dft_c2r_3d(P, N, M,
-                                                (fftwf_complex*) fX,
-                                                X,
-                                                FFTW3_PLANNING);
-
-    fftwf_execute(plan_c2r);
-    fftwf_destroy_plan(plan_c2r);
-
+    fftwf_execute_dft_c2r(plan_c2r, (fftwf_complex*) fX, X);
 
 #pragma omp parallel for shared(X)
     for(size_t kk = 0 ; kk < M*N*P; kk++)
@@ -383,19 +385,16 @@ float * ifft(const fftwf_complex * fX, size_t M, size_t N, size_t P)
 }
 
 
-fftwf_complex * fft(const float * restrict in, const int n1, const int n2, const int n3)
+fftwf_complex * fft(const float * restrict in,
+                    const int n1, const int n2, const int n3)
 {
+
     size_t N = nch(n1, n2, n3);
     fftwf_complex * out = fftwf_malloc(N*sizeof(fftwf_complex));
     memset(out, 0, N*sizeof(fftwf_complex));
 
-    /* See the note in ifft about the typecasting of in */
-    fftwf_plan p = fftwf_plan_dft_r2c_3d(n3, n2, n1,
-                                         (float *) in, // Float
-                                         out, // fftwf_complex
-                                         FFTW3_PLANNING);
-    fftwf_execute(p);
-    fftwf_destroy_plan(p);
+    fftwf_execute_dft_r2c(plan_r2c, (float*) in, out);
+
     return out;
 }
 
@@ -509,11 +508,7 @@ float * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B,
 
     float * out = fftwf_malloc(M*N*P*sizeof(float));
 
-    fftwf_plan p = fftwf_plan_dft_c2r_3d(P, N, M,
-                                         C, out,
-                                         FFTW3_PLANNING);
-    fftwf_execute(p);
-    fftwf_destroy_plan(p);
+    fftwf_execute_dft_c2r(plan_r2c, C, out);
     fftwf_free(C);
 
     const size_t MNP = M*N*P;
@@ -533,12 +528,9 @@ float * fft_convolve_cc_conj(fftwf_complex * A, fftwf_complex * B,
     fft_mul_conj(C, A, B, M, N, P);
 
     float * out = fftwf_malloc(M*N*P*sizeof(float));
+    assert(plan_c2r != NULL);
 
-    fftwf_plan p = fftwf_plan_dft_c2r_3d(P, N, M,
-                                         C, out,
-                                         FFTW3_PLANNING);
-    fftwf_execute(p);
-    fftwf_destroy_plan(p);
+    fftwf_execute_dft_c2r(plan_c2r, C, out);
     fftwf_free(C);
 
     const size_t MNP = M*N*P;
@@ -575,110 +567,74 @@ void fft_train(const size_t M, const size_t N, const size_t P,
     }
     nThreads < 1 ? nThreads = 1 : 0;
 
-    if(FFTW3_PLANNING == FFTW_ESTIMATE)
-    {
-        if(verbosity > 0)
-        {
-            printf("No training needed for FFTW_ESTIMATE\n");
-        }
-        fprintf(log, "No training needed for FFTW_ESTIMATE\n");
-        return;
-    }
-
-    if(verbosity > 1){
-        printf("fftw3 training ... \n"); fflush(stdout);
+    if(verbosity > 0){
+        printf("creating fftw3 plans ... \n"); fflush(stdout);
     }
     if(log != stdout)
     {
         fprintf(log, "--- fftw3 training ---\n");
     }
 
+    /* Free old plans if exist */
+    fftwf_destroy_plan(plan_r2c);
+    fftwf_destroy_plan(plan_c2r);
+    fftwf_destroy_plan(plan_r2c_inplace);
+    fftwf_destroy_plan(plan_c2r_inplace);
+
     fftwf_complex * C = fftwf_malloc(nch(M, N, P)*sizeof(fftwf_complex));
     float * R = fftwf_malloc(nch(M,N,P)*2*sizeof(float));
 
-    fftwf_plan plan_c2r;
+    /* Hermitian to Real */
 
-    /* See if there is a plan already */
-    if(use_inplace == 0)
-    {
-        plan_c2r = fftwf_plan_dft_c2r_3d(P, N, M,
-                                         C, R, FFTW3_PLANNING  | FFTW_WISDOM_ONLY);
-    } else {
-        plan_c2r = fftwf_plan_dft_c2r_3d(P, N, M,
-                                         C, (float *) C, FFTW3_PLANNING  | FFTW_WISDOM_ONLY);
-    }
-
+    plan_c2r = fftwf_plan_dft_c2r_3d(P, N, M,
+                                     C, R, FFTW3_PLANNING  | FFTW_WISDOM_ONLY);
     if(plan_c2r == NULL)
     {
-        if(verbosity > 0)
-        {
-            printf("> generating fftw3 c2r plan\n");
-        }
-        fprintf(log, "> generating fftw3 c2r plan\n");
-
-        if(use_inplace == 0)
-        {
-            plan_c2r = fftwf_plan_dft_c2r_3d(P, N, M,
-                                             C, R, FFTW3_PLANNING);
-        } else {
-            plan_c2r = fftwf_plan_dft_c2r_3d(P, N, M,
-                                             C, (float *) C, FFTW3_PLANNING);
-        }
+        plan_c2r = fftwf_plan_dft_c2r_3d(P, N, M,
+                                         C, R, FFTW3_PLANNING);
+        printf("creating c2r plan ... (consider the --noplan option)\n");
         fftwf_execute(plan_c2r);
-
-
         updatedWisdom = 1;
-    } else {
-        if(verbosity > 1)
-        {
-            printf("\t Using cached fftw3 c2r plan\n");
-        }
-        if(log != stdout)
-        {
-            fprintf(log, "Using cached fftw3 c2r plan\n");
-        }
     }
 
-    fftwf_plan plan_r2c;
-    if(use_inplace == 0)
+    plan_c2r_inplace = fftwf_plan_dft_c2r_3d(P, N, M,
+                                             C, (float *) C, FFTW3_PLANNING  | FFTW_WISDOM_ONLY);
+    if(plan_c2r_inplace == NULL)
+    {
+        plan_c2r_inplace = fftwf_plan_dft_c2r_3d(P, N, M,
+                                                 C, (float *) C, FFTW3_PLANNING);
+        printf("creating c2r inplace plan ... \n");
+        fftwf_execute(plan_c2r_inplace);
+        updatedWisdom = 1;
+    }
+
+    /* Real to Hermitian */
+
+    plan_r2c = fftwf_plan_dft_r2c_3d(P, N, M,
+                                     R, C,
+                                     FFTW3_PLANNING | FFTW_WISDOM_ONLY);
+    if(plan_r2c == NULL)
     {
         plan_r2c = fftwf_plan_dft_r2c_3d(P, N, M,
                                          R, C,
-                                         FFTW3_PLANNING | FFTW_WISDOM_ONLY);
-    } else {
-        plan_r2c = fftwf_plan_dft_r2c_3d(P, N, M,
-                                         (float*) C, C,
-                                         FFTW3_PLANNING | FFTW_WISDOM_ONLY);
-    }
-
-    if(plan_r2c  == NULL)
-    {
-        if(verbosity > 0){
-            printf("> generating fftw3 r2c plan \n");
-        }
-        if(log != stdout)
-        {
-            fprintf(log, "> generating fftw3 r2c plan\n");
-        }
-
-        if(use_inplace == 0)
-        {
-            plan_r2c = fftwf_plan_dft_r2c_3d(P, N, M,
-                                             R, C,
-                                             FFTW3_PLANNING);
-        } else {
-            plan_r2c = fftwf_plan_dft_r2c_3d(P, N, M,
-                                             (float*) C, C,
-                                             FFTW3_PLANNING);
-        }
+                                         FFTW3_PLANNING);
+        printf("creating r2c plan ... \n");
+        fftwf_execute(plan_r2c);
         updatedWisdom = 1;
-    } else {
-        if(verbosity > 1)
-        {
-            printf("\t Using cached fftw3 r2c plan\n");
-        }
-        fprintf(log, "Using cached fftw3 r2c plan\n");
     }
+    plan_r2c_inplace = fftwf_plan_dft_r2c_3d(P, N, M,
+                                             (float*) C, C,
+                                             FFTW3_PLANNING | FFTW_WISDOM_ONLY);
+    if(plan_r2c_inplace == NULL)
+    {
+        plan_r2c_inplace = fftwf_plan_dft_r2c_3d(P, N, M,
+                                                 (float*) C, C,
+                                                 FFTW3_PLANNING);
+        printf("creating r2c inplace plan ... \n");
+        fftwf_execute(plan_r2c_inplace);
+        updatedWisdom = 1;
+    }
+
 
     fftwf_free(C);
     fftwf_free(R);
@@ -686,27 +642,22 @@ void fft_train(const size_t M, const size_t N, const size_t P,
     if(updatedWisdom)
     {
         char * swf = get_swf_file_name(nThreads);
-        if(swf == NULL)
-        { assert(0); }
-        else {
-            fprintf(log, "Exporting fftw wisdom to %s\n", swf);
-            int ret = fftwf_export_wisdom_to_filename(swf);
-            if(verbosity > 0)
+        assert(swf != NULL);
+
+        fprintf(log, "Exporting fftw wisdom to %s\n", swf);
+        int ret = fftwf_export_wisdom_to_filename(swf);
+
+        if(ret != 0)
+        {
+            if(verbosity > 1)
             {
-                if(ret != 0)
-                {
-                    printf("Exported fftw wisdom to %s\n", swf);
-                } else {
-                    printf("ERROR; Failed to write fftw wisdom to %s\n", swf);
-                }
-
+                printf("Exported fftw wisdom to %s\n", swf);
             }
-            free(swf);
+        } else {
+            printf("ERROR; Failed to write fftw wisdom to %s\n", swf);
         }
+        free(swf);
     }
-
-    fftwf_destroy_plan(plan_r2c);
-    fftwf_destroy_plan(plan_c2r);
 
     return;
 }
@@ -843,48 +794,59 @@ void test_inplace(void)
     printf(" -> Testing out-of-place vs in-place\n");
     for(size_t kk = 0; kk<1000; kk++)
     {
-        size_t M = 512+(rand() % 1000);
-        size_t N = 256+(rand() % 1000);
-        size_t P = 20+(rand() % 100);
+        /* Normal non-inplace version */
+        size_t M = 51+(rand() % 10);
+        size_t N = 25+(rand() % 10);
+        size_t P = 20+(rand() % 10);
+        //M = 2228; N = 2228; P = 208; // caused strange problems
         printf("Test image size: %zu %zu %zu\n", M, N, P);
         size_t MNP = M*N*P;
         float * X = test_data_rand(M, N, P);
-    fftwf_complex * fX = fft(X, M, N, P);
-    float * ffX = ifft(fX, M, N, P);
-    float relerr_oo = fim_compare(X, ffX, M, N, P);
-    printf("fft:out-of-place ifft:out-of-place max_rel_err: %e\n", relerr_oo);
+        printf("fft\n");
+        fftwf_complex * fX = fft(X, M, N, P);
+        printf("ifft\n");
+        float * ffX = ifft(fX, M, N, P);
+        float relerr_oo = fim_compare(X, ffX, M, N, P);
+        printf("fft:out-of-place ifft:out-of-place max_rel_err: %e\n", relerr_oo);
 
-    float * X2 = fftwf_malloc(M*N*P*sizeof(float));
-    memcpy(X2, X, M*N*P*sizeof(float));
-    float * dummy1 = malloc(MNP);
-    fftwf_complex * fX2 = fft_inplace(X2, M, N, P);
-    float * dummy2 = malloc(MNP);
-    float * ffX2 = ifft(fX2, M , N, P);
-    float relerr_io = fim_compare(X, ffX2, M, N, P);
-    printf("fft:in-place ifft:out-of-place max_rel_err: %e\n", relerr_io);
+        /* Only forward inplace */
+        float * X2 = fftwf_malloc(M*N*P*sizeof(float));
+        memcpy(X2, X, M*N*P*sizeof(float));
+        float * dummy1 = malloc(MNP);
+        printf("fft_inplace\n");
+        fftwf_complex * fX2 = fft_inplace(X2, M, N, P);
+        float * dummy2 = malloc(MNP);
+        printf("ifft\n");
+        float * ffX2 = ifft(fX2, M , N, P);
+        float relerr_io = fim_compare(X, ffX2, M, N, P);
+        printf("fft:in-place ifft:out-of-place max_rel_err: %e\n", relerr_io);
 
-    float * X3 = fftwf_malloc(M*N*P*sizeof(float));
-    float * dummy3 = malloc(MNP);
-    memcpy(X3, X, M*N*P*sizeof(float));
-    fftwf_complex * fX3 = fft_inplace(X3, M, N, P);
-    float * dummy4 = malloc(MNP);;
-    float * ffX3 = ifft_inplace(fX3, M , N, P);
-    float relerr_ii = fim_compare(X, ffX3, M, N, P);
-    printf("fft:in-place ifft:out-of-place max_rel_err: %e\n", relerr_ii);
-    assert(relerr_oo < 1e-5);
-    assert(relerr_io < 1e-5);
-    assert(relerr_ii < 1e-5);
+        /* Forward inplace and backward inplace */
+        float * X3 = fftwf_malloc(M*N*P*sizeof(float));
+        float * dummy3 = malloc(MNP);
+        memcpy(X3, X, M*N*P*sizeof(float));
+        printf("fft_inplace\n");
+        fftwf_complex * fX3 = fft_inplace(X3, M, N, P);
+        float * dummy4 = malloc(MNP);
+        printf("ifft_inplace\n");
+        float * ffX3 = ifft_inplace(fX3, M , N, P);
+        float relerr_ii = fim_compare(X, ffX3, M, N, P);
+        printf("fft:in-place ifft:out-of-place max_rel_err: %e\n", relerr_ii);
 
-    free(dummy1);
-    free(dummy2);
-    free(dummy3);
-    free(dummy4);
-    free(X);
-    free(ffX3);
-    free(fX2);
-    free(ffX2);
-    free(ffX);
-    free(fX);
+        assert(relerr_oo < 1e-5);
+        assert(relerr_io < 1e-5);
+        assert(relerr_ii < 1e-5);
+
+        free(dummy1);
+        free(dummy2);
+        free(dummy3);
+        free(dummy4);
+        free(X);
+        free(ffX3);
+        free(fX2);
+        free(ffX2);
+        free(ffX);
+        free(fX);
     }
     exit(EXIT_SUCCESS);
     return;
@@ -895,6 +857,7 @@ void fft_ut(void)
     fft_set_inplace(0);
     fft_set_plan(FFTW_ESTIMATE);
     myfftw_start(8, 1, stdout);
+    fftwf_forget_wisdom();
 
     test_inplace();
     tictoc;
@@ -981,24 +944,17 @@ fftwf_complex * fft_inplace(float * X, const size_t M, const size_t N, const siz
 {
 
     fft_inplace_pad(&X, M, N, P);
-    fftwf_plan plan_r2c = fftwf_plan_dft_r2c_3d(P, N, M,
-                                                X, /* Input */
-                                                (fftwf_complex*) X, /* Output */
-                                                FFTW3_PLANNING);
-    fftwf_execute(plan_r2c);
-    fftwf_destroy_plan(plan_r2c);
+    assert(plan_r2c_inplace != NULL);
+    fftwf_execute_dft_r2c(plan_r2c_inplace, X, (fftwf_complex *) X);
     return (fftwf_complex*) X;
 }
 
 float * ifft_inplace(fftwf_complex * fX, const size_t M, const size_t N, const size_t P)
 {
     float * X = (float *) fX;
-    fftwf_plan plan_c2r = fftwf_plan_dft_c2r_3d(P, N, M,
-                                                fX,
-                                                X,
-                                                FFTW3_PLANNING);
-    fftwf_execute(plan_c2r);
-    fftwf_destroy_plan(plan_c2r);
+
+    assert(plan_c2r_inplace != NULL);
+    fftwf_execute_dft_c2r(plan_c2r_inplace, fX, (float *) X);
 
     fft_inplace_unpad(&X, M, N, P);
 #pragma omp parallel for shared(X)
