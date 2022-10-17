@@ -47,11 +47,16 @@ typedef struct{
     clfftPlanHandle h2r_plan;
     clfftPlanHandle h2r_inplace_plan;
     size_t M; size_t N; size_t P;
+    /* For complex data */
     clu_kernel_t kern_mul;
     clu_kernel_t kern_mul_conj;
     clu_kernel_t kern_mul_inplace;
     clu_kernel_t kern_mul_conj_inplace;
+    /* For real data */
+    cl_mem buf_size;
+    clu_kernel_t kern_real_mul_inplace;
     clu_kernel_t kern_error_idiv;
+
 
     size_t nb_allocated;
     size_t n_release;
@@ -118,6 +123,9 @@ void fimcl_complex_mul(fimcl_t * fX, fimcl_t * fY, fimcl_t * fZ, int conj);
 
 /* fY = fX .* fY */
 void fimcl_complex_mul_inplace(fimcl_t * fX, fimcl_t * fY, int conj);
+
+/* Y = X.*Y */
+void fimcl_real_mul_inplace(fimcl_t * X, fimcl_t * Y);
 
 /* Wait until the object is available.
  * To be used after fft, ifft, complex_mul etc ...*/

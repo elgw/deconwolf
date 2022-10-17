@@ -1,9 +1,15 @@
 #include "method_shb_cl.h"
 
+//#define here(x) printf("%s %s %d\n", __FILE__, __FUNCTION__, __LINE__);
+#define here(x) ;
+
+
 #include "kernels/cl_idiv_kernel.h"
+#include "kernels/cl_update_y_kernel.h"
 
 clu_kernel_t * idiv_kernel;
 clu_kernel_t * reduction_kernel;
+clu_kernel_t * update_y_kernel;
 
 void prepare_kernels(clu_env_t * clu,
                      size_t M, size_t N, size_t P,
@@ -16,15 +22,84 @@ void prepare_kernels(clu_env_t * clu,
             "-D wM=%zu -D wN=%zu -D wP=%zu",
             wM*wN*wP, M, N, P, wM, wN, wP);
     idiv_kernel = clu_kernel_newa(clu,
-                                      "kernels/cl_idiv_kernel.cl",
+                                  "kernels/cl_idiv_kernel.c",
                                   (const char *) cl_idiv_kernel,
-                                      cl_idiv_kernel_len,
-                                      "idiv_kernel",
+                                  cl_idiv_kernel_len,
+                                  "idiv_kernel",
+                                  argstring);
+    update_y_kernel = clu_kernel_newa(clu,
+                                      "kernels/cl_update_y_kernel.c",
+                                      (const char *) cl_update_y_kernel,
+                                      cl_update_y_kernel_len,
+                                      "update_y_kernel",
                                       argstring);
+
     free(argstring);
 }
 
 float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image);
+
+void gpu_update_y(fimcl_t * gy, fimcl_t * image)
+{
+    here();
+
+    /* Configure sizes */
+    size_t nel = gy->M*gy->N*gy->P;
+    size_t localWorkSize; /* Use largest possible */
+    cl_kernel kernel = update_y_kernel->kernel;
+    // TOOD: does this take time?
+    cl_int status = clGetKernelWorkGroupInfo(kernel,
+                                             gy->clu->device_id,
+                                             CL_KERNEL_WORK_GROUP_SIZE,
+                                             sizeof(size_t), &localWorkSize, NULL);
+    check_CL(status);
+    /* The global size needs to be a multiple of the localWorkSize
+     * i.e. it will be larger than the number of elements */
+    size_t numWorkGroups = (nel + (localWorkSize -1) ) / localWorkSize;
+    size_t globalWorkSize = localWorkSize * numWorkGroups;
+    if(0)
+    {
+        printf("   globalWorkSize: %zu\n", globalWorkSize);
+        printf("   localWorkSize: %zu\n", localWorkSize);
+        printf("   numWorkGroups: %zu\n", numWorkGroups);
+    }
+    assert(globalWorkSize >= image->M*image->N*image->P);
+
+    fimcl_sync(gy);
+    //fimcl_sync(image); // never changed
+
+    /* The image is assumed to be smaller or the same size
+     * as the forward projection (which might be extended). */
+    assert(image->M <= gy->M);
+    assert(image->N <= gy->N);
+    assert(image->P <= gy->P);
+
+    check_CL( clSetKernelArg(kernel,
+                             0, // argument index
+                             sizeof(cl_mem), // argument size
+                             (void *) &gy->buf) ); // argument value
+
+    check_CL( clSetKernelArg(kernel,
+                             1, // argument index
+                             sizeof(cl_mem), // argument size
+                             (void *) &image->buf) ); // argument value
+
+    check_CL( clEnqueueNDRangeKernel(gy->clu->command_queue,
+                                     kernel,
+                                     1,
+                                     NULL,
+                                     &globalWorkSize, //global_work_size,
+                                     &localWorkSize,
+                                     0,
+                                     NULL,
+                                     &gy->wait_ev) );
+
+    fimcl_sync(gy);
+
+    return;
+}
+
+
 
 float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
 {
@@ -33,8 +108,10 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
     /* Configure sizes */
     size_t nel = forward->M*forward->N*forward->P;
     size_t localWorkSize; /* Use largest possible */
+    // TOOD: does this take time?
     status = clGetKernelWorkGroupInfo(idiv_kernel->kernel,
-                                      forward->clu->device_id, CL_KERNEL_WORK_GROUP_SIZE,
+                                      forward->clu->device_id,
+                                      CL_KERNEL_WORK_GROUP_SIZE,
                                       sizeof(size_t), &localWorkSize, NULL);
     /* The global size needs to be a multiple of the localWorkSize
      * i.e. it will be larger than the number of elements */
@@ -121,13 +198,11 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
 
 
 
-//#define here(x) printf("%s %s %d\n", __FILE__, __FUNCTION__, __LINE__);
-#define here(x) ;
 
 
 static fimcl_t  * initial_guess_cl(clu_env_t * clu,
-                            const int64_t M, const int64_t N, const int64_t P,
-                            const int64_t wM, const int64_t wN, const int64_t wP)
+                                   const int64_t M, const int64_t N, const int64_t P,
+                                   const int64_t wM, const int64_t wN, const int64_t wP)
 {
     /* Create initial guess: the fft of an image that is 1 in MNP and 0 outside
      * M, N, P is the dimension of the microscopic image
@@ -160,10 +235,10 @@ static fimcl_t  * initial_guess_cl(clu_env_t * clu,
 
 
 float * deconvolve_shb_cl2(float * restrict im,
-                          const int64_t M, const int64_t N, const int64_t P,
-                          float * restrict psf,
-                          const int64_t pM, const int64_t pN, const int64_t pP,
-                          dw_opts * s)
+                           const int64_t M, const int64_t N, const int64_t P,
+                           float * restrict psf,
+                           const int64_t pM, const int64_t pN, const int64_t pP,
+                           dw_opts * s)
 {
 
     if(s->verbosity > 3)
@@ -348,32 +423,11 @@ float * deconvolve_shb_cl2(float * restrict im,
      *  set to be the same */
 
     float * x = fim_constant(wMNP, sumg / (float) wMNP);
-
-
     float * xp = fim_copy(x, wMNP);
 
     dw_iterator_t * it = dw_iterator_new(s);
     while(dw_iterator_next(it) >= 0)
     {
-
-        if(s->iterdump > 0){
-            if(it->iter % s->iterdump == 0)
-            {
-                float * temp = fim_subregion(x, wM, wN, wP, M, N, P);
-                char * outname = gen_iterdump_name(s, it->iter);
-                //printf(" Writing current guess to %s\n", outname);
-                if(s->outFormat == 32)
-                {
-                    fim_tiff_write_float(outname, temp, NULL, M, N, P);
-                } else {
-                    fim_tiff_write(outname, temp, NULL, M, N, P);
-                }
-                free(outname);
-                free(temp);
-            }
-        }
-
-        //float * p = fim_copy(x, wMNP);
         float * p = xp; /* We don't need xp more */
 
         /* Eq. 10 in SHB paper */
@@ -388,37 +442,31 @@ float * deconvolve_shb_cl2(float * restrict im,
             p[kk] = x[kk] + alpha*(x[kk]-xp[kk]);
         }
 
-        if(s->psigma > 0)
-        {
-            printf("gsmoothing()\n");
-            fim_gsmooth(x, wM, wN, wP, s->psigma);
-        }
-
         putdot(s);
 
         double err = iter_shb_cl2(
-                                 clu,
-                                 &xp, // xp is updated to the next guess
-                                 im,
-                                 im_gpu,
-                                 clfftPSF, // FFT of PSF
-                                 p, // Current guess
-                                 //p,
-                                 W, // Weights (to handle boundaries)
-                                 wM, wN, wP, // Expanded size
-                                 M, N, P, // Original size
-                                 s);
+            clu,
+            &xp, // xp is updated to the next guess
+            im,
+            im_gpu,
+            clfftPSF, // FFT of PSF
+            p, // Current guess
+            //p,
+            W, // Weights (to handle boundaries)
+            wM, wN, wP, // Expanded size
+            M, N, P, // Original size
+            s);
 
         fftwf_free(p); // i.e. p
 
         dw_iterator_set_error(it, err);
-        if(1){
+        {
             /* Swap so that the current is named x */
             float * t = x;
             x = xp;
             xp = t;
         }
-        //fftwf_free(p);
+
         /* Enforce a priori information about the lowest possible value */
         if(s->positivity)
         {
@@ -484,15 +532,15 @@ float * deconvolve_shb_cl2(float * restrict im,
 
 
 float iter_shb_cl2(clu_env_t * clu,
-                  float ** xp, // Output, f_(t+1)
-                  const float * restrict im, // Input image
+                   float ** xp, // Output, f_(t+1)
+                   const float * restrict im, // Input image
                    fimcl_t * restrict im_gpu, // as above, on GPU
-                  fimcl_t * restrict cK, // fft(psf)
-                  float * restrict pk, // p_k, estimation of the gradient
-                  float * restrict W, // Bertero Weights
-                  const int64_t wM, const int64_t wN, const int64_t wP, // expanded size
-                  const int64_t M, const int64_t N, const int64_t P, // input image size
-                  __attribute__((unused)) const dw_opts * s)
+                   fimcl_t * restrict cK, // fft(psf)
+                   float * restrict pk, // p_k, estimation of the gradient
+                   float * restrict W, // Bertero Weights
+                   const int64_t wM, const int64_t wN, const int64_t wP, // expanded size
+                   const int64_t M, const int64_t N, const int64_t P, // input image size
+                   __attribute__((unused)) const dw_opts * s)
 {
     // We could reduce memory even further by using
     // the allocation for xp
@@ -514,73 +562,34 @@ float iter_shb_cl2(clu_env_t * clu,
     here();
 
     float error = fimcl_error_idiv(gy, im_gpu);
-    here();
-    fimcl_free(gy);
-    here();
 
-    /* consumes something like 9% of CPU time if not run on the GPU */
-    float error_cpu = getError(y, im, M, N, P, wM, wN, wP, s->metric);
-    //printf("\nerror = %f, error_cpu = %f\n", error, error_cpu);
-    //assert(fabs(error-error_gpu) < 1e-4);
     putdot(s);
 
-    /* fimcl_t * im = fimcl_new(clu, ...) // outside of the loop
-     * fimcl_div(y, im, y); // y = im/y
-     */
+    gpu_update_y(gy, im_gpu);
+    fimcl_t * _Y = gy;
+    fimcl_sync(_Y);
 
-    // Continue here:
-    // gpu_update_y(gy, im_gpu);
-    // Then we can avoid one pair of download/upload!
-
-    float * y = fimcl_download(gy);
-    const double mindiv = 1e-6; /* Smallest allowed divisor */
-#pragma omp parallel for shared(y, im)
-    for(size_t cc =0; cc < (size_t) wP; cc++){
-        for(size_t bb = 0; bb < (size_t) wN; bb++){
-            for(size_t aa = 0; aa < (size_t) wM; aa++){
-                size_t yidx = aa + bb*wM + cc*wM*wN;
-                size_t imidx = aa + bb*M + cc*M*N;
-                if(aa < (size_t) M && bb < (size_t) N && cc < (size_t) P)
-                {
-                    /* abs and sign */
-                    fabs(y[yidx]) < mindiv ? y[yidx] = copysign(mindiv, y[yidx]) : 0;
-                    y[yidx] = im[imidx]/y[yidx];
-                } else {
-                    y[yidx]=0;
-                }
-            }
-        }
-    }
-
-    fimcl_t * _Y = fimcl_new(clu, 0, 0, y, wM, wN, wP);
-    clFinish(_Y->clu->command_queue);
     // fimcl_fft_inplace(Y);
     fimcl_t * Y = fimcl_fft(_Y);
     fimcl_free(_Y);
 
     clFinish(Y->clu->command_queue);
-    fftwf_free(y);
-    fimcl_t * gx = fimcl_convolve_conj(Y, cK, CLU_KEEP_2ND); // TODO
-    here();
-    float * x = fimcl_download(gx);
-    fimcl_free(gx);
+    fimcl_t * gx = fimcl_convolve_conj(Y, cK, CLU_KEEP_2ND);
     here();
 
-    /* Eq. 18 in Bertero */
+    fimcl_t * gpk = fimcl_new(clu, 0, 0, pk, wM, wN, wP);
+    fimcl_sync(gpk);
+    fimcl_real_mul_inplace(gpk, gx); // gx = gpk .* gx
+    fimcl_free(gpk);
     if(W != NULL)
     {
-#pragma omp parallel for shared(x, pk, W)
-        for(size_t cc = 0; cc<wMNP; cc++)
-        {
-            x[cc] *= pk[cc]*W[cc];
-        }
-    } else {
-#pragma omp parallel for shared(x, pk)
-        for(size_t cc = 0; cc<wMNP; cc++)
-        {
-            x[cc] *= pk[cc];
-        }
+        fimcl_t * gW = fimcl_new(clu, 0, 0, W, wM, wN, wP);
+        fimcl_sync(gW);
+        fimcl_real_mul_inplace(gW, gx);
+        fimcl_free(gpk);
     }
+    float * x = fimcl_download(gx);
+    fimcl_free(gx);
 
     xp[0] = x;
     return error;

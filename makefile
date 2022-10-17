@@ -165,7 +165,7 @@ $(dwbw): $(dwbw_OBJECTS)
 clean:
 	rm -f *.o
 
-# the kernels are included by cl_util.c
+# the kernels are included by cl_util.c and in method_shb_cl*
 kernels:
 	# cl_complex_square
 	cp src/kernels/cl_complex_square.c cl_complex_square
@@ -191,7 +191,12 @@ kernels:
 	cp src/kernels/cl_idiv_kernel.c cl_idiv_kernel
 	xxd -i cl_idiv_kernel > src/kernels/cl_idiv_kernel.h
 	rm cl_idiv_kernel
-
+	# y = im/y
+	cp src/kernels/cl_update_y_kernel.c cl_update_y_kernel
+	xxd -i cl_update_y_kernel > src/kernels/cl_update_y_kernel.h
+	rm cl_update_y_kernel
+	#
+	xxd -i src/kernels/cl_real_mul_inplace.c > src/kernels/cl_real_mul_inplace.h
 
 install:
 	# Binaries

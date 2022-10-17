@@ -6,7 +6,7 @@
 #include "kernels/cl_complex_mul_inplace.h"
 #include "kernels/cl_complex_mul_conj_inplace.h"
 #include "kernels/cl_error_idiv.h"
-
+#include "kernels/cl_real_mul_inplace.h"
 
 static char * read_program(const char * fname, size_t * size);
 static double clockdiff(struct timespec* start, struct timespec * finish);
@@ -121,9 +121,11 @@ float * fimcl_download(fimcl_t * gX)
         float * X = calloc(MNP, sizeof(float));
         if(X == NULL)
         {
-            fprintf(stderr, "Failed to allocate memory in %s/%s/%d\n", __FILE__,
+            fprintf(stderr, "Failed to allocate memory in %s %s %d\n", __FILE__,
                     __FUNCTION__,
                     __LINE__);
+            fprintf(stderr, "Tried to allocate %zu x %zu x %zu (%zu floats)\n",
+                    gX->M, gX->N, gX->P, MNP);
             exit(EXIT_FAILURE);
         }
         assert(X != NULL);
@@ -482,6 +484,60 @@ void fimcl_complex_mul(fimcl_t * X, fimcl_t * Y, fimcl_t * Z, int conj)
                                      &Z->wait_ev) );
     fimcl_sync(Z);
     return;
+}
+
+/* Y = X.*Y */
+void fimcl_real_mul_inplace(fimcl_t * X, fimcl_t * Y)
+{
+    assert(X->M == Y->M);
+    assert(X->N == Y->N);
+    assert(X->P == Y->P);
+    assert(X->transformed == 0);
+    assert(Y->transformed == 0);
+
+    cl_kernel kernel = X->clu->kern_real_mul_inplace.kernel;
+
+    /* Set sizes */
+    size_t localWorkSize; /* Use largest possible */
+    check_CL ( clGetKernelWorkGroupInfo(kernel,
+                                        X->clu->device_id,
+                                        CL_KERNEL_WORK_GROUP_SIZE,
+                                        sizeof(size_t),
+                                        &localWorkSize,
+                                        NULL) );
+
+    size_t nel = X->M * X->N * X->P;
+    size_t numWorkGroups = (nel + (localWorkSize -1) ) / localWorkSize;
+    size_t globalWorkSize = localWorkSize * numWorkGroups;
+
+    check_CL( clSetKernelArg(kernel,
+                                 0, // argument index
+                                 sizeof(cl_mem), // argument size
+                                 (void *) &X->buf) ); // argument value
+
+    check_CL( clSetKernelArg(kernel,
+                             1, // argument index
+                             sizeof(cl_mem), // argument size
+                             (void *) &Y->buf) ); // argument value
+
+    check_CL( clSetKernelArg(kernel,
+                             2,
+                             sizeof(cl_mem),
+                             (void *) &X->clu->buf_size) );
+
+    check_CL( clEnqueueNDRangeKernel(X->clu->command_queue,
+                                     kernel,
+                                     1, //3,
+                                     NULL,
+                                     &globalWorkSize, //global_work_size,
+                                     &localWorkSize,
+                                     0,
+                                     NULL,
+                                     &Y->wait_ev) );
+
+    fimcl_sync(Y);
+
+
 }
 
 void fimcl_complex_mul_inplace(fimcl_t * X, fimcl_t * Y, int conj)
@@ -854,20 +910,20 @@ clu_env_t * clu_new(int verbose)
     return env;
 }
 
-void clu_prepare_fft(clu_env_t * env, size_t M, size_t N, size_t P)
+void clu_prepare_fft(clu_env_t * clu, size_t M, size_t N, size_t P)
 {
-    if(env->verbose > 1)
+    if(clu->verbose > 1)
     {
         printf("Preparing for convolutions of size %zu x %zu x %zu\n",
                M, N, P);
     }
-    assert(env->clFFT_loaded == 0);
+    assert(clu->clFFT_loaded == 0);
 
     /* Setup clFFT. */
-    check_CL( clfftInitSetupData(&env->fftSetup));
-    check_CL( clfftSetup(&env->fftSetup));
+    check_CL( clfftInitSetupData(&clu->fftSetup));
+    check_CL( clfftSetup(&clu->fftSetup));
 
-    if(env->verbose > 1)
+    if(clu->verbose > 1)
     {
         cl_uint major, minor, patch;
         check_clFFT(clfftGetVersion(&major, &minor, &patch));
@@ -875,47 +931,70 @@ void clu_prepare_fft(clu_env_t * env, size_t M, size_t N, size_t P)
     }
 
     /* Create clFFT plans for this particular size */
-    env->r2h_plan = gen_r2h_plan(env, M, N, P);
-    env->r2h_inplace_plan = gen_r2h_inplace_plan(env, M, N, P);
+    clu->r2h_plan = gen_r2h_plan(clu, M, N, P);
+    clu->r2h_inplace_plan = gen_r2h_inplace_plan(clu, M, N, P);
 
-    env->h2r_plan = gen_h2r_plan(env, M, N, P);
-    env->h2r_inplace_plan = gen_h2r_inplace_plan(env, M, N, P);
+    clu->h2r_plan = gen_h2r_plan(clu, M, N, P);
+    clu->h2r_inplace_plan = gen_h2r_inplace_plan(clu, M, N, P);
 
     /* Create the OpenCL kernels that we will use*/
-    env->kern_mul =
-        *clu_kernel_new(env,
+    clu->kern_mul =
+        *clu_kernel_new(clu,
                         NULL, //"cl_complex_mul.c",
                         (const char *) cl_complex_mul,
                         cl_complex_mul_len,
                         "cl_complex_mul");
 
-    env->kern_mul_conj =
-        *clu_kernel_new(env,
+    clu->kern_mul_conj =
+        *clu_kernel_new(clu,
                         NULL, //"cl_complex_mul_conj.c",
                         (const char *) cl_complex_mul_conj,
                         cl_complex_mul_conj_len,
                         "cl_complex_mul_conj");
-    env->kern_mul_inplace =
-        *clu_kernel_new(env,
+    clu->kern_mul_inplace =
+        *clu_kernel_new(clu,
                         NULL,
                         (const char *) cl_complex_mul_inplace,
                         cl_complex_mul_inplace_len,
                         "cl_complex_mul_inplace");
-    env->kern_mul_conj_inplace =
-        *clu_kernel_new(env,
+    clu->kern_mul_conj_inplace =
+        *clu_kernel_new(clu,
                         NULL,
                         (const char *) cl_complex_mul_conj_inplace,
                         cl_complex_mul_conj_inplace_len,
                         "cl_complex_mul_conj_inplace");
-    /*
-    env->kern_error_idiv =
-        *clu_kernel_new(env,
-                        NULL,
-                        (const char *) cl_error_idiv,
-                        cl_error_idiv_len,
-                        "cl_error_idiv");
-    */
-    env->clFFT_loaded = 1;
+
+    clu->kern_real_mul_inplace =
+        * clu_kernel_new(clu,
+                         NULL,
+                         (const char *) src_kernels_cl_real_mul_inplace_c,
+                         src_kernels_cl_real_mul_inplace_c_len,
+                         "cl_real_mul_inplace");
+
+    /* Set up size-dependent data */
+    size_t * size = malloc(4*sizeof(size_t));
+    size[0] = M*N*P;
+    size[1] = M;
+    size[2] = M;
+    size[3] = P;
+    cl_int status;
+    clu->buf_size = clCreateBuffer(clu->context,
+                              CL_MEM_READ_ONLY,
+                              4*sizeof(size_t),
+                              NULL, &status);
+    check_CL(status);
+    check_CL( clEnqueueWriteBuffer( clu->command_queue,
+                                    clu->buf_size,
+                                    CL_TRUE,
+                                    0,
+                                    4*sizeof(size_t),
+                                    size,
+                                    0, NULL, NULL));
+    printf(" --- clu->buf_size initialized\n");
+    clu->n_alloc++;
+    free(size);
+
+    clu->clFFT_loaded = 1;
     return;
 }
 
@@ -938,6 +1017,10 @@ void clu_destroy(clu_env_t * clu)
         if(clu->clfft_buffer_size > 0)
         {
             check_CL(clReleaseMemObject(clu->clfft_buffer));
+        }
+        if(clu->buf_size != NULL)
+        {
+            check_CL(clReleaseMemObject(clu->buf_size));
         }
     }
 
