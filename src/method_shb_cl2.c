@@ -234,6 +234,73 @@ static fimcl_t  * initial_guess_cl(clu_env_t * clu,
 }
 
 
+float iter_shb_cl2(clu_env_t * clu,
+                   float ** xp, // Output, f_(t+1)
+//                   const float * restrict im, // Input image
+                   fimcl_t * restrict im_gpu, // as above, on GPU
+                   fimcl_t * restrict cK, // fft(psf)
+                   float * restrict pk, // p_k, estimation of the gradient
+                   fimcl_t * W_gpu, // Bertero Weights
+                   const int64_t wM, const int64_t wN, const int64_t wP, // expanded size
+                   const int64_t M, const int64_t N, const int64_t P, // input image size
+                   __attribute__((unused)) const dw_opts * s)
+{
+    // We could reduce memory even further by using
+    // the allocation for xp
+    const size_t wMNP = wM*wN*wP;
+
+    fimcl_t * _Pk = fimcl_new(clu, 0, 0, pk, wM, wN, wP);
+    here();
+    clFinish(_Pk->clu->command_queue);
+    here();
+    //fimcl_fft_inplace(Pk);
+    fimcl_t * Pk = fimcl_fft(_Pk);
+    here();
+    fimcl_free(_Pk);
+    here();
+    clFinish(Pk->clu->command_queue);
+    here();
+    putdot(s);
+    fimcl_t * gy = fimcl_convolve(Pk, cK, CLU_KEEP_2ND);
+    here();
+
+    float error = fimcl_error_idiv(gy, im_gpu);
+
+    putdot(s);
+
+    gpu_update_y(gy, im_gpu);
+    fimcl_t * _Y = gy;
+    fimcl_sync(_Y);
+
+    // fimcl_fft_inplace(Y);
+    fimcl_t * Y = fimcl_fft(_Y);
+    fimcl_free(_Y);
+
+    clFinish(Y->clu->command_queue);
+    fimcl_t * gx = fimcl_convolve_conj(Y, cK, CLU_KEEP_2ND);
+    here();
+
+    fimcl_t * gpk = fimcl_new(clu, 0, 0, pk, wM, wN, wP);
+    fimcl_sync(gpk);
+    fimcl_real_mul_inplace(gpk, gx); // gx = gpk .* gx
+    fimcl_free(gpk);
+    if(W_gpu != NULL)
+    {
+        fimcl_real_mul_inplace(W_gpu, gx);
+    }
+
+    // TODO: the s->bg value is ignored and 0 is used for the min value.
+    fimcl_positivity(gx, s->bg);
+
+    float * x = fimcl_download(gx);
+
+    fimcl_free(gx);
+
+    xp[0] = x;
+    return error;
+}
+
+
 float * deconvolve_shb_cl2(float * restrict im,
                            const int64_t M, const int64_t N, const int64_t P,
                            float * restrict psf,
@@ -384,6 +451,7 @@ float * deconvolve_shb_cl2(float * restrict im,
     putdot(s);
 
     float * W = NULL;
+    fimcl_t * W_gpu = NULL;
     /* Sigma in Bertero's paper, introduced for Eq. 17 */
     if(s->borderQuality > 0)
     {
@@ -414,6 +482,8 @@ float * deconvolve_shb_cl2(float * restrict im,
             }
         }
         W = clP1;
+        W_gpu = fimcl_new(clu, 0, 0, W, wM, wN, wP);
+        fftwf_free(W);
     }
 
     float sumg = fim_sum(im, M*N*P);
@@ -442,17 +512,21 @@ float * deconvolve_shb_cl2(float * restrict im,
             p[kk] = x[kk] + alpha*(x[kk]-xp[kk]);
         }
 
+        // TODO -- then we can go all GPU :)
+        //fimcl_shb_update(gpu_p, gpu_x, gpu_xp, alpha);
+
+
         putdot(s);
 
         double err = iter_shb_cl2(
             clu,
             &xp, // xp is updated to the next guess
-            im,
+            //im,
             im_gpu,
             clfftPSF, // FFT of PSF
             p, // Current guess
             //p,
-            W, // Weights (to handle boundaries)
+            W_gpu, // Weights (to handle boundaries)
             wM, wN, wP, // Expanded size
             M, N, P, // Original size
             s);
@@ -465,19 +539,6 @@ float * deconvolve_shb_cl2(float * restrict im,
             float * t = x;
             x = xp;
             xp = t;
-        }
-
-        /* Enforce a priori information about the lowest possible value */
-        if(s->positivity)
-        {
-#pragma omp parallel for shared(x)
-            for(size_t kk = 0; kk<wMNP; kk++)
-            {
-                if(x[kk] < s->bg)
-                {
-                    x[kk] = s->bg;
-                }
-            }
         }
 
         putdot(s);
@@ -505,11 +566,6 @@ float * deconvolve_shb_cl2(float * restrict im,
         printf("\n");
     }
 
-    if(W != NULL)
-    {
-        fftwf_free(W); /* Allocated as P1 */
-    }
-
     fimcl_free(clfftPSF);
 
     if(s->fulldump)
@@ -528,69 +584,4 @@ float * deconvolve_shb_cl2(float * restrict im,
     clu_destroy(clu);
 
     return out;
-}
-
-
-float iter_shb_cl2(clu_env_t * clu,
-                   float ** xp, // Output, f_(t+1)
-                   const float * restrict im, // Input image
-                   fimcl_t * restrict im_gpu, // as above, on GPU
-                   fimcl_t * restrict cK, // fft(psf)
-                   float * restrict pk, // p_k, estimation of the gradient
-                   float * restrict W, // Bertero Weights
-                   const int64_t wM, const int64_t wN, const int64_t wP, // expanded size
-                   const int64_t M, const int64_t N, const int64_t P, // input image size
-                   __attribute__((unused)) const dw_opts * s)
-{
-    // We could reduce memory even further by using
-    // the allocation for xp
-    const size_t wMNP = wM*wN*wP;
-
-    fimcl_t * _Pk = fimcl_new(clu, 0, 0, pk, wM, wN, wP);
-    here();
-    clFinish(_Pk->clu->command_queue);
-    here();
-    //fimcl_fft_inplace(Pk);
-    fimcl_t * Pk = fimcl_fft(_Pk);
-    here();
-    fimcl_free(_Pk);
-    here();
-    clFinish(Pk->clu->command_queue);
-    here();
-    putdot(s);
-    fimcl_t * gy = fimcl_convolve(Pk, cK, CLU_KEEP_2ND);
-    here();
-
-    float error = fimcl_error_idiv(gy, im_gpu);
-
-    putdot(s);
-
-    gpu_update_y(gy, im_gpu);
-    fimcl_t * _Y = gy;
-    fimcl_sync(_Y);
-
-    // fimcl_fft_inplace(Y);
-    fimcl_t * Y = fimcl_fft(_Y);
-    fimcl_free(_Y);
-
-    clFinish(Y->clu->command_queue);
-    fimcl_t * gx = fimcl_convolve_conj(Y, cK, CLU_KEEP_2ND);
-    here();
-
-    fimcl_t * gpk = fimcl_new(clu, 0, 0, pk, wM, wN, wP);
-    fimcl_sync(gpk);
-    fimcl_real_mul_inplace(gpk, gx); // gx = gpk .* gx
-    fimcl_free(gpk);
-    if(W != NULL)
-    {
-        fimcl_t * gW = fimcl_new(clu, 0, 0, W, wM, wN, wP);
-        fimcl_sync(gW);
-        fimcl_real_mul_inplace(gW, gx);
-        fimcl_free(gpk);
-    }
-    float * x = fimcl_download(gx);
-    fimcl_free(gx);
-
-    xp[0] = x;
-    return error;
 }

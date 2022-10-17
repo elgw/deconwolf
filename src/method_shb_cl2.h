@@ -28,16 +28,4 @@ float * deconvolve_shb_cl2(float * restrict im,
                        const int64_t pM, const int64_t pN, const int64_t pP,
                        dw_opts * s);
 
-float iter_shb_cl2(
-    clu_env_t * clu,
-    float ** xp, // Output, f_(t+1)
-    const float * restrict im, // Input image
-    fimcl_t * restrict im_gpu, // same as im, but on GPU
-    fimcl_t * restrict cK, // fft(psf)
-    float * restrict pk, // Current guess
-    float * restrict W, // Bertero Weights
-    const int64_t wM, const int64_t wN, const int64_t wP, // expanded size
-    const int64_t M, const int64_t N, const int64_t P, // input image size
-    __attribute__((unused)) const dw_opts * s);
-
 #endif

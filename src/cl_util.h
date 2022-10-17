@@ -53,10 +53,12 @@ typedef struct{
     clu_kernel_t kern_mul_inplace;
     clu_kernel_t kern_mul_conj_inplace;
     /* For real data */
-    cl_mem buf_size;
+    cl_mem real_size;
     clu_kernel_t kern_real_mul_inplace;
     clu_kernel_t kern_error_idiv;
-
+    clu_kernel_t kern_real_positivity;
+    cl_mem pos_th; /* Positivity threshold */
+    clu_kernel_t kern_shb_update; /* Find next guess with shb */
 
     size_t nb_allocated;
     size_t n_release;
@@ -126,6 +128,12 @@ void fimcl_complex_mul_inplace(fimcl_t * fX, fimcl_t * fY, int conj);
 
 /* Y = X.*Y */
 void fimcl_real_mul_inplace(fimcl_t * X, fimcl_t * Y);
+
+/*  P[idx] = x[idx] + alpha[0]*(x[idx]-xp[idx]) */
+void fimcl_shb_update(fimcl_t * P, fimcl_t * X, fimcl_t * XP, float alpha);
+
+/* X[kk] < val ? X[kk] = val : 0 */
+void fimcl_positivity(fimcl_t * X, float val);
 
 /* Wait until the object is available.
  * To be used after fft, ifft, complex_mul etc ...*/

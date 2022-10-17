@@ -7,6 +7,9 @@
 #include "kernels/cl_complex_mul_conj_inplace.h"
 #include "kernels/cl_error_idiv.h"
 #include "kernels/cl_real_mul_inplace.h"
+#include "kernels/cl_positivity.h"
+#include "kernels/cl_shb_update.h"
+
 
 static char * read_program(const char * fname, size_t * size);
 static double clockdiff(struct timespec* start, struct timespec * finish);
@@ -511,9 +514,9 @@ void fimcl_real_mul_inplace(fimcl_t * X, fimcl_t * Y)
     size_t globalWorkSize = localWorkSize * numWorkGroups;
 
     check_CL( clSetKernelArg(kernel,
-                                 0, // argument index
-                                 sizeof(cl_mem), // argument size
-                                 (void *) &X->buf) ); // argument value
+                             0, // argument index
+                             sizeof(cl_mem), // argument size
+                             (void *) &X->buf) ); // argument value
 
     check_CL( clSetKernelArg(kernel,
                              1, // argument index
@@ -523,7 +526,7 @@ void fimcl_real_mul_inplace(fimcl_t * X, fimcl_t * Y)
     check_CL( clSetKernelArg(kernel,
                              2,
                              sizeof(cl_mem),
-                             (void *) &X->clu->buf_size) );
+                             (void *) &X->clu->real_size) );
 
     check_CL( clEnqueueNDRangeKernel(X->clu->command_queue,
                                      kernel,
@@ -538,6 +541,120 @@ void fimcl_real_mul_inplace(fimcl_t * X, fimcl_t * Y)
     fimcl_sync(Y);
 
 
+}
+
+void fimcl_shb_update(fimcl_t * P, fimcl_t * X, fimcl_t * XP, float alpha)
+{
+
+    cl_kernel kernel = X->clu->kern_shb_update.kernel;
+
+    /* Set sizes */
+    size_t localWorkSize; /* Use largest possible */
+    check_CL ( clGetKernelWorkGroupInfo(kernel,
+                                        X->clu->device_id,
+                                        CL_KERNEL_WORK_GROUP_SIZE,
+                                        sizeof(size_t),
+                                        &localWorkSize,
+                                        NULL) );
+
+    size_t nel = X->M * X->N * X->P;
+    size_t numWorkGroups = (nel + (localWorkSize -1) ) / localWorkSize;
+    size_t globalWorkSize = localWorkSize * numWorkGroups;
+
+    check_CL( clSetKernelArg(kernel,
+                             0, // argument index
+                             sizeof(cl_mem), // argument size
+                             (void *) &P->buf) ); // argument value
+
+    check_CL( clSetKernelArg(kernel,
+                             1, // argument index
+                             sizeof(cl_mem), // argument size
+                             (void *) &X->buf) ); // argument value
+
+    check_CL( clSetKernelArg(kernel,
+                             2, // argument index
+                             sizeof(cl_mem), // argument size
+                             (void *) &XP->buf) ); // argument value
+
+    check_CL( clSetKernelArg(kernel,
+                             3,
+                             sizeof(cl_mem),
+                             (void *) &X->clu->real_size) );
+
+    check_CL( clEnqueueWriteBuffer( X->clu->command_queue,
+                                    X->clu->pos_th,
+                                    CL_TRUE,
+                                    0,
+                                    sizeof(float),
+                                    &alpha,
+                                    0, NULL, NULL));
+
+    check_CL( clSetKernelArg(kernel,
+                             4,
+                             sizeof(cl_mem),
+                             (void *) &X->clu->pos_th) );
+
+
+    check_CL( clEnqueueNDRangeKernel(X->clu->command_queue,
+                                     kernel,
+                                     1, //3,
+                                     NULL,
+                                     &globalWorkSize, //global_work_size,
+                                     &localWorkSize,
+                                     0,
+                                     NULL,
+                                     &P->wait_ev) );
+
+    fimcl_sync(P);
+
+
+}
+
+
+void fimcl_positivity(fimcl_t * X, float val)
+{
+    assert(X->transformed == 0);
+    cl_kernel kernel = X->clu->kern_real_positivity.kernel;
+
+    /* Set sizes */
+    size_t localWorkSize; /* Use largest possible */
+    check_CL ( clGetKernelWorkGroupInfo(kernel,
+                                        X->clu->device_id,
+                                        CL_KERNEL_WORK_GROUP_SIZE,
+                                        sizeof(size_t),
+                                        &localWorkSize,
+                                        NULL) );
+
+    size_t nel = X->M * X->N * X->P;
+    size_t numWorkGroups = (nel + (localWorkSize -1) ) / localWorkSize;
+    size_t globalWorkSize = localWorkSize * numWorkGroups;
+
+    check_CL( clSetKernelArg(kernel,
+                             0, // argument index
+                             sizeof(cl_mem), // argument size
+                             (void *) &X->buf) ); // argument value
+
+    check_CL( clSetKernelArg(kernel,
+                             1,
+                             sizeof(cl_mem),
+                             (void *) &X->clu->real_size) );
+
+    check_CL( clSetKernelArg(kernel,
+                             2,
+                             sizeof(cl_mem),
+                             (void *) &X->clu->pos_th) );
+
+    check_CL( clEnqueueNDRangeKernel(X->clu->command_queue,
+                                     kernel,
+                                     1, //3,
+                                     NULL,
+                                     &globalWorkSize, //global_work_size,
+                                     &localWorkSize,
+                                     0,
+                                     NULL,
+                                     &X->wait_ev) );
+
+    fimcl_sync(X);
 }
 
 void fimcl_complex_mul_inplace(fimcl_t * X, fimcl_t * Y, int conj)
@@ -970,6 +1087,20 @@ void clu_prepare_fft(clu_env_t * clu, size_t M, size_t N, size_t P)
                          (const char *) src_kernels_cl_real_mul_inplace_c,
                          src_kernels_cl_real_mul_inplace_c_len,
                          "cl_real_mul_inplace");
+    clu->kern_real_positivity =
+        * clu_kernel_new(clu,
+                       NULL,
+                       (const char *) src_kernels_cl_positivity_c,
+                       src_kernels_cl_positivity_c_len,
+                       "cl_positivity");
+
+    clu->kern_shb_update =
+        * clu_kernel_new(clu,
+                         NULL,
+                         (const char *) src_kernels_cl_shb_update_c,
+                         src_kernels_cl_shb_update_c_len,
+                         "cl_shb_update");
+
 
     /* Set up size-dependent data */
     size_t * size = malloc(4*sizeof(size_t));
@@ -978,21 +1109,36 @@ void clu_prepare_fft(clu_env_t * clu, size_t M, size_t N, size_t P)
     size[2] = M;
     size[3] = P;
     cl_int status;
-    clu->buf_size = clCreateBuffer(clu->context,
-                              CL_MEM_READ_ONLY,
-                              4*sizeof(size_t),
-                              NULL, &status);
+    clu->real_size = clCreateBuffer(clu->context,
+                                    CL_MEM_READ_ONLY,
+                                    4*sizeof(size_t),
+                                    NULL, &status);
     check_CL(status);
     check_CL( clEnqueueWriteBuffer( clu->command_queue,
-                                    clu->buf_size,
+                                    clu->real_size,
                                     CL_TRUE,
                                     0,
                                     4*sizeof(size_t),
                                     size,
                                     0, NULL, NULL));
-    printf(" --- clu->buf_size initialized\n");
     clu->n_alloc++;
     free(size);
+
+    float pos_th = 0; // TODO make settable
+    clu->pos_th = clCreateBuffer(clu->context,
+                                 CL_MEM_READ_ONLY,
+                                 sizeof(float),
+                                 NULL, &status);
+    check_CL(status);
+    check_CL( clEnqueueWriteBuffer( clu->command_queue,
+                                    clu->pos_th,
+                                    CL_TRUE,
+                                    0,
+                                    sizeof(float),
+                                    &pos_th,
+                                    0, NULL, NULL));
+    clu->n_alloc++;
+
 
     clu->clFFT_loaded = 1;
     return;
@@ -1018,9 +1164,13 @@ void clu_destroy(clu_env_t * clu)
         {
             check_CL(clReleaseMemObject(clu->clfft_buffer));
         }
-        if(clu->buf_size != NULL)
+        if(clu->real_size != NULL)
         {
-            check_CL(clReleaseMemObject(clu->buf_size));
+            check_CL(clReleaseMemObject(clu->real_size));
+        }
+        if(clu->pos_th != NULL)
+        {
+            check_CL(clReleaseMemObject(clu->pos_th));
         }
     }
 

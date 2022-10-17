@@ -197,6 +197,8 @@ kernels:
 	rm cl_update_y_kernel
 	#
 	xxd -i src/kernels/cl_real_mul_inplace.c > src/kernels/cl_real_mul_inplace.h
+	xxd -i src/kernels/cl_positivity.c > src/kernels/cl_positivity.h
+	xxd -i src/kernels/cl_shb_update.c > src/kernels/cl_shb_update.h
 
 install:
 	# Binaries
