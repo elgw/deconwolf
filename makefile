@@ -34,11 +34,14 @@ CFLAGS += -fno-math-errno
 DESTDIR?=/usr/local/bin
 DEBUG?=0
 ifeq ($(DEBUG),1)
-    CFLAGS += -g3 -O3 -DNDEBUG
+    # TODO: only compiles with flto on, why?
+    # TODO: does not compile without -O1 or above
+    CFLAGS += -O1 -g3 -Wno-unknown-pragmas -flto
 else
-    #CFLAGS +=  -g -O2 -ftree-vectorize -Wno-unknown-pragmas -flto
-    CFLAGS += -O3 -Wno-unknown-pragmas -flto  #-DNDEBUG
-    #-fno-math-errno no relevant performance gain
+    CFLAGS += -O3 -Wno-unknown-pragmas -flto
+    # -O2 -ftree-vectorize and -O3 give about the same performance
+    # -DNDEBUG will not make it faster so don't use it
+    # -fno-math-errno no relevant performance gain
 endif
 
 dw_LIBRARIES =  -lm -ltiff
@@ -184,10 +187,10 @@ kernels:
 	cp src/kernels/cl_complex_mul_conj_inplace.c cl_complex_mul_conj_inplace
 	xxd -i cl_complex_mul_conj_inplace > src/kernels/cl_complex_mul_conj_inplace.h
 	rm cl_complex_mul_conj_inplace
-	# cl_complex_mul_conj_inplace
-	cp src/kernels/cl_error_idiv.c cl_error_idiv
-	xxd -i cl_error_idiv > src/kernels/cl_error_idiv.h
-	rm cl_error_idiv
+	# for iDiv
+	cp src/kernels/cl_idiv_kernel.c cl_idiv_kernel
+	xxd -i cl_idiv_kernel > src/kernels/cl_idiv_kernel.h
+	rm cl_idiv_kernel
 
 
 install:

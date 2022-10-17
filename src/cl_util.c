@@ -253,7 +253,7 @@ fimcl_t * fimcl_new(clu_env_t * clu, int ffted, int fullsize,
                 __FILE__, __LINE__);
         exit(EXIT_FAILURE);
     }
-done: ;
+ done: ;
     return Y;
 }
 
@@ -271,15 +271,15 @@ fimcl_t * fimcl_copy(fimcl_t * G)
         fimcl_sync(G);
         fimcl_sync(H);
         check_CL(clEnqueueCopyBuffer(
-                     G->clu->command_queue,//cl_command_queue command_queue,
-                     G->buf, //cl_mem src_buffer,
-                     H->buf, //cl_mem dst_buffer,
-                     0, //size_t src_offset,
-                     0, //size_t dst_offset,
-                     G->M*G->N*G->P*sizeof(float),//size_t size,
-                     0, //cl_uint num_events_in_wait_list,
-                     NULL, //const cl_event* event_wait_list,
-                     &H->wait_ev)); //cl_event* event);
+                                     G->clu->command_queue,//cl_command_queue command_queue,
+                                     G->buf, //cl_mem src_buffer,
+                                     H->buf, //cl_mem dst_buffer,
+                                     0, //size_t src_offset,
+                                     0, //size_t dst_offset,
+                                     G->M*G->N*G->P*sizeof(float),//size_t size,
+                                     0, //cl_uint num_events_in_wait_list,
+                                     NULL, //const cl_event* event_wait_list,
+                                     &H->wait_ev)); //cl_event* event);
         fimcl_sync(H);
     } else {
         fprintf(stderr, "fimcl_copy for transformed objects is not implemented \n");
@@ -524,71 +524,6 @@ void fimcl_complex_mul_inplace(fimcl_t * X, fimcl_t * Y, int conj)
 
     fimcl_sync(Y);
     return;
-}
-
-float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
-{
-    /* This has to be done in two steps:
-    * 1/ per element error, E = idiv(a,b) ...
-    * 2/ Reduction on N -> N/2 -> N/4 ... 1
-    * How can we handle odd sizes ?
-    * see https://stackoverflow.com/questions/15161575/reduction-for-sum-of-vector-when-size-is-not-power-of-2
-    */
-    size_t global_work_offset[] = {0, 0, 0};
-    size_t local_work_size[] = {1,1,1};
-
-    cl_kernel kernel = forward->clu->kern_error_idiv.kernel;
-
-    size_t MNP = fimcl_nreal(forward);
-    printf("Will run the kernel for %zu elements\n", MNP);
-    fimcl_sync(forward);
-    fimcl_sync(image);
-
-    /* The image is assumed to be smaller or the same size
-     * as the forward projection (which might be extended). */
-    assert(image->M <= forward->M);
-    assert(image->N <= forward->N);
-    assert(image->P <= forward->P);
-
-    /* a buffer for passing array sizes and returning the value */
-    float argbuff[7] = {forward->M, forward->N, forward->P,
-        image->M, image->N, image->P, 0};
-
-    fimcl_t * g_argbuff = fimcl_new(forward->clu, 0, 0, argbuff, 7, 1, 1);
-
-    check_CL( clSetKernelArg(kernel,
-                             0, // argument index
-                             sizeof(cl_mem), // argument size
-                             (void *) &forward->buf) ); // argument value
-
-    check_CL( clSetKernelArg(kernel,
-                             1, // argument index
-                             sizeof(cl_mem), // argument size
-                             (void *) &image->buf) ); // argument value
-
-    check_CL( clSetKernelArg(kernel,
-                             2, // argument index
-                             sizeof(cl_mem), // argument size
-                             (void *) &g_argbuff->buf) ); // argument value
-
-    check_CL( clEnqueueNDRangeKernel(forward->clu->command_queue,
-                                     kernel,
-                                     1, //3,
-                                     global_work_offset,
-                                     &MNP, //global_work_size,
-                                     local_work_size,
-                                     0,
-                                     NULL,
-                                     &g_argbuff->wait_ev) );
-
-    fimcl_sync(g_argbuff);
-    // Download the result
-    float * res = fimcl_download(g_argbuff);
-    // return it
-    fimcl_free(g_argbuff);
-    float idiv = res[6];
-    free(res);
-    return idiv;
 }
 
 
@@ -972,13 +907,14 @@ void clu_prepare_fft(clu_env_t * env, size_t M, size_t N, size_t P)
                         (const char *) cl_complex_mul_conj_inplace,
                         cl_complex_mul_conj_inplace_len,
                         "cl_complex_mul_conj_inplace");
+    /*
     env->kern_error_idiv =
         *clu_kernel_new(env,
                         NULL,
                         (const char *) cl_error_idiv,
                         cl_error_idiv_len,
                         "cl_error_idiv");
-
+    */
     env->clFFT_loaded = 1;
     return;
 }
@@ -1016,11 +952,23 @@ void clu_destroy(clu_env_t * clu)
     return;
 }
 
+
 clu_kernel_t * clu_kernel_new(clu_env_t * env,
                               const char * file,
                               const char * program_code,
                               size_t program_size,
                               const char * kernel_name)
+{
+    return clu_kernel_newa(env, file, program_code, program_size, kernel_name, NULL);
+}
+
+
+clu_kernel_t * clu_kernel_newa(clu_env_t * env,
+                               const char * file,
+                               const char * program_code,
+                               size_t program_size,
+                               const char * kernel_name,
+                               const char * argument_string)
 {
     clu_kernel_t * clk = calloc(1, sizeof(clu_kernel_t));
     cl_int ret = CL_SUCCESS;
@@ -1057,7 +1005,7 @@ clu_kernel_t * clu_kernel_new(clu_env_t * env,
     cl_uint err = clBuildProgram(clk->program,
                                  1,
                                  &env->device_id,
-                                 NULL,
+                                 argument_string,
                                  NULL,
                                  NULL);
 

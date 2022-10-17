@@ -83,9 +83,9 @@ sudo apt-get install gcc
 sudo apt-get install pkg-config
 sudo apt-get install libfftw3-single3
 sudo apt-get install libfftw3-dev
-sudo apt-get install openmp
-sudo apt-get install tiff-5     # or possibly the next line
-sudo apt-get install libtiff-dev
+sudo apt-get install openmp libomp-dev
+sudo apt-get install tiff-5      # or possibly the next line
+sudo apt-get install libtiff-dev # for older versions of Ubuntu
 sudo apt-get install libgsl-dev
 sudo apt-get install libpng-dev
 ```

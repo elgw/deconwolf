@@ -105,7 +105,7 @@ void fimcl_fft_inplace(fimcl_t * X);
 fimcl_t * fimcl_ifft(fimcl_t * A);
 void fimcl_ifft_inplace(fimcl_t * A);
 
-float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image);
+
 
 /* B = copy(A)
  * non-blocking */
@@ -177,6 +177,15 @@ clu_kernel_t * clu_kernel_new(clu_env_t * env,
                               const char * program_code,
                               size_t program_size,
                               const char * kernel_name);
+
+/* As clu_kernel_new but also forward arguments to the compiler
+ * useful for -D PI=3.14 etc. */
+clu_kernel_t * clu_kernel_newa(clu_env_t * env,
+                               const char * file,
+                               const char * program_code,
+                               size_t program_size,
+                               const char * kernel_name,
+                               const char * argument_string);
 
 void clu_kernel_destroy(clu_kernel_t kern);
 

@@ -1,8 +1,125 @@
 #include "method_shb_cl.h"
 
-/* TODO:
- * // Do this without in-place FFTs. check all inplace as well as the convolve functions.
- * */
+#include "kernels/cl_idiv_kernel.h"
+
+clu_kernel_t * idiv_kernel;
+clu_kernel_t * reduction_kernel;
+
+void prepare_kernels(clu_env_t * clu,
+                     size_t M, size_t N, size_t P,
+                     size_t wM, size_t wN, size_t wP)
+{
+    char * argstring = malloc(1024);
+    sprintf(argstring,
+            "-D NELEMENTS=%zu "
+            "-D M=%zu -D N=%zu -D P=%zu "
+            "-D wM=%zu -D wN=%zu -D wP=%zu",
+            wM*wN*wP, M, N, P, wM, wN, wP);
+    idiv_kernel = clu_kernel_newa(clu,
+                                      "kernels/cl_idiv_kernel.cl",
+                                  (const char *) cl_idiv_kernel,
+                                      cl_idiv_kernel_len,
+                                      "idiv_kernel",
+                                      argstring);
+    free(argstring);
+}
+
+float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image);
+
+float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
+{
+    cl_int status = CL_SUCCESS;
+
+    /* Configure sizes */
+    size_t nel = forward->M*forward->N*forward->P;
+    size_t localWorkSize; /* Use largest possible */
+    status = clGetKernelWorkGroupInfo(idiv_kernel->kernel,
+                                      forward->clu->device_id, CL_KERNEL_WORK_GROUP_SIZE,
+                                      sizeof(size_t), &localWorkSize, NULL);
+    /* The global size needs to be a multiple of the localWorkSize
+     * i.e. it will be larger than the number of elements */
+    size_t numWorkGroups = (nel + (localWorkSize -1) ) / localWorkSize;
+    size_t globalWorkSize = localWorkSize * numWorkGroups;
+    if(0)
+    {
+        printf("   globalWorkSize: %zu\n", globalWorkSize);
+        printf("   localWorkSize: %zu\n", localWorkSize);
+        printf("   numWorkGroups: %zu\n", numWorkGroups);
+    }
+    assert(globalWorkSize >= image->M*image->N*image->P);
+
+    fimcl_sync(forward);
+    fimcl_sync(image);
+
+    /* The image is assumed to be smaller or the same size
+     * as the forward projection (which might be extended). */
+    assert(image->M <= forward->M);
+    assert(image->N <= forward->N);
+    assert(image->P <= forward->P);
+
+    /* Create a buffer for the partial sums */
+    cl_mem partial_sums_gpu = clCreateBuffer(forward->clu->context,
+                                             CL_MEM_WRITE_ONLY,
+                                             numWorkGroups * sizeof(float),
+                                             NULL,
+                                             &status );
+
+
+    cl_kernel kernel = idiv_kernel->kernel;
+    check_CL( clSetKernelArg(kernel,
+                             0, // argument index
+                             sizeof(cl_mem), // argument size
+                             (void *) &forward->buf) ); // argument value
+
+    check_CL( clSetKernelArg(kernel,
+                             1, // argument index
+                             sizeof(cl_mem), // argument size
+                             (void *) &image->buf) ); // argument value
+
+    check_CL( clSetKernelArg(kernel,
+                             2, localWorkSize*sizeof(float), NULL) );
+
+    check_CL( clSetKernelArg(kernel,
+                             3, sizeof(cl_mem), &partial_sums_gpu));
+
+    check_CL( clEnqueueNDRangeKernel(forward->clu->command_queue,
+                                     kernel,
+                                     1,
+                                     NULL,
+                                     &globalWorkSize, //global_work_size,
+                                     &localWorkSize,
+                                     0,
+                                     NULL,
+                                     &forward->wait_ev) );
+
+    fimcl_sync(forward);
+
+    /* Download the result */
+    float * partial_sums = malloc(numWorkGroups*sizeof(float));
+    status = clEnqueueReadBuffer(forward->clu->command_queue,
+                                 partial_sums_gpu,
+                                 CL_TRUE,
+                                 0,
+                                 numWorkGroups*sizeof(float),
+                                 partial_sums,
+                                 0,
+                                 NULL,
+                                 NULL);
+    clFinish(forward->clu->command_queue);
+
+    float sum_gpu = 0;
+#pragma omp parallel for reduction(+ : sum_gpu)
+    for(size_t kk = 0 ; kk<numWorkGroups; kk++)
+    {
+        sum_gpu += partial_sums[kk];
+    }
+    free(partial_sums);
+    clReleaseMemObject(partial_sums_gpu);
+
+    return sum_gpu / (float) (image->M*image->N*image->P);
+}
+
+
 
 //#define here(x) printf("%s %s %d\n", __FILE__, __FUNCTION__, __LINE__);
 #define here(x) ;
@@ -126,6 +243,8 @@ float * deconvolve_shb_cl2(float * restrict im,
     wN = clu_next_fft_size(wN);
     wP = clu_next_fft_size(wP);
     clu_prepare_fft(clu, wM, wN, wP);
+
+    prepare_kernels(clu, M, N, P, wM, wN, wP);
 
     /* Total number of pixels */
     size_t wMNP = wM*wN*wP;
@@ -393,22 +512,27 @@ float iter_shb_cl2(clu_env_t * clu,
     putdot(s);
     fimcl_t * gy = fimcl_convolve(Pk, cK, CLU_KEEP_2ND);
     here();
-    float * y = fimcl_download(gy);
-    float error_gpu = fimcl_error_idiv(gy, im_gpu);
+
+    float error = fimcl_error_idiv(gy, im_gpu);
     here();
     fimcl_free(gy);
     here();
 
-    /* consumes something like 9% of the total lift over to GPU! */
-    float error = getError(y, im, M, N, P, wM, wN, wP, s->metric);
-    printf("\nerror = %f, error_gpu = %f\n", error, error_gpu);
-    assert(fabs(error-error_gpu) < 1e-4);
+    /* consumes something like 9% of CPU time if not run on the GPU */
+    float error_cpu = getError(y, im, M, N, P, wM, wN, wP, s->metric);
+    //printf("\nerror = %f, error_cpu = %f\n", error, error_cpu);
+    //assert(fabs(error-error_gpu) < 1e-4);
     putdot(s);
 
     /* fimcl_t * im = fimcl_new(clu, ...) // outside of the loop
      * fimcl_div(y, im, y); // y = im/y
      */
 
+    // Continue here:
+    // gpu_update_y(gy, im_gpu);
+    // Then we can avoid one pair of download/upload!
+
+    float * y = fimcl_download(gy);
     const double mindiv = 1e-6; /* Smallest allowed divisor */
 #pragma omp parallel for shared(y, im)
     for(size_t cc =0; cc < (size_t) wP; cc++){

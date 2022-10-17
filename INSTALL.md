@@ -135,13 +135,16 @@ sudo python3 -m pip install meson ninja
 ## Ubuntu 16.04
 ``` shell
 sudo apt-get update
-# find out actual names with command like
-# sudo apt-cache search fftw
+sudo apt-get install gcc
+sudo apt-get install pkg-config
 sudo apt-get install libfftw3-single3
 sudo apt-get install libfftw3-dev
+sudo apt-get install openmp
+sudo apt-get install libtiff-dev # only difference to 20.04
 sudo apt-get install libgsl-dev
 sudo apt-get install libomp-dev
-sudo apt-get install libtiff-dev
+sudo apt-get install libpng-dev
+
 ```
 ## FreeBSD
 Differences to building on Linux.

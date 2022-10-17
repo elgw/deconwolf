@@ -592,7 +592,7 @@ void fft_train(const size_t M, const size_t N, const size_t P,
     {
         plan_c2r = fftwf_plan_dft_c2r_3d(P, N, M,
                                          C, R, FFTW3_PLANNING);
-        printf("creating c2r plan ... (consider the --noplan option)\n");
+        printf("   c2r plan ... \n");
         fftwf_execute(plan_c2r);
         updatedWisdom = 1;
     }
@@ -603,7 +603,7 @@ void fft_train(const size_t M, const size_t N, const size_t P,
     {
         plan_c2r_inplace = fftwf_plan_dft_c2r_3d(P, N, M,
                                                  C, (float *) C, FFTW3_PLANNING);
-        printf("creating c2r inplace plan ... \n");
+        printf("   c2r inplace plan ... \n");
         fftwf_execute(plan_c2r_inplace);
         updatedWisdom = 1;
     }
@@ -618,7 +618,7 @@ void fft_train(const size_t M, const size_t N, const size_t P,
         plan_r2c = fftwf_plan_dft_r2c_3d(P, N, M,
                                          R, C,
                                          FFTW3_PLANNING);
-        printf("creating r2c plan ... \n");
+        printf("   r2c plan ... \n");
         fftwf_execute(plan_r2c);
         updatedWisdom = 1;
     }
@@ -630,7 +630,7 @@ void fft_train(const size_t M, const size_t N, const size_t P,
         plan_r2c_inplace = fftwf_plan_dft_r2c_3d(P, N, M,
                                                  (float*) C, C,
                                                  FFTW3_PLANNING);
-        printf("creating r2c inplace plan ... \n");
+        printf("   r2c inplace plan ... \n");
         fftwf_execute(plan_r2c_inplace);
         updatedWisdom = 1;
     }
