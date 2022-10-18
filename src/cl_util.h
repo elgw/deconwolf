@@ -48,6 +48,7 @@ typedef struct{
     clfftPlanHandle h2r_inplace_plan;
     size_t M; size_t N; size_t P;
     /* For complex data */
+    cl_mem complex_size;
     clu_kernel_t kern_mul;
     clu_kernel_t kern_mul_conj;
     clu_kernel_t kern_mul_inplace;

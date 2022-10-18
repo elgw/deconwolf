@@ -449,6 +449,65 @@ void fimcl_sync(fimcl_t * X)
 
 void fimcl_complex_mul(fimcl_t * X, fimcl_t * Y, fimcl_t * Z, int conj)
 {
+    cl_kernel kernel = X->clu->kern_mul.kernel;
+    if(conj == 1)
+    {
+        kernel = X->clu->kern_mul_conj.kernel;
+    }
+
+
+/* Set sizes */
+    size_t localWorkSize; /* Use largest possible */
+    check_CL ( clGetKernelWorkGroupInfo(kernel,
+                                        X->clu->device_id,
+                                        CL_KERNEL_WORK_GROUP_SIZE,
+                                        sizeof(size_t),
+                                        &localWorkSize,
+                                        NULL) );
+
+    size_t nel = fimcl_ncx(X); // number of complex values
+    size_t numWorkGroups = (nel + (localWorkSize -1) ) / localWorkSize;
+    size_t globalWorkSize = localWorkSize * numWorkGroups;
+
+
+    check_CL( clSetKernelArg(kernel,
+                             0, // argument index
+                             sizeof(cl_mem), // argument size
+                             (void *) &X->buf) ); // argument value
+
+    check_CL( clSetKernelArg(kernel,
+                             1, // argument index
+                             sizeof(cl_mem), // argument size
+                             (void *) &Y->buf) ); // argument value
+
+    check_CL( clSetKernelArg(kernel,
+                             2, // argument index
+                             sizeof(cl_mem), // argument size
+                             (void *) &Z->buf) ); // argument value
+
+    check_CL( clSetKernelArg(kernel,
+                             3,
+                             sizeof(cl_mem),
+                             (void *) &X->clu->real_size) );
+
+    fimcl_sync(X);
+    fimcl_sync(Y);
+    fimcl_sync(Z);
+    check_CL( clEnqueueNDRangeKernel(X->clu->command_queue,
+                                     kernel,
+                                     1, //3,
+                                     NULL,
+                                     &globalWorkSize, //global_work_size,
+                                     &localWorkSize,
+                                     0,
+                                     NULL,
+                                     &Z->wait_ev) );
+    fimcl_sync(Z);
+    return;
+}
+
+void fimcl_complex_mul_old(fimcl_t * X, fimcl_t * Y, fimcl_t * Z, int conj)
+{
     size_t global_work_offset[] = {0, 0, 0};
     size_t local_work_size[] = {1,1,1};
 
@@ -490,6 +549,7 @@ void fimcl_complex_mul(fimcl_t * X, fimcl_t * Y, fimcl_t * Z, int conj)
     fimcl_sync(Z);
     return;
 }
+
 
 /* Y = X.*Y */
 void fimcl_real_mul_inplace(fimcl_t * X, fimcl_t * Y)
@@ -628,7 +688,7 @@ void fimcl_positivity(fimcl_t * X, float val)
                                         &localWorkSize,
                                         NULL) );
 
-    size_t nel = fimcl_nreal(X); //X->M * X->N * X->P;
+    size_t nel = fimcl_nreal(X);
     size_t numWorkGroups = (nel + (localWorkSize -1) ) / localWorkSize;
     size_t globalWorkSize = localWorkSize * numWorkGroups;
 
@@ -670,8 +730,6 @@ void fimcl_positivity(fimcl_t * X, float val)
 
 void fimcl_complex_mul_inplace(fimcl_t * X, fimcl_t * Y, int conj)
 {
-    size_t global_work_offset[] = {0, 0, 0};
-    size_t local_work_size[] = {1,1,1};
 
     cl_kernel kernel = X->clu->kern_mul_inplace.kernel;
     if(conj == 1)
@@ -679,7 +737,18 @@ void fimcl_complex_mul_inplace(fimcl_t * X, fimcl_t * Y, int conj)
         kernel = X->clu->kern_mul_conj_inplace.kernel;
     }
 
-    size_t cMNP = fimcl_ncx(X);
+    /* Set sizes */
+    size_t localWorkSize; /* Use largest possible */
+    check_CL ( clGetKernelWorkGroupInfo(kernel,
+                                        X->clu->device_id,
+                                        CL_KERNEL_WORK_GROUP_SIZE,
+                                        sizeof(size_t),
+                                        &localWorkSize,
+                                        NULL) );
+
+    size_t nel = fimcl_ncx(X);
+    size_t numWorkGroups = (nel + (localWorkSize -1) ) / localWorkSize;
+    size_t globalWorkSize = localWorkSize * numWorkGroups;
 
     fimcl_sync(X);
     fimcl_sync(Y);
@@ -695,13 +764,17 @@ void fimcl_complex_mul_inplace(fimcl_t * X, fimcl_t * Y, int conj)
                              sizeof(cl_mem), // argument size
                              (void *) &Y->buf) ); // argument value
 
+    check_CL( clSetKernelArg(kernel,
+                             2,
+                             sizeof(cl_mem),
+                             (void *) &X->clu->real_size) );
 
     check_CL( clEnqueueNDRangeKernel(X->clu->command_queue,
                                      kernel,
                                      1, //3,
-                                     global_work_offset,
-                                     &cMNP, //global_work_size,
-                                     local_work_size,
+                                     NULL,
+                                     &globalWorkSize, //global_work_size,
+                                     &localWorkSize,
                                      0,
                                      NULL,
                                      &Y->wait_ev) );
@@ -1117,7 +1190,7 @@ void clu_prepare_fft(clu_env_t * clu, size_t M, size_t N, size_t P)
     size_t * size = malloc(4*sizeof(size_t));
     size[0] = M*N*P;
     size[1] = M;
-    size[2] = M;
+    size[2] = N;
     size[3] = P;
     cl_int status;
     clu->real_size = clCreateBuffer(clu->context,
@@ -1127,6 +1200,25 @@ void clu_prepare_fft(clu_env_t * clu, size_t M, size_t N, size_t P)
     check_CL(status);
     check_CL( clEnqueueWriteBuffer( clu->command_queue,
                                     clu->real_size,
+                                    CL_TRUE,
+                                    0,
+                                    4*sizeof(size_t),
+                                    size,
+                                    0, NULL, NULL));
+    clu->n_alloc++;
+
+    /* Create a buffer with information about transformed size */
+    size[0] = M_r2h(M)*N_r2h(N)*P_r2h(P);
+    size[1] = M_r2h(M);
+    size[2] = N_r2h(N);
+    size[3] = P_r2h(P);
+    clu->complex_size = clCreateBuffer(clu->context,
+                                    CL_MEM_READ_ONLY,
+                                    4*sizeof(size_t),
+                                    NULL, &status);
+    check_CL(status);
+    check_CL( clEnqueueWriteBuffer( clu->command_queue,
+                                    clu->complex_size,
                                     CL_TRUE,
                                     0,
                                     4*sizeof(size_t),
@@ -1178,6 +1270,10 @@ void clu_destroy(clu_env_t * clu)
         if(clu->real_size != NULL)
         {
             check_CL(clReleaseMemObject(clu->real_size));
+        }
+        if(clu->complex_size != NULL)
+        {
+            check_CL(clReleaseMemObject(clu->complex_size));
         }
         if(clu->float_gpu != NULL)
         {

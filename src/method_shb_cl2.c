@@ -56,12 +56,16 @@ void gpu_update_y(fimcl_t * gy, fimcl_t * image)
     size_t nel = gy->M*gy->N*gy->P;
     size_t localWorkSize; /* Use largest possible */
     cl_kernel kernel = update_y_kernel->kernel;
-    // TOOD: does this take time?
-    cl_int status = clGetKernelWorkGroupInfo(kernel,
-                                             gy->clu->device_id,
-                                             CL_KERNEL_WORK_GROUP_SIZE,
-                                             sizeof(size_t), &localWorkSize, NULL);
-    check_CL(status);
+
+    /* This takes no time, probably just a look-up so no need to
+     * cache it */
+    check_CL(
+             clGetKernelWorkGroupInfo(kernel,
+                                      gy->clu->device_id,
+                                      CL_KERNEL_WORK_GROUP_SIZE,
+                                      sizeof(size_t), &localWorkSize, NULL)
+             );
+
     /* The global size needs to be a multiple of the localWorkSize
      * i.e. it will be larger than the number of elements */
     size_t numWorkGroups = (nel + (localWorkSize -1) ) / localWorkSize;
@@ -267,7 +271,13 @@ float iter_shb_cl2(fimcl_t ** _xp_gpu, // Output, f_(t+1)
 
     putdot(s);
 
+    //struct timespec t0, t1;
+    //clock_gettime(CLOCK_MONOTONIC, &t0);
     gpu_update_y(gy, im_gpu);
+    //clock_gettime(CLOCK_MONOTONIC, &t1);
+    //float  dt = clockdiff(&t1, &t0);
+    //printf("\n gpu_update_y took %f s\n", dt);
+
     fimcl_t * _Y = gy;
     fimcl_sync(_Y);
 
@@ -380,6 +390,7 @@ float * deconvolve_shb_cl2(float * restrict im,
     wP = clu_next_fft_size(wP);
     clu_prepare_fft(clu, wM, wN, wP);
 
+    /* Set up the kernels defined in this function */
     prepare_kernels(clu, M, N, P, wM, wN, wP);
 
     /* Total number of pixels */
