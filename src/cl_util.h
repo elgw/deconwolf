@@ -57,7 +57,8 @@ typedef struct{
     clu_kernel_t kern_real_mul_inplace;
     clu_kernel_t kern_error_idiv;
     clu_kernel_t kern_real_positivity;
-    cl_mem pos_th; /* Positivity threshold */
+    /* mem buffer with 1 float. Used for positivity threshold and for alpha */
+    cl_mem float_gpu;
     clu_kernel_t kern_shb_update; /* Find next guess with shb */
 
     size_t nb_allocated;

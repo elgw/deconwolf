@@ -584,7 +584,7 @@ void fimcl_shb_update(fimcl_t * P, fimcl_t * X, fimcl_t * XP, float alpha)
                              (void *) &X->clu->real_size) );
 
     check_CL( clEnqueueWriteBuffer( X->clu->command_queue,
-                                    X->clu->pos_th,
+                                    X->clu->float_gpu,
                                     CL_TRUE,
                                     0,
                                     sizeof(float),
@@ -594,7 +594,7 @@ void fimcl_shb_update(fimcl_t * P, fimcl_t * X, fimcl_t * XP, float alpha)
     check_CL( clSetKernelArg(kernel,
                              4,
                              sizeof(cl_mem),
-                             (void *) &X->clu->pos_th) );
+                             (void *) &X->clu->float_gpu) );
 
 
     check_CL( clEnqueueNDRangeKernel(X->clu->command_queue,
@@ -615,6 +615,7 @@ void fimcl_shb_update(fimcl_t * P, fimcl_t * X, fimcl_t * XP, float alpha)
 
 void fimcl_positivity(fimcl_t * X, float val)
 {
+    assert(X != NULL);
     assert(X->transformed == 0);
     cl_kernel kernel = X->clu->kern_real_positivity.kernel;
 
@@ -627,7 +628,7 @@ void fimcl_positivity(fimcl_t * X, float val)
                                         &localWorkSize,
                                         NULL) );
 
-    size_t nel = X->M * X->N * X->P;
+    size_t nel = fimcl_nreal(X); //X->M * X->N * X->P;
     size_t numWorkGroups = (nel + (localWorkSize -1) ) / localWorkSize;
     size_t globalWorkSize = localWorkSize * numWorkGroups;
 
@@ -641,10 +642,18 @@ void fimcl_positivity(fimcl_t * X, float val)
                              sizeof(cl_mem),
                              (void *) &X->clu->real_size) );
 
+    check_CL( clEnqueueWriteBuffer( X->clu->command_queue,
+                                    X->clu->float_gpu,
+                                    CL_TRUE,
+                                    0,
+                                    sizeof(float),
+                                    &val,
+                                    0, NULL, NULL));
+
     check_CL( clSetKernelArg(kernel,
                              2,
                              sizeof(cl_mem),
-                             (void *) &X->clu->pos_th) );
+                             (void *) &X->clu->float_gpu) );
 
     check_CL( clEnqueueNDRangeKernel(X->clu->command_queue,
                                      kernel,
@@ -1126,18 +1135,18 @@ void clu_prepare_fft(clu_env_t * clu, size_t M, size_t N, size_t P)
     clu->n_alloc++;
     free(size);
 
-    float pos_th = 0; // TODO make settable
-    clu->pos_th = clCreateBuffer(clu->context,
+    float value = 0;
+    clu->float_gpu = clCreateBuffer(clu->context,
                                  CL_MEM_READ_ONLY,
                                  sizeof(float),
                                  NULL, &status);
     check_CL(status);
     check_CL( clEnqueueWriteBuffer( clu->command_queue,
-                                    clu->pos_th,
+                                    clu->float_gpu,
                                     CL_TRUE,
                                     0,
                                     sizeof(float),
-                                    &pos_th,
+                                    &value,
                                     0, NULL, NULL));
     clu->n_alloc++;
 
@@ -1170,9 +1179,9 @@ void clu_destroy(clu_env_t * clu)
         {
             check_CL(clReleaseMemObject(clu->real_size));
         }
-        if(clu->pos_th != NULL)
+        if(clu->float_gpu != NULL)
         {
-            check_CL(clReleaseMemObject(clu->pos_th));
+            check_CL(clReleaseMemObject(clu->float_gpu));
         }
     }
 

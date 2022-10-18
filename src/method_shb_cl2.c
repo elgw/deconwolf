@@ -243,16 +243,12 @@ static fimcl_t  * initial_guess_cl(clu_env_t * clu,
 }
 
 
-float iter_shb_cl2(clu_env_t * clu,
-                   fimcl_t ** _xp_gpu, // Output, f_(t+1)
-//                   const float * restrict im, // Input image
+float iter_shb_cl2(fimcl_t ** _xp_gpu, // Output, f_(t+1)
                    fimcl_t * restrict im_gpu, // as above, on GPU
                    fimcl_t * restrict cK, // fft(psf)
                    fimcl_t * restrict pk_gpu, // p_k, estimation of the gradient
                    fimcl_t * W_gpu, // Bertero Weights
-                   const int64_t wM, const int64_t wN, const int64_t wP, // expanded size
-                   const int64_t M, const int64_t N, const int64_t P, // input image size
-                   __attribute__((unused)) const dw_opts * s)
+                   const dw_opts * s)
 {
     fimcl_t * xp_gpu = _xp_gpu[0];
 
@@ -290,7 +286,6 @@ float iter_shb_cl2(clu_env_t * clu,
         fimcl_real_mul_inplace(W_gpu, gx);
     }
 
-    // TODO: the s->bg value is ignored and 0 is used for the min value.
     here();
     fimcl_positivity(gx, s->bg);
     here();
@@ -525,20 +520,20 @@ float * deconvolve_shb_cl2(float * restrict im,
 
         putdot(s);
         here();
-        double err = iter_shb_cl2(
-            clu,
-            &xp_gpu, // xp is updated to the next guess
-            //im,
-            im_gpu,
-            clfftPSF, // FFT of PSF
-            p_gpu, // Current guess
-            //p,
-            W_gpu, // Weights (to handle boundaries)
-            wM, wN, wP, // Expanded size
-            M, N, P, // Original size
-            s);
+        double err =
+            iter_shb_cl2(
+                         &xp_gpu, // xp is updated to the next guess
+                                  //im,
+                         im_gpu,
+                         clfftPSF, // FFT of PSF
+                         p_gpu, // Current guess
+                         //p,
+                         W_gpu, // Weights (to handle boundaries)
+                         s);
+
         //fimcl_to_tiff(xp_gpu, "xp_gpu.tif");
         //exit(EXIT_FAILURE);
+
         here();
         //fimcl_free(p_gpu);
         //here();
@@ -556,6 +551,7 @@ float * deconvolve_shb_cl2(float * restrict im,
         benchmark_write(s, it->iter, it->error, x, M, N, P, wM, wN, wP);
         here();
     } /* End of main loop */
+
     dw_iterator_free(it);
     here();
     fimcl_free(im_gpu);
