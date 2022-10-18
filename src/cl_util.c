@@ -111,7 +111,8 @@ static size_t fimcl_nreal(fimcl_t * X)
 
 float * fimcl_download(fimcl_t * gX)
 {
-
+    assert(gX != NULL);
+    fimcl_sync(gX);
     if(gX->transformed == 0)
     {
         size_t MNP = gX->M*gX->N*gX->P;
@@ -295,6 +296,7 @@ fimcl_t * fimcl_copy(fimcl_t * G)
 
 void fimcl_free(fimcl_t * G)
 {
+    assert(G != NULL);
     fimcl_sync(G);
     check_CL(clReleaseMemObject(G->buf));
     G->clu->n_release++;

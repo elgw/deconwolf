@@ -165,7 +165,8 @@ $(dwbw): $(dwbw_OBJECTS)
 clean:
 	rm -f *.o
 
-# the kernels are included by cl_util.c and in method_shb_cl*
+# the kernels are mostly included by cl_util.c some in method_shb_cl*
+# TODO: this is a silly list
 kernels:
 	# cl_complex_square
 	cp src/kernels/cl_complex_square.c cl_complex_square

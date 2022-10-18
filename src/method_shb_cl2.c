@@ -11,6 +11,15 @@ clu_kernel_t * idiv_kernel;
 clu_kernel_t * reduction_kernel;
 clu_kernel_t * update_y_kernel;
 
+
+void fimcl_to_tiff(fimcl_t * I_gpu, char * filename)
+{
+    float * I = fimcl_download(I_gpu);
+    printf("Writing to %s\n", filename);
+    fim_tiff_write_float(filename, I, NULL, I_gpu->M, I_gpu->N, I_gpu->P);
+    fftwf_free(I);
+}
+
 void prepare_kernels(clu_env_t * clu,
                      size_t M, size_t N, size_t P,
                      size_t wM, size_t wN, size_t wP)
@@ -235,33 +244,27 @@ static fimcl_t  * initial_guess_cl(clu_env_t * clu,
 
 
 float iter_shb_cl2(clu_env_t * clu,
-                   float ** xp, // Output, f_(t+1)
+                   fimcl_t ** _xp_gpu, // Output, f_(t+1)
 //                   const float * restrict im, // Input image
                    fimcl_t * restrict im_gpu, // as above, on GPU
                    fimcl_t * restrict cK, // fft(psf)
-                   float * restrict pk, // p_k, estimation of the gradient
+                   fimcl_t * restrict pk_gpu, // p_k, estimation of the gradient
                    fimcl_t * W_gpu, // Bertero Weights
                    const int64_t wM, const int64_t wN, const int64_t wP, // expanded size
                    const int64_t M, const int64_t N, const int64_t P, // input image size
                    __attribute__((unused)) const dw_opts * s)
 {
-    // We could reduce memory even further by using
-    // the allocation for xp
-    const size_t wMNP = wM*wN*wP;
+    fimcl_t * xp_gpu = _xp_gpu[0];
 
-    fimcl_t * _Pk = fimcl_new(clu, 0, 0, pk, wM, wN, wP);
     here();
-    clFinish(_Pk->clu->command_queue);
+    fimcl_t * fft_pk_gpu = fimcl_fft(pk_gpu); // Pk -> fft_pk_gpu
     here();
-    //fimcl_fft_inplace(Pk);
-    fimcl_t * Pk = fimcl_fft(_Pk);
-    here();
-    fimcl_free(_Pk);
-    here();
-    clFinish(Pk->clu->command_queue);
+    clFinish(fft_pk_gpu->clu->command_queue);
     here();
     putdot(s);
-    fimcl_t * gy = fimcl_convolve(Pk, cK, CLU_KEEP_2ND);
+    fimcl_t * gy = fimcl_convolve(fft_pk_gpu, cK, CLU_KEEP_2ND);
+    fft_pk_gpu = NULL;
+
     here();
 
     float error = fimcl_error_idiv(gy, im_gpu);
@@ -272,31 +275,27 @@ float iter_shb_cl2(clu_env_t * clu,
     fimcl_t * _Y = gy;
     fimcl_sync(_Y);
 
-    // fimcl_fft_inplace(Y);
     fimcl_t * Y = fimcl_fft(_Y);
     fimcl_free(_Y);
-
     clFinish(Y->clu->command_queue);
+
     fimcl_t * gx = fimcl_convolve_conj(Y, cK, CLU_KEEP_2ND);
     here();
-
-    fimcl_t * gpk = fimcl_new(clu, 0, 0, pk, wM, wN, wP);
-    fimcl_sync(gpk);
-    fimcl_real_mul_inplace(gpk, gx); // gx = gpk .* gx
-    fimcl_free(gpk);
+    fimcl_real_mul_inplace(pk_gpu, gx); // gx = gpk .* gx
+    here();
+    fimcl_free(pk_gpu);
+    here();
     if(W_gpu != NULL)
     {
         fimcl_real_mul_inplace(W_gpu, gx);
     }
 
     // TODO: the s->bg value is ignored and 0 is used for the min value.
+    here();
     fimcl_positivity(gx, s->bg);
-
-    float * x = fimcl_download(gx);
-
-    fimcl_free(gx);
-
-    xp[0] = x;
+    here();
+    fimcl_free(xp_gpu);
+    _xp_gpu[0] = gx;
     return error;
 }
 
@@ -397,7 +396,8 @@ float * deconvolve_shb_cl2(float * restrict im,
     }
     if(s->verbosity > 1)
     {
-        printf("Estimated peak memory usage: %.1f GB\n", wMNP*35.0/1e9);
+        // TODO
+        // printf("Estimated peak memory usage: %.1f GB\n", wMNP*35.0/1e9);
     }
     fprintf(s->log, "image: [%" PRId64 "x%" PRId64 "x%" PRId64 "]\n"
             "psf: [%" PRId64 "x%" PRId64 "x%" PRId64 "]\n"
@@ -495,77 +495,83 @@ float * deconvolve_shb_cl2(float * restrict im,
     float * x = fim_constant(wMNP, sumg / (float) wMNP);
     float * xp = fim_copy(x, wMNP);
 
+    /* TODO: we only need two of these to be allocated at a time */
+    fimcl_t * x_gpu = fimcl_new(clu, 0, 1, x, wM, wN, wP);
+
+
+    fimcl_t * xp_gpu = fimcl_new(clu, 0, 1, xp, wM, wN, wP);
+    fimcl_t * p_gpu = NULL;
+
+    fftwf_free(x);
+    fftwf_free(xp);
+
     dw_iterator_t * it = dw_iterator_new(s);
     while(dw_iterator_next(it) >= 0)
     {
-        float * p = xp; /* We don't need xp more */
+        here();
 
         /* Eq. 10 in SHB paper */
         double alpha = ((float) it->iter-1.0)/((float) it->iter+2.0);
         //alpha /= 1.5;
         alpha < 0 ? alpha = 0: 0;
 
-#pragma omp parallel for shared(p, x, xp)
-        /* To be interpreted as p^k in Eq. 7 of SHB */
-        for(size_t kk = 0; kk<wMNP; kk++)
-        {
-            p[kk] = x[kk] + alpha*(x[kk]-xp[kk]);
-        }
+        here();
+        /* To be interpreted as p^k in Eq. 7 of SHB
+         *  p[kk] = x[kk] + alpha*(x[kk]-xp[kk]); */
+        p_gpu = fimcl_new(clu, 0, 1, NULL, wM, wN, wP);
 
-        // TODO -- then we can go all GPU :)
-        //fimcl_shb_update(gpu_p, gpu_x, gpu_xp, alpha);
+        fimcl_shb_update(p_gpu, x_gpu, xp_gpu, alpha);
 
 
         putdot(s);
-
+        here();
         double err = iter_shb_cl2(
             clu,
-            &xp, // xp is updated to the next guess
+            &xp_gpu, // xp is updated to the next guess
             //im,
             im_gpu,
             clfftPSF, // FFT of PSF
-            p, // Current guess
+            p_gpu, // Current guess
             //p,
             W_gpu, // Weights (to handle boundaries)
             wM, wN, wP, // Expanded size
             M, N, P, // Original size
             s);
-
-        fftwf_free(p); // i.e. p
+        //fimcl_to_tiff(xp_gpu, "xp_gpu.tif");
+        //exit(EXIT_FAILURE);
+        here();
+        //fimcl_free(p_gpu);
+        //here();
 
         dw_iterator_set_error(it, err);
         {
             /* Swap so that the current is named x */
-            float * t = x;
-            x = xp;
-            xp = t;
+            fimcl_t * t = x_gpu;
+            x_gpu = xp_gpu;
+            xp_gpu = t;
         }
 
         putdot(s);
         dw_iterator_show(it, s);
         benchmark_write(s, it->iter, it->error, x, M, N, P, wM, wN, wP);
-
+        here();
     } /* End of main loop */
     dw_iterator_free(it);
-
+    here();
     fimcl_free(im_gpu);
 
     {
         /* Swap back so that x is the final iteration */
-        float * t = x;
-        x = xp;
-        xp = t;
+        fimcl_t * t = x_gpu;
+        x_gpu = xp_gpu;
+        xp_gpu = t;
     }
-
-    if(xp != NULL)
-    {
-        fftwf_free(xp);
-    }
+    here();
 
     if(s->verbosity > 0) {
         printf("\n");
     }
-
+    here();
     fimcl_free(clfftPSF);
 
     if(s->fulldump)
@@ -573,15 +579,16 @@ float * deconvolve_shb_cl2(float * restrict im,
         printf("Dumping to fulldump.tif\n");
         fim_tiff_write("fulldump.tif", x, NULL, wM, wN, wP);
     }
-
-    float * out = fim_subregion(x, wM, wN, wP, M, N, P);
-
-    if(x != NULL)
-    {
-        fftwf_free(x);
-    }
+    here();
+    float * out_full = fimcl_download(x_gpu);
+    fimcl_sync(x_gpu);
+    fimcl_free(x_gpu);
+    here();
+    float * out = fim_subregion(out_full, wM, wN, wP, M, N, P);
+    here();
+    fftwf_free(out_full);
+    here();
 
     clu_destroy(clu);
-
     return out;
 }
