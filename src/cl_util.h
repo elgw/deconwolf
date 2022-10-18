@@ -53,13 +53,13 @@ typedef struct{
     clu_kernel_t kern_mul_inplace;
     clu_kernel_t kern_mul_conj_inplace;
     /* For real data */
-    cl_mem real_size;
     clu_kernel_t kern_real_mul_inplace;
     clu_kernel_t kern_error_idiv;
     clu_kernel_t kern_real_positivity;
     /* mem buffer with 1 float. Used for positivity threshold and for alpha */
     cl_mem float_gpu;
     clu_kernel_t kern_shb_update; /* Find next guess with shb */
+    clu_kernel_t kern_preprocess_image;
 
     clu_kernel_t * idiv_kernel;
     clu_kernel_t * reduction_kernel;
@@ -253,5 +253,7 @@ void clu_benchmark_transfer(clu_env_t * clu);
 
 float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image);
 void fimcl_update_y(fimcl_t * gy, fimcl_t * image);
+
+void fimcl_preprocess( fimcl_t * fft_image, fimcl_t * fft_PSF, float value);
 
 #endif

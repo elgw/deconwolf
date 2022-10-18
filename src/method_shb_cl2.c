@@ -3,7 +3,7 @@
 //#define here(x) printf("%s %s %d\n", __FILE__, __FUNCTION__, __LINE__);
 #define here(x) ;
 
-#if 0
+
 static void fimcl_to_tiff(fimcl_t * I_gpu, char * filename)
 {
     float * I = fimcl_download(I_gpu);
@@ -11,7 +11,6 @@ static void fimcl_to_tiff(fimcl_t * I_gpu, char * filename)
     fim_tiff_write_float(filename, I, NULL, I_gpu->M, I_gpu->N, I_gpu->P);
     fftwf_free(I);
 }
-#endif
 
 static fimcl_t  * initial_guess_cl(clu_env_t * clu,
                                    const int64_t M, const int64_t N, const int64_t P,
@@ -167,29 +166,10 @@ float * deconvolve_shb_cl2(float * restrict im,
         wP = int64_t_max(P, pP);
     }
 
-    if(wP %2 == 1)
-    {
-        /*  The jobb size is not divisable by 2.
-         * potentially it could be faster to extend the job by
-         * one slice in Z, but for some sizes, e.g. 85->86 it gets slower
-         * some benchmarking or prediction should guide this, not just a flag.
-         */
-        if(s->experimental1)
-        {
-            printf("      Adding one extra slice to the job for performance"
-                   " this is still experimental. \n");
-            // One slice of the "job" should be cleared every iterations.
-            wP++;
-        }
-    }
-
     clu_env_t * clu = clu_new(s->verbosity);
     wM = clu_next_fft_size(wM);
     wN = clu_next_fft_size(wN);
     wP = clu_next_fft_size(wP);
-
-    /* Set up the kernels defined in this function */
-    clu_prepare_kernels(clu, wM, wN, wP, M, N, P);
 
     /* Total number of pixels */
     size_t wMNP = wM*wN*wP;
@@ -198,6 +178,10 @@ float * deconvolve_shb_cl2(float * restrict im,
     { printf("image: [%" PRId64 "x%" PRId64 "x%" PRId64 "], psf: [%" PRId64 "x%" PRId64 "x%" PRId64 "], job: [%" PRId64 "x%" PRId64 "x%" PRId64 "]\n",
              M, N, P, pM, pN, pP, wM, wN, wP);
     }
+
+    /* Set up the kernels defined in this function */
+    clu_prepare_kernels(clu, M, N, P, wM, wN, wP);
+
     if(s->verbosity > 1)
     {
         // TODO
@@ -214,6 +198,7 @@ float * deconvolve_shb_cl2(float * restrict im,
         printf("Iterating "); fflush(stdout);
     }
 
+    /* Prepare the PSF */
     // cK : "full size" fft of the PSF
     float * Z = fftwf_malloc(wMNP*sizeof(float));
     memset(Z, 0, wMNP*sizeof(float));
@@ -241,16 +226,45 @@ float * deconvolve_shb_cl2(float * restrict im,
         fim_tiff_write_float("fullPSF.tif", Z, NULL, wM, wN, wP);
     }
 
-    fimcl_t * im_gpu = fimcl_new(clu, 0, 0, im, M, N, P);
-
-    //fftwf_complex * fftPSF = fft(Z, wM, wN, wP);
     fimcl_t * PSF_gpu = fimcl_new(clu, 0, 0,
                                     Z, wM, wN, wP);
 
     fimcl_t * fft_PSF_gpu = fimcl_fft(PSF_gpu);
     fimcl_free(PSF_gpu);
-
     fftwf_free(Z);
+
+    /* Prepare the image */
+    fimcl_t * im_gpu = NULL;
+
+    if(s->psf_pass == 0)
+    {
+        im_gpu = fimcl_new(clu, 0, 0, im, M, N, P);
+    } else {
+        printf("Experimental pre-processing path. Don't use. Work in progress.\n");
+        /* Leaves some artifacts at the boundaries. FFT-based
+           pre-filtering is a tricky path. */
+        float * im_full = fftwf_malloc(wMNP*sizeof(float));
+        memset(im_full, 0, wMNP*sizeof(float));
+        /* Insert the psf into the bigger Z */
+        fim_insert(im_full, wM, wN, wP,
+                   im, M, N, P);
+        fimcl_t * im_full_gpu = fimcl_new(clu, 0, 0, im_full, wM, wN, wP);
+        fimcl_t * fft_im_full_gpu = fimcl_fft(im_full_gpu);
+        im_full_gpu = NULL;
+        // magic thresholding
+
+        fimcl_preprocess(fft_im_full_gpu, fft_PSF_gpu, s->psf_pass);
+        im_full_gpu = fimcl_ifft(fft_im_full_gpu);
+        float * im_filt = fimcl_download(im_full_gpu);
+        float * im_filt_cropped = fim_subregion(im_filt, wM, wN, wP, M, N, P);
+        fftwf_free(im_filt);
+        im_gpu = fimcl_new(clu, 0, 0, im_filt_cropped, M, N, P);
+        fimcl_to_tiff(im_gpu, "ifft_fft_input.tif");
+        fftwf_free(im_filt_cropped);
+    }
+
+
+
 
     putdot(s);
 

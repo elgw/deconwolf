@@ -11,6 +11,7 @@
 #include "kernels/cl_shb_update.h"
 #include "kernels/cl_idiv_kernel.h"
 #include "kernels/cl_update_y_kernel.h"
+#include "kernels/cl_preprocess_image.h"
 
 //#define here(x) printf("%s %s %d\n", __FILE__, __FUNCTION__, __LINE__);
 #define here(x) ;
@@ -440,6 +441,67 @@ void fimcl_sync(fimcl_t * X)
     return;
 }
 
+void fimcl_preprocess(fimcl_t * fft_image, fimcl_t * fft_PSF, float value)
+{
+    printf("fimcl_preprocess, value = %f\n", value);
+    assert(fft_PSF->transformed == 1);
+    assert(fft_image -> transformed == 1);
+    assert(fft_PSF->M == fft_image->M);
+    cl_kernel kernel = fft_image->clu->kern_preprocess_image.kernel;
+
+    /* Set sizes */
+    size_t localWorkSize; /* Use largest possible */
+    check_CL ( clGetKernelWorkGroupInfo(kernel,
+                                        fft_image->clu->device_id,
+                                        CL_KERNEL_WORK_GROUP_SIZE,
+                                        sizeof(size_t),
+                                        &localWorkSize,
+                                        NULL) );
+
+    size_t nel = fimcl_ncx(fft_image); // number of complex values
+    size_t numWorkGroups = (nel + (localWorkSize -1) ) / localWorkSize;
+    size_t globalWorkSize = localWorkSize * numWorkGroups;
+
+
+    check_CL( clSetKernelArg(kernel,
+                             0, // argument index
+                             sizeof(cl_mem), // argument size
+                             (void *) &fft_image->buf) ); // argument value
+
+    check_CL( clSetKernelArg(kernel,
+                             1, // argument index
+                             sizeof(cl_mem), // argument size
+                             (void *) &fft_PSF->buf) ); // argument value
+
+    check_CL( clEnqueueWriteBuffer( fft_image->clu->command_queue,
+                                    fft_image->clu->float_gpu,
+                                    CL_TRUE,
+                                    0,
+                                    sizeof(float),
+                                    &value,
+                                    0, NULL, NULL));
+
+    check_CL( clSetKernelArg(kernel,
+                             2,
+                             sizeof(cl_mem),
+                             (void *) &fft_image->clu->float_gpu) );
+
+    fimcl_sync(fft_image);
+    fimcl_sync(fft_PSF);;
+
+    check_CL( clEnqueueNDRangeKernel(fft_image->clu->command_queue,
+                                     kernel,
+                                     1, //3,
+                                     NULL,
+                                     &globalWorkSize, //global_work_size,
+                                     &localWorkSize,
+                                     0,
+                                     NULL,
+                                     &fft_image->wait_ev) );
+    fimcl_sync(fft_image);
+}
+
+
 void fimcl_complex_mul(fimcl_t * X, fimcl_t * Y, fimcl_t * Z, int conj)
 {
     cl_kernel kernel = X->clu->kern_mul.kernel;
@@ -647,8 +709,7 @@ void fimcl_shb_update(fimcl_t * P, fimcl_t * X, fimcl_t * XP, float alpha)
                                      &P->wait_ev) );
 
     fimcl_sync(P);
-
-
+    return;
 }
 
 
@@ -1079,6 +1140,13 @@ clu_env_t * clu_new(int verbose)
                CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS);
     }
 
+    if(env->verbose > 1)
+    {
+        cl_uint major, minor, patch;
+        clfftGetVersion(&major, &minor, &patch);
+        printf("clfft version: %d.%d.%d\n", major, minor, patch);
+    }
+
     return env;
 }
 
@@ -1122,9 +1190,9 @@ void clu_prepare_kernels(clu_env_t * clu,
             M_r2h(wM)*N_r2h(wN)*P_r2h(wP));
     clu->kern_mul =
         *clu_kernel_newa(clu,
-                        NULL, //"cl_complex_mul.c",
-                        (const char *) cl_complex_mul,
-                        cl_complex_mul_len,
+                         NULL, //"cl_complex_mul.c",
+                         (const char *) cl_complex_mul,
+                         cl_complex_mul_len,
                          "cl_complex_mul",
                          argstring);
 
@@ -1137,39 +1205,47 @@ void clu_prepare_kernels(clu_env_t * clu,
                          argstring);
     clu->kern_mul_inplace =
         *clu_kernel_newa(clu,
-                        NULL,
-                        (const char *) cl_complex_mul_inplace,
-                        cl_complex_mul_inplace_len,
+                         NULL,
+                         (const char *) cl_complex_mul_inplace,
+                         cl_complex_mul_inplace_len,
                          "cl_complex_mul_inplace",
                          argstring);
     clu->kern_mul_conj_inplace =
         *clu_kernel_newa(clu,
-                        NULL,
-                        (const char *) cl_complex_mul_conj_inplace,
-                        cl_complex_mul_conj_inplace_len,
+                         NULL,
+                         (const char *) cl_complex_mul_conj_inplace,
+                         cl_complex_mul_conj_inplace_len,
                          "cl_complex_mul_conj_inplace",
                          argstring);
+    clu->kern_preprocess_image =
+        * clu_kernel_newa(clu,
+                          NULL,
+                          (const char *) src_kernels_cl_preprocess_image_c,
+                          src_kernels_cl_preprocess_image_c_len,
+                          "cl_preprocess_image",
+                          argstring);
+
     /* Kernels for real float */
     sprintf(argstring, "-D wMNP=%zu", wM*wN*wP);
     clu->kern_real_mul_inplace =
         * clu_kernel_newa(clu,
-                         NULL,
-                         (const char *) src_kernels_cl_real_mul_inplace_c,
-                         src_kernels_cl_real_mul_inplace_c_len,
+                          NULL,
+                          (const char *) src_kernels_cl_real_mul_inplace_c,
+                          src_kernels_cl_real_mul_inplace_c_len,
                           "cl_real_mul_inplace",
                           argstring);
     clu->kern_real_positivity =
         * clu_kernel_newa(clu,
-                         NULL,
-                         (const char *) src_kernels_cl_positivity_c,
-                         src_kernels_cl_positivity_c_len,
+                          NULL,
+                          (const char *) src_kernels_cl_positivity_c,
+                          src_kernels_cl_positivity_c_len,
                           "cl_positivity",
                           argstring);
     clu->kern_shb_update =
         * clu_kernel_newa(clu,
-                         NULL,
-                         (const char *) src_kernels_cl_shb_update_c,
-                         src_kernels_cl_shb_update_c_len,
+                          NULL,
+                          (const char *) src_kernels_cl_shb_update_c,
+                          src_kernels_cl_shb_update_c_len,
                           "cl_shb_update",
                           argstring);
 
@@ -1193,31 +1269,8 @@ void clu_prepare_kernels(clu_env_t * clu,
 
     free(argstring);
 
-
-    /* Set up size-dependent data */
-    size_t * size = malloc(4*sizeof(size_t));
-    size[0] = M*N*P;
-    size[1] = M;
-    size[2] = N;
-    size[3] = P;
-    cl_int status;
-    clu->real_size = clCreateBuffer(clu->context,
-                                    CL_MEM_READ_ONLY,
-                                    4*sizeof(size_t),
-                                    NULL, &status);
-    check_CL(status);
-    check_CL( clEnqueueWriteBuffer( clu->command_queue,
-                                    clu->real_size,
-                                    CL_TRUE,
-                                    0,
-                                    4*sizeof(size_t),
-                                    size,
-                                    0, NULL, NULL));
-    clu->n_alloc++;
-
-    free(size);
-
     float value = 0;
+    cl_int status;
     clu->float_gpu = clCreateBuffer(clu->context,
                                     CL_MEM_READ_ONLY,
                                     sizeof(float),
@@ -1231,8 +1284,6 @@ void clu_prepare_kernels(clu_env_t * clu,
                                     &value,
                                     0, NULL, NULL));
     clu->n_alloc++;
-
-
     clu->clFFT_loaded = 1;
     return;
 }
@@ -1256,10 +1307,6 @@ void clu_destroy(clu_env_t * clu)
         if(clu->clfft_buffer_size > 0)
         {
             check_CL(clReleaseMemObject(clu->clfft_buffer));
-        }
-        if(clu->real_size != NULL)
-        {
-            check_CL(clReleaseMemObject(clu->real_size));
         }
 
         if(clu->float_gpu != NULL)
@@ -1442,6 +1489,8 @@ cl_uint clu_wait_for_event(cl_event clev, size_t ns)
 
 size_t clu_next_fft_size(size_t N)
 {
+    const int has_factor_11 = 1;
+    const int has_factor_13 = 1;
 
     while(1)
     {
@@ -1462,13 +1511,19 @@ size_t clu_next_fft_size(size_t N)
         {
             t/=7;
         }
-        while( t > 0 && (t % 11) == 0)
+        if(has_factor_11)
         {
-            t/=11;
+            while( t > 0 && (t % 11) == 0)
+            {
+                t/=11;
+            }
         }
-        while( t > 0 && (t % 13) == 0)
+        if(has_factor_13)
         {
-            t/=13;
+            while( t > 0 && (t % 13) == 0)
+            {
+                t/=13;
+            }
         }
         if(t == 1)
         {
@@ -1514,6 +1569,8 @@ clfftPlanHandle  gen_r2h_plan(clu_env_t * clu,
 
     clfftPlanHandle planHandle;
     size_t real_size[3] = {M, N, P};
+
+    printf("Real size: %zu x %zu x %zu\n", M, N, P);
 
     /* Start with a default plan and then adjust it */
     check_clFFT(clfftCreateDefaultPlan(&planHandle,

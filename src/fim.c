@@ -283,8 +283,10 @@ void fim_flipall(float * restrict T, const float * restrict A, const int64_t a1,
 }
 
 
-void fim_insert(float * restrict T, const int64_t t1, const int64_t t2, const int64_t t3,
-                const float * restrict F, const int64_t f1, const int64_t f2, const int64_t f3)
+void fim_insert(float * restrict T,
+                const int64_t t1, const int64_t t2, const int64_t t3,
+                const float * restrict F,
+                const int64_t f1, const int64_t f2, const int64_t f3)
 /* Insert F [f1xf2xf3] into T [t1xt2xt3] in the "upper left" corner */
 {
     if(f3 > t3 || f2 > t2 || f1 > t1)
@@ -300,6 +302,13 @@ void fim_insert(float * restrict T, const int64_t t1, const int64_t t2, const in
                f1, f2, f3, t1, t2, t3);
         exit(-1);
     }
+
+    if(f1 == t1 && f2 == t2 && f3 == t3)
+    {
+        memcpy(T, F, t1*t2*t3*sizeof(float));
+        return;
+    }
+
 #pragma omp parallel for shared(T, F)
     for(int64_t pp = 0; pp<f3; pp++)
     {

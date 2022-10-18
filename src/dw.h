@@ -130,6 +130,7 @@ struct _dw_opts{
 
     float relax;
     float bg; /* Background level, 0 by default */
+    float psf_pass; /* For low-pass filtering by the PSF */
 
     /* Selection of method */
     dw_method method; /* what algorithm to use */

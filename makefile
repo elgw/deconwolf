@@ -200,6 +200,7 @@ kernels:
 	xxd -i src/kernels/cl_real_mul_inplace.c > src/kernels/cl_real_mul_inplace.h
 	xxd -i src/kernels/cl_positivity.c > src/kernels/cl_positivity.h
 	xxd -i src/kernels/cl_shb_update.c > src/kernels/cl_shb_update.h
+	xxd -i src/kernels/cl_preprocess_image.c > src/kernels/cl_preprocess_image.h
 
 install:
 	# Binaries

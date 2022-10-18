@@ -530,6 +530,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     struct option longopts[] = {
         { "no-inplace",   no_argument,       NULL, '1' },
         { "ompthreads", required_argument, NULL, '2' },
+        { "psf-pass",   required_argument, NULL, '3', },
         { "noplan",    no_argument,       NULL, 'a' },
         { "bg",        required_argument, NULL, 'b' },
         { "threads",   required_argument, NULL, 'c' },
@@ -572,7 +573,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     int ch;
     int prefix_set = 0;
     while((ch = getopt_long(argc, argv,
-                            "12ab:c:f:ghil:m:n:o:p:r:s:tvwx:B:C:DFI:L:MR:TPQ:X:",
+                            "123ab:c:f:ghil:m:n:o:p:r:s:tvwx:B:C:DFI:L:MR:TPQ:X:",
                             longopts, NULL)) != -1)
     {
         switch(ch) {
@@ -581,6 +582,9 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             break;
         case '2':
             s->nThreads_OMP = atoi(optarg);
+            break;
+        case '3':
+            s->psf_pass = atof(optarg);
             break;
         case 'C':
             s->flatfieldFile = strdup(optarg);
