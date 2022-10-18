@@ -3,215 +3,15 @@
 //#define here(x) printf("%s %s %d\n", __FILE__, __FUNCTION__, __LINE__);
 #define here(x) ;
 
-
-#include "kernels/cl_idiv_kernel.h"
-#include "kernels/cl_update_y_kernel.h"
-
-clu_kernel_t * idiv_kernel;
-clu_kernel_t * reduction_kernel;
-clu_kernel_t * update_y_kernel;
-
-
-void fimcl_to_tiff(fimcl_t * I_gpu, char * filename)
+#if 0
+static void fimcl_to_tiff(fimcl_t * I_gpu, char * filename)
 {
     float * I = fimcl_download(I_gpu);
     printf("Writing to %s\n", filename);
     fim_tiff_write_float(filename, I, NULL, I_gpu->M, I_gpu->N, I_gpu->P);
     fftwf_free(I);
 }
-
-void prepare_kernels(clu_env_t * clu,
-                     size_t M, size_t N, size_t P,
-                     size_t wM, size_t wN, size_t wP)
-{
-    char * argstring = malloc(1024);
-    sprintf(argstring,
-            "-D NELEMENTS=%zu "
-            "-D M=%zu -D N=%zu -D P=%zu "
-            "-D wM=%zu -D wN=%zu -D wP=%zu",
-            wM*wN*wP, M, N, P, wM, wN, wP);
-    idiv_kernel = clu_kernel_newa(clu,
-                                  "kernels/cl_idiv_kernel.c",
-                                  (const char *) cl_idiv_kernel,
-                                  cl_idiv_kernel_len,
-                                  "idiv_kernel",
-                                  argstring);
-    update_y_kernel = clu_kernel_newa(clu,
-                                      "kernels/cl_update_y_kernel.c",
-                                      (const char *) cl_update_y_kernel,
-                                      cl_update_y_kernel_len,
-                                      "update_y_kernel",
-                                      argstring);
-
-    free(argstring);
-}
-
-float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image);
-
-void gpu_update_y(fimcl_t * gy, fimcl_t * image)
-{
-    here();
-
-    /* Configure sizes */
-    size_t nel = gy->M*gy->N*gy->P;
-    size_t localWorkSize; /* Use largest possible */
-    cl_kernel kernel = update_y_kernel->kernel;
-
-    /* This takes no time, probably just a look-up so no need to
-     * cache it */
-    check_CL(
-             clGetKernelWorkGroupInfo(kernel,
-                                      gy->clu->device_id,
-                                      CL_KERNEL_WORK_GROUP_SIZE,
-                                      sizeof(size_t), &localWorkSize, NULL)
-             );
-
-    /* The global size needs to be a multiple of the localWorkSize
-     * i.e. it will be larger than the number of elements */
-    size_t numWorkGroups = (nel + (localWorkSize -1) ) / localWorkSize;
-    size_t globalWorkSize = localWorkSize * numWorkGroups;
-    if(0)
-    {
-        printf("   globalWorkSize: %zu\n", globalWorkSize);
-        printf("   localWorkSize: %zu\n", localWorkSize);
-        printf("   numWorkGroups: %zu\n", numWorkGroups);
-    }
-    assert(globalWorkSize >= image->M*image->N*image->P);
-
-    fimcl_sync(gy);
-    //fimcl_sync(image); // never changed
-
-    /* The image is assumed to be smaller or the same size
-     * as the forward projection (which might be extended). */
-    assert(image->M <= gy->M);
-    assert(image->N <= gy->N);
-    assert(image->P <= gy->P);
-
-    check_CL( clSetKernelArg(kernel,
-                             0, // argument index
-                             sizeof(cl_mem), // argument size
-                             (void *) &gy->buf) ); // argument value
-
-    check_CL( clSetKernelArg(kernel,
-                             1, // argument index
-                             sizeof(cl_mem), // argument size
-                             (void *) &image->buf) ); // argument value
-
-    check_CL( clEnqueueNDRangeKernel(gy->clu->command_queue,
-                                     kernel,
-                                     1,
-                                     NULL,
-                                     &globalWorkSize, //global_work_size,
-                                     &localWorkSize,
-                                     0,
-                                     NULL,
-                                     &gy->wait_ev) );
-
-    fimcl_sync(gy);
-
-    return;
-}
-
-
-
-float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
-{
-    cl_int status = CL_SUCCESS;
-
-    /* Configure sizes */
-    size_t nel = forward->M*forward->N*forward->P;
-    size_t localWorkSize; /* Use largest possible */
-    // TOOD: does this take time?
-    status = clGetKernelWorkGroupInfo(idiv_kernel->kernel,
-                                      forward->clu->device_id,
-                                      CL_KERNEL_WORK_GROUP_SIZE,
-                                      sizeof(size_t), &localWorkSize, NULL);
-    /* The global size needs to be a multiple of the localWorkSize
-     * i.e. it will be larger than the number of elements */
-    size_t numWorkGroups = (nel + (localWorkSize -1) ) / localWorkSize;
-    size_t globalWorkSize = localWorkSize * numWorkGroups;
-    if(0)
-    {
-        printf("   globalWorkSize: %zu\n", globalWorkSize);
-        printf("   localWorkSize: %zu\n", localWorkSize);
-        printf("   numWorkGroups: %zu\n", numWorkGroups);
-    }
-    assert(globalWorkSize >= image->M*image->N*image->P);
-
-    fimcl_sync(forward);
-    fimcl_sync(image);
-
-    /* The image is assumed to be smaller or the same size
-     * as the forward projection (which might be extended). */
-    assert(image->M <= forward->M);
-    assert(image->N <= forward->N);
-    assert(image->P <= forward->P);
-
-    /* Create a buffer for the partial sums */
-    cl_mem partial_sums_gpu = clCreateBuffer(forward->clu->context,
-                                             CL_MEM_WRITE_ONLY,
-                                             numWorkGroups * sizeof(float),
-                                             NULL,
-                                             &status );
-
-
-    cl_kernel kernel = idiv_kernel->kernel;
-    check_CL( clSetKernelArg(kernel,
-                             0, // argument index
-                             sizeof(cl_mem), // argument size
-                             (void *) &forward->buf) ); // argument value
-
-    check_CL( clSetKernelArg(kernel,
-                             1, // argument index
-                             sizeof(cl_mem), // argument size
-                             (void *) &image->buf) ); // argument value
-
-    check_CL( clSetKernelArg(kernel,
-                             2, localWorkSize*sizeof(float), NULL) );
-
-    check_CL( clSetKernelArg(kernel,
-                             3, sizeof(cl_mem), &partial_sums_gpu));
-
-    check_CL( clEnqueueNDRangeKernel(forward->clu->command_queue,
-                                     kernel,
-                                     1,
-                                     NULL,
-                                     &globalWorkSize, //global_work_size,
-                                     &localWorkSize,
-                                     0,
-                                     NULL,
-                                     &forward->wait_ev) );
-
-    fimcl_sync(forward);
-
-    /* Download the result */
-    float * partial_sums = malloc(numWorkGroups*sizeof(float));
-    status = clEnqueueReadBuffer(forward->clu->command_queue,
-                                 partial_sums_gpu,
-                                 CL_TRUE,
-                                 0,
-                                 numWorkGroups*sizeof(float),
-                                 partial_sums,
-                                 0,
-                                 NULL,
-                                 NULL);
-    clFinish(forward->clu->command_queue);
-
-    float sum_gpu = 0;
-#pragma omp parallel for reduction(+ : sum_gpu)
-    for(size_t kk = 0 ; kk<numWorkGroups; kk++)
-    {
-        sum_gpu += partial_sums[kk];
-    }
-    free(partial_sums);
-    clReleaseMemObject(partial_sums_gpu);
-
-    return sum_gpu / (float) (image->M*image->N*image->P);
-}
-
-
-
-
+#endif
 
 static fimcl_t  * initial_guess_cl(clu_env_t * clu,
                                    const int64_t M, const int64_t N, const int64_t P,
@@ -259,8 +59,7 @@ float iter_shb_cl2(fimcl_t ** _xp_gpu, // Output, f_(t+1)
     here();
     fimcl_t * fft_pk_gpu = fimcl_fft(pk_gpu); // Pk -> fft_pk_gpu
     here();
-    clFinish(fft_pk_gpu->clu->command_queue);
-    here();
+
     putdot(s);
     fimcl_t * gy = fimcl_convolve(fft_pk_gpu, cK, CLU_KEEP_2ND);
     fft_pk_gpu = NULL;
@@ -273,32 +72,32 @@ float iter_shb_cl2(fimcl_t ** _xp_gpu, // Output, f_(t+1)
 
     //struct timespec t0, t1;
     //clock_gettime(CLOCK_MONOTONIC, &t0);
-    gpu_update_y(gy, im_gpu);
+    fimcl_update_y(gy, im_gpu);
     //clock_gettime(CLOCK_MONOTONIC, &t1);
     //float  dt = clockdiff(&t1, &t0);
     //printf("\n gpu_update_y took %f s\n", dt);
 
     fimcl_t * _Y = gy;
-    fimcl_sync(_Y);
 
     fimcl_t * Y = fimcl_fft(_Y);
     fimcl_free(_Y);
-    clFinish(Y->clu->command_queue);
 
+    // gx = Y * cK, Y is freed
     fimcl_t * gx = fimcl_convolve_conj(Y, cK, CLU_KEEP_2ND);
-    here();
+    Y = NULL;
+
+
     fimcl_real_mul_inplace(pk_gpu, gx); // gx = gpk .* gx
-    here();
     fimcl_free(pk_gpu);
-    here();
+
     if(W_gpu != NULL)
     {
+        // gx = gx .* W_gpu
         fimcl_real_mul_inplace(W_gpu, gx);
     }
 
-    here();
+    // gx[kk] < s->bg ? gx[kk] = s->bg : 0;
     fimcl_positivity(gx, s->bg);
-    here();
     fimcl_free(xp_gpu);
     _xp_gpu[0] = gx;
     return error;
@@ -388,10 +187,9 @@ float * deconvolve_shb_cl2(float * restrict im,
     wM = clu_next_fft_size(wM);
     wN = clu_next_fft_size(wN);
     wP = clu_next_fft_size(wP);
-    clu_prepare_fft(clu, wM, wN, wP);
 
     /* Set up the kernels defined in this function */
-    prepare_kernels(clu, M, N, P, wM, wN, wP);
+    clu_prepare_kernels(clu, wM, wN, wP, M, N, P);
 
     /* Total number of pixels */
     size_t wMNP = wM*wN*wP;
@@ -446,11 +244,11 @@ float * deconvolve_shb_cl2(float * restrict im,
     fimcl_t * im_gpu = fimcl_new(clu, 0, 0, im, M, N, P);
 
     //fftwf_complex * fftPSF = fft(Z, wM, wN, wP);
-    fimcl_t * _clfftPSF = fimcl_new(clu, 0, 0,
+    fimcl_t * PSF_gpu = fimcl_new(clu, 0, 0,
                                     Z, wM, wN, wP);
-    // fimcl_fft_inplace(clfftPSF);
-    fimcl_t * clfftPSF = fimcl_fft(_clfftPSF);
-    fimcl_free(_clfftPSF);
+
+    fimcl_t * fft_PSF_gpu = fimcl_fft(PSF_gpu);
+    fimcl_free(PSF_gpu);
 
     fftwf_free(Z);
 
@@ -466,7 +264,7 @@ float * deconvolve_shb_cl2(float * restrict im,
         fimcl_t * clfftOne = initial_guess_cl(clu, M, N, P, wM, wN, wP);
         here();
         //float * P1 = fft_convolve_cc_conj_f2(fftPSF, F_one, wM, wN, wP);
-        fimcl_t * gclP1 = fimcl_convolve_conj(clfftOne, clfftPSF, CLU_KEEP_2ND);
+        fimcl_t * gclP1 = fimcl_convolve_conj(clfftOne, fft_PSF_gpu, CLU_KEEP_2ND);
         here();
         clfftOne = NULL; // freed already
         here();
@@ -534,11 +332,9 @@ float * deconvolve_shb_cl2(float * restrict im,
         double err =
             iter_shb_cl2(
                          &xp_gpu, // xp is updated to the next guess
-                                  //im,
                          im_gpu,
-                         clfftPSF, // FFT of PSF
+                         fft_PSF_gpu, // FFT of PSF
                          p_gpu, // Current guess
-                         //p,
                          W_gpu, // Weights (to handle boundaries)
                          s);
 
@@ -562,10 +358,12 @@ float * deconvolve_shb_cl2(float * restrict im,
         benchmark_write(s, it->iter, it->error, x, M, N, P, wM, wN, wP);
         here();
     } /* End of main loop */
-
     dw_iterator_free(it);
     here();
+    fimcl_free(fft_PSF_gpu);
+    fft_PSF_gpu = NULL;
     fimcl_free(im_gpu);
+    im_gpu = NULL;
 
     {
         /* Swap back so that x is the final iteration */
@@ -578,22 +376,18 @@ float * deconvolve_shb_cl2(float * restrict im,
     if(s->verbosity > 0) {
         printf("\n");
     }
-    here();
-    fimcl_free(clfftPSF);
 
+    float * out_full = fimcl_download(x_gpu);
     if(s->fulldump)
     {
         printf("Dumping to fulldump.tif\n");
-        fim_tiff_write("fulldump.tif", x, NULL, wM, wN, wP);
+        fim_tiff_write("fulldump.tif", out_full, NULL, wM, wN, wP);
     }
     here();
-    float * out_full = fimcl_download(x_gpu);
-    fimcl_sync(x_gpu);
-    fimcl_free(x_gpu);
-    here();
+
     float * out = fim_subregion(out_full, wM, wN, wP, M, N, P);
-    here();
     fftwf_free(out_full);
+
     here();
 
     clu_destroy(clu);

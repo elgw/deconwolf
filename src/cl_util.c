@@ -9,13 +9,18 @@
 #include "kernels/cl_real_mul_inplace.h"
 #include "kernels/cl_positivity.h"
 #include "kernels/cl_shb_update.h"
+#include "kernels/cl_idiv_kernel.h"
+#include "kernels/cl_update_y_kernel.h"
 
+//#define here(x) printf("%s %s %d\n", __FILE__, __FUNCTION__, __LINE__);
+#define here(x) ;
 
 static char * read_program(const char * fname, size_t * size);
 static double clockdiff(struct timespec* start, struct timespec * finish);
 
 /* Number of floats */
 static size_t fimcl_nreal(fimcl_t * X);
+
 /* Number of complex values required for Hermitian representation */
 static size_t fimcl_ncx(fimcl_t * X);
 
@@ -34,8 +39,9 @@ void clu_exit_error(cl_int err,
                     int clfft)
 {
     fprintf(stderr, "\n");
-    fprintf(stderr, "ERROR!\n");
-    fprintf(stderr, "There was an unrecoverable problem in %s (%s) at line %d\n",
+    fprintf(stderr, "Sorry! There was an unrecoverable error!\n"
+            "   File: %s\n"
+            "   Function: %s at line %d\n",
             file, function, line);
 
     const char * err_cl = clGetErrorString(err);
@@ -53,7 +59,7 @@ void clu_exit_error(cl_int err,
     exit(EXIT_FAILURE);
 }
 
-#if 1
+/* Convert real dimensions to complex hermitian dimensions */
 static size_t M_r2h(size_t M)
 {
     return (1+M/2);
@@ -66,22 +72,6 @@ static size_t P_r2h(size_t P)
 {
     return P;
 }
-#endif
-
-#if 0
-static size_t M_r2h(size_t M)
-{
-    return M;
-}
-static size_t N_r2h(size_t N)
-{
-    return N;
-}
-static size_t P_r2h(size_t P)
-{
-    return (1+P/2);
-}
-#endif
 
 
 static size_t fimcl_hM(fimcl_t * X)
@@ -142,7 +132,7 @@ float * fimcl_download(fimcl_t * gX)
                                        0,
                                        NULL,
                                        &gX->wait_ev ));
-        fimcl_sync(gX); // todo remove
+        fimcl_sync(gX);
         return X;
     }
     if(gX->transformed == 1)
@@ -172,7 +162,7 @@ float * fimcl_download(fimcl_t * gX)
                                        0,
                                        NULL,
                                        &gX->wait_ev ));
-        fimcl_sync(gX); // todo remove
+        fimcl_sync(gX);
         return X;
     }
     assert(0);
@@ -259,7 +249,7 @@ fimcl_t * fimcl_new(clu_env_t * clu, int ffted, int fullsize,
                 __FILE__, __LINE__);
         exit(EXIT_FAILURE);
     }
- done: ;
+done: ;
     return Y;
 }
 
@@ -277,15 +267,15 @@ fimcl_t * fimcl_copy(fimcl_t * G)
         fimcl_sync(G);
         fimcl_sync(H);
         check_CL(clEnqueueCopyBuffer(
-                                     G->clu->command_queue,//cl_command_queue command_queue,
-                                     G->buf, //cl_mem src_buffer,
-                                     H->buf, //cl_mem dst_buffer,
-                                     0, //size_t src_offset,
-                                     0, //size_t dst_offset,
-                                     G->M*G->N*G->P*sizeof(float),//size_t size,
-                                     0, //cl_uint num_events_in_wait_list,
-                                     NULL, //const cl_event* event_wait_list,
-                                     &H->wait_ev)); //cl_event* event);
+                     G->clu->command_queue,//cl_command_queue command_queue,
+                     G->buf, //cl_mem src_buffer,
+                     H->buf, //cl_mem dst_buffer,
+                     0, //size_t src_offset,
+                     0, //size_t dst_offset,
+                     G->M*G->N*G->P*sizeof(float),//size_t size,
+                     0, //cl_uint num_events_in_wait_list,
+                     NULL, //const cl_event* event_wait_list,
+                     &H->wait_ev)); //cl_event* event);
         fimcl_sync(H);
     } else {
         fprintf(stderr, "fimcl_copy for transformed objects is not implemented \n");
@@ -306,6 +296,9 @@ void fimcl_free(fimcl_t * G)
 
 static fimcl_t * _fimcl_convolve(fimcl_t * X, fimcl_t * Y, int mode, int conj)
 {
+    assert(X != NULL);
+    assert(Y != NULL);
+
     struct timespec tk0, tk1, tfft0, tfft1, tifft0, tifft1;
     if(X->clu->verbose > 1)
     {
@@ -485,10 +478,6 @@ void fimcl_complex_mul(fimcl_t * X, fimcl_t * Y, fimcl_t * Z, int conj)
                              sizeof(cl_mem), // argument size
                              (void *) &Z->buf) ); // argument value
 
-    check_CL( clSetKernelArg(kernel,
-                             3,
-                             sizeof(cl_mem),
-                             (void *) &X->clu->real_size) );
 
     fimcl_sync(X);
     fimcl_sync(Y);
@@ -585,11 +574,6 @@ void fimcl_real_mul_inplace(fimcl_t * X, fimcl_t * Y)
                              sizeof(cl_mem), // argument size
                              (void *) &Y->buf) ); // argument value
 
-    check_CL( clSetKernelArg(kernel,
-                             2,
-                             sizeof(cl_mem),
-                             (void *) &X->clu->real_size) );
-
     check_CL( clEnqueueNDRangeKernel(X->clu->command_queue,
                                      kernel,
                                      1, //3,
@@ -638,11 +622,6 @@ void fimcl_shb_update(fimcl_t * P, fimcl_t * X, fimcl_t * XP, float alpha)
                              sizeof(cl_mem), // argument size
                              (void *) &XP->buf) ); // argument value
 
-    check_CL( clSetKernelArg(kernel,
-                             3,
-                             sizeof(cl_mem),
-                             (void *) &X->clu->real_size) );
-
     check_CL( clEnqueueWriteBuffer( X->clu->command_queue,
                                     X->clu->float_gpu,
                                     CL_TRUE,
@@ -652,7 +631,7 @@ void fimcl_shb_update(fimcl_t * P, fimcl_t * X, fimcl_t * XP, float alpha)
                                     0, NULL, NULL));
 
     check_CL( clSetKernelArg(kernel,
-                             4,
+                             3,
                              sizeof(cl_mem),
                              (void *) &X->clu->float_gpu) );
 
@@ -697,10 +676,6 @@ void fimcl_positivity(fimcl_t * X, float val)
                              sizeof(cl_mem), // argument size
                              (void *) &X->buf) ); // argument value
 
-    check_CL( clSetKernelArg(kernel,
-                             1,
-                             sizeof(cl_mem),
-                             (void *) &X->clu->real_size) );
 
     check_CL( clEnqueueWriteBuffer( X->clu->command_queue,
                                     X->clu->float_gpu,
@@ -711,7 +686,7 @@ void fimcl_positivity(fimcl_t * X, float val)
                                     0, NULL, NULL));
 
     check_CL( clSetKernelArg(kernel,
-                             2,
+                             1,
                              sizeof(cl_mem),
                              (void *) &X->clu->float_gpu) );
 
@@ -764,10 +739,6 @@ void fimcl_complex_mul_inplace(fimcl_t * X, fimcl_t * Y, int conj)
                              sizeof(cl_mem), // argument size
                              (void *) &Y->buf) ); // argument value
 
-    check_CL( clSetKernelArg(kernel,
-                             2,
-                             sizeof(cl_mem),
-                             (void *) &X->clu->real_size) );
 
     check_CL( clEnqueueNDRangeKernel(X->clu->command_queue,
                                      kernel,
@@ -1111,12 +1082,14 @@ clu_env_t * clu_new(int verbose)
     return env;
 }
 
-void clu_prepare_fft(clu_env_t * clu, size_t M, size_t N, size_t P)
+void clu_prepare_kernels(clu_env_t * clu,
+                         size_t M, size_t N, size_t P,
+                         size_t wM, size_t wN, size_t wP)
 {
     if(clu->verbose > 1)
     {
         printf("Preparing for convolutions of size %zu x %zu x %zu\n",
-               M, N, P);
+               wM, wN, wP);
     }
     assert(clu->clFFT_loaded == 0);
 
@@ -1132,58 +1105,93 @@ void clu_prepare_fft(clu_env_t * clu, size_t M, size_t N, size_t P)
     }
 
     /* Create clFFT plans for this particular size */
-    clu->r2h_plan = gen_r2h_plan(clu, M, N, P);
-    clu->r2h_inplace_plan = gen_r2h_inplace_plan(clu, M, N, P);
+    clu->r2h_plan = gen_r2h_plan(clu, wM, wN, wP);
+    clu->r2h_inplace_plan = gen_r2h_inplace_plan(clu, wM, wN, wP);
 
-    clu->h2r_plan = gen_h2r_plan(clu, M, N, P);
-    clu->h2r_inplace_plan = gen_h2r_inplace_plan(clu, M, N, P);
+    clu->h2r_plan = gen_h2r_plan(clu, wM, wN, wP);
+    clu->h2r_inplace_plan = gen_h2r_inplace_plan(clu, wM, wN, wP);
 
-    /* Create the OpenCL kernels that we will use*/
+    char * argstring = malloc(1024);
+
+    /*
+     *  Create the OpenCL kernels that we will use
+     */
+
+    /* Kernels for complex floats */
+    sprintf(argstring, "-D cMNP=%zu",
+            M_r2h(wM)*N_r2h(wN)*P_r2h(wP));
     clu->kern_mul =
-        *clu_kernel_new(clu,
+        *clu_kernel_newa(clu,
                         NULL, //"cl_complex_mul.c",
                         (const char *) cl_complex_mul,
                         cl_complex_mul_len,
-                        "cl_complex_mul");
+                         "cl_complex_mul",
+                         argstring);
 
     clu->kern_mul_conj =
-        *clu_kernel_new(clu,
-                        NULL, //"cl_complex_mul_conj.c",
-                        (const char *) cl_complex_mul_conj,
-                        cl_complex_mul_conj_len,
-                        "cl_complex_mul_conj");
+        *clu_kernel_newa(clu,
+                         NULL, //"cl_complex_mul_conj.c",
+                         (const char *) cl_complex_mul_conj,
+                         cl_complex_mul_conj_len,
+                         "cl_complex_mul_conj",
+                         argstring);
     clu->kern_mul_inplace =
-        *clu_kernel_new(clu,
+        *clu_kernel_newa(clu,
                         NULL,
                         (const char *) cl_complex_mul_inplace,
                         cl_complex_mul_inplace_len,
-                        "cl_complex_mul_inplace");
+                         "cl_complex_mul_inplace",
+                         argstring);
     clu->kern_mul_conj_inplace =
-        *clu_kernel_new(clu,
+        *clu_kernel_newa(clu,
                         NULL,
                         (const char *) cl_complex_mul_conj_inplace,
                         cl_complex_mul_conj_inplace_len,
-                        "cl_complex_mul_conj_inplace");
-
+                         "cl_complex_mul_conj_inplace",
+                         argstring);
+    /* Kernels for real float */
+    sprintf(argstring, "-D wMNP=%zu", wM*wN*wP);
     clu->kern_real_mul_inplace =
-        * clu_kernel_new(clu,
+        * clu_kernel_newa(clu,
                          NULL,
                          (const char *) src_kernels_cl_real_mul_inplace_c,
                          src_kernels_cl_real_mul_inplace_c_len,
-                         "cl_real_mul_inplace");
+                          "cl_real_mul_inplace",
+                          argstring);
     clu->kern_real_positivity =
-        * clu_kernel_new(clu,
-                       NULL,
-                       (const char *) src_kernels_cl_positivity_c,
-                       src_kernels_cl_positivity_c_len,
-                       "cl_positivity");
-
+        * clu_kernel_newa(clu,
+                         NULL,
+                         (const char *) src_kernels_cl_positivity_c,
+                         src_kernels_cl_positivity_c_len,
+                          "cl_positivity",
+                          argstring);
     clu->kern_shb_update =
-        * clu_kernel_new(clu,
+        * clu_kernel_newa(clu,
                          NULL,
                          (const char *) src_kernels_cl_shb_update_c,
                          src_kernels_cl_shb_update_c_len,
-                         "cl_shb_update");
+                          "cl_shb_update",
+                          argstring);
+
+    sprintf(argstring,
+            "-D NELEMENTS=%zu "
+            "-D M=%zu -D N=%zu -D P=%zu "
+            "-D wM=%zu -D wN=%zu -D wP=%zu",
+            wM*wN*wP, M, N, P, wM, wN, wP);
+    clu->idiv_kernel = clu_kernel_newa(clu,
+                                       "kernels/cl_idiv_kernel.c",
+                                       (const char *) cl_idiv_kernel,
+                                       cl_idiv_kernel_len,
+                                       "idiv_kernel",
+                                       argstring);
+    clu->update_y_kernel = clu_kernel_newa(clu,
+                                           "kernels/cl_update_y_kernel.c",
+                                           (const char *) cl_update_y_kernel,
+                                           cl_update_y_kernel_len,
+                                           "update_y_kernel",
+                                           argstring);
+
+    free(argstring);
 
 
     /* Set up size-dependent data */
@@ -1207,31 +1215,13 @@ void clu_prepare_fft(clu_env_t * clu, size_t M, size_t N, size_t P)
                                     0, NULL, NULL));
     clu->n_alloc++;
 
-    /* Create a buffer with information about transformed size */
-    size[0] = M_r2h(M)*N_r2h(N)*P_r2h(P);
-    size[1] = M_r2h(M);
-    size[2] = N_r2h(N);
-    size[3] = P_r2h(P);
-    clu->complex_size = clCreateBuffer(clu->context,
-                                    CL_MEM_READ_ONLY,
-                                    4*sizeof(size_t),
-                                    NULL, &status);
-    check_CL(status);
-    check_CL( clEnqueueWriteBuffer( clu->command_queue,
-                                    clu->complex_size,
-                                    CL_TRUE,
-                                    0,
-                                    4*sizeof(size_t),
-                                    size,
-                                    0, NULL, NULL));
-    clu->n_alloc++;
     free(size);
 
     float value = 0;
     clu->float_gpu = clCreateBuffer(clu->context,
-                                 CL_MEM_READ_ONLY,
-                                 sizeof(float),
-                                 NULL, &status);
+                                    CL_MEM_READ_ONLY,
+                                    sizeof(float),
+                                    NULL, &status);
     check_CL(status);
     check_CL( clEnqueueWriteBuffer( clu->command_queue,
                                     clu->float_gpu,
@@ -1271,10 +1261,7 @@ void clu_destroy(clu_env_t * clu)
         {
             check_CL(clReleaseMemObject(clu->real_size));
         }
-        if(clu->complex_size != NULL)
-        {
-            check_CL(clReleaseMemObject(clu->complex_size));
-        }
+
         if(clu->float_gpu != NULL)
         {
             check_CL(clReleaseMemObject(clu->float_gpu));
@@ -1378,10 +1365,16 @@ clu_kernel_t * clu_kernel_newa(clu_env_t * env,
                                         NULL);
         check_CL(errcode);
 
-        fprintf(stderr,"Build log: \n%s\n", buff_erro); //Be careful with  the fprint
+        fprintf(stderr, "\n");
+        fprintf(stderr, "Sorry, a fatal error occurred and dw can't continue\n");
+        fprintf(stderr, "File: %s, Function: %s Line: %d\n",
+                __FILE__, __FUNCTION__, __LINE__);
+        fprintf(stderr, "This happened when trying to compile the kernel %s\n",
+                kernel_name);
+        fprintf(stderr,"Build log: \n%s\n", buff_erro);
         free(buff_erro);
-        fprintf(stderr,"clBuildProgram failed\n");
-        return NULL;
+
+        exit(EXIT_FAILURE);
     }
 
 
@@ -1796,4 +1789,164 @@ void clu_benchmark_transfer(clu_env_t * clu)
     free(buf_copy);
     check_CL(clReleaseMemObject(buf_gpu));
     return;
+}
+
+
+void fimcl_update_y(fimcl_t * gy, fimcl_t * image)
+{
+    here();
+
+    /* Configure sizes */
+    size_t nel = gy->M*gy->N*gy->P;
+    size_t localWorkSize; /* Use largest possible */
+    cl_kernel kernel = gy->clu->update_y_kernel->kernel;
+
+    /* This takes no time, probably just a look-up so no need to
+     * cache it */
+    check_CL(
+        clGetKernelWorkGroupInfo(kernel,
+                                 gy->clu->device_id,
+                                 CL_KERNEL_WORK_GROUP_SIZE,
+                                 sizeof(size_t), &localWorkSize, NULL)
+        );
+
+    /* The global size needs to be a multiple of the localWorkSize
+     * i.e. it will be larger than the number of elements */
+    size_t numWorkGroups = (nel + (localWorkSize -1) ) / localWorkSize;
+    size_t globalWorkSize = localWorkSize * numWorkGroups;
+    if(0)
+    {
+        printf("   globalWorkSize: %zu\n", globalWorkSize);
+        printf("   localWorkSize: %zu\n", localWorkSize);
+        printf("   numWorkGroups: %zu\n", numWorkGroups);
+    }
+    assert(globalWorkSize >= image->M*image->N*image->P);
+
+    fimcl_sync(gy);
+    //fimcl_sync(image); // never changed
+
+    /* The image is assumed to be smaller or the same size
+     * as the forward projection (which might be extended). */
+    assert(image->M <= gy->M);
+    assert(image->N <= gy->N);
+    assert(image->P <= gy->P);
+
+    check_CL( clSetKernelArg(kernel,
+                             0, // argument index
+                             sizeof(cl_mem), // argument size
+                             (void *) &gy->buf) ); // argument value
+
+    check_CL( clSetKernelArg(kernel,
+                             1, // argument index
+                             sizeof(cl_mem), // argument size
+                             (void *) &image->buf) ); // argument value
+
+    check_CL( clEnqueueNDRangeKernel(gy->clu->command_queue,
+                                     kernel,
+                                     1,
+                                     NULL,
+                                     &globalWorkSize, //global_work_size,
+                                     &localWorkSize,
+                                     0,
+                                     NULL,
+                                     &gy->wait_ev) );
+
+    fimcl_sync(gy);
+
+    return;
+}
+
+
+float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
+{
+    cl_int status = CL_SUCCESS;
+
+    /* Configure sizes */
+    size_t nel = forward->M*forward->N*forward->P;
+    size_t localWorkSize; /* Use largest possible */
+    // TOOD: does this take time?
+    cl_kernel kernel = forward->clu->idiv_kernel->kernel;
+    status = clGetKernelWorkGroupInfo(kernel,
+                                      forward->clu->device_id,
+                                      CL_KERNEL_WORK_GROUP_SIZE,
+                                      sizeof(size_t), &localWorkSize, NULL);
+    /* The global size needs to be a multiple of the localWorkSize
+     * i.e. it will be larger than the number of elements */
+    size_t numWorkGroups = (nel + (localWorkSize -1) ) / localWorkSize;
+    size_t globalWorkSize = localWorkSize * numWorkGroups;
+    if(0)
+    {
+        printf("   globalWorkSize: %zu\n", globalWorkSize);
+        printf("   localWorkSize: %zu\n", localWorkSize);
+        printf("   numWorkGroups: %zu\n", numWorkGroups);
+    }
+    assert(globalWorkSize >= image->M*image->N*image->P);
+
+    fimcl_sync(forward);
+    fimcl_sync(image);
+
+    /* The image is assumed to be smaller or the same size
+     * as the forward projection (which might be extended). */
+    assert(image->M <= forward->M);
+    assert(image->N <= forward->N);
+    assert(image->P <= forward->P);
+
+    /* Create a buffer for the partial sums */
+    cl_mem partial_sums_gpu = clCreateBuffer(forward->clu->context,
+                                             CL_MEM_WRITE_ONLY,
+                                             numWorkGroups * sizeof(float),
+                                             NULL,
+                                             &status );
+
+    check_CL( clSetKernelArg(kernel,
+                             0, // argument index
+                             sizeof(cl_mem), // argument size
+                             (void *) &forward->buf) ); // argument value
+
+    check_CL( clSetKernelArg(kernel,
+                             1, // argument index
+                             sizeof(cl_mem), // argument size
+                             (void *) &image->buf) ); // argument value
+
+    check_CL( clSetKernelArg(kernel,
+                             2, localWorkSize*sizeof(float), NULL) );
+
+    check_CL( clSetKernelArg(kernel,
+                             3, sizeof(cl_mem), &partial_sums_gpu));
+
+    check_CL( clEnqueueNDRangeKernel(forward->clu->command_queue,
+                                     kernel,
+                                     1,
+                                     NULL,
+                                     &globalWorkSize, //global_work_size,
+                                     &localWorkSize,
+                                     0,
+                                     NULL,
+                                     &forward->wait_ev) );
+
+    fimcl_sync(forward);
+
+    /* Download the result */
+    float * partial_sums = malloc(numWorkGroups*sizeof(float));
+    status = clEnqueueReadBuffer(forward->clu->command_queue,
+                                 partial_sums_gpu,
+                                 CL_TRUE,
+                                 0,
+                                 numWorkGroups*sizeof(float),
+                                 partial_sums,
+                                 0,
+                                 NULL,
+                                 NULL);
+    clFinish(forward->clu->command_queue);
+
+    float sum_gpu = 0;
+#pragma omp parallel for reduction(+ : sum_gpu)
+    for(size_t kk = 0 ; kk<numWorkGroups; kk++)
+    {
+        sum_gpu += partial_sums[kk];
+    }
+    free(partial_sums);
+    clReleaseMemObject(partial_sums_gpu);
+
+    return sum_gpu / (float) (image->M*image->N*image->P);
 }

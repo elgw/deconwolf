@@ -124,7 +124,7 @@ float * deconvolve_shb_cl(float * restrict im,
     wM = clu_next_fft_size(wM);
     wN = clu_next_fft_size(wN);
     wP = clu_next_fft_size(wP);
-    clu_prepare_fft(clu, wM, wN, wP);
+    clu_prepare_kernels(clu, wM, wN, wP, M, N, P);
 
     /* Total number of pixels */
     size_t wMNP = wM*wN*wP;

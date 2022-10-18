@@ -48,7 +48,6 @@ typedef struct{
     clfftPlanHandle h2r_inplace_plan;
     size_t M; size_t N; size_t P;
     /* For complex data */
-    cl_mem complex_size;
     clu_kernel_t kern_mul;
     clu_kernel_t kern_mul_conj;
     clu_kernel_t kern_mul_inplace;
@@ -61,6 +60,11 @@ typedef struct{
     /* mem buffer with 1 float. Used for positivity threshold and for alpha */
     cl_mem float_gpu;
     clu_kernel_t kern_shb_update; /* Find next guess with shb */
+
+    clu_kernel_t * idiv_kernel;
+    clu_kernel_t * reduction_kernel;
+    clu_kernel_t * update_y_kernel;
+
 
     size_t nb_allocated;
     size_t n_release;
@@ -92,7 +96,8 @@ fimcl_t * fimcl_new(clu_env_t * clu, int ffted, int fullsize,
 
 void fimcl_free(fimcl_t * );
 
-/* Get back data from GPU. Blocking. */
+/* Get back data from GPU.
+ * Blocking (sync before and after) */
 float * fimcl_download(fimcl_t *);
 
 /* C = A*B, where C will be allocated or possibly reused from A
@@ -164,8 +169,10 @@ void clu_exit_error(cl_int err,
 /* Create an environment with OpenCL and clFFT */
 clu_env_t * clu_new(int verbose);
 
-/* Prepare to do FFTs */
-void clu_prepare_fft(clu_env_t * clu,
+/* Prepare to do FFTs at size wM x wN x wP
+* the size M x N x P is the size of the input image before it was possibly padded */
+void clu_prepare_kernels(clu_env_t * clu,
+                     size_t wM, size_t wN, size_t wP,
                      size_t M, size_t N, size_t P);
 
 /* Tear down what is crated with clu_new */
@@ -243,4 +250,8 @@ clfftPlanHandle  gen_h2r_inplace_plan(clu_env_t * clu,
 cl_int clu_increase_clfft_buffer(clu_env_t * clu, size_t size);
 
 void clu_benchmark_transfer(clu_env_t * clu);
+
+float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image);
+void fimcl_update_y(fimcl_t * gy, fimcl_t * image);
+
 #endif
