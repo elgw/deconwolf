@@ -1,17 +1,19 @@
 #include "cl_util.h"
 #include "clext.h"
 
-#include "kernels/cl_complex_mul.h" // corresponds to cl_complex_mul
-#include "kernels/cl_complex_mul_conj.h" // corresponds to cl_complex_mul_conj
+#include "kernels/cl_complex_mul.h"
+#include "kernels/cl_complex_mul_conj.h"
 #include "kernels/cl_complex_mul_inplace.h"
 #include "kernels/cl_complex_mul_conj_inplace.h"
-#include "kernels/cl_error_idiv.h"
+
 #include "kernels/cl_real_mul_inplace.h"
 #include "kernels/cl_positivity.h"
+
 #include "kernels/cl_shb_update.h"
+#include "kernels/cl_preprocess_image.h"
 #include "kernels/cl_idiv_kernel.h"
 #include "kernels/cl_update_y_kernel.h"
-#include "kernels/cl_preprocess_image.h"
+
 
 //#define here(x) printf("%s %s %d\n", __FILE__, __FUNCTION__, __LINE__);
 #define here(x) ;
@@ -1310,6 +1312,8 @@ void clu_destroy(clu_env_t * clu)
         /* Teardown */
         check_clFFT(clfftDestroyPlan( &clu->r2h_plan ));
         check_clFFT(clfftDestroyPlan( &clu->h2r_plan ));
+        check_clFFT(clfftDestroyPlan( &clu->r2h_inplace_plan ));
+        check_clFFT(clfftDestroyPlan( &clu->h2r_inplace_plan ));
         check_clFFT(clfftTeardown());
 
         /* Free memory */
@@ -1326,8 +1330,23 @@ void clu_destroy(clu_env_t * clu)
 
     /* Clear up the OpenCL stuff */
     check_CL(clFlush(clu->command_queue));
+    /* For complex data */
     clu_kernel_destroy(clu->kern_mul);
     clu_kernel_destroy(clu->kern_mul_conj);
+    clu_kernel_destroy(clu->kern_mul_inplace);
+    clu_kernel_destroy(clu->kern_mul_conj_inplace);
+    /* For real data */
+
+    clu_kernel_destroy(clu->kern_real_mul_inplace);
+    clu_kernel_destroy(clu->kern_real_positivity);
+
+    clu_kernel_destroy(clu->kern_shb_update);
+    clu_kernel_destroy(clu->kern_preprocess_image);
+
+    clu_kernel_destroy(*clu->idiv_kernel);
+
+    clu_kernel_destroy(*clu->update_y_kernel);
+
     check_CL(clReleaseCommandQueue(clu->command_queue) );
     check_CL(clReleaseContext(clu->context));
 

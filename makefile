@@ -168,10 +168,6 @@ clean:
 # the kernels are mostly included by cl_util.c some in method_shb_cl*
 # TODO: this is a silly list
 kernels:
-	# cl_complex_square
-	cp src/kernels/cl_complex_square.c cl_complex_square
-	xxd -i cl_complex_square > src/kernels/cl_complex_square.h
-	rm cl_complex_square
 	# cl_complex_mul
 	cp src/kernels/cl_complex_mul.c cl_complex_mul
 	xxd -i cl_complex_mul > src/kernels/cl_complex_mul.h

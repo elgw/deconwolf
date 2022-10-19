@@ -13,8 +13,8 @@ static void fimcl_to_tiff(fimcl_t * I_gpu, char * filename)
 }
 
 static fimcl_t  * fft_block_of_ones(clu_env_t * clu,
-                                   const int64_t M, const int64_t N, const int64_t P,
-                                   const int64_t wM, const int64_t wN, const int64_t wP)
+                                    const int64_t M, const int64_t N, const int64_t P,
+                                    const int64_t wM, const int64_t wN, const int64_t wP)
 {
     /* Return the fft of an image that is 1 in MNP and 0 outside
      * M, N, P is the dimension of the microscopic image
@@ -194,6 +194,7 @@ float * deconvolve_shb_cl2(float * restrict im,
 
     if(s->borderQuality == 0)
     {
+        /* Should we require that pM <= M, etc ? */
         wM = int64_t_max(M, pM);
         wN = int64_t_max(N, pN);
         wP = int64_t_max(P, pP);
@@ -204,12 +205,25 @@ float * deconvolve_shb_cl2(float * restrict im,
     wN = clu_next_fft_size(wN);
     wP = clu_next_fft_size(wP);
 
+    if(s->borderQuality == 0)
+    {
+        if(wM != M || wN != N || wP != P)
+        {
+            // This is probably not good.
+        }
+    }
+
     /* Total number of pixels */
-    size_t wMNP = wM*wN*wP;
+    const size_t wMNP = wM*wN*wP;
 
     if(s->verbosity > 0)
-    { printf("image: [%" PRId64 "x%" PRId64 "x%" PRId64 "], psf: [%" PRId64 "x%" PRId64 "x%" PRId64 "], job: [%" PRId64 "x%" PRId64 "x%" PRId64 "]\n",
-             M, N, P, pM, pN, pP, wM, wN, wP);
+    {
+        printf("image: [%" PRId64 "x%" PRId64 "x%" PRId64 "], "
+               "psf: [%" PRId64 "x%" PRId64 "x%" PRId64 "], "
+               "job: [%" PRId64 "x%" PRId64 "x%" PRId64 "]\n",
+               M, N, P,
+               pM, pN, pP,
+               wM, wN, wP);
     }
 
     /* Set up the kernels defined in this function */

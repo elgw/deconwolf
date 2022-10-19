@@ -54,15 +54,12 @@ typedef struct{
     clu_kernel_t kern_mul_conj_inplace;
     /* For real data */
     clu_kernel_t kern_real_mul_inplace;
-    clu_kernel_t kern_error_idiv;
     clu_kernel_t kern_real_positivity;
     /* mem buffer with 1 float. Used for positivity threshold and for alpha */
     cl_mem float_gpu;
     clu_kernel_t kern_shb_update; /* Find next guess with shb */
     clu_kernel_t kern_preprocess_image;
-
     clu_kernel_t * idiv_kernel;
-    clu_kernel_t * reduction_kernel;
     clu_kernel_t * update_y_kernel;
 
 
