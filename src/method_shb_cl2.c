@@ -12,14 +12,12 @@ static void fimcl_to_tiff(fimcl_t * I_gpu, char * filename)
     fftwf_free(I);
 }
 
-static fimcl_t  * initial_guess_cl(clu_env_t * clu,
+static fimcl_t  * fft_block_of_ones(clu_env_t * clu,
                                    const int64_t M, const int64_t N, const int64_t P,
                                    const int64_t wM, const int64_t wN, const int64_t wP)
 {
-    /* Create initial guess: the fft of an image that is 1 in MNP and 0 outside
+    /* Return the fft of an image that is 1 in MNP and 0 outside
      * M, N, P is the dimension of the microscopic image
-     *
-     * Possibly more stable to use the mean of the input image rather than 1
      */
 
     assert(wM >= M); assert(wN >= N); assert(wP >= P);
@@ -45,6 +43,41 @@ static fimcl_t  * initial_guess_cl(clu_env_t * clu,
     return gfOne;
 }
 
+fimcl_t * create_initial_W(clu_env_t * clu,
+                           size_t M, size_t N, size_t P,
+                           size_t wM, size_t wN, size_t wP,
+                           fimcl_t * fft_PSF_gpu)
+{
+
+    here();
+    fimcl_t * fft_block_ones_gpu = fft_block_of_ones(clu, M, N, P, wM, wN, wP);
+    here();
+    fimcl_t * W_pre_gpu = fimcl_convolve_conj(fft_block_ones_gpu, fft_PSF_gpu, CLU_KEEP_2ND);
+    fft_block_ones_gpu = NULL; // freed already
+    here();
+    float * W_pre = fimcl_download(W_pre_gpu);
+    fimcl_free(W_pre_gpu);
+    here();
+
+    const size_t wMNP = wM*wN*wP;
+
+    /* Sigma in Bertero's paper, introduced for Eq. 17 */
+    float sigma = 0.01;
+#pragma omp parallel for shared(W_pre)
+    for(size_t kk = 0; kk<wMNP; kk++)
+    {
+        if(W_pre[kk] > sigma)
+        {
+            W_pre[kk] = 1.0/W_pre[kk];
+        } else {
+            W_pre[kk] = 0;
+        }
+    }
+
+    fimcl_t * W_gpu = fimcl_new(clu, 0, 0, W_pre, wM, wN, wP);
+    fftwf_free(W_pre);
+    return W_gpu;
+}
 
 float iter_shb_cl2(fimcl_t ** _xp_gpu, // Output, f_(t+1)
                    fimcl_t * restrict im_gpu, // as above, on GPU
@@ -193,10 +226,6 @@ float * deconvolve_shb_cl2(float * restrict im,
             M, N, P, pM, pN, pP, wM, wN, wP, wMNP);
     fflush(s->log);
 
-    if(s->verbosity > 0)
-    {
-        printf("Iterating "); fflush(stdout);
-    }
 
     /* Prepare the PSF */
     // cK : "full size" fft of the PSF
@@ -227,7 +256,7 @@ float * deconvolve_shb_cl2(float * restrict im,
     }
 
     fimcl_t * PSF_gpu = fimcl_new(clu, 0, 0,
-                                    Z, wM, wN, wP);
+                                  Z, wM, wN, wP);
 
     fimcl_t * fft_PSF_gpu = fimcl_fft(PSF_gpu);
     fimcl_free(PSF_gpu);
@@ -268,60 +297,44 @@ float * deconvolve_shb_cl2(float * restrict im,
 
     putdot(s);
 
-    float * W = NULL;
+    /* Create W_gpu that contains the weights used for the
+       boundary handling  */
+
     fimcl_t * W_gpu = NULL;
-    /* Sigma in Bertero's paper, introduced for Eq. 17 */
+
     if(s->borderQuality > 0)
     {
-        //fftwf_complex * F_one = initial_guess(M, N, P, wM, wN, wP);
-        here();
-        fimcl_t * clfftOne = initial_guess_cl(clu, M, N, P, wM, wN, wP);
-        here();
-        //float * P1 = fft_convolve_cc_conj_f2(fftPSF, F_one, wM, wN, wP);
-        fimcl_t * gclP1 = fimcl_convolve_conj(clfftOne, fft_PSF_gpu, CLU_KEEP_2ND);
-        here();
-        clfftOne = NULL; // freed already
-        here();
-        float * clP1 = fimcl_download(gclP1);
-        here();
-        //fim_tiff_write_float("P1.tif", P1, NULL, wM, wN, wP);
-        //fim_tiff_write_float("P2.tif", clP1, NULL, wM, wN, wP);
-
-
-        float sigma = 0.01;
-#pragma omp parallel for shared(clP1)
-        for(size_t kk = 0; kk<wMNP; kk++)
+        if(s->verbosity > 1)
         {
-            if(clP1[kk] > sigma)
-            {
-                clP1[kk] = 1/clP1[kk];
-            } else {
-                clP1[kk] = 0;
-            }
+            printf("Creating weight map for boundary handling\n");
         }
-        W = clP1;
-        W_gpu = fimcl_new(clu, 0, 0, W, wM, wN, wP);
-        fftwf_free(W);
+        W_gpu = create_initial_W(clu, M, N, P, wM, wN, wP, fft_PSF_gpu);
     }
 
-    float sumg = fim_sum(im, M*N*P);
 
-    /* x is the initial guess, initially the previous iteration,
-     *  xp is
-     *  set to be the same */
+    /* Set up the initial guess, x_gpu as well as arrays for the
+       previous iterations. p_gpu will be used later on. */
 
-    float * x = fim_constant(wMNP, sumg / (float) wMNP);
-    float * xp = fim_copy(x, wMNP);
-
-    /* TODO: we only need two of these to be allocated at a time */
-    fimcl_t * x_gpu = fimcl_new(clu, 0, 1, x, wM, wN, wP);
-
-
-    fimcl_t * xp_gpu = fimcl_new(clu, 0, 1, xp, wM, wN, wP);
+    fimcl_t * x_gpu = NULL;
+    fimcl_t * xp_gpu = NULL;
     fimcl_t * p_gpu = NULL;
+    {
+        float sumg = fim_sum(im, M*N*P);
+        float * x = fim_constant(wMNP, sumg / (float) wMNP);
+        float * xp = fim_copy(x, wMNP);
 
-    fftwf_free(x);
-    fftwf_free(xp);
+        /*  */
+        x_gpu = fimcl_new(clu, 0, 1, x, wM, wN, wP);
+        xp_gpu = fimcl_new(clu, 0, 1, xp, wM, wN, wP);
+
+        fftwf_free(x);
+        fftwf_free(xp);
+    }
+
+    if(s->verbosity > 0)
+    {
+        printf("Iterating "); fflush(stdout);
+    }
 
     dw_iterator_t * it = dw_iterator_new(s);
     while(dw_iterator_next(it) >= 0)
@@ -369,7 +382,7 @@ float * deconvolve_shb_cl2(float * restrict im,
 
         putdot(s);
         dw_iterator_show(it, s);
-        benchmark_write(s, it->iter, it->error, x, M, N, P, wM, wN, wP);
+        // benchmark_write(s, it->iter, it->error, x, M, N, P, wM, wN, wP);
         here();
     } /* End of main loop */
     dw_iterator_free(it);

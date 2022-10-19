@@ -46,17 +46,26 @@ void clu_exit_error(cl_int err,
             file, function, line);
 
     const char * err_cl = clGetErrorString(err);
-    printf("OpenCl error=%s\n", err_cl);
+    printf("   OpenCl error=%s\n", err_cl);
 
     if(clfft)
     {
         if(strcmp(err_cl, "CL_UNKNOWN_ERROR") == 0)
         {
             const char * err_clfft = get_clfft_error_string(err);
-            printf("clFFT error=%s\n", err_clfft);
+            fprintf(stderr, "clFFT error=%s\n", err_clfft);
         }
     }
 
+    if(err == CL_MEM_OBJECT_ALLOCATION_FAILURE)
+    {
+        fprintf(stderr, "\n");
+        fprintf(stderr,
+                "   CL_MEM_OBJECT_ALLOCATION_FAILURE indicates that there was not\n"
+                "   enough memory on the GPU to continue. Try with a smaller image\n"
+                "   and look up the option --tilesize\n");
+    }
+    fprintf(stderr, "\n");
     exit(EXIT_FAILURE);
 }
 
@@ -1570,7 +1579,8 @@ clfftPlanHandle  gen_r2h_plan(clu_env_t * clu,
     clfftPlanHandle planHandle;
     size_t real_size[3] = {M, N, P};
 
-    printf("Real size: %zu x %zu x %zu\n", M, N, P);
+
+    //printf("Real size: %zu x %zu x %zu\n", M, N, P);
 
     /* Start with a default plan and then adjust it */
     check_clFFT(clfftCreateDefaultPlan(&planHandle,
