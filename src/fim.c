@@ -110,8 +110,18 @@ int fim_maxAtOrigo(const float * restrict V, const int64_t M, const int64_t N, c
 }
 
 void fim_argmax(const float * I,
-                size_t M, size_t N, size_t P,
+                const size_t M, const size_t N, const size_t P,
                 int64_t * _aM, int64_t *_aN, int64_t *_aP)
+{
+    float v = 0;
+    fim_argmax_max(I, M, N, P, _aM, _aN, _aP, &v);
+    return;
+}
+
+void fim_argmax_max(const float * I,
+                    size_t M, size_t N, size_t P,
+                    int64_t * _aM, int64_t *_aN, int64_t *_aP,
+                    float * max_value)
 {
     float max = I[0];
     int64_t aM = 0;
@@ -138,6 +148,7 @@ void fim_argmax(const float * I,
     _aM[0] = aM;
     _aN[0] = aN;
     _aP[0] = aP;
+    max_value[0] = max;
 }
 
 float fim_sum(const float * restrict A, size_t N)
@@ -574,7 +585,7 @@ void fim_circshift(float * restrict A,
 
 
     /* Dimension 1 */
-#pragma omp parallel for
+#pragma omp parallel for shared(A)
     for(int64_t cc = 0; cc<P; cc++)
     {
         float * tbuf = buf + bsize*omp_get_thread_num();
@@ -590,7 +601,7 @@ void fim_circshift(float * restrict A,
     }
 
     /* Dimension 2 */
-#pragma omp parallel for
+#pragma omp parallel for shared(A)
     for(int64_t cc = 0; cc<P; cc++)
     {
         float * tbuf = buf + bsize*omp_get_thread_num();
@@ -603,7 +614,7 @@ void fim_circshift(float * restrict A,
     }
 
     /* Dimension 3 */
-#pragma omp parallel for
+#pragma omp parallel for shared(A)
     for(int64_t bb = 0; bb<N; bb++)
     {
         float * tbuf = buf + bsize*omp_get_thread_num();

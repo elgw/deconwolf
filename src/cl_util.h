@@ -79,7 +79,8 @@ typedef struct{
     int fullsize; /* If the buffer is large enough for in-place fft */
     int padded; /* Ready for inplace transform ? */
     clu_env_t * clu;
-    cl_event wait_ev; // Check this before data is used
+    /* Check this before data is used, initialized to NULL */
+    cl_event wait_ev;
 } fimcl_t;
 
 /* Allocate a new float image on the GPU.
@@ -87,6 +88,7 @@ typedef struct{
  * if fullsize is set to 1, this object can be used for
  * inplace transformations
  * non-blocking. call fimcl_sync on the new object to manually sync
+ * if X != NULL
  */
 fimcl_t * fimcl_new(clu_env_t * clu, int ffted, int fullsize,
                     const float * X, size_t M, size_t N, size_t P);
@@ -119,7 +121,7 @@ void fimcl_ifft_inplace(fimcl_t * A);
 
 
 /* B = copy(A)
- * non-blocking */
+ * non-blocking, sync object before using */
 fimcl_t * fimcl_copy(fimcl_t * );
 
 /* fZ = fX.*fY

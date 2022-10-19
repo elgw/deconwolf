@@ -187,15 +187,16 @@ fimcl_t * fimcl_new(clu_env_t * clu, int ffted, int fullsize,
     // Consider CL_MEM_COPY_HOST_PTR on creation
     if(clu->verbose > 2)
     {
-        printf("fimcl_new, ffted = %d, fullsize = %d\n", ffted, fullsize);;
+        printf("fimcl_new, ffted = %d, fullsize = %d\n", ffted, fullsize);
     }
+
     fimcl_t * Y = calloc(1, sizeof(fimcl_t));
     Y->M = M;
     Y->N = N;
     Y->P = P;
     Y->transformed = ffted;
     Y->clu = clu;
-    Y->wait_ev = CL_SUCCESS;
+    Y->wait_ev = NULL;
 
     cl_int ret;
     if(ffted == 0 && fullsize == 0)
@@ -204,6 +205,7 @@ fimcl_t * fimcl_new(clu_env_t * clu, int ffted, int fullsize,
                                 CL_MEM_READ_WRITE,
                                 M*N*P* sizeof(float),
                                 NULL, &ret );
+
         Y->buf_size_nf = M*N*P;
         clu->nb_allocated += M*N*P*sizeof(float);
     } else {
@@ -212,6 +214,7 @@ fimcl_t * fimcl_new(clu_env_t * clu, int ffted, int fullsize,
                                 CL_MEM_READ_WRITE,
                                 Y->buf_size_nf*sizeof(float),
                                 NULL, &ret );
+
         clu->nb_allocated += Y->buf_size_nf*sizeof(float);
         Y->fullsize = 1;
     }
@@ -275,9 +278,8 @@ fimcl_t * fimcl_copy(fimcl_t * G)
     if(G->transformed == 0)
     {
         H = fimcl_new(G->clu, 0, G->fullsize, NULL, G->M, G->N, G->P);
-
         fimcl_sync(G);
-        fimcl_sync(H);
+
         check_CL(clEnqueueCopyBuffer(
                      G->clu->command_queue,//cl_command_queue command_queue,
                      G->buf, //cl_mem src_buffer,
@@ -288,7 +290,7 @@ fimcl_t * fimcl_copy(fimcl_t * G)
                      0, //cl_uint num_events_in_wait_list,
                      NULL, //const cl_event* event_wait_list,
                      &H->wait_ev)); //cl_event* event);
-        fimcl_sync(H);
+
     } else {
         fprintf(stderr, "fimcl_copy for transformed objects is not implemented \n");
         exit(EXIT_FAILURE);
@@ -447,6 +449,10 @@ fimcl_t * fimcl_convolve_conj(fimcl_t * X, fimcl_t * Y, int mode)
 
 void fimcl_sync(fimcl_t * X)
 {
+    if(X->wait_ev == NULL)
+    {
+        return;
+    }
     check_CL( clu_wait_for_event(X->wait_ev, 10000));
     clFinish(X->clu->command_queue);
     return;

@@ -95,19 +95,15 @@ float iter_shb_cl2(fimcl_t ** _xp_gpu, // Output, f_(t+1)
     putdot(s);
     fimcl_t * gy = fimcl_convolve(fft_pk_gpu, cK, CLU_KEEP_2ND);
     fft_pk_gpu = NULL;
+    putdot(s);
 
     here();
 
     float error = fimcl_error_idiv(gy, im_gpu);
-
     putdot(s);
 
-    //struct timespec t0, t1;
-    //clock_gettime(CLOCK_MONOTONIC, &t0);
     fimcl_update_y(gy, im_gpu);
-    //clock_gettime(CLOCK_MONOTONIC, &t1);
-    //float  dt = clockdiff(&t1, &t0);
-    //printf("\n gpu_update_y took %f s\n", dt);
+    putdot(s);
 
     fimcl_t * _Y = gy;
 
@@ -117,7 +113,7 @@ float iter_shb_cl2(fimcl_t ** _xp_gpu, // Output, f_(t+1)
     // gx = Y * cK, Y is freed
     fimcl_t * gx = fimcl_convolve_conj(Y, cK, CLU_KEEP_2ND);
     Y = NULL;
-
+    putdot(s);
 
     fimcl_real_mul_inplace(pk_gpu, gx); // gx = gpk .* gx
     fimcl_free(pk_gpu);
@@ -143,19 +139,9 @@ float * deconvolve_shb_cl2(float * restrict im,
                            dw_opts * s)
 {
 
-    if(s->verbosity > 3)
-    {
-        printf("deconv_w debug info:\n");
-        printf("Will deconvolve an image of size %" PRId64 "x%" PRId64 "x%" PRId64 "\n", M, N, P);
-        printf("Using a PSF of size %" PRId64 "x%" PRId64 "x%" PRId64 "\n", pM, pN, pP);
-        printf("Output will be of size %" PRId64 "x%" PRId64 "x%" PRId64 "\n", M, N, P);
-        printf("psf will be freed\n");
-    }
-
-
     if(s->verbosity > 1)
     {
-        printf("Deconvolving\n");
+        printf("Deconvolving using shbcl2\n");
     }
 
     if(s->nIter == 0)
@@ -168,17 +154,17 @@ float * deconvolve_shb_cl2(float * restrict im,
     {
         if(s->verbosity > 0)
         {
-            printf(" ! SHBCL: PSF is not centered!\n");
+            printf(" ! SHBCL2: PSF is not centered!\n");
         }
         if(s->log != stdout)
         {
-            fprintf(s->log, " ! SHBCL: PSF is not centered!\n");
+            fprintf(s->log, " ! SHBCL2: PSF is not centered!\n");
         }
     }
 
-
-    /* This is the work dimensions, i.e., dimensions
-     * that will be used for all FFTs
+    /* These are the work dimensions, i.e., dimensions
+     * that will be used for all FFTs. Will possibly be increased
+     * later on if clFFT handle these sizes.
      */
 
     int64_t wM = M + pM -1;
@@ -200,7 +186,6 @@ float * deconvolve_shb_cl2(float * restrict im,
         wP = int64_t_max(P, pP);
     }
 
-    clu_env_t * clu = clu_new(s->verbosity);
     wM = clu_next_fft_size(wM);
     wN = clu_next_fft_size(wN);
     wP = clu_next_fft_size(wP);
@@ -226,6 +211,8 @@ float * deconvolve_shb_cl2(float * restrict im,
                wM, wN, wP);
     }
 
+    /* Set up the OpenCL environment */
+    clu_env_t * clu = clu_new(s->verbosity);
     /* Set up the kernels defined in this function */
     clu_prepare_kernels(clu, M, N, P, wM, wN, wP);
 
@@ -250,14 +237,15 @@ float * deconvolve_shb_cl2(float * restrict im,
                psf, pM, pN, pP);
 
     free(psf);
+    psf = NULL;
 
     /* Shift the PSF so that the mid is at (0,0,0) */
     int64_t midM, midN, midP = -1;
-    fim_argmax(Z, wM, wN, wP, &midM, &midN, &midP);
-    //printf("max(PSF) = %f\n", fim_max(Z, wM*wN*wP));
-    //printf("PSF(%ld, %ld, %ld) = %f\n", midM, midN, midP, Z[midM + wM*midN + wM*wN*midP]);
+    float psf_max = 0;
+    fim_argmax_max(Z, wM, wN, wP, &midM, &midN, &midP, &psf_max);
+
     fim_circshift(Z, wM, wN, wP, -midM, -midN, -midP);
-    if(Z[0] != fim_max(Z, wM*wN*wP))
+    if(Z[0] != psf_max)
     {
         printf("Something went wrong here, the max of the PSF is in the wrong place\n");
         exit(1);
@@ -335,14 +323,10 @@ float * deconvolve_shb_cl2(float * restrict im,
     {
         float sumg = fim_sum(im, M*N*P);
         float * x = fim_constant(wMNP, sumg / (float) wMNP);
-        float * xp = fim_copy(x, wMNP);
 
-        /*  */
-        x_gpu = fimcl_new(clu, 0, 1, x, wM, wN, wP);
-        xp_gpu = fimcl_new(clu, 0, 1, xp, wM, wN, wP);
-
+        x_gpu = fimcl_new(clu, 0, 0, x, wM, wN, wP);
+        xp_gpu = fimcl_copy(x_gpu);
         fftwf_free(x);
-        fftwf_free(xp);
     }
 
     if(s->verbosity > 0)
@@ -363,10 +347,9 @@ float * deconvolve_shb_cl2(float * restrict im,
         here();
         /* To be interpreted as p^k in Eq. 7 of SHB
          *  p[kk] = x[kk] + alpha*(x[kk]-xp[kk]); */
-        p_gpu = fimcl_new(clu, 0, 1, NULL, wM, wN, wP);
+        p_gpu = fimcl_new(clu, 0, 0, NULL, wM, wN, wP);
 
         fimcl_shb_update(p_gpu, x_gpu, xp_gpu, alpha);
-
 
         putdot(s);
         here();
@@ -379,12 +362,7 @@ float * deconvolve_shb_cl2(float * restrict im,
                          W_gpu, // Weights (to handle boundaries)
                          s);
 
-        //fimcl_to_tiff(xp_gpu, "xp_gpu.tif");
-        //exit(EXIT_FAILURE);
-
         here();
-        //fimcl_free(p_gpu);
-        //here();
 
         dw_iterator_set_error(it, err);
         {

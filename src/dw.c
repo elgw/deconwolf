@@ -1320,8 +1320,13 @@ float * psf_autocrop_byImage(float * psf,/* psf and size */
 
     if((p % 2) == 0)
     {
-        fprintf(stderr, "Error: The PSF should have odd number of slices\n");
-        fprintf(stderr, "Possibly it will be auto-cropped wrong\n");
+        if(s->verbosity > 0)
+        {
+            fprintf(stderr, " ! The PSF should have odd number of slices\n");
+            fprintf(stderr, "   Possibly it will be auto-cropped wrong\n");
+        }
+        fprintf(s->log, " ! The PSF should have odd number of slices\n");
+        fprintf(s->log, "   Possibly it will be auto-cropped wrong\n");
     }
 
 
@@ -1999,8 +2004,12 @@ int dw_run(dw_opts * s)
     if(fim_maxAtOrigo(psf, pM, pN, pP) == 0)
     {
         /* It might still be centered between pixels */
-        warning(stdout);
-        printf("The PSF is not centered!\n");
+        if(s->verbosity > 0)
+        {
+            warning(stdout);
+            printf("The PSF is not centered!\n");
+        }
+        fprintf(s->log, " ! The PSF is not centered\n");
     }
 
     // Possibly the PSF will be cropped even more per tile later on
