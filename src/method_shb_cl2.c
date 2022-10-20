@@ -143,6 +143,10 @@ float * deconvolve_shb_cl2(float * restrict im,
     {
         printf("Deconvolving using shbcl2\n");
     }
+    fprintf(s->log, "Deconvolving with shbcl2\n");
+    struct timespec t_deconvolution_start, t_deconvolution_end;
+    clock_gettime(CLOCK_REALTIME, &t_deconvolution_start);
+
 
     if(s->nIter == 0)
     {
@@ -397,6 +401,7 @@ float * deconvolve_shb_cl2(float * restrict im,
     }
 
     float * out_full = fimcl_download(x_gpu);
+    fimcl_free(x_gpu);
     if(s->fulldump)
     {
         printf("Dumping to fulldump.tif\n");
@@ -410,5 +415,11 @@ float * deconvolve_shb_cl2(float * restrict im,
     here();
 
     clu_destroy(clu);
+
+    clock_gettime(CLOCK_REALTIME, &t_deconvolution_end);
+    float dt_deconvolution = clockdiff(&t_deconvolution_end,
+                                       &t_deconvolution_start);
+    fprintf(s->log, "Deconvolution took %.2f s\n", dt_deconvolution);
+
     return out;
 }
