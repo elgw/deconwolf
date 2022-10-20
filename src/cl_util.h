@@ -15,7 +15,17 @@
 #include <unistd.h>
 
 #define CLFFT_REQUEST_LIB_NOMEMALLOC
-#define CL_TARGET_OPENCL_VERSION 300
+
+#define CL_USE_DEPRECATED_OPENCL_1_2_APIS
+#define CL_TARGET_OPENCL_VERSION 120
+
+// Did also work to ask for the latest version
+// however it would warn that clCreateCommandQueue
+// is depreciated. Will keep it at 1.2.0 until I need
+// something specific from never versions.
+//
+// #define CL_TARGET_OPENCL_VERSION 300
+
 #include <CL/cl.h>
 #include <clFFT.h>
 
