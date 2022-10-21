@@ -25,6 +25,8 @@
 #include <stdint.h>
 #include <malloc.h>
 
+#include "dw_util.h"
+
 /*
  * Initialization commands.
  *

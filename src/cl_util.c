@@ -424,6 +424,8 @@ void fimcl_sync(fimcl_t * X)
         return;
     }
     check_CL( clu_wait_for_event(X->wait_ev, 10000));
+    X->wait_ev = NULL;
+
     clFinish(X->clu->command_queue);
     return;
 }
@@ -1084,6 +1086,17 @@ static char * read_program(const char * fname, size_t * size)
 
 clu_env_t * clu_new(int verbose)
 {
+    /* Might be of use in future releases */
+    setenv("CLFFT_REQUEST_LIB_NOMEMALLOC", "1", 1);
+
+    char * clFFT_cache_path = malloc(1024);
+    char * dir_home = getenv("HOME");
+    sprintf(clFFT_cache_path, "%s/.config/deconwolf/clFFT/", dir_home);
+    setenv("CLFFT_CACHE_PATH", clFFT_cache_path, 1);
+    ensuredir(clFFT_cache_path);
+    free(clFFT_cache_path);
+
+
     clu_env_t * env = calloc(1, sizeof(clu_env_t));
     env->verbose = verbose;
     env->clfft_buffer = NULL;
@@ -1459,15 +1472,6 @@ void clu_kernel_destroy(clu_kernel_t kern)
 
 cl_uint clu_wait_for_event(cl_event clev, size_t ns)
 {
-    /* Always use a clFinish afterwards since ...
-       "Using clGetEventInfo to determine if a command identified by
-       event has finished execution
-       (i.e. CL_EVENT_COMMAND_EXECUTION_STATUS returns CL_COMPLETE) is
-       not a synchronization point. There are no guarantees that the
-       memory objects being modified by command associated with event
-       will be visible to other enqueued commands".
-    */
-
     cl_uint ret = CL_SUCCESS;
     size_t param_value_size = sizeof(cl_int);
     size_t param_value_size_ret = 0;
@@ -1693,8 +1697,10 @@ cl_int clu_increase_clfft_buffer(clu_env_t * clu, size_t req_size)
     {
         return ret;
     }
+
     if(clu->clfft_buffer_size > 0)
     {
+        /* If there was already a smaller buffer allocated */
         check_CL(clReleaseMemObject( clu->clfft_buffer));
     }
     clu->clfft_buffer = clCreateBuffer(clu->context,

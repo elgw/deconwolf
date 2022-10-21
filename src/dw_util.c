@@ -16,6 +16,50 @@
 
 #include "dw_util.h"
 
+int isdir(char * dir)
+{
+
+    DIR* odir = opendir(dir);
+    if (odir) {
+        /* Directory exists. */
+        closedir(odir);
+        return 1;
+    } else if (ENOENT == errno) {
+        /* Directory does not exist. */
+        return 0;
+    } else {
+        /* opendir() failed for some other reason. */
+        return 0;
+    }
+}
+
+
+
+int ensuredir(char * dir)
+
+{
+    if(isdir(dir) == 1)
+    {
+        return 0;
+    }
+
+#ifdef WINDOWS
+    if(_mkdir(dir) == ENOENT)
+    {
+        return 0;
+    }
+#else
+    if(mkdir(dir, 0700) == 0)
+    {
+        return 0;
+    }
+#endif
+
+    return 1;
+}
+
+
+
 int ptr_alignment_B(const void * p)
 {
     int align = 1;

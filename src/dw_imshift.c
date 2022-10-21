@@ -19,21 +19,6 @@ static void argparsing(int argc, char ** argv, opts * s);
 static int file_exist(char * fname);
 int dw_imshift(int argc, char ** argv);
 
-static int dw_get_threads(void)
-{
-    int nThreads = 4;
-#ifndef WINDOWS
-/* Reports #threads, typically 2x#cores */
-    nThreads = sysconf(_SC_NPROCESSORS_ONLN)/2;
-#endif
-#ifdef OMP
-/* Reports number of cores */
-    nThreads = omp_get_num_procs();
-#endif
-    return nThreads;
-}
-
-
 static opts * opts_new()
 {
     opts * s = malloc(sizeof(opts));

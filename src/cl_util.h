@@ -13,6 +13,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include "dw_util.h"
 
 #define CL_USE_DEPRECATED_OPENCL_1_2_APIS
 #define CL_TARGET_OPENCL_VERSION 120
@@ -226,13 +227,8 @@ clu_kernel_t * clu_kernel_newa(clu_env_t * env,
 void clu_kernel_destroy(clu_kernel_t kern);
 
 
-/* replacement for clWaitForEvents which isn't bussy waiting.
-
-   Unfortunately it looks like there is no way to signal a thread
-   that a job is done.
-   This is one way to avoid bussy waiting. See
-   CL_QUEUE_THROTTLE_LOW_KHR for another alternative.
-   https://github.com/intel/compute-runtime/issues/363
+/* replacement for the bussy-waiting clWaitForEvents
+   check fimcl_sync for usage.
 */
 cl_uint clu_wait_for_event(cl_event clev, size_t ns);
 

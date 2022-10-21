@@ -170,65 +170,6 @@ int clock_gettime(int a , struct timespec *spec)      //C-file part
 }
 #endif
 
-#define tictoc struct timespec tictoc_start, tictoc_end;
-#define tic clock_gettime(CLOCK_REALTIME, &tictoc_start);
-#define toc(X) clock_gettime(CLOCK_REALTIME, &tictoc_end); printf(#X); printf(" %f s\n", timespec_diff(&tictoc_end, &tictoc_start));
-
-static double timespec_diff(struct timespec* end, struct timespec * start)
-{
-    double elapsed = (end->tv_sec - start->tv_sec);
-    elapsed += (end->tv_nsec - start->tv_nsec) / 1000000000.0;
-    return elapsed;
-}
-
-
-
-static int isdir(char * dir)
-{
-    /* Check if directory exist, do not create if missing
-     * returns 1 if it exist
-     * */
-
-    DIR* odir = opendir(dir);
-    if (odir) {
-        /* Directory exists. */
-        closedir(odir);
-        return 1;
-    } else if (ENOENT == errno) {
-        /* Directory does not exist. */
-        return 0;
-    } else {
-        /* opendir() failed for some other reason. */
-        return 0;
-    }
-}
-
-static int ensuredir(char * dir)
-/* Create dir if it does not exist.
- * Returns 0 if the dir already existed or could be created
- * returns non-zeros if the dir can't be created
- */
-{
-    if(isdir(dir) == 1)
-    {
-        return 0;
-    }
-
-#ifdef WINDOWS
-    if(_mkdir(dir) == ENOENT)
-    {
-        return 0;
-    }
-#else
-    if(mkdir(dir, 0700) == 0)
-    {
-        return 0;
-    }
-#endif
-
-    return 1;
-}
-
 static char * get_swf_file_name(int nThreads)
 {
     char * dir_home = getenv("HOME");

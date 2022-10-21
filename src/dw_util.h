@@ -17,11 +17,15 @@
 #ifndef __dw_util_h__
 #define __dw_util_h__
 
+#include <dirent.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -29,6 +33,18 @@
 #define tic clock_gettime(CLOCK_REALTIME, &tictoc_start);
 #define toc(X) clock_gettime(CLOCK_REALTIME, &tictoc_end); printf(#X); printf(" %f s\n", timespec_diff(&tictoc_end, &tictoc_start)); fflush(stdout);
 
+
+/* Create dir if it does not exist.
+ * Returns 0 if the dir already existed or could be created
+ * returns non-zeros if the dir can't be created
+ */
+int ensuredir(char * dir);
+
+/* Check if directory exist, do not create if missing
+ * returns 1 if it exist
+ * */
+
+int isdir(char * dir);
 
 /* Return a suggestion for how many threads to use
  * ideally this should be the same as the number of cores
