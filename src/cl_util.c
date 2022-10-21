@@ -35,6 +35,16 @@ static size_t M_r2h(size_t M);
 static size_t N_r2h(size_t N);
 static size_t P_r2h(size_t P);
 
+static size_t padsize(size_t M)
+{
+    if(M % 2 == 0)
+    {
+        return M+2;
+    }
+    return M+1;
+}
+
+
 void clu_exit_error(cl_int err,
                     const char * file,
                     const char * function,
@@ -115,7 +125,7 @@ float * fimcl_download(fimcl_t * gX)
 {
     assert(gX != NULL);
     fimcl_sync(gX);
-    if(gX->transformed == 0)
+    if(gX->type == fimcl_real)
     {
         size_t MNP = gX->M*gX->N*gX->P;
         if(gX->clu->verbose > 1)
@@ -147,7 +157,8 @@ float * fimcl_download(fimcl_t * gX)
         fimcl_sync(gX);
         return X;
     }
-    if(gX->transformed == 1)
+
+    if(gX->type == fimcl_hermitian)
     {
         size_t cMNP = fimcl_ncx(gX);
         if(gX->clu->verbose > 1)
@@ -181,25 +192,38 @@ float * fimcl_download(fimcl_t * gX)
     return NULL;
 }
 
-fimcl_t * fimcl_new(clu_env_t * clu, int ffted, int fullsize,
+fimcl_t * fimcl_new(clu_env_t * clu, fimcl_type type,
                     const float * X, size_t M, size_t N, size_t P)
 {
     // Consider CL_MEM_COPY_HOST_PTR on creation
     if(clu->verbose > 2)
     {
-        printf("fimcl_new, ffted = %d, fullsize = %d\n", ffted, fullsize);
+        printf("fimcl_new, type=");
+        switch(type)
+        {
+        case fimcl_real:
+            printf("real\n");
+            break;
+        case fimcl_real_inplace:
+            printf("real_inplace\n");
+            break;
+        case fimcl_hermitian:
+            printf("fimcl_hermitian\n");
+            break;
+        }
     }
 
     fimcl_t * Y = calloc(1, sizeof(fimcl_t));
     Y->M = M;
     Y->N = N;
     Y->P = P;
-    Y->transformed = ffted;
+    Y->type = type;
     Y->clu = clu;
     Y->wait_ev = NULL;
 
     cl_int ret;
-    if(ffted == 0 && fullsize == 0)
+    /* Create buffer */
+    if(type == fimcl_real)
     {
         Y->buf = clCreateBuffer(clu->context,
                                 CL_MEM_READ_WRITE,
@@ -214,9 +238,7 @@ fimcl_t * fimcl_new(clu_env_t * clu, int ffted, int fullsize,
                                 CL_MEM_READ_WRITE,
                                 Y->buf_size_nf*sizeof(float),
                                 NULL, &ret );
-
         clu->nb_allocated += Y->buf_size_nf*sizeof(float);
-        Y->fullsize = 1;
     }
     check_CL(ret);
 
@@ -225,28 +247,9 @@ fimcl_t * fimcl_new(clu_env_t * clu, int ffted, int fullsize,
         goto done;
     }
 
-    if(ffted == 0)
+    /* Copy data */
+    if(type == fimcl_real)
     {
-
-        if(fullsize)
-        {
-            /* Until we get the padding correct we fill the whole memory region,
-             * which is larger than the image data, with zeros  */
-            if(clu->verbose > 2)
-            {
-                printf("Clearing the clBuffer before uploading\n");
-            }
-            float zero_pattern[1] = {0.0};
-            check_CL ( clEnqueueFillBuffer (clu->command_queue, //  command_queue ,
-                                            Y->buf, // cl_mem  buffer ,
-                                            &zero_pattern, // const void  *pattern ,
-                                            sizeof(float), // size_t  pattern_size ,
-                                            0, // size_t  offset ,
-                                            Y->buf_size_nf*sizeof(float), // size_t  size ,
-                                            0, // cl_uint  num_events_in_wait_list ,
-                                            NULL, // const cl_event  *event_wait_list ,
-                                            &Y->wait_ev)); // cl_event  *event
-        }
         check_CL( clEnqueueWriteBuffer( clu->command_queue,
                                         Y->buf,
                                         CL_TRUE, // blocking_write
@@ -258,13 +261,32 @@ fimcl_t * fimcl_new(clu_env_t * clu, int ffted, int fullsize,
                                         &Y->wait_ev ) );
         fimcl_sync(Y);
     }
-    if(ffted == 1)
+
+    if(type == fimcl_real_inplace)
+    {
+        float * PX = pad_for_inplace(X, M, N, P);
+        check_CL( clEnqueueWriteBuffer( clu->command_queue,
+                                        Y->buf,
+                                        CL_TRUE, // blocking_write
+                                        0,
+                                        fimcl_ncx(Y)*2*sizeof( float ),
+                                        X,
+                                        0, // num_events_in_wait_list
+                                        NULL,
+                                        &Y->wait_ev ) );
+        fimcl_sync(Y);
+        free(PX);
+        exit(EXIT_FAILURE);
+    }
+
+    if(type == fimcl_hermitian)
     {
         fprintf(stderr, "TODO: Unable to upload already ffted data in %s, line %d\n",
                 __FILE__, __LINE__);
         exit(EXIT_FAILURE);
     }
-done: ;
+
+ done: ;
     return Y;
 }
 
@@ -274,27 +296,44 @@ fimcl_t * fimcl_copy(fimcl_t * G)
     {
         printf("fimcl_copy\n");
     }
-    fimcl_t * H = NULL;
-    if(G->transformed == 0)
+
+    if(G->type == fimcl_hermitian)
     {
-        H = fimcl_new(G->clu, 0, G->fullsize, NULL, G->M, G->N, G->P);
-        fimcl_sync(G);
-
-        check_CL(clEnqueueCopyBuffer(
-                     G->clu->command_queue,//cl_command_queue command_queue,
-                     G->buf, //cl_mem src_buffer,
-                     H->buf, //cl_mem dst_buffer,
-                     0, //size_t src_offset,
-                     0, //size_t dst_offset,
-                     G->M*G->N*G->P*sizeof(float),//size_t size,
-                     0, //cl_uint num_events_in_wait_list,
-                     NULL, //const cl_event* event_wait_list,
-                     &H->wait_ev)); //cl_event* event);
-
-    } else {
-        fprintf(stderr, "fimcl_copy for transformed objects is not implemented \n");
+        fprintf(stderr, "fimcl_copy for type==fimcl_hermitian not implemented \n");
         exit(EXIT_FAILURE);
     }
+
+    fimcl_t * H = fimcl_new(G->clu, G->type, NULL, G->M, G->N, G->P);
+
+    fimcl_sync(G);
+    if(G->type == fimcl_real)
+    {
+        check_CL(clEnqueueCopyBuffer(
+                                     G->clu->command_queue,//cl_command_queue command_queue,
+                                     G->buf, //cl_mem src_buffer,
+                                     H->buf, //cl_mem dst_buffer,
+                                     0, //size_t src_offset,
+                                     0, //size_t dst_offset,
+                                     G->M*G->N*G->P*sizeof(float),//size_t size,
+                                     0, //cl_uint num_events_in_wait_list,
+                                     NULL, //const cl_event* event_wait_list,
+                                     &H->wait_ev)); //cl_event* event);
+    }
+
+    if(G->type == fimcl_real_inplace)
+    {
+        check_CL(clEnqueueCopyBuffer(
+                                     G->clu->command_queue,//cl_command_queue command_queue,
+                                     G->buf, //cl_mem src_buffer,
+                                     H->buf, //cl_mem dst_buffer,
+                                     0, //size_t src_offset,
+                                     0, //size_t dst_offset,
+                                     2*fimcl_ncx(H)*sizeof(float),//size_t size,
+                                     0, //cl_uint num_events_in_wait_list,
+                                     NULL, //const cl_event* event_wait_list,
+                                     &H->wait_ev)); //cl_event* event);
+    }
+
     return H;
 }
 
@@ -313,127 +352,58 @@ static fimcl_t * _fimcl_convolve(fimcl_t * X, fimcl_t * Y, int mode, int conj)
     assert(X != NULL);
     assert(Y != NULL);
 
-    struct timespec tk0, tk1, tfft0, tfft1, tifft0, tifft1;
+
     if(X->clu->verbose > 1)
     {
         printf("fimcl_convolve\n");
     }
-    clFinish(X->clu->command_queue);
-    if(X->transformed == 0)
+
+    if(X->type == fimcl_hermitian && Y->type == fimcl_hermitian)
     {
-        if(X->clu->verbose > 1)
+
+        if(mode == CLU_KEEP_ALL)
         {
-            printf("fimcl_convolve - convolving first argument\n");
+            fimcl_t * Z = fimcl_new(X->clu, fimcl_hermitian, NULL, X->M, X->N, X->P);
+            fimcl_complex_mul(X, Y, Z, conj);
+            fimcl_ifft(Z);
+            return Z;
         }
 
-        clock_gettime(CLOCK_MONOTONIC, &tfft0);
-        if(X->fullsize)
+        if(mode == CLU_DROP_ALL)
         {
-            fimcl_fft_inplace(X);
-        } else {
-            fimcl_fft(X);
-        }
-        clock_gettime(CLOCK_MONOTONIC, &tfft1);
-    }
-    clFinish(X->clu->command_queue);
-    if(Y->transformed == 0)
-    {
-        if(X->clu->verbose > 1)
-        {
-            printf("fimcl_convolve - convolving 2nd argument\n");
-        }
-        clock_gettime(CLOCK_MONOTONIC, &tfft0);
-        if(Y->fullsize)
-        {
-            fimcl_fft_inplace(Y);
-        } else {
-            fimcl_fft(Y);
-        }
-        clock_gettime(CLOCK_MONOTONIC, &tfft1);
-    }
-    clFinish(X->clu->command_queue);
-    assert(X->transformed == 1);
-    assert(Y->transformed == 1);
+            fimcl_complex_mul_inplace(Y, Y, conj);
+            fimcl_free(Y);
 
-    if(mode == CLU_KEEP_ALL)
-    {
-        fimcl_t * Z = fimcl_new(X->clu, 1, 0, NULL, X->M, X->N, X->P);
-        assert(Z->transformed == 1);
+            fimcl_t * fX = NULL;
 
-        clock_gettime(CLOCK_MONOTONIC, &tk1);
-        fimcl_complex_mul(X, Y, Z, conj);
 
-        clock_gettime(CLOCK_MONOTONIC, &tk1);
-        fimcl_ifft(Z);
-
-        return Z;
-    }
-
-    if(mode == CLU_DROP_ALL)
-    {
-        clock_gettime(CLOCK_MONOTONIC, &tk0);
-        fimcl_complex_mul_inplace(Y, Y, conj);
-        clock_gettime(CLOCK_MONOTONIC, &tk1);
-        fimcl_free(Y);
-
-        fimcl_t * fX = NULL;
-        if(X->fullsize == 1)
-        {
-            clock_gettime(CLOCK_MONOTONIC, &tifft0);
-            fimcl_ifft_inplace(X);
-            fX = X;
-            clock_gettime(CLOCK_MONOTONIC, &tifft1);
-        } else {
             fX = fimcl_ifft(X);
             fimcl_free(X);
+
+            clFinish(X->clu->command_queue);
+            return fX;
         }
 
-        double dfft = clockdiff(&tfft0, &tfft1);
-        double dtk = clockdiff(&tk0, &tk1);
-        double difft = clockdiff(&tifft0, &tifft1);
 
-        if(X->clu->verbose > 1)
+
+        if(mode == CLU_KEEP_2ND)
         {
-            printf("- One fft took %f s\n", dfft);
-            printf("- Multiplication took %f s\n", dtk);
-            printf("- Inverse fft took %f s\n", difft);
-        }
-        clFinish(X->clu->command_queue);
-        return fX;
-    }
+            fimcl_complex_mul_inplace(Y, X, conj);
 
-    if(mode == CLU_KEEP_2ND)
-    {
-        clock_gettime(CLOCK_MONOTONIC, &tk0);
-        fimcl_complex_mul_inplace(Y, X, conj);
-        clock_gettime(CLOCK_MONOTONIC, &tk1);
+            fimcl_t * fX = NULL;
 
-        fimcl_t * fX = NULL;
-        if(X->fullsize == 1)
-        {
-            clock_gettime(CLOCK_MONOTONIC, &tifft0);
-            fimcl_ifft_inplace(X);
-            fX = X;
-            clock_gettime(CLOCK_MONOTONIC, &tifft1);
-        } else {
             fX = fimcl_ifft(X);
             fimcl_sync(fX);
             fimcl_free(X);
-        }
 
-        double dtk = clockdiff(&tk0, &tk1);
-        double difft = clockdiff(&tifft0, &tifft1);
-        double dfft = clockdiff(&tfft0, &tfft1);
-        if(fX->clu->verbose > 1)
-        {
-            printf("- One fft took %f s\n", dfft);
-            printf("- Multiplication took %f s\n", dtk);
-            printf("- Inverse fft took %f s\n", difft);
+            return fX;
         }
-
-        return fX;
     }
 
+    fprintf(stderr, "Can't convolve the objects\n");
+    exit(EXIT_FAILURE);
+
+    return NULL;
     assert(NULL);
     return NULL;
 }
@@ -460,9 +430,11 @@ void fimcl_sync(fimcl_t * X)
 
 void fimcl_preprocess(fimcl_t * fft_image, fimcl_t * fft_PSF, float value)
 {
+    assert(fft_image->type == fimcl_hermitian);
+    assert(fft_PSF->type == fimcl_hermitian);
+
     printf("fimcl_preprocess, value = %f\n", value);
-    assert(fft_PSF->transformed == 1);
-    assert(fft_image -> transformed == 1);
+
     assert(fft_PSF->M == fft_image->M);
     cl_kernel kernel = fft_image->clu->kern_preprocess_image.kernel;
 
@@ -521,6 +493,9 @@ void fimcl_preprocess(fimcl_t * fft_image, fimcl_t * fft_PSF, float value)
 
 void fimcl_complex_mul(fimcl_t * X, fimcl_t * Y, fimcl_t * Z, int conj)
 {
+    assert(X->type == fimcl_hermitian);
+    assert(Y->type == fimcl_hermitian);
+
     cl_kernel kernel = X->clu->kern_mul.kernel;
     if(conj == 1)
     {
@@ -528,7 +503,7 @@ void fimcl_complex_mul(fimcl_t * X, fimcl_t * Y, fimcl_t * Z, int conj)
     }
 
 
-/* Set sizes */
+    /* Set sizes */
     size_t localWorkSize; /* Use largest possible */
     check_CL ( clGetKernelWorkGroupInfo(kernel,
                                         X->clu->device_id,
@@ -622,11 +597,12 @@ void fimcl_complex_mul_old(fimcl_t * X, fimcl_t * Y, fimcl_t * Z, int conj)
 /* Y = X.*Y */
 void fimcl_real_mul_inplace(fimcl_t * X, fimcl_t * Y)
 {
+    assert(X->type == fimcl_real && Y->type == fimcl_real);
+
     assert(X->M == Y->M);
     assert(X->N == Y->N);
     assert(X->P == Y->P);
-    assert(X->transformed == 0);
-    assert(Y->transformed == 0);
+
 
     cl_kernel kernel = X->clu->kern_real_mul_inplace.kernel;
 
@@ -664,12 +640,14 @@ void fimcl_real_mul_inplace(fimcl_t * X, fimcl_t * Y)
                                      &Y->wait_ev) );
 
     fimcl_sync(Y);
-
-
+    return;
 }
 
 void fimcl_shb_update(fimcl_t * P, fimcl_t * X, fimcl_t * XP, float alpha)
 {
+    assert(P->type == fimcl_real);
+    assert(X->type == fimcl_real);
+    assert(XP->type == fimcl_real);
 
     cl_kernel kernel = X->clu->kern_shb_update.kernel;
 
@@ -733,7 +711,7 @@ void fimcl_shb_update(fimcl_t * P, fimcl_t * X, fimcl_t * XP, float alpha)
 void fimcl_positivity(fimcl_t * X, float val)
 {
     assert(X != NULL);
-    assert(X->transformed == 0);
+    assert(X->type == fimcl_real);
     cl_kernel kernel = X->clu->kern_real_positivity.kernel;
 
     /* Set sizes */
@@ -779,10 +757,13 @@ void fimcl_positivity(fimcl_t * X, float val)
                                      &X->wait_ev) );
 
     fimcl_sync(X);
+    return;
 }
 
 void fimcl_complex_mul_inplace(fimcl_t * X, fimcl_t * Y, int conj)
 {
+    assert(X->type == fimcl_hermitian);
+    assert(Y->type == fimcl_hermitian);
 
     cl_kernel kernel = X->clu->kern_mul_inplace.kernel;
     if(conj == 1)
@@ -839,15 +820,14 @@ fimcl_t * fimcl_ifft(fimcl_t * fX)
     {
         printf("fimcl_ifft\n");
     }
-    assert(fX->transformed == 1);
+    assert(fX->type == fimcl_hermitian);
 
     fimcl_t * X = calloc(1, sizeof(fimcl_t));
     X->M = fX->M;
     X->N = fX->N;
     X->P = fX->P;
-    X->transformed = 0;
+    X->type = fimcl_real;
     X->wait_ev = CL_SUCCESS;
-    X->fullsize = 0;
     X->clu = fX->clu;
 
     cl_int ret;
@@ -878,11 +858,13 @@ fimcl_t * fimcl_ifft(fimcl_t * fX)
 
 void fimcl_ifft_inplace(fimcl_t * X)
 {
+    assert(X->type == fimcl_hermitian);
+
     if(X->clu->verbose > 1)
     {
         printf("fimcl_ifft_inplace\n");
     }
-    assert(X->transformed == 1);
+
 
     fimcl_sync(X);
     check_clFFT(clfftEnqueueTransform(X->clu->h2r_inplace_plan,
@@ -896,7 +878,7 @@ void fimcl_ifft_inplace(fimcl_t * X)
                                       NULL, // output buffer
                                       NULL)); // temp buffer
     clFinish(X->clu->command_queue);
-    X->transformed = 0;
+    X->type = fimcl_real_inplace;
     fimcl_sync(X);
     return;
 }
@@ -908,7 +890,7 @@ fimcl_t * fimcl_fft(fimcl_t * X)
     {
         printf("fimcl_fft\n");
     }
-    assert(X->transformed == 0);
+    assert(X->type == fimcl_real);
     fimcl_sync(X);
 
     /* Number of complex elements in the FFT */
@@ -918,7 +900,8 @@ fimcl_t * fimcl_fft(fimcl_t * X)
     fX->M = X->M;
     fX->N = X->N;
     fX->P = X->P;
-    fX->transformed = 1;
+    fX->type = fimcl_hermitian;
+
     fX->clu = X->clu;
 
     cl_int ret;
@@ -946,11 +929,11 @@ fimcl_t * fimcl_fft(fimcl_t * X)
 
 void fimcl_fft_inplace(fimcl_t * X)
 {
+    assert(X->type == fimcl_real_inplace);
     if(X->clu->verbose > 1)
     {
         printf("fimcl_fft_inplace\n");
     }
-    assert(X->transformed == 0);
 
     /* Number of complex elements in the FFT */
     size_t cMNP = fimcl_ncx(X);
@@ -978,7 +961,7 @@ void fimcl_fft_inplace(fimcl_t * X)
                                       NULL, // output buffer
                                       X->clu->clfft_buffer)); // temp buffer
     fimcl_sync(X);
-    X->transformed = 1;
+    X->type = fimcl_hermitian;
     return;
 }
 
@@ -999,9 +982,9 @@ float * clu_convolve(clu_env_t * clu,
     // Note full size specified for in-place transformations
     struct timespec t0, t1, t2;
     clock_gettime(CLOCK_MONOTONIC, &t0);
-    fimcl_t * gX = fimcl_new(clu, 0, 1, X, M, N, P);
+    fimcl_t * gX = fimcl_new(clu, fimcl_real, X, M, N, P);
     clock_gettime(CLOCK_MONOTONIC, &t1);
-    fimcl_t * gY = fimcl_new(clu, 0, 1, Y, M, N, P);
+    fimcl_t * gY = fimcl_new(clu, fimcl_real, Y, M, N, P);
     clock_gettime(CLOCK_MONOTONIC, &t2);
 
     float  dt0 = clockdiff(&t0, &t1);
@@ -1670,7 +1653,8 @@ clfftPlanHandle  gen_r2h_inplace_plan(clu_env_t * clu,
     check_clFFT(clfftSetResultLocation(planHandle,
                                        CLFFT_INPLACE));
 
-    size_t inStride[3] = {1, M, M*N};
+    size_t inStride[3] = {1, padsize(M), padsize(M)*N};
+    //size_t inStride[3] = {1, M, M*N};
     size_t outStride[3] = {1, cM, cM*cN};
 
     check_clFFT(clfftSetPlanInStride(planHandle,  CLFFT_3D, inStride));
@@ -1795,7 +1779,8 @@ clfftPlanHandle  gen_h2r_inplace_plan(clu_env_t * clu,
                                        CLFFT_INPLACE));
 
     size_t inStride[3] = {1, cM, cM*cN};
-    size_t outStride[3] = {1, M, M*N};
+    size_t outStride[3] = {1, padsize(M), padsize(M)*N};
+    //size_t outStride[3] = {1, M, M*N};
 
     check_clFFT(clfftSetPlanInStride(planHandle,  CLFFT_3D, inStride));
     check_clFFT(clfftSetPlanOutStride(planHandle, CLFFT_3D, outStride));
@@ -1896,11 +1881,11 @@ void fimcl_update_y(fimcl_t * gy, fimcl_t * image)
     /* This takes no time, probably just a look-up so no need to
      * cache it */
     check_CL(
-        clGetKernelWorkGroupInfo(kernel,
-                                 gy->clu->device_id,
-                                 CL_KERNEL_WORK_GROUP_SIZE,
-                                 sizeof(size_t), &localWorkSize, NULL)
-        );
+             clGetKernelWorkGroupInfo(kernel,
+                                      gy->clu->device_id,
+                                      CL_KERNEL_WORK_GROUP_SIZE,
+                                      sizeof(size_t), &localWorkSize, NULL)
+             );
 
     /* The global size needs to be a multiple of the localWorkSize
      * i.e. it will be larger than the number of elements */
@@ -2041,4 +2026,35 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
     clReleaseMemObject(partial_sums_gpu);
 
     return sum_gpu / (float) (image->M*image->N*image->P);
+}
+
+
+float * pad_for_inplace(const float * X, size_t M, size_t N, size_t P)
+{
+    const size_t nchunk = N*P;
+    const size_t chunk_size = M*sizeof(float);
+    float * PX = calloc(padsize(M)*N*P, sizeof(float));
+    assert(PX != NULL);
+    /* P values at a time */
+    for(size_t c = 0; c < nchunk; c++)
+    {
+        memcpy(PX+c*padsize(M), X + c*M, chunk_size);
+    }
+
+    return PX;
+}
+
+float * unpad_from_inplace(const float * PX, size_t M, size_t N, size_t P)
+{
+    const size_t nchunk = N*P;
+    const size_t chunk_size = M*sizeof(float);
+    float * X = calloc(M*N*P, sizeof(float));
+    assert(PX != NULL);
+    /* P values at a time */
+    for(size_t c = 0; c < nchunk; c++)
+    {
+        memcpy(X + c*M, PX+c*padsize(M), chunk_size);
+    }
+
+    return X;
 }

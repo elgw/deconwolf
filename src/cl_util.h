@@ -5,7 +5,7 @@
  * do much initialization in bulk at the beginning.
  * Notes:
  * -
-*/
+ */
 
 #include <assert.h>
 #include <stdio.h>
@@ -13,8 +13,6 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-
-#define CLFFT_REQUEST_LIB_NOMEMALLOC
 
 #define CL_USE_DEPRECATED_OPENCL_1_2_APIS
 #define CL_TARGET_OPENCL_VERSION 120
@@ -32,6 +30,7 @@
 #define CLU_KEEP_ALL 0
 #define CLU_DROP_ALL 1
 #define CLU_KEEP_2ND 2
+
 
 const char* clGetErrorString(int errorCode);
 
@@ -78,6 +77,11 @@ typedef struct{
     size_t n_alloc;
 } clu_env_t;
 
+/* A fimcl object can be one of these types */
+typedef enum {
+    fimcl_real,
+    fimcl_real_inplace,
+    fimcl_hermitian} fimcl_type ;
 
 typedef struct{
     size_t M;
@@ -85,9 +89,9 @@ typedef struct{
     size_t P;
     cl_mem buf;
     size_t buf_size_nf; // Number of floats, not bytes
-    int transformed; /* 0=real or 1=hermitian */
-    int fullsize; /* If the buffer is large enough for in-place fft */
-    int padded; /* Ready for inplace transform ? */
+
+    fimcl_type type;
+
     clu_env_t * clu;
     /* Check this before data is used, initialized to NULL */
     cl_event wait_ev;
@@ -100,7 +104,7 @@ typedef struct{
  * non-blocking. call fimcl_sync on the new object to manually sync
  * if X != NULL
  */
-fimcl_t * fimcl_new(clu_env_t * clu, int ffted, int fullsize,
+fimcl_t * fimcl_new(clu_env_t * clu, fimcl_type type,
                     const float * X, size_t M, size_t N, size_t P);
 
 void fimcl_free(fimcl_t * );
@@ -128,8 +132,6 @@ void fimcl_fft_inplace(fimcl_t * X);
 fimcl_t * fimcl_ifft(fimcl_t * A);
 void fimcl_ifft_inplace(fimcl_t * A);
 
-
-
 /* B = copy(A)
  * non-blocking, sync object before using */
 fimcl_t * fimcl_copy(fimcl_t * );
@@ -156,15 +158,15 @@ void fimcl_positivity(fimcl_t * X, float val);
 void fimcl_sync(fimcl_t * X);
 
 
-#define check_CL(x) if(x != CL_SUCCESS)                             \
-    {                                                               \
-        clu_exit_error(x, __FILE__, __FUNCTION__, __LINE__, 0);     \
-    }                                                               \
+#define check_CL(x) if(x != CL_SUCCESS)                         \
+    {                                                           \
+        clu_exit_error(x, __FILE__, __FUNCTION__, __LINE__, 0); \
+    }                                                           \
 
-#define check_clFFT(x) if(x != CL_SUCCESS)                          \
-    {                                                               \
-        clu_exit_error(x, __FILE__, __FUNCTION__, __LINE__, 1);     \
-    }                                                               \
+#define check_clFFT(x) if(x != CL_SUCCESS)                      \
+    {                                                           \
+        clu_exit_error(x, __FILE__, __FUNCTION__, __LINE__, 1); \
+    }                                                           \
 
 
 /* Try to resolve the error code and then exit */
@@ -179,10 +181,10 @@ void clu_exit_error(cl_int err,
 clu_env_t * clu_new(int verbose);
 
 /* Prepare to do FFTs at size wM x wN x wP
-* the size M x N x P is the size of the input image before it was possibly padded */
+ * the size M x N x P is the size of the input image before it was possibly padded */
 void clu_prepare_kernels(clu_env_t * clu,
-                     size_t wM, size_t wN, size_t wP,
-                     size_t M, size_t N, size_t P);
+                         size_t wM, size_t wN, size_t wP,
+                         size_t M, size_t N, size_t P);
 
 /* Tear down what is crated with clu_new */
 void clu_destroy(clu_env_t * );
@@ -264,5 +266,17 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image);
 void fimcl_update_y(fimcl_t * gy, fimcl_t * image);
 
 void fimcl_preprocess( fimcl_t * fft_image, fimcl_t * fft_PSF, float value);
+
+/* Pad the data and make it ready for in-place transformations
+ * This is called by fimcl_new when type is set to fimcl_real_inplace
+ */
+float * pad_for_inplace(const float * X,
+                        size_t M, size_t N, size_t P);
+
+/* Reverse of unpad_from_inplace, used with fimcl_download when
+ * X->type == fimcl_real_inplace */
+float * unpad_from_inplace(const float * PX,
+                           size_t M, size_t N, size_t P);
+
 
 #endif

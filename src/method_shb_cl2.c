@@ -1,5 +1,8 @@
 #include "method_shb_cl.h"
 
+#define use_inplace_clfft 0
+
+
 //#define here(x) printf("%s %s %d\n", __FILE__, __FUNCTION__, __LINE__);
 #define here(x) ;
 
@@ -33,13 +36,13 @@ static fimcl_t  * fft_block_of_ones(clu_env_t * clu,
         }
     }
 
-    fimcl_t * gOne = fimcl_new(clu, 0, 0, one, wM, wN, wP);
+    fimcl_t * gOne = fimcl_new(clu, fimcl_real, one, wM, wN, wP);
     here();
     fimcl_sync(gOne);
     here();
     fftwf_free(one);
     fimcl_t * gfOne = fimcl_fft(gOne);
-
+    fimcl_free(gOne);
     return gfOne;
 }
 
@@ -74,27 +77,31 @@ fimcl_t * create_initial_W(clu_env_t * clu,
         }
     }
 
-    fimcl_t * W_gpu = fimcl_new(clu, 0, 0, W_pre, wM, wN, wP);
+    fimcl_t * W_gpu = fimcl_new(clu, fimcl_real, W_pre, wM, wN, wP);
     fftwf_free(W_pre);
     return W_gpu;
 }
 
 float iter_shb_cl2(fimcl_t ** _xp_gpu, // Output, f_(t+1)
                    fimcl_t * restrict im_gpu, // as above, on GPU
-                   fimcl_t * restrict cK, // fft(psf)
+                   fimcl_t * restrict fft_psf_gpu,
                    fimcl_t * restrict pk_gpu, // p_k, estimation of the gradient
                    fimcl_t * W_gpu, // Bertero Weights
                    const dw_opts * s)
 {
     fimcl_t * xp_gpu = _xp_gpu[0];
+    fimcl_free(xp_gpu);
 
-    here();
     fimcl_t * fft_pk_gpu = fimcl_fft(pk_gpu); // Pk -> fft_pk_gpu
+
     here();
 
     putdot(s);
-    fimcl_t * gy = fimcl_convolve(fft_pk_gpu, cK, CLU_KEEP_2ND);
+
+    // could be done inplace
+    fimcl_t * gy = fimcl_convolve(fft_pk_gpu, fft_psf_gpu, CLU_KEEP_2ND);
     fft_pk_gpu = NULL;
+
     putdot(s);
 
     here();
@@ -107,11 +114,17 @@ float iter_shb_cl2(fimcl_t ** _xp_gpu, // Output, f_(t+1)
 
     fimcl_t * _Y = gy;
 
+#if use_inplace_clfft
+    fimcl_fft_inplace(_Y);
+    fimcl_t * Y = _Y;
+#else
     fimcl_t * Y = fimcl_fft(_Y);
     fimcl_free(_Y);
+#endif
 
     // gx = Y * cK, Y is freed
-    fimcl_t * gx = fimcl_convolve_conj(Y, cK, CLU_KEEP_2ND);
+    // could be done inplace
+    fimcl_t * gx = fimcl_convolve_conj(Y, fft_psf_gpu, CLU_KEEP_2ND);
     Y = NULL;
     putdot(s);
 
@@ -126,7 +139,7 @@ float iter_shb_cl2(fimcl_t ** _xp_gpu, // Output, f_(t+1)
 
     // gx[kk] < s->bg ? gx[kk] = s->bg : 0;
     fimcl_positivity(gx, s->bg);
-    fimcl_free(xp_gpu);
+
     _xp_gpu[0] = gx;
     return error;
 }
@@ -139,10 +152,15 @@ float * deconvolve_shb_cl2(float * restrict im,
                            dw_opts * s)
 {
 
-    if(s->verbosity > 1)
+    if(s->verbosity > 0)
     {
+#if use_inplace_clfft
+        printf("Deconvolving using shbcl2 (using inplace)\n");
+#else
         printf("Deconvolving using shbcl2\n");
+#endif
     }
+
     fprintf(s->log, "Deconvolving with shbcl2\n");
     struct timespec t_deconvolution_start, t_deconvolution_end;
     clock_gettime(CLOCK_REALTIME, &t_deconvolution_start);
@@ -261,19 +279,28 @@ float * deconvolve_shb_cl2(float * restrict im,
         fim_tiff_write_float("fullPSF.tif", Z, NULL, wM, wN, wP);
     }
 
-    fimcl_t * PSF_gpu = fimcl_new(clu, 0, 0,
+#if use_inplace_clfft
+    fimcl_t * PSF_gpu = fimcl_new(clu, fimcl_real_inplace,
+                                  Z, wM, wN, wP);
+    fimcl_fft_inplace(PSF_gpu);
+    fimcl_t * fft_PSF_gpu = PSF_gpu;
+    PSF_gpu = NULL;
+    fftwf_free(Z);
+#else
+    fimcl_t * PSF_gpu = fimcl_new(clu, fimcl_real,
                                   Z, wM, wN, wP);
 
     fimcl_t * fft_PSF_gpu = fimcl_fft(PSF_gpu);
     fimcl_free(PSF_gpu);
     fftwf_free(Z);
+#endif
 
     /* Prepare the image */
     fimcl_t * im_gpu = NULL;
 
     if(s->psf_pass == 0)
     {
-        im_gpu = fimcl_new(clu, 0, 0, im, M, N, P);
+        im_gpu = fimcl_new(clu, fimcl_real, im, M, N, P);
     } else {
         printf("Experimental pre-processing path. Don't use. Work in progress.\n");
         /* Leaves some artifacts at the boundaries. FFT-based
@@ -283,7 +310,7 @@ float * deconvolve_shb_cl2(float * restrict im,
         /* Insert the psf into the bigger Z */
         fim_insert(im_full, wM, wN, wP,
                    im, M, N, P);
-        fimcl_t * im_full_gpu = fimcl_new(clu, 0, 0, im_full, wM, wN, wP);
+        fimcl_t * im_full_gpu = fimcl_new(clu, fimcl_real, im_full, wM, wN, wP);
         fimcl_t * fft_im_full_gpu = fimcl_fft(im_full_gpu);
         im_full_gpu = NULL;
         // magic thresholding
@@ -293,13 +320,10 @@ float * deconvolve_shb_cl2(float * restrict im,
         float * im_filt = fimcl_download(im_full_gpu);
         float * im_filt_cropped = fim_subregion(im_filt, wM, wN, wP, M, N, P);
         fftwf_free(im_filt);
-        im_gpu = fimcl_new(clu, 0, 0, im_filt_cropped, M, N, P);
+        im_gpu = fimcl_new(clu, fimcl_real, im_filt_cropped, M, N, P);
         fimcl_to_tiff(im_gpu, "ifft_fft_input.tif");
         fftwf_free(im_filt_cropped);
     }
-
-
-
 
     putdot(s);
 
@@ -328,8 +352,14 @@ float * deconvolve_shb_cl2(float * restrict im,
         float sumg = fim_sum(im, M*N*P);
         float * x = fim_constant(wMNP, sumg / (float) wMNP);
 
-        x_gpu = fimcl_new(clu, 0, 0, x, wM, wN, wP);
+#if use_inplace_clfft
+        x_gpu = fimcl_new(clu, fimcl_real_inplace, x, wM, wN, wP);
+#else
+        x_gpu = fimcl_new(clu, fimcl_real, x, wM, wN, wP);
+#endif
         xp_gpu = fimcl_copy(x_gpu);
+
+
         fftwf_free(x);
     }
 
@@ -351,7 +381,11 @@ float * deconvolve_shb_cl2(float * restrict im,
         here();
         /* To be interpreted as p^k in Eq. 7 of SHB
          *  p[kk] = x[kk] + alpha*(x[kk]-xp[kk]); */
-        p_gpu = fimcl_new(clu, 0, 0, NULL, wM, wN, wP);
+#if use_inplace_clfft
+        p_gpu = fimcl_new(clu, fimcl_real_inplace, NULL, wM, wN, wP);
+#else
+        p_gpu = fimcl_new(clu, fimcl_real, NULL, wM, wN, wP);
+#endif
 
         fimcl_shb_update(p_gpu, x_gpu, xp_gpu, alpha);
 
@@ -359,12 +393,12 @@ float * deconvolve_shb_cl2(float * restrict im,
         here();
         double err =
             iter_shb_cl2(
-                         &xp_gpu, // xp is updated to the next guess
-                         im_gpu,
-                         fft_PSF_gpu, // FFT of PSF
-                         p_gpu, // Current guess
-                         W_gpu, // Weights (to handle boundaries)
-                         s);
+                &xp_gpu, // xp is updated to the next guess
+                im_gpu,
+                fft_PSF_gpu, // FFT of PSF
+                p_gpu, // Current guess
+                W_gpu, // Weights (to handle boundaries)
+                s);
 
         here();
 

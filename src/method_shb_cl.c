@@ -1,5 +1,7 @@
 #include "method_shb_cl.h"
 
+#define use_inplace_clfft 1
+
 /* TODO:
  * // Do this without in-place FFTs. check all inplace as well as the convolve functions.
  * */
@@ -30,7 +32,7 @@ fimcl_t  * initial_guess_cl(clu_env_t * clu,
         }
     }
 
-    fimcl_t * gOne = fimcl_new(clu, 0, 0, one, wM, wN, wP);
+    fimcl_t * gOne = fimcl_new(clu, fimcl_real, one, wM, wN, wP);
     here();
     fimcl_sync(gOne);
     here();
@@ -58,9 +60,13 @@ float * deconvolve_shb_cl(float * restrict im,
     }
 
 
-    if(s->verbosity > 1)
+    if(s->verbosity > 0)
     {
+        #if use_inplace_clfft
+        printf("Deconvolving (using inplace)\n");
+        #else
         printf("Deconvolving\n");
+        #endif
     }
 
     if(s->nIter == 0)
@@ -176,7 +182,7 @@ float * deconvolve_shb_cl(float * restrict im,
     }
 
     //fftwf_complex * fftPSF = fft(Z, wM, wN, wP);
-    fimcl_t * _clfftPSF = fimcl_new(clu, 0, 0,
+    fimcl_t * _clfftPSF = fimcl_new(clu, fimcl_real,
                                     Z, wM, wN, wP);
     // fimcl_fft_inplace(clfftPSF);
     fimcl_t * clfftPSF = fimcl_fft(_clfftPSF);
@@ -275,16 +281,16 @@ float * deconvolve_shb_cl(float * restrict im,
         putdot(s);
 
         double err = iter_shb_cl(
-                                 clu,
-                                 &xp, // xp is updated to the next guess
-                                 im,
-                                 clfftPSF, // FFT of PSF
-                                 p, // Current guess
-                                 //p,
-                                 W, // Weights (to handle boundaries)
-                                 wM, wN, wP, // Expanded size
-                                 M, N, P, // Original size
-                                 s);
+            clu,
+            &xp, // xp is updated to the next guess
+            im,
+            clfftPSF, // FFT of PSF
+            p, // Current guess
+            //p,
+            W, // Weights (to handle boundaries)
+            wM, wN, wP, // Expanded size
+            M, N, P, // Original size
+            s);
 
         fftwf_free(p); // i.e. p
 
@@ -372,14 +378,28 @@ float iter_shb_cl(clu_env_t * clu,
     // the allocation for xp
     const size_t wMNP = wM*wN*wP;
 
-    fimcl_t * _Pk = fimcl_new(clu, 0, 0, pk, wM, wN, wP);
+
+
+#if use_inplace_clfft
+    fimcl_t * _Pk = fimcl_new(clu, fimcl_real_inplace, pk, wM, wN, wP);
+#else
+    fimcl_t * _Pk = fimcl_new(clu, fimcl_real, pk, wM, wN, wP);
+#endif
+
     here();
     clFinish(_Pk->clu->command_queue);
     here();
-    //fimcl_fft_inplace(Pk);
+
+#if use_inplace_clfft
+    fimcl_fft_inplace(_Pk);
+    fimcl_t * Pk = _Pk;
+#else
     fimcl_t * Pk = fimcl_fft(_Pk);
-    here();
     fimcl_free(_Pk);
+#endif
+
+    here();
+
     here();
     clFinish(Pk->clu->command_queue);
     here();
@@ -419,7 +439,12 @@ float iter_shb_cl(clu_env_t * clu,
         }
     }
 
-    fimcl_t * _Y = fimcl_new(clu, 0, 0, y, wM, wN, wP);
+    #if use_inplace_clfft
+    fimcl_t * _Y = fimcl_new(clu, fimcl_real_inplace, y, wM, wN, wP);
+    #else
+    fimcl_t * _Y = fimcl_new(clu, fimcl_real, y, wM, wN, wP);
+    #endif
+
     clFinish(_Y->clu->command_queue);
     // fimcl_fft_inplace(Y);
     fimcl_t * Y = fimcl_fft(_Y);
