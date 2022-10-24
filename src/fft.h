@@ -23,7 +23,9 @@
 
 #include <fftw3.h>
 #include <stdint.h>
+#ifndef __APPLE__
 #include <malloc.h>
+#endif
 
 #include "dw_util.h"
 

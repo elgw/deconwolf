@@ -8,7 +8,9 @@
 #include <math.h>
 #include <limits.h>
 #include <stdint.h>
+#ifndef __APPLE__
 #include <malloc.h>
+#endif
 #include "qsort.h"
 
 #define PRF_AUTOMATIC -1

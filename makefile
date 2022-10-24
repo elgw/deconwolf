@@ -102,7 +102,8 @@ OMP?=1
 ifeq ($(OMP), 1)
 $(info OMP enabled)
 ifeq ($(UNAME_S), Darwin)
-dw_LIBRARIES += -Xpreprocessor -lomp
+CFLAGS+=-Xpreprocessor -fopenmp
+dw_LIBRARIES += -lomp
 else
 CFLAGS += -fopenmp
 ifeq ($(CC),clang)
