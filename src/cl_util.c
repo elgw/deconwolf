@@ -1015,6 +1015,21 @@ static double clockdiff(struct timespec* start, struct timespec * finish)
     return elapsed;
 }
 
+char * get_cl_device_info_string(cl_device_id dev_id, cl_device_info info_type)
+{
+  size_t string_size = 1024;
+  size_t string_size_used = 0;
+  char * string = malloc(string_size);
+  check_CL(clGetDeviceInfo(dev_id,
+			   info_type,
+			   string_size,
+			   string,
+			   &string_size_used));
+
+  return string;
+
+}
+
 void clu_print_device_info(FILE * fid, cl_device_id dev_id)
 {
     cl_device_type dev_type;
@@ -1052,17 +1067,21 @@ void clu_print_device_info(FILE * fid, cl_device_id dev_id)
             dev_memory,
             dev_memory/1000000);
 
-    size_t driver_version_buff_size = 256;
-    size_t driver_version_buff_size_used = 0;
-    char * driver_version_buff = malloc(driver_version_buff_size);
-    check_CL(clGetDeviceInfo(dev_id, // 	cl_device_id device,
-                             CL_DRIVER_VERSION,
-                             driver_version_buff_size,
-                             driver_version_buff,
-                             &driver_version_buff_size_used));
+    char * string = NULL;
+    string = get_cl_device_info_string(dev_id, CL_DEVICE_NAME);    
+    fprintf(fid, "CL_DEVICE_NAME = %s\n", string);
+    free(string);
+    string = get_cl_device_info_string(dev_id, CL_DEVICE_VENDOR);    
+    fprintf(fid, "CL_DEVICE_VENDOR = %s\n", string);
+    free(string);
+    string = get_cl_device_info_string(dev_id, CL_DRIVER_VERSION);    
+    fprintf(fid, "CL_DRIVER_VERSION = %s\n", string);
+    free(string);
+    string = get_cl_device_info_string(dev_id, CL_DEVICE_EXTENSIONS);    
+    fprintf(fid, "CL_DEVICE_EXTENSIONS = %s\n", string);
+    free(string);
 
-    fprintf(fid, "CL_DRIVER_VERSION = %s\n", driver_version_buff);
-    free(driver_version_buff);
+ 			     
     return;
 }
 
@@ -1114,21 +1133,38 @@ clu_env_t * clu_new(int verbose)
     }
     assert(ret_num_platforms > 0);
 
-
+    /* Get the number of devices */
+        check_CL( clGetDeviceIDs(env->platform_id,
+                             CL_DEVICE_TYPE_ALL,
+                             0,
+                             NULL,
+                             &ret_num_devices));
+	
+    cl_device_id * devices = malloc(ret_num_devices*sizeof(cl_device_id));
+    /* Get the devices */
     check_CL( clGetDeviceIDs(env->platform_id,
                              CL_DEVICE_TYPE_ALL,
-                             1,
-                             &env->device_id,
+                             10,
+                             devices,
                              &ret_num_devices));
+
 
     if(env->verbose > 1)
     {
         printf("Found %d CL devices\n", ret_num_devices);
     }
-
+    fflush(stdout);
+    env->verbose = 10;
+    // TODO add a command line argument to select OpenCL device
+    env->device_id = devices[0];
+    
     if(env->verbose > 1)
     {
-        clu_print_device_info(stdout, env->device_id);
+      for(int kk = 0; kk<ret_num_devices; kk++)
+	{
+	  printf("CL device #%d\n", kk);
+	  clu_print_device_info(stdout, devices[kk]);
+	}
     }
 
 
@@ -1262,24 +1298,28 @@ void clu_prepare_kernels(clu_env_t * clu,
                           "cl_shb_update",
                           argstring);
 
+    /* CL_DEVICE_MAX_CONSTANT_ARGS is at least 8 so 7 is safe
+       without checking capabilities */
     sprintf(argstring,
-            "-D NELEMENTS=%zu "
-            "-D M=%zu -D N=%zu -D P=%zu "
-            "-D wM=%zu -D wN=%zu -D wP=%zu",
+            "-DNELEMENTS=%zu "
+            "-DM=%zu -DN=%zu -DP=%zu "
+            "-DwM=%zu -DwN=%zu -DwP=%zu",
             wM*wN*wP, M, N, P, wM, wN, wP);
+
     clu->idiv_kernel = clu_kernel_newa(clu,
                                        "kernels/cl_idiv_kernel.c",
                                        (const char *) cl_idiv_kernel,
                                        cl_idiv_kernel_len,
                                        "idiv_kernel",
                                        argstring);
+    
     clu->update_y_kernel = clu_kernel_newa(clu,
                                            "kernels/cl_update_y_kernel.c",
                                            (const char *) cl_update_y_kernel,
                                            cl_update_y_kernel_len,
                                            "update_y_kernel",
                                            argstring);
-
+    
     free(argstring);
 
     float value = 0;
@@ -2064,3 +2104,4 @@ float * unpad_from_inplace(const float * PX, size_t M, size_t N, size_t P)
 
     return X;
 }
+

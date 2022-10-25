@@ -15,8 +15,8 @@
 #include <unistd.h>
 #include "dw_util.h"
 
-#define CL_USE_DEPRECATED_OPENCL_1_2_APIS
-#define CL_TARGET_OPENCL_VERSION 120
+//#define CL_USE_DEPRECATED_OPENCL_1_2_APIS
+//#define CL_TARGET_OPENCL_VERSION 120
 
 // Did also work to ask for the latest version
 // however it would warn that clCreateCommandQueue
@@ -24,8 +24,11 @@
 // something specific from never versions.
 //
 // #define CL_TARGET_OPENCL_VERSION 300
-
+#ifdef __APPLE__
+#include <OpenCL/cl.h>
+#else
 #include <CL/cl.h>
+#endif
 #include <clFFT.h>
 
 #define CLU_KEEP_ALL 0

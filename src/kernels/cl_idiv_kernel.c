@@ -4,8 +4,6 @@
 
 // see https://dean-shaff.github.io/blog/c++/opencl/2020/03/29/opencl-reduction-sum.html
 
-// NELEMENTS specified at compile time
-
 kernel void idiv_kernel( global const float * forward,
                          global const float * image,
                           local float *wgBuff, /* For this work group only */

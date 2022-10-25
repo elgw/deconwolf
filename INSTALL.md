@@ -39,6 +39,7 @@ brew install libomp
 brew install libtiff
 brew install fftw
 brew install gsl
+# brew install clfft # see note below.
 ```
 
 Build and install deconwolf
@@ -46,6 +47,8 @@ Build and install deconwolf
 make -B
 sudo make install
 ```
+
+clFFT does unfortunately not work on MacOS according to [this issue](https://github.com/clMathLibraries/clFFT/issues/183)
 
 ## Windows 10
 Although it might be possible to build native windows executables, it
