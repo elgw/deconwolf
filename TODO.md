@@ -18,6 +18,7 @@ if needed when using **--bq 0**
 - [ ] Why is **-O1** required for building?
 
 ## Nice to have
+- [ ] Switch to/add vkFFT over clFFT
 - [ ] See if Pinned memory allocations can improve the performance for shbcl (don't expect anything drastic from shbcl2).
 - [ ] Adjust the PSF cropping so that the working image size has at
 least one power of two. Or even better use **nextfastfft** from
