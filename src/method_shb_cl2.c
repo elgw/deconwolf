@@ -234,7 +234,7 @@ float * deconvolve_shb_cl2(float * restrict im,
     }
 
     /* Set up the OpenCL environment */
-    clu_env_t * clu = clu_new(s->verbosity);
+    clu_env_t * clu = clu_new(s->verbosity, s->cl_device);
     /* Set up the kernels defined in this function */
     clu_prepare_kernels(clu, M, N, P, wM, wN, wP);
 

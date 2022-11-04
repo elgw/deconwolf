@@ -214,7 +214,7 @@ float * deconvolve_shb(float * restrict im,
             M, N, P, // Original size
             s);
         here();
-        free(p);
+	//        free(p); // free'ed in iter_shb
         here();
         dw_iterator_set_error(it, err);
         if(1){
@@ -298,7 +298,7 @@ float iter_shb(
     const size_t wMNP = wM*wN*wP;
 
     fftwf_complex * Pk = fft(pk, wM, wN, wP);
-
+    
     putdot(s);
     float * y = fft_convolve_cc_f2(cK, Pk, wM, wN, wP); // Pk is freed
 
@@ -345,6 +345,7 @@ float iter_shb(
             x[cc] *= pk[cc];
         }
     }
+    free(pk);
     here();
     xp[0] = x;
     return error;

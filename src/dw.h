@@ -45,6 +45,7 @@
 
 #include "dw_util.h"
 #include "dw_maxproj.h"
+#include "dw_tiff_merge.h"
 #include "dw_imshift.h"
 #include "dw_version.h"
 /* Uncomment to include, requires linking with libpng and libz
@@ -165,6 +166,8 @@ struct _dw_opts{
     /* How far should bigger image sizes be considered? */
     int lookahead;
     int eve; /* Use Exponential vector extrapolation */
+
+  int cl_device; /* OpenCL device number, default 0 */
 
     fftwf_plan fft_plan;
     fftwf_plan ifft_plan;

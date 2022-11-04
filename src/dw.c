@@ -531,6 +531,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         { "no-inplace",   no_argument,       NULL, '1' },
         { "ompthreads", required_argument, NULL, '2' },
         { "psf-pass",   required_argument, NULL, '3', },
+	{ "cldevice",  required_argument, NULL, '4', },
         { "noplan",    no_argument,       NULL, 'a' },
         { "bg",        required_argument, NULL, 'b' },
         { "threads",   required_argument, NULL, 'c' },
@@ -573,7 +574,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     int ch;
     int prefix_set = 0;
     while((ch = getopt_long(argc, argv,
-                            "123ab:c:f:ghil:m:n:o:p:r:s:tvwx:B:C:DFI:L:MR:TPQ:X:",
+                            "1234ab:c:f:ghil:m:n:o:p:r:s:tvwx:B:C:DFI:L:MR:TPQ:X:",
                             longopts, NULL)) != -1)
     {
         switch(ch) {
@@ -586,6 +587,9 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         case '3':
             s->psf_pass = atof(optarg);
             break;
+	case '4':
+	  s->cl_device = atoi(optarg);
+	  break;
         case 'C':
             s->flatfieldFile = strdup(optarg);
             break;

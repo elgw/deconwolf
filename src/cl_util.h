@@ -182,7 +182,7 @@ void clu_exit_error(cl_int err,
 
 
 /* Create an environment with OpenCL and clFFT */
-clu_env_t * clu_new(int verbose);
+clu_env_t * clu_new(int verbose, int cl_device);
 
 /* Prepare to do FFTs at size wM x wN x wP
  * the size M x N x P is the size of the input image before it was possibly padded */

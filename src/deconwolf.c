@@ -33,6 +33,10 @@ int main(int argc, char ** argv)
         {
             return dw_imshift(argc-1, argv+1);
         }
+        if(strcmp(argv[1], "merge") == 0)
+        {
+            return dw_tiff_merge(argc-1, argv+1);
+        }
 #ifdef __dw_nuclei_h__
         if(strcmp(argv[1], "nuclei") == 0)
         {

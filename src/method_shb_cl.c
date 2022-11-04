@@ -126,7 +126,7 @@ float * deconvolve_shb_cl(float * restrict im,
         }
     }
 
-    clu_env_t * clu = clu_new(s->verbosity);
+    clu_env_t * clu = clu_new(s->verbosity, s->cl_device);
     wM = clu_next_fft_size(wM);
     wN = clu_next_fft_size(wN);
     wP = clu_next_fft_size(wP);

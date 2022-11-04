@@ -16,6 +16,8 @@ and expected sample thickness.
 - [ ] When using clFFT that does not support all sizes, crop the image
 if needed when using **--bq 0**
 - [ ] Why is **-O1** required for building?
+- [ ] Transfer pixel size to output when doing max projections.
+- [ ] Clean up the **merge** sub command and test it.
 
 ## Nice to have
 - [ ] Switch to/add vkFFT over clFFT

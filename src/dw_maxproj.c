@@ -32,6 +32,7 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
     printf("Options:\n");
     printf(" --slice N\n\t Extract slice N\n");
     printf(" --overwrite\n\t Overwrite existing files\n");
+    printf(" --verbose v\n\t Set verbosity level\n");
 }
 
 
@@ -98,6 +99,8 @@ int dw_tiff_max(int argc, char ** argv)
   }
 
   argparsing(argc, argv, s);
+
+  fim_tiff_init();
 
   char * outFile;
   char * inFile;

@@ -1103,7 +1103,7 @@ static char * read_program(const char * fname, size_t * size)
     return source_str;
 }
 
-clu_env_t * clu_new(int verbose)
+clu_env_t * clu_new(int verbose, int cl_device)
 {
     /* Might be of use in future releases */
     setenv("CLFFT_REQUEST_LIB_NOMEMALLOC", "1", 1);
@@ -1156,7 +1156,7 @@ clu_env_t * clu_new(int verbose)
     fflush(stdout);
     env->verbose = 10;
     // TODO add a command line argument to select OpenCL device
-    env->device_id = devices[0];
+    env->device_id = devices[cl_device];
     
     if(env->verbose > 1)
     {

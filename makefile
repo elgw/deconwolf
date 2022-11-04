@@ -149,11 +149,13 @@ ifeq ($(UNAME_S),Darwin)
 	MANPATH=/usr/local/share/man/man1
 endif
 
+# Extra protection
+CC+=-g3
 
 CCF = $(CC) $(CFLAGS)
 SRCDIR = src/
 
-dw_OBJECTS += fim.o tiling.o fft.o fim_tiff.o dw.o deconwolf.o dw_maxproj.o dw_util.o method_eve.o method_identity.o method_rl.o method_ave.o method_shb.o dw_imshift.o fft.o dw_nuclei.o dw_dots.o fwhm.o ftab.o dw_psf.o
+dw_OBJECTS += fim.o tiling.o fft.o fim_tiff.o dw.o deconwolf.o dw_maxproj.o dw_util.o method_eve.o method_identity.o method_rl.o method_ave.o method_shb.o dw_imshift.o fft.o dw_nuclei.o dw_dots.o fwhm.o ftab.o dw_psf.o dw_tiff_merge.o
 dwbw_OBJECTS = fim.o fim_tiff.o dw_bwpsf.o bw_gsl.o lanczos.o li.o fft.o dw_util.o
 
 # dwtm = bin/dw_tiffmax
