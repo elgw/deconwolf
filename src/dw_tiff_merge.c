@@ -1,20 +1,103 @@
 #include "dw_tiff_merge.h"
 
+typedef struct {
+    int overwrite;
+    int verbose;
+    int optind; /* Where the first non-consumed argument is stored */
+    int test;
+} tm_config_t;
+
+tm_config_t * tm_config_new()
+{
+    tm_config_t * conf = malloc(sizeof(tm_config_t));
+    conf->overwrite = 0;
+    conf->verbose = 1;
+    conf->test = 0;
+    return conf;
+}
+
+void tm_config_free(tm_config_t * conf)
+{
+    free(conf);
+}
+
+
 void usage()
 {
-    printf("Usage\n");
-    printf("dw merge output.tif input1.tif input2.tif ...\n");
+    printf("Usage for subcommand 'merge'\n");
+    printf("dw merge [merge] output.tif input1.tif input2.tif ...\n");
+    printf("Options:\n");
+    printf("--help\n\t "
+           "Show this help message and quit\n");
+    printf("--verbose v\n\t "
+           "Set verbosity level to v\n");
+    printf("--overwrite\n\t "
+           "Overwrite output image if it already exists\n");
+    return;
+}
+
+static void argparsing(int argc, char ** argv, tm_config_t * conf)
+{
+
+    struct option longopts[] = {
+        { "help",     no_argument,       NULL, 'h' },
+        { "verbose",   required_argument, NULL, 'v' },
+        { "overwrite",     no_argument,       NULL,  'o' },
+        { "test",      no_argument, NULL, 't' },
+        { NULL,           0,                 NULL,   0   }
+    };
+
+    char ch;
+    while((ch = getopt_long(argc, argv,
+                            "hv:ot",
+                            longopts, NULL)) != -1)
+    {
+        switch(ch) {
+        case 'h':
+            usage();
+            exit(EXIT_SUCCESS);
+        case 'v':
+            conf->verbose = atoi(optarg);
+            break;
+        case 'o':
+            conf->overwrite = 1;
+            break;
+        case 't':
+            conf->test = 1;
+            break;
+        default:
+            fprintf(stderr, "Unknown argument\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    conf->optind = optind;
     return;
 }
 
 int dw_tiff_merge(int argc, char ** argv)
 {
-    int verbose = 1;
+    tm_config_t * conf = tm_config_new();
 
-    if(argc < 2)
+    argparsing(argc, argv, conf);
+
+    if(argc < 3)
     {
+        usage();
         return EXIT_FAILURE;
     }
+
+    char * outfile = argv[conf->optind];
+    if(conf->overwrite == 0)
+    {
+        if(dw_file_exist(outfile) == 1)
+        {
+            printf("%s already exists, doing nothing. Use --overwrite to overwrite existing files\n",
+                   outfile);
+            exit(EXIT_SUCCESS);
+        }
+    }
+
     fim_tiff_init();
 
     int64_t M = 0;
@@ -25,35 +108,35 @@ int dw_tiff_merge(int argc, char ** argv)
     int64_t N_out = 0;
     int64_t P_out = 0;
 
-    fim_tiff_init();
-    for(int kk = 0 ; kk<argc; kk++)
+
+    for(int kk = conf->optind+1 ; kk<argc; kk++)
     {
-        printf("argv[%d] = %s", kk, argv[kk]);
+
         if(kk > 1)
         {
             fim_tiff_get_size(argv[kk], &M, &N, &P);
-            printf(" %lld x %lld x %lld", M, N, P);
-            if(kk == 2)
+            //printf(" %ld x %ld x %ld", M, N, P);
+            if(kk == optind+1)
             {
                 M_out = M;
                 N_out = N;
             }
-            if(kk > 2)
+            if(kk > optind+1)
             {
                 if(M_out != M || N_out != N)
                 {
-                    fprintf(stderr, "Image sizes does not match. A previous image had size"
-                            "%llu x %llu while %s has size %llu x %llu\n",
+                    fprintf(stderr, "Error while reading %s\n", argv[kk]);
+                    fprintf(stderr, "Image sizes does not match. A previous image had size "
+                            "%lu x %lu while %s has size %lu x %lu\n",
                             M_out, N_out, argv[kk], M, N);
                     return EXIT_FAILURE;
                 }
             }
             P_out += P;
         }
-        printf("\n");
     }
 
-    printf("Output image size: %llu x %llu x %llu\n", M_out, N_out, P_out);
+    printf("Output image size: %lu x %lu x %lu\n", M_out, N_out, P_out);
 
     float * im_out = malloc(M_out*N_out*P_out*sizeof(float));
     if(im_out == NULL)
@@ -62,21 +145,28 @@ int dw_tiff_merge(int argc, char ** argv)
         return EXIT_FAILURE;
     }
     size_t plane = 0;
-    for(int kk = 2; kk<argc; kk++)
+    for(int kk = conf->optind + 1; kk<argc; kk++)
     {
         ttags T;
         printf("Reading %s\n", argv[kk]); fflush(stdout);
-        float * im = fim_tiff_read(argv[kk], &T, &M, &N, &P, verbose);
-        assert(im != NULL);
-        memcpy(im_out + plane*M_out*N_out,
-               im, M*N*P*sizeof(float));
-        plane += P;
-        free(im);
+        if(!conf->test)
+        {
+            float * im = fim_tiff_read(argv[kk], &T, &M, &N, &P, conf->verbose);
+            assert(im != NULL);
+            memcpy(im_out + plane*M_out*N_out,
+                   im, M*N*P*sizeof(float));
+            plane += P;
+            free(im);
+        }
     }
-    printf("Writing to %s\n", argv[1]); fflush(stdout);
-    fim_tiff_write_float(argv[1], im_out,
-                         NULL, // tiff tags, TODO
-                         M_out, N_out, P_out);
+    printf("Writing to %s\n", outfile);
+    if(! conf->test)
+    {
+        fim_tiff_write_float(outfile, im_out,
+                             NULL, // tiff tags, TODO
+                             M_out, N_out, P_out);
+    }
     free(im_out);
+    tm_config_free(conf);
     return EXIT_SUCCESS;
 }

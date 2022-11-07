@@ -19,10 +19,25 @@
 
 /* see man 3 tifflib
  *
- * From: https://www.cs.rochester.edu/u/nelson/courses/vision/resources/tiff/libtiff.html#Errors
- * Finally, note that the last strip of data in an image may have fewer rows in it than specified by the
- * RowsPerStrip tag. A reader should not assume that each decoded strip contains a full set of rows in it.
+ * From:
+ * https://www.cs.rochester.edu/u/nelson/courses/vision/resources/tiff/libtiff.html#Errors
+ * Finally, note that the last strip of data in an image may have
+ * fewer rows in it than specified by the RowsPerStrip tag. A reader
+ * should not assume that each decoded strip contains a full set of
+ * rows in it.
  */
+
+/*
+ * Forward declarations
+ */
+
+/* Read a uint16 volumetric image */
+void readUint16(TIFF * tfile, float * V,
+                const tsize_t ssize, // strip size in bytes
+                const uint32_t ndirs, // number of directories (z-planes)
+                const uint32_t nstrips, // number of strips
+                const uint32_t perDirectory); // elements per plane
+
 
 int fim_tiff_write_opt(const char * fName, const float * V,
                        ttags * T,
@@ -235,13 +250,13 @@ void readUint16_sub(TIFF * tfile, float * V,
 }
 
 void readUint8_sub(TIFF * tfile, float * V,
-                    const uint32_t ssize,
-                    const uint32_t ndirs,
-                    const uint32_t nstrips,
-                    const uint32_t perDirectory,
-                    int64_t M, int64_t N, int64_t P,
-                    int64_t sM, int64_t sN, int64_t sP,
-                    int64_t wM, int64_t wN, int64_t wP)
+                   const uint32_t ssize,
+                   const uint32_t ndirs,
+                   const uint32_t nstrips,
+                   const uint32_t perDirectory,
+                   int64_t M, int64_t N, int64_t P,
+                   int64_t sM, int64_t sN, int64_t sP,
+                   int64_t wM, int64_t wN, int64_t wP)
 {
 
     // V should hold wM*wN*wP uint16
@@ -297,11 +312,13 @@ void readUint16(TIFF * tfile, float * V,
                 const uint32_t perDirectory
     )
 {
+//    printf("readUint16\n"); fflush(stdout);
     // Number of elements per strip
     size_t nes = ssize/sizeof(uint16_t);
     //  uint16_t * buf = _TIFFmalloc(ssize);
-    uint16_t * buf = malloc(ssize);
+    //uint16_t * buf = malloc(ssize);
 
+    uint16_t * buf = _TIFFmalloc(TIFFStripSize(tfile));
     if(buf == NULL)
     {
         printf("Failed to allocate %" PRId64 " bytes of memory!", ssize);
@@ -320,38 +337,51 @@ void readUint16(TIFF * tfile, float * V,
             exit(EXIT_FAILURE);
             fflush(stdout);
         }
-        for(int64_t kk=0; kk<nstrips; kk++) {
-            int64_t strip = kk;
-            tsize_t read = TIFFReadEncodedStrip(tfile,
-                                                (tstrip_t) strip, // Strip number
-                                                (tdata_t) buf, // target
-                                                ssize); // The entire strip
+
+
+        size_t nread = 0;
+
+        for(int64_t ss=0; ss < TIFFNumberOfStrips(tfile); ss++)
+        {
+            //printf("Reading strip %ld of size %ld B\n", ss, ssize); fflush(stdout);
+            // vs TIFFReadEncodedStrip vs TIFFReadRawStrip ?
+            tsize_t read = TIFFReadRawStrip(tfile,
+                                            (tstrip_t) ss, // Strip number
+                                            (tdata_t) buf, // target
+                                            (tsize_t) -1); // The entire strip
+            //printf("Got %ld\n", read);
             if(read == -1)
             {
-                printf("Failed to read from tif file\n");
+                fprintf(stderr, "Failed to read from tif file and can't continue.\n");
+                fprintf(stderr, "ERROR at FILE: %s FUNCTION: %s LINE: %d\n",
+                        __FILE__, __FUNCTION__, __LINE__);
+                tmsize_t ssize2 = TIFFStripSize(tfile);
+                printf("ssize2: %ld\n", ssize2);
                 fflush(stdout);
+                exit(EXIT_FAILURE);
             }
-            if(read > ssize)
+
+            //printf("Will write %d elements from strip %d\n", read/sizeof(uint16_t), ss);
+            for(size_t ii = 0; ii < read/sizeof(uint16_t); ii++)
             {
-                printf("Read to much!\n"); fflush(stdout);
-            }
-            //printf("\r%lu/%lu", dd, kk); fflush(stdout);
-            for(size_t ii = 0; ii < read/sizeof(uint16_t); ii++) {
-                size_t pos = (size_t)( ii+kk*nes + dd*perDirectory);
+                //size_t pos = (size_t)( ii+ss*nes + dd*perDirectory);
+                size_t pos = (size_t)( nread/sizeof(uint16_t) + ii + dd*perDirectory);
                 //printf("pos=%zu\n", pos);
                 V[pos] = buf[ii];
             }
-        }
-    }
+            nread += read;
+        } // strip
+    } // directory
 
     _TIFFfree(buf);
+    return;
 }
 
 void readUint8(TIFF * tfile, float * V,
-                const tsize_t ssize,
-                const uint32_t ndirs,
-                const uint32_t nstrips,
-                const uint32_t perDirectory
+               const tsize_t ssize,
+               const uint32_t ndirs,
+               const uint32_t nstrips,
+               const uint32_t perDirectory
     )
 {
     // Number of elements per strip
@@ -404,18 +434,6 @@ void readUint8(TIFF * tfile, float * V,
     _TIFFfree(buf);
 }
 
-/*
-  void readFloat_sub(TIFF * tfile, float * V,
-  uint32_t ssize,
-  uint32_t ndirs,
-  uint32_t nstrips,
-  uint32_t perDirectory,
-  int64_t sM, int64_t sN, int64_t sP, int64_t wM, int64_t wN, int64_t wP)
-  {
-  perror("Not implemented!\n");
-  exit(1);
-  }
-*/
 
 void readFloat(TIFF * tfile, float * V,
                uint32_t ssize,
@@ -873,8 +891,8 @@ int fim_tiff_write(const char * fName, const float * V,
 }
 
 int fim_tiff_write_noscale(const char * fName, const float * V,
-                   ttags * T,
-                   int64_t N, int64_t M, int64_t P)
+                           ttags * T,
+                           int64_t N, int64_t M, int64_t P)
 {
     /* Default, use scaling */
     return fim_tiff_write_opt(fName, V, T, N, M, P, 0);
@@ -882,7 +900,7 @@ int fim_tiff_write_noscale(const char * fName, const float * V,
 
 
 int fim_tiff_write_opt(const char * fName, const float * V,
-                   ttags * T,
+                       ttags * T,
                        int64_t N, int64_t M, int64_t P, int scale)
 {
     if(fim_tiff_log == NULL)
@@ -895,11 +913,11 @@ int fim_tiff_write_opt(const char * fName, const float * V,
 
     if(scale)
     {
-    if(V != NULL)
-    {
-        float imax = fim_max(V, M*N*P);
-        scaling = 1.0/imax*(pow(2,16)-2.0);
-    }
+        if(V != NULL)
+        {
+            float imax = fim_max(V, M*N*P);
+            scaling = 1.0/imax*(pow(2,16)-2.0);
+        }
     }
 
     if(!isfinite(scaling))
@@ -1010,8 +1028,8 @@ int fim_tiff_get_size(char * fname, int64_t * M, int64_t * N, int64_t * P)
 
 
 float * fim_tiff_read(const char * fName,
-                       ttags * T,
-                       int64_t * N0, int64_t * M0, int64_t * P0, int verbosity)
+                      ttags * T,
+                      int64_t * N0, int64_t * M0, int64_t * P0, int verbosity)
 {
     return fim_tiff_read_sub(fName, T, N0, M0, P0, verbosity,
                              0, // sub disabled
@@ -1117,7 +1135,7 @@ void ttags_get(TIFF * tfile, ttags * T)
         T->resolutionunit = runit;
     }
 
-    float xres = 0, yres = 0;;
+    float xres = 0, yres = 0;
     if(TIFFGetField(tfile, TIFFTAG_XRESOLUTION, &xres))
     {
         T->xresolution = xres;
@@ -1262,11 +1280,11 @@ void ttags_show(FILE * fout, ttags* T)
 }
 
 float * fim_tiff_read_sub(const char * fName,
-                           ttags * T,
-                           int64_t * M0, int64_t * N0, int64_t * P0, int verbosity,
-                           int subregion,
-                           int64_t sM, int64_t sN, int64_t sP, // start
-                           int64_t wM, int64_t wN, int64_t wP) // width
+                          ttags * T,
+                          int64_t * M0, int64_t * N0, int64_t * P0, int verbosity,
+                          int subregion,
+                          int64_t sM, int64_t sN, int64_t sP, // start
+                          int64_t wM, int64_t wN, int64_t wP) // width
 {
     /* Reads the content of the tif file with fName
      * Puts the images size in M0, N0, P0
@@ -1463,7 +1481,7 @@ float * fim_tiff_read_sub(const char * fName,
                         PRId64 " %" PRId64 "\n",
                         M, N, P, sM, sN, sP, wM, wN, wP);
                 readUint8_sub(tfile, V, ssize, ndirs, nstrips, M*N,
-                               M, N, (int) P, sM, sN, sP, wM, wN, wP);
+                              M, N, (int) P, sM, sN, sP, wM, wN, wP);
             } else {
                 readUint8(tfile, V, ssize, ndirs, nstrips, M*N);
             }
@@ -1640,6 +1658,10 @@ int fim_tiff_maxproj(char * in, char * out)
         return -1;
     }
 
+    ttags * T = malloc(sizeof(ttags));;
+    ttags_get(input, T);
+    ttags_set_software(T, "deconwolf " deconwolf_version);
+
     uint32_t SF = SAMPLEFORMAT_UINT;
     int gotSF = TIFFGetField(input, TIFFTAG_SAMPLEFORMAT, &SF);
     if(gotSF != 1)
@@ -1657,6 +1679,9 @@ int fim_tiff_maxproj(char * in, char * out)
     }
 
     TIFF * output = TIFFOpen(out, "w");
+    ttags_set(output, T);
+    ttags_free(&T);
+
     TIFFSetField(output, TIFFTAG_IMAGEWIDTH, M);
     TIFFSetField(output, TIFFTAG_IMAGELENGTH, N);
     TIFFSetField(output, TIFFTAG_SAMPLESPERPIXEL, 1);
@@ -1687,7 +1712,7 @@ int fim_tiff_maxproj(char * in, char * out)
 
     if(verbose > 1)
     {
-        printf("strip size: %lld\n", ssize);
+        printf("strip size: %ld\n", ssize);
         printf("number of strips: %u\n", nstrips);
         switch(SF)
         {
@@ -1702,7 +1727,7 @@ int fim_tiff_maxproj(char * in, char * out)
             break;
         }
         printf("Bits per sample: %u\n", BPS);
-        printf("Number of directories (Z-planes): %lld\n", P);
+        printf("Number of directories (Z-planes): %ld\n", P);
     }
 
     TIFFSetDirectory(output, 0);
@@ -1713,9 +1738,6 @@ int fim_tiff_maxproj(char * in, char * out)
 
         uint16_t * mstrip = _TIFFmalloc(ssize); // For max over all directories
         uint16_t * strip    = _TIFFmalloc(ssize);
-
-        uint16_t * outbuffer = malloc(M*N*sizeof(uint16_t));
-        size_t outbufferpos = 0;
 
         for(int64_t nn = 0; nn<nstrips; nn++) // Each strip
         {
@@ -1733,14 +1755,10 @@ int fim_tiff_maxproj(char * in, char * out)
                     }
                 }
             }
+            tsize_t written = TIFFWriteRawStrip(output, nn, mstrip, read);
+            assert(written == read);
 
-            memcpy(outbuffer+outbufferpos, mstrip, read);
-            outbufferpos += read/sizeof(uint16_t);
         }
-
-        tsize_t written = TIFFWriteRawStrip(output, 0, outbuffer, M*N*sizeof(float));
-        assert((size_t) written == M*N*sizeof(float));
-        free(outbuffer);
 
         _TIFFfree(strip);
         _TIFFfree(mstrip);
@@ -1754,8 +1772,10 @@ int fim_tiff_maxproj(char * in, char * out)
 
         float * mstrip = _TIFFmalloc(ssize); // For max over all directories
         float * strip    = _TIFFmalloc(ssize);
+#if 0
         float * outbuffer = malloc(M*N*sizeof(float));
         size_t outbufferpos = 0;
+#endif
         for(int64_t ss = 0; ss < nstrips; ss++) // Each strip
         {
             memset(mstrip, 0, ssize);
@@ -1772,20 +1792,14 @@ int fim_tiff_maxproj(char * in, char * out)
                     }
                 }
             }
-            // TIFFWriteRawStrip
-            // should append but seems to overwrite on MacOS with
-            // libtiff 4.4.0. Hence we have to keep the whole max projection
-            // in memory before writing it to disk ... :( earlier versions of
-            // dw did not need that
-            memcpy(outbuffer+outbufferpos, mstrip, read);
-            outbufferpos += read/4;
+
+
+            tsize_t written = TIFFWriteRawStrip(output, ss, mstrip, read);
+            assert(written == read);
+
         }
         _TIFFfree(strip);
         _TIFFfree(mstrip);
-
-        tsize_t written = TIFFWriteRawStrip(output, 0, outbuffer, M*N*sizeof(float));
-        assert((size_t) written == M*N*sizeof(float));
-        free(outbuffer);
 
     }
 

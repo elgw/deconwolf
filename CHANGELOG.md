@@ -1,18 +1,15 @@
 # CHANGELOG
 
+## v 0.2.3
+- Fixed some errors introduced in v 0.2.2.
+
 ## v 0.2.2
-- **dw maxproj** had to be changed in a negative way, now keeping a
-  full slice in memory. This was because **TIFFWriteRawStrip** does
-  not always append, rather overwrites from the beginning. This
-  problem was found on MacOS with Libtiff 4.4.0.
-- Added the subcommand **dw merge** which merges individual slices into a 3D image.
 - Can deconvolve using clFFT, when compiled with **OPENCL=1** two new
   methods appear, **--method shbcl** and **--shbcl2*, the first using
   clFFT only for the Fourier transforms, the latter using OpenCL for
   the whole deconvolution procedure. Uses quite much GPU memory which
   is something to improve upon in future version, possibly by
   switching to vkFFT.
-
 
 ## v 0.1.1
 - Added experimental **dw imshift** for shifting images, also shift

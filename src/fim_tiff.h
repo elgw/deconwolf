@@ -43,6 +43,7 @@
 #include <inttypes.h>
 #include "fim.h"
 #include "ftab.h"
+#include "dw_version.h"
 
 #define INLINED inline __attribute__((always_inline))
 #define XTAG_IJIJUNKNOWN 50838

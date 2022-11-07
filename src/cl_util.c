@@ -286,7 +286,7 @@ fimcl_t * fimcl_new(clu_env_t * clu, fimcl_type type,
         exit(EXIT_FAILURE);
     }
 
- done: ;
+done: ;
     return Y;
 }
 
@@ -309,29 +309,29 @@ fimcl_t * fimcl_copy(fimcl_t * G)
     if(G->type == fimcl_real)
     {
         check_CL(clEnqueueCopyBuffer(
-                                     G->clu->command_queue,//cl_command_queue command_queue,
-                                     G->buf, //cl_mem src_buffer,
-                                     H->buf, //cl_mem dst_buffer,
-                                     0, //size_t src_offset,
-                                     0, //size_t dst_offset,
-                                     G->M*G->N*G->P*sizeof(float),//size_t size,
-                                     0, //cl_uint num_events_in_wait_list,
-                                     NULL, //const cl_event* event_wait_list,
-                                     &H->wait_ev)); //cl_event* event);
+                     G->clu->command_queue,//cl_command_queue command_queue,
+                     G->buf, //cl_mem src_buffer,
+                     H->buf, //cl_mem dst_buffer,
+                     0, //size_t src_offset,
+                     0, //size_t dst_offset,
+                     G->M*G->N*G->P*sizeof(float),//size_t size,
+                     0, //cl_uint num_events_in_wait_list,
+                     NULL, //const cl_event* event_wait_list,
+                     &H->wait_ev)); //cl_event* event);
     }
 
     if(G->type == fimcl_real_inplace)
     {
         check_CL(clEnqueueCopyBuffer(
-                                     G->clu->command_queue,//cl_command_queue command_queue,
-                                     G->buf, //cl_mem src_buffer,
-                                     H->buf, //cl_mem dst_buffer,
-                                     0, //size_t src_offset,
-                                     0, //size_t dst_offset,
-                                     2*fimcl_ncx(H)*sizeof(float),//size_t size,
-                                     0, //cl_uint num_events_in_wait_list,
-                                     NULL, //const cl_event* event_wait_list,
-                                     &H->wait_ev)); //cl_event* event);
+                     G->clu->command_queue,//cl_command_queue command_queue,
+                     G->buf, //cl_mem src_buffer,
+                     H->buf, //cl_mem dst_buffer,
+                     0, //size_t src_offset,
+                     0, //size_t dst_offset,
+                     2*fimcl_ncx(H)*sizeof(float),//size_t size,
+                     0, //cl_uint num_events_in_wait_list,
+                     NULL, //const cl_event* event_wait_list,
+                     &H->wait_ev)); //cl_event* event);
     }
 
     return H;
@@ -1017,16 +1017,16 @@ static double clockdiff(struct timespec* start, struct timespec * finish)
 
 char * get_cl_device_info_string(cl_device_id dev_id, cl_device_info info_type)
 {
-  size_t string_size = 1024;
-  size_t string_size_used = 0;
-  char * string = malloc(string_size);
-  check_CL(clGetDeviceInfo(dev_id,
-			   info_type,
-			   string_size,
-			   string,
-			   &string_size_used));
+    size_t string_size = 1024;
+    size_t string_size_used = 0;
+    char * string = malloc(string_size);
+    check_CL(clGetDeviceInfo(dev_id,
+                             info_type,
+                             string_size,
+                             string,
+                             &string_size_used));
 
-  return string;
+    return string;
 
 }
 
@@ -1068,20 +1068,20 @@ void clu_print_device_info(FILE * fid, cl_device_id dev_id)
             dev_memory/1000000);
 
     char * string = NULL;
-    string = get_cl_device_info_string(dev_id, CL_DEVICE_NAME);    
+    string = get_cl_device_info_string(dev_id, CL_DEVICE_NAME);
     fprintf(fid, "CL_DEVICE_NAME = %s\n", string);
     free(string);
-    string = get_cl_device_info_string(dev_id, CL_DEVICE_VENDOR);    
+    string = get_cl_device_info_string(dev_id, CL_DEVICE_VENDOR);
     fprintf(fid, "CL_DEVICE_VENDOR = %s\n", string);
     free(string);
-    string = get_cl_device_info_string(dev_id, CL_DRIVER_VERSION);    
+    string = get_cl_device_info_string(dev_id, CL_DRIVER_VERSION);
     fprintf(fid, "CL_DRIVER_VERSION = %s\n", string);
     free(string);
-    string = get_cl_device_info_string(dev_id, CL_DEVICE_EXTENSIONS);    
+    string = get_cl_device_info_string(dev_id, CL_DEVICE_EXTENSIONS);
     fprintf(fid, "CL_DEVICE_EXTENSIONS = %s\n", string);
     free(string);
 
- 			     
+
     return;
 }
 
@@ -1134,12 +1134,12 @@ clu_env_t * clu_new(int verbose, int cl_device)
     assert(ret_num_platforms > 0);
 
     /* Get the number of devices */
-        check_CL( clGetDeviceIDs(env->platform_id,
+    check_CL( clGetDeviceIDs(env->platform_id,
                              CL_DEVICE_TYPE_ALL,
                              0,
                              NULL,
                              &ret_num_devices));
-	
+
     cl_device_id * devices = malloc(ret_num_devices*sizeof(cl_device_id));
     /* Get the devices */
     check_CL( clGetDeviceIDs(env->platform_id,
@@ -1154,19 +1154,17 @@ clu_env_t * clu_new(int verbose, int cl_device)
         printf("Found %d CL devices\n", ret_num_devices);
     }
     fflush(stdout);
-    env->verbose = 10;
-    // TODO add a command line argument to select OpenCL device
+
     env->device_id = devices[cl_device];
-    
+
     if(env->verbose > 1)
     {
-      for(int kk = 0; kk<ret_num_devices; kk++)
+        for(cl_uint kk = 0; kk<ret_num_devices; kk++)
 	{
-	  printf("CL device #%d\n", kk);
-	  clu_print_device_info(stdout, devices[kk]);
+            printf("CL device #%d\n", kk);
+            clu_print_device_info(stdout, devices[kk]);
 	}
     }
-
 
     cl_int ret = CL_SUCCESS;
     env->context = clCreateContext( NULL,
@@ -1312,14 +1310,14 @@ void clu_prepare_kernels(clu_env_t * clu,
                                        cl_idiv_kernel_len,
                                        "idiv_kernel",
                                        argstring);
-    
+
     clu->update_y_kernel = clu_kernel_newa(clu,
                                            "kernels/cl_update_y_kernel.c",
                                            (const char *) cl_update_y_kernel,
                                            cl_update_y_kernel_len,
                                            "update_y_kernel",
                                            argstring);
-    
+
     free(argstring);
 
     float value = 0;
@@ -1927,11 +1925,11 @@ void fimcl_update_y(fimcl_t * gy, fimcl_t * image)
     /* This takes no time, probably just a look-up so no need to
      * cache it */
     check_CL(
-             clGetKernelWorkGroupInfo(kernel,
-                                      gy->clu->device_id,
-                                      CL_KERNEL_WORK_GROUP_SIZE,
-                                      sizeof(size_t), &localWorkSize, NULL)
-             );
+        clGetKernelWorkGroupInfo(kernel,
+                                 gy->clu->device_id,
+                                 CL_KERNEL_WORK_GROUP_SIZE,
+                                 sizeof(size_t), &localWorkSize, NULL)
+        );
 
     /* The global size needs to be a multiple of the localWorkSize
      * i.e. it will be larger than the number of elements */
@@ -2104,4 +2102,3 @@ float * unpad_from_inplace(const float * PX, size_t M, size_t N, size_t P)
 
     return X;
 }
-
