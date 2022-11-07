@@ -1,7 +1,10 @@
 # CHANGELOG
 
 ## v 0.2.3
-- Fixed some errors introduced in v 0.2.2.
+- Fixed some errors introduced in v 0.2.2, especially the **dw
+  maxproj** was broken.
+- added the subcommand **dw merge**. To be used to merge single z-planes
+  into a 3D volume.
 
 ## v 0.2.2
 - Can deconvolve using clFFT, when compiled with **OPENCL=1** two new
