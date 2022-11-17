@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## v 0.2.4
+- Reading 16-bit tif files with **TIFFReadEncodedStrip** instead of
+  **TIFFReadRawStrip**. Some programs saves tiff files in other ways
+  :)
+
 ## v 0.2.3
 - Fixed some errors introduced in v 0.2.2, especially the **dw
   maxproj** was broken.

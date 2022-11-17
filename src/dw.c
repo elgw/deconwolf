@@ -240,8 +240,8 @@ char * gen_iterdump_name(
 {
     // Generate a name for the an iterdump file
     // at iteration it
-    char * name = malloc(100*sizeof(char));
-    sprintf(name, "itd%05d.tif", it);
+    char * name = malloc(strlen(s->outFolder) + 100*sizeof(char));
+    sprintf(name, "%sitd%05d.tif", s->outFolder, it);
     return name;
 }
 
@@ -842,8 +842,16 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         char * bname = basename(basec);
         s->outFile = malloc(strlen(dname) + strlen(bname) + strlen(s->prefix) + 10);
         sprintf(s->outFile, "%s/%s_%s", dname, s->prefix, bname);
+        s->outFolder = malloc(strlen(dname) + 16);
+        sprintf(s->outFolder, "%s/", dname);
         free(dirc);
         free(basec);
+    } else {
+        char * dirc = strdup(s->outFile);
+        char * dname = dirname(dirc);
+        s->outFolder = malloc(strlen(dname) + 16);
+        sprintf(s->outFolder, "%s/", dname);
+        free(dirc);
     }
 
     if(! s->iterdump)
@@ -864,6 +872,8 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
 
     s->logFile = malloc(strlen(s->outFile) + 10);
     sprintf(s->logFile, "%s.log.txt", s->outFile);
+
+
 
     if(s->tsvFile != NULL)
     {

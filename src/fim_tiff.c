@@ -345,7 +345,7 @@ void readUint16(TIFF * tfile, float * V,
         {
             //printf("Reading strip %ld of size %ld B\n", ss, ssize); fflush(stdout);
             // vs TIFFReadEncodedStrip vs TIFFReadRawStrip ?
-            tsize_t read = TIFFReadRawStrip(tfile,
+            tsize_t read = TIFFReadEncodedStrip(tfile,
                                             (tstrip_t) ss, // Strip number
                                             (tdata_t) buf, // target
                                             (tsize_t) -1); // The entire strip

@@ -110,6 +110,7 @@ struct _dw_opts{
     float * ref; /* Reference image */
     char * outFile;
     char * logFile;
+    char * outFolder; /* Where iterdump files should go etc */
     char * prefix;
     char * flatfieldFile;
     FILE * log;
