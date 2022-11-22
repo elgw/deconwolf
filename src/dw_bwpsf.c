@@ -87,7 +87,8 @@ void bw_conf_printf(FILE * out, bw_conf * conf)
     double fwhm_z = 2*2.783115/M_PI*conf->ni/pow(conf->NA, 2)*conf->lambda;
 
     fprintf(out, "FWHM_r (lateral plane) %.2f nm\n", fwhm_r);
-    fprintf(out, "Resolution_r = %.2f nm\n", 0.61*conf->NA / conf->ni);
+    fprintf(out, "Rayleigh Resolution (lateral) = %.2f nm\n",
+            0.61*conf->lambda / conf->NA);
     double qlateral = fwhm_r/conf->resLateral;
     fprintf(out, "FWHM_r / dr = %.2f\n", qlateral);
     if(qlateral < 2)
