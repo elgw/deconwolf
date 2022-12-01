@@ -1,5 +1,5 @@
-#ifndef _dw_dots_h_
-#define _dw_dots_h_
+#ifndef __dw_dots_h__
+#define __dw_dots_h__
 
 #include <getopt.h>
 #include <libgen.h>
