@@ -614,10 +614,12 @@ fim_t * gen_psf(opts * s, double lambda)
         }
     }
 
+    /* TODO: apply Zernike moments where Re(pu) == 1*/
+
 
     ifftshift2_complex(pu, XM);
 
-    /* TODO: apply moments */
+
 
     if(s->verbose > 2) { printf("Calculating\n"); fflush(stdout); }
 

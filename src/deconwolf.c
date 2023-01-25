@@ -55,6 +55,13 @@ int main(int argc, char ** argv)
             return dw_psf_cli(argc-1, argv+1);
         }
 #endif
+#ifdef __dw_psf_sted_h__
+        if(strcmp(argv[1], "psf-STED") == 0)
+        {
+            return dw_psf_sted_cli(argc-1, argv+1);
+        }
+#endif
+
     }
 
     dw_opts * s = dw_opts_new(); /* Load default settings and initialize */

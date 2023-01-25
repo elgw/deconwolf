@@ -37,6 +37,12 @@ psf_cflags=$(cflags) $(gsl_cflags)
 dw_psf: $(psf_files)
 	$(cc) $(psf_cflags) -DSTANDALONE $(psf_files) $(psf_ldflags) -o dw_psf
 
+spsf_files = dw_psf_sted.c fim.c ftab.c fim_tiff.c fwhm.c dw_util.c fft.c
+spsf_ldflags=$(ldflags) $(gsl_ldflags)
+spsf_cflags=$(cflags) $(gsl_cflags)
+dw_psf_sted: $(spsf_files)
+	$(cc) $(spsf_cflags) -DSTANDALONE $(spsf_files) $(spsf_ldflags) -o dw_psf_sted
+
 prf_forest.o: random_forest/prf_forest.c
 	$(cc) -c $(cflags) random_forest/prf*.c random_forest/qsort.c
 

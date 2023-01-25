@@ -1163,6 +1163,7 @@ float getError_ref(const float * restrict y,
 
 void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opts * s)
 {
+    printf("deconwolf: %s\n", deconwolf_version);
     printf("usage: %s [<options>] image.tif psf.tif\n", argv[0]);
 
     printf("\n");
@@ -1191,14 +1192,28 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
     printf(" --lookahead N"
            "\n\t Try to do a speed-for-memory trade off by using a N pixels larger"
            "\n\t job size that is better suited for FFT.\n");
-    printf("\n");
-    printf("max-projections of tif files can be created with:\n");
-    printf("\t%s maxproj image.tif\n", argv[0]);
-    printf("\tsee %s maxproj --help\n", argv[0]);
+
     printf(" --noplan\n\t Don't use any planning optimization for fftw3\n");
     printf(" --no-inplace\n\t Disable in-place FFTs (for fftw3), uses more "
            "memory but could potentially be faster for some problem sizes.\n");
     printf("\n");
+
+    printf("Additional commands with separate help sections:\n");
+    printf("   maxproj    maximum Z-projections\n");
+    printf("   merge      merge individual slices to volume\n");
+    #ifdef __dw_dots_h__
+    printf("   dots       detect dots\n");
+    #endif
+    #ifdef __dw_psf_h__
+    printf("   psf        generate PSFs for Widefield and Confocal\n");
+    #endif
+    #ifdef __dw_psf_sted_h__
+    printf("   psf-STED   PSFs for 3D STED\n");
+    #endif
+    printf("\n");
+    printf("see: %s [module] --help\n", argv[0]);
+    printf("\n");
+
     printf("Web page: https://www.github.com/elgw/deconwolf/\n");
 }
 
@@ -1862,7 +1877,7 @@ void prefilter(dw_opts * s,
                float * psf, int64_t pM, int64_t pN, int64_t pP)
 {
 
-    if(s->psigma <= 0)
+    if(s->psigma<= 0)
     {
         return;
     }

@@ -54,6 +54,7 @@
 // #include "dw_otsu.h"
 #include "dw_dots.h"
 #include "dw_psf.h"
+#include "dw_psf_sted.h"
 
 #include "fim.h"
 #include "fim_tiff.h"

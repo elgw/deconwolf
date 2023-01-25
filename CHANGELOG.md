@@ -4,6 +4,8 @@
 - Reading 16-bit tif files with **TIFFReadEncodedStrip** instead of
   **TIFFReadRawStrip**. Some programs saves tiff files in other ways
   :)
+- Added the command psf-STED for 3D STED PSFs. Use at your own risk.
+- Building with meson is temporarily broken and to be fixed.
 
 ## v 0.2.3
 - Fixed some errors introduced in v 0.2.2, especially the **dw
