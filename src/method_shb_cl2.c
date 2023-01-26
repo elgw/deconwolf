@@ -172,6 +172,16 @@ float * deconvolve_shb_cl2(float * restrict im,
         return fim_copy(im, M*N*P);
     }
 
+    if(s->bg_auto)
+    {
+        s->bg = fim_min(im, M*N*P);
+        s->bg < 1e-2 ? s->bg = 1e-2 : 0;
+        if(s->verbosity > 1)
+        {
+            printf("Setting the background level to %f\n", s->bg);
+        }
+    }
+
     if(fim_maxAtOrigo(psf, pM, pN, pP) == 0)
     {
         if(s->verbosity > 0)

@@ -35,7 +35,7 @@ float * deconvolve_shb(float * restrict im,
     if(s->bg_auto)
     {
         s->bg = fim_min(im, M*N*P);
-        s->bg < 1 ? s->bg = 1 : 0;
+        s->bg < 1e-2 ? s->bg = 1e-2 : 0;
         if(s->verbosity > 1)
         {
             printf("Setting the background level to %f\n", s->bg);

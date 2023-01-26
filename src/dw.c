@@ -192,7 +192,7 @@ dw_opts * dw_opts_new(void)
     s->experimental1 = 0;
     s->fulldump = 0;
     s->positivity = 1;
-    s->bg = 1.0; /* Should be strictly positive or pixels will be freezed */
+    s->bg = 1e-2; /* Should be strictly positive or pixels will be freezed */
     s->bg_auto = 1;
     s->flatfieldFile = NULL;
     s->lookahead = 0;
