@@ -308,13 +308,13 @@ void readUint8_sub(TIFF * tfile, float * V,
 void readUint16(TIFF * tfile, float * V,
                 const tsize_t ssize,
                 const uint32_t ndirs,
-                const uint32_t nstrips,
+                const uint32_t  __attribute__((__unused__)) nstrips,
                 const uint32_t perDirectory
     )
 {
 //    printf("readUint16\n"); fflush(stdout);
     // Number of elements per strip
-    size_t nes = ssize/sizeof(uint16_t);
+    //size_t nes = ssize/sizeof(uint16_t);
     //  uint16_t * buf = _TIFFmalloc(ssize);
     //uint16_t * buf = malloc(ssize);
 
