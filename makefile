@@ -5,8 +5,8 @@
 # For normal build
 # make -B
 
-# To enable the method shbcl use
-# make OPENCL=1
+# To enable the methods shbcl1, shbcl2 use
+# make -B OPENCL=1
 #
 # To build with clang, specify CC=clang
 

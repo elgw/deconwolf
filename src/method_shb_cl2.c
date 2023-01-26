@@ -387,7 +387,9 @@ float * deconvolve_shb_cl2(float * restrict im,
         p_gpu = fimcl_new(clu, fimcl_real, NULL, wM, wN, wP);
 #endif
 
+
         fimcl_shb_update(p_gpu, x_gpu, xp_gpu, alpha);
+        fimcl_positivity(p_gpu, s->bg);
 
         putdot(s);
         here();

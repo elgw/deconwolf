@@ -192,7 +192,8 @@ dw_opts * dw_opts_new(void)
     s->experimental1 = 0;
     s->fulldump = 0;
     s->positivity = 1;
-    s->bg = 1e-5; /* Should be strictly positive or pixels will be freezed */
+    s->bg = 1.0; /* Should be strictly positive or pixels will be freezed */
+    s->bg_auto = 1;
     s->flatfieldFile = NULL;
     s->lookahead = 0;
     s->psigma = 0;
@@ -201,6 +202,7 @@ dw_opts * dw_opts_new(void)
     s->metric = DW_METRIC_IDIV;
     clock_gettime(CLOCK_REALTIME, &s->tstart);
     s->fftw3_planning = FFTW_MEASURE;
+    s->alphamax = 1;
     return s;
 }
 
@@ -289,7 +291,12 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
     fprintf(f, "nThreads for FFT: %d\n", s->nThreads_FFT);
     fprintf(f, "nThreads for OMP: %d\n", s->nThreads_OMP);
     fprintf(f, "verbosity: %d\n", s->verbosity);
-    fprintf(f, "background level: %f\n", s->bg);
+    if(s->bg_auto == 1)
+    {
+        fprintf(f, "background level: auto\n");
+    } else {
+        fprintf(f, "background level: %f\n", s->bg);
+    }
 
     switch(s->method)
     {
@@ -528,10 +535,11 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
 
 
     struct option longopts[] = {
-        { "no-inplace",   no_argument,       NULL, '1' },
-        { "ompthreads", required_argument, NULL, '2' },
-        { "psf-pass",   required_argument, NULL, '3', },
-	{ "cldevice",  required_argument, NULL, '4', },
+        { "no-inplace",no_argument,       NULL, '1' },
+        { "ompthreads",required_argument, NULL, '2' },
+        { "psf-pass",  required_argument, NULL, '3' },
+	{ "cldevice",  required_argument, NULL, '4' },
+        { "temp",      required_argument, NULL, '9' },
         { "noplan",    no_argument,       NULL, 'a' },
         { "bg",        required_argument, NULL, 'b' },
         { "threads",   required_argument, NULL, 'c' },
@@ -574,7 +582,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     int ch;
     int prefix_set = 0;
     while((ch = getopt_long(argc, argv,
-                            "1234ab:c:f:ghil:m:n:o:p:r:s:tvwx:B:C:DFI:L:MR:TPQ:X:",
+                            "12349ab:c:f:ghil:m:n:o:p:r:s:tvwx:B:C:DFI:L:MR:TPQ:X:",
                             longopts, NULL)) != -1)
     {
         switch(ch) {
@@ -590,6 +598,9 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
 	case '4':
 	  s->cl_device = atoi(optarg);
 	  break;
+        case '9':
+            s->alphamax = atof(optarg);
+            break;
         case 'C':
             s->flatfieldFile = strdup(optarg);
             break;
@@ -598,6 +609,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             break;
         case 'b':
             s->bg = atof(optarg);
+            s->bg_auto = 0;
             break;
         case 'd': /* diagnostics */
             s->tsvFile = strdup(optarg);
@@ -1211,7 +1223,7 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
     printf("   psf-STED   PSFs for 3D STED\n");
     #endif
     printf("\n");
-    printf("see: %s [module] --help\n", argv[0]);
+    printf("see: %s [command] --help\n", argv[0]);
     printf("\n");
 
     printf("Web page: https://www.github.com/elgw/deconwolf/\n");

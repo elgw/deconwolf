@@ -24,11 +24,24 @@ float * deconvolve_shb(float * restrict im,
         printf("Deconvolving\n");
     }
 
+
     if(s->nIter == 0)
     {
         fftw_free(psf);
         return fim_copy(im, M*N*P);
     }
+
+
+    if(s->bg_auto)
+    {
+        s->bg = fim_min(im, M*N*P);
+        s->bg < 1 ? s->bg = 1 : 0;
+        if(s->verbosity > 1)
+        {
+            printf("Setting the background level to %f\n", s->bg);
+        }
+    }
+
 
     if(fim_maxAtOrigo(psf, pM, pN, pP) == 0)
     {
@@ -185,14 +198,16 @@ float * deconvolve_shb(float * restrict im,
 
         /* Eq. 10 in SHB paper */
         double alpha = ((float) it->iter-1.0)/((float) it->iter+2.0);
-        //alpha /= 1.5;
         alpha < 0 ? alpha = 0: 0;
+        alpha > s->alphamax ? alpha = s->alphamax : 0;
+
 
 #pragma omp parallel for shared(p, x, xp)
             /* To be interpreted as p^k in Eq. 7 of SHB */
             for(size_t kk = 0; kk<wMNP; kk++)
             {
                 p[kk] = x[kk] + alpha*(x[kk]-xp[kk]);
+                p[kk] < s->bg ? p[kk] = s->bg : 0; // TODO
             }
 
         if(s->psigma > 0)
@@ -298,7 +313,7 @@ float iter_shb(
     const size_t wMNP = wM*wN*wP;
 
     fftwf_complex * Pk = fft(pk, wM, wN, wP);
-    
+
     putdot(s);
     float * y = fft_convolve_cc_f2(cK, Pk, wM, wN, wP); // Pk is freed
 

@@ -1,11 +1,15 @@
 # CHANGELOG
 
 ## v 0.2.4
+- **dw --help** now shows the additional commands/modules available.
 - Reading 16-bit tif files with **TIFFReadEncodedStrip** instead of
   **TIFFReadRawStrip**. Some programs saves tiff files in other ways
   :)
 - Added the command psf-STED for 3D STED PSFs. Use at your own risk.
 - Building with meson is temporarily broken and to be fixed.
+- Fixed dw chashing when combining --method rl with --iterdump
+- Setting the background level automatically to min(image) unless
+  specified with **--bg**.
 
 ## v 0.2.3
 - Fixed some errors introduced in v 0.2.2, especially the **dw
@@ -15,7 +19,7 @@
 
 ## v 0.2.2
 - Can deconvolve using clFFT, when compiled with **OPENCL=1** two new
-  methods appear, **--method shbcl** and **--shbcl2*, the first using
+  methods appear, **--method shbcl** and **--shbcl2**, the first using
   clFFT only for the Fourier transforms, the latter using OpenCL for
   the whole deconvolution procedure. Uses quite much GPU memory which
   is something to improve upon in future version, possibly by

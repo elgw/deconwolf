@@ -132,7 +132,8 @@ struct _dw_opts{
     int iterdump; /* Dump each iteration to file */
 
     float relax;
-    float bg; /* Background level, 0 by default */
+    float bg; /* Background level, set automatically by default */
+    int bg_auto; /* Indicator if background was set on CLI */
     float psf_pass; /* For low-pass filtering by the PSF */
 
     /* Selection of method */
@@ -168,6 +169,8 @@ struct _dw_opts{
     /* How far should bigger image sizes be considered? */
     int lookahead;
     int eve; /* Use Exponential vector extrapolation */
+
+    float alphamax;
 
   int cl_device; /* OpenCL device number, default 0 */
 

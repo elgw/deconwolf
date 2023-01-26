@@ -110,6 +110,17 @@
      }
 
 
+     if(s->bg_auto)
+     {
+         s->bg = fim_min(im, M*N*P);
+         s->bg < 1 ? s->bg = 1 : 0;
+         if(s->verbosity > 1)
+         {
+             printf("Setting the background level to %f\n", s->bg);
+         }
+     }
+
+
      if(fim_maxAtOrigo(psf, pM, pN, pP) == 0)
      {
          if(s->verbosity > 0)
@@ -275,7 +286,7 @@
          if(s->iterdump > 0){
              if(it->iter % s->iterdump == 0)
              {
-                 float * temp = fim_subregion(x, wM, wN, wP, M, N, P);
+                 float * temp = fim_subregion(xp, wM, wN, wP, M, N, P);
                  char * outname = gen_iterdump_name(s, it->iter);
                  //fulldump(s, temp, M, N, P, outname);
                  if(s->outFormat == 32)
