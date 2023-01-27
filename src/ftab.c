@@ -20,6 +20,22 @@
 static int parse_floats(char * l, float * row, int nval);
 static size_t count_newlines(const char * fname);
 
+
+void ftab_head(ftab_t * T, int64_t n)
+{
+
+    if(n < 0)
+    {
+        return;
+    }
+
+    if(n > (int64_t) T->nrow)
+    {
+        n = T->nrow;
+    }
+    T->nrow = n;
+}
+
 void ftab_free(ftab_t * T)
 {
     if(T == NULL)
