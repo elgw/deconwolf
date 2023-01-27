@@ -79,4 +79,8 @@ int ftab_ut(void);
  */
 int ftab_set_coldata(ftab_t * T, int col, const float * data);
 
+
+/* Keep n head rows */
+void ftab_head(ftab_t * T, int64_t n);
+
 #endif

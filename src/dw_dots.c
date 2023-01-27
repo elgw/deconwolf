@@ -260,7 +260,7 @@ void detect_dots(opts * s, char * inFile)
     /* Set up the log file for this image */
     dw_nullfree(s->logfile);
     s->logfile = malloc(strlen(s->image) + 64);
-    sprintf(s->logfile, "%sdots.log.txt", s->image);
+    sprintf(s->logfile, "%s.dots.log.txt", s->image);
     s->log = fopen(s->logfile, "w");
     opts_print(s->log, s);
 
@@ -410,6 +410,9 @@ void detect_dots(opts * s, char * inFile)
     free(A);
     free(fI);
     free(feature);
+
+    /* Discard unwanted dots */
+    ftab_head(T, s->ndots);
 
     /* Write to file */
     if(s->verbose > 0)

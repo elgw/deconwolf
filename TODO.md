@@ -1,23 +1,26 @@
- - [Prioritized](#top-priority)
- - [Nice to have](#nice-to-have)
- - [Maybe](#maybe)
- - [Done](#done)
+# To do
 
-# Todo
+This document is complementary to the [issues page on
+github](https://github.com/elgw/deconwolf/issues). And focuses more on
+changes to the internal machinery.
 
 ## Top priority
-- [ ] Can deconwolf be built on the M1 mac models without modification?
 - [ ] Crash-safe writing of output images, write to temporary file and
 move when write is complete to avoid bad luck.
 - [ ] Get documentation up to date.
 - [ ] Set default PSF size in `dw_bw` based on the geometry of the PSF
 and expected sample thickness.
 - [ ] Wrap image pointers in some abstraction.
+- [ ] Transfer pixel size to output when doing max projections.
+- [ ] Can deconwolf be built on the M1 mac models without modification?
+- [ ] Why is **-O1** required for building?
+
+### Related to OpenCL/GPU
 - [ ] When using clFFT that does not support all sizes, crop the image
 if needed when using **--bq 0**
-- [ ] Why is **-O1** required for building?
-- [ ] Transfer pixel size to output when doing max projections.
-- [ ] Clean up the **merge** sub command and test it.
+- [ ] Possibly replace `clCreateCommandQueue` by
+      `clCreateCommandQueueWithProperties`. First decide what
+      `CL_TARGET_OPENCL_VERSION` to define.
 
 ## Nice to have
 - [ ] Switch to/add vkFFT over clFFT
@@ -44,6 +47,7 @@ fftw3 from source for `-march=native -mtune=native`.
 
 
 ## Done
+- [x] Clean up the **merge** sub command and test it.
 - [x] fftw3 in-place FFTs for memory saving.
 - [x] Make `FFTW_ESTIMATE` an option. This is set with the argument **--noplan**.
 - [x] Don't crop the PSF unless it is needed.
