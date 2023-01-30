@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## v 0.2.5
+- Added the **--xyz** option to **dw maxproj**, for creating max
+  projections along the three axes and collecting them on a single 2D
+  image.
+
 ## v 0.2.4
 - **dw --help** now shows the additional commands/modules available.
 - Reading 16-bit tif files with **TIFFReadEncodedStrip** instead of

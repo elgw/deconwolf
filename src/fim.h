@@ -75,6 +75,9 @@ double * fim_get_line_double(fim_t * Im,
 /* Similar to MATLABs shiftfim, [M,N,P] -> [N,P,M] */
 fim_t * fim_shiftdim(fim_t *);
 
+/* [M, N, P] -> [N, M, P] */
+fim_t * fimt_transpose(const fim_t * );
+
 /* Partial derivative along dimension dim */
 fim_t * fimt_partial(const fim_t *, int dim, float sigma);
 
@@ -105,6 +108,8 @@ float fim_sum(const float * restrict A, size_t N);
 
 /* Standard deviation, normalizing by (N-1) */
 float fim_std(const float * V, size_t N);
+
+fim_t * fimt_maxproj(const fim_t * Im);
 
 float * fim_maxproj(const float * A, size_t M, size_t N, size_t P);
 
@@ -355,6 +360,13 @@ float * fim_LoG(const float * V, size_t M, size_t N, size_t P,
 float * fim_LoG_S(const float * V, size_t M, size_t N, size_t P,
                   float sigmaxy, float sigmaz);
 
+
+/* Simple interface to write 2D or 3D images without any meta data */
+int fimt_tiff_write(const fim_t * Im, const char * fName);
+
+
+/* Insert into B into A, with upper left corner at x0, y0 */
+void fimt_blit_2D(fim_t * A, const fim_t * B, size_t x0, size_t y0);
 
 
 #endif /* _fim_h_ */

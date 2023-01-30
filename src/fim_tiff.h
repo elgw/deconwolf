@@ -45,6 +45,7 @@
 #include "ftab.h"
 #include "dw_version.h"
 
+
 #define INLINED inline __attribute__((always_inline))
 #define XTAG_IJIJUNKNOWN 50838
 #define XTAG_IJIJINFO 50839
@@ -92,6 +93,7 @@ int fim_tiff_write_noscale(const char * fName, const float * V,
                            ttags * T,
                            int64_t N, int64_t M, int64_t P);
 
+
 int fim_tiff_write_float(const char * fName, const float * V,
                          ttags * T,
     int64_t M, int64_t N, int64_t P);
@@ -130,6 +132,11 @@ int fim_tiff_get_size(char * fname,
 
 /* Max projection from input to output file */
 int fim_tiff_maxproj(char * in, char * out);
+
+/* Max projection from input to output file
+*  This version produces XY XZ and YZ */
+int fim_tiff_maxproj_XYZ(const char * in, const char * out);
+
 
 /* Extract a single slice from input to output file */
 int fim_tiff_extract_slice(char *in, char *out, int slice);

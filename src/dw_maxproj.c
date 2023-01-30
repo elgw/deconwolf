@@ -1,7 +1,8 @@
 #include "dw_maxproj.h"
 
 #define MODE_MAX 0
-#define MODE_SLICE 1
+#define MODE_MAX_XYZ 1
+#define MODE_SLICE 2
 
 typedef struct{
     int mode;
@@ -30,22 +31,26 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
 {
     printf("usage: %s [<options>] input1.tif input2.tif ... \n", argv[0]);
     printf("Options:\n");
+    printf(" --xyz \n\t Max projection for xy, xz and yz as a collage "
+           "on a single image.\n");
     printf(" --slice N\n\t Extract slice N\n");
     printf(" --overwrite\n\t Overwrite existing files\n");
     printf(" --verbose v\n\t Set verbosity level\n");
+    return;
 }
 
 
 static void argparsing(int argc, char ** argv, opts * s)
 {
     struct option longopts[] = {
-                                 {"help", no_argument, NULL, 'h'},
-                                 {"slice", required_argument, NULL, 's'},
-                                 {"overwrite", no_argument, NULL, 'o'},
-                                 {"verbose", required_argument, NULL, 'v'},
-                                 {NULL, 0, NULL, 0}};
+        {"help", no_argument, NULL, 'h'},
+        {"slice", required_argument, NULL, 's'},
+        {"overwrite", no_argument, NULL, 'o'},
+        {"verbose", required_argument, NULL, 'v'},
+        {"xyz", no_argument, NULL, 'x'},
+        {NULL, 0, NULL, 0}};
     int ch;
-    while((ch = getopt_long(argc, argv, "ohs:v:", longopts, NULL)) != -1)
+    while((ch = getopt_long(argc, argv, "ohs:v:x", longopts, NULL)) != -1)
     {
         switch(ch){
         case 'o':
@@ -62,6 +67,9 @@ static void argparsing(int argc, char ** argv, opts * s)
         case 'v':
             s->verbose = atoi(optarg);
             break;
+        case 'x':
+            s->mode = MODE_MAX_XYZ;
+            break;
         }
     }
     s->optpos = optind;
@@ -71,11 +79,11 @@ static void argparsing(int argc, char ** argv, opts * s)
 
 static int file_exist(char * fname)
 {
-  if( access( fname, F_OK ) != -1 ) {
-    return 1; // File exist
-  } else {
-    return 0;
-  }
+    if( access( fname, F_OK ) != -1 ) {
+        return 1; // File exist
+    } else {
+        return 0;
+    }
 }
 
 
@@ -86,78 +94,102 @@ int main(int argc, char ** argv)
 }
 #endif
 
+static char * get_outfile_name_for_max(const char * inFile)
+{
+    char * _dname = strdup(inFile);
+    char * dname = dirname(_dname);
+    char * _fname = strdup(inFile);
+    char * fname = basename(_fname);
+    char * outFile = malloc(strlen(inFile) + 20);
+    sprintf(outFile, "%s/max_%s", dname, fname);
+    free(_dname);
+    free(_fname);
+    return outFile;
+}
 
 int dw_tiff_max(int argc, char ** argv)
 {
 
     opts * s = opts_new();
 
-  if(argc < 2)
-  {
-    usage(argc, argv);
-    exit(1);
-  }
-
-  argparsing(argc, argv, s);
-
-  fim_tiff_init();
-
-  char * outFile;
-  char * inFile;
-
-  for(int ff = s->optpos; ff<argc; ff++)
-  {
-    inFile = argv[ff];
-
-    if(!file_exist(inFile))
+    if(argc < 2)
     {
-        printf("Can't open %s!\n", inFile);
+        usage(argc, argv);
         exit(1);
     }
 
-    outFile = malloc(strlen(inFile) + 20);
-    if(s->mode == MODE_MAX)
-    {
-        char * _dname = strdup(inFile);
-        char * dname = dirname(_dname);
-        char * _fname = strdup(inFile);
-        char * fname = basename(_fname);
+    argparsing(argc, argv, s);
 
-        if(s->verbose > 1)
+    fim_tiff_init();
+
+
+    char * inFile;
+
+    for(int ff = s->optpos; ff<argc; ff++)
+    {
+        inFile = argv[ff];
+
+        if(!file_exist(inFile))
         {
-            fprintf(stdout, "Input file: %s\n", inFile);
-            fprintf(stdout, "'%s' /  '%s'\n", dname, fname);
+            printf("Can't open %s!\n", inFile);
+            exit(EXIT_FAILURE);
         }
 
-        sprintf(outFile, "%s/max_%s", dname, fname);
-        free(_dname);
-        free(_fname);
-        if(s->verbose > 1)
+        if(s->mode == MODE_MAX || s->mode == MODE_MAX_XYZ)
         {
-            fprintf(stdout, "Ouput file: %s\n", outFile);
+            char * outFile = get_outfile_name_for_max(inFile);
+
+            if(s->verbose > 1)
+            {
+                fprintf(stdout, "Input file: %s\n", inFile);
+                fprintf(stdout, "Ouput file: %s\n", outFile);
+            }
+
+            if(s->overwrite == 0 && file_exist(outFile))
+            {
+                printf("%s exists, skipping.\n", outFile);
+            } else {
+                if(s->verbose > 0)
+                {
+                    printf("%s -> %s\n", inFile, outFile);
+                }
+                switch(s->mode)
+                {
+                case MODE_MAX:
+                    fim_tiff_maxproj(inFile, outFile);
+                    break;
+                case MODE_MAX_XYZ:
+                    fim_tiff_maxproj_XYZ(inFile, outFile);
+                    break;
+                default:
+                    fprintf(stderr, "Unknown mode!\n");
+                    exit(EXIT_FAILURE);
+                    break;
+                }
+
+            }
+            free(outFile);
         }
 
-        if(s->overwrite == 0 && file_exist(outFile))
-    {
-      printf("%s exists, skipping.\n", outFile);
-    } else {
-      printf("%s -> %s\n", inFile, outFile);
-      fim_tiff_maxproj(inFile, outFile);
-    }}
-    if(s->mode == MODE_SLICE)
-    {
-        sprintf(outFile, "s%04d_%s", s->slice, inFile);
-        if(file_exist(outFile) && s->overwrite == 0)
+        if(s->mode == MODE_SLICE)
         {
-            printf("%s exists, skipping.\n", outFile);
-        } else {
-            printf("%s -> %s\n", inFile, outFile);
-            fim_tiff_extract_slice(inFile, outFile, s->slice);
+            char * outFile = malloc(strlen(inFile) + 20);
+            sprintf(outFile, "s%04d_%s", s->slice, inFile);
+            if(file_exist(outFile) && s->overwrite == 0)
+            {
+                printf("%s exists, skipping.\n", outFile);
+            } else {
+                if(s->verbose > 0)
+                {
+                    printf("%s -> %s\n", inFile, outFile);
+                }
+                fim_tiff_extract_slice(inFile, outFile, s->slice);
+            }
+            free(outFile);
         }
+
 
     }
-    free(outFile);
-  }
-  opts_free(s);
-  return 0;
+    opts_free(s);
+    return 0;
 }

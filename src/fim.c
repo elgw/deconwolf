@@ -227,8 +227,8 @@ void fim_minus(float * restrict  A,
 }
 
 void fim_add(float * restrict  A,
-               const float * restrict B,
-               const size_t N)
+             const float * restrict B,
+             const size_t N)
 /* A[kk] += B[kk] */
 {
     size_t kk = 0;
@@ -369,7 +369,7 @@ void fim_insert_ref(float * T, int64_t t1, int64_t t2, int64_t t3,
 
 
 float * fim_get_cuboid(float * restrict A, const int64_t M, const int64_t N, const int64_t P,
-                        const int64_t m0, const int64_t m1, const int64_t n0, const int64_t n1, const int64_t p0, const int64_t p1)
+                       const int64_t m0, const int64_t m1, const int64_t n0, const int64_t n1, const int64_t p0, const int64_t p1)
 {
 
 
@@ -848,8 +848,8 @@ void shift_vector(float * restrict V,
 
 
 float * fim_expand(const float * restrict in,
-                    const int64_t pM, const int64_t pN, const int64_t pP,
-                    const int64_t M, const int64_t N, const int64_t P)
+                   const int64_t pM, const int64_t pN, const int64_t pP,
+                   const int64_t M, const int64_t N, const int64_t P)
 /* "expand an image" by making it larger
  * pM, ... current size
  * M, Nm ... new size
@@ -1195,10 +1195,10 @@ void fim_LoG_ut()
 
     if(M*N*P < 200)
     {
-    printf("LoG = \n");
-    fim_show(LoG, M, N, P);
-    printf("LoG_S = \n");
-    fim_show(LoG2, M, N, P);
+        printf("LoG = \n");
+        fim_show(LoG, M, N, P);
+        printf("LoG_S = \n");
+        fim_show(LoG2, M, N, P);
     }
 
     free(V);
@@ -1538,7 +1538,7 @@ void fim_cumsum(float * A, const size_t M, const size_t N, const int dim)
     assert(dim <= 1);
     if(dim == 0)
     {
-        #pragma omp parallel for
+#pragma omp parallel for
         for(size_t nn = 0; nn<N; nn++)
         {
             cumsum_array(A+M*nn, M, 1);
@@ -1806,6 +1806,17 @@ float * fim_maxproj_ref(const float * V, size_t M, size_t N, size_t P)
     return Pr;
 }
 
+fim_t * fimt_maxproj(const fim_t * F)
+{
+    float * _M = fim_maxproj(F->V, F->M, F->N, F->P);
+    fim_t * M = malloc(sizeof(fim_t));
+    M->V = _M;
+    M->M = F->M;
+    M->N = F->N;
+    M->P = 1;
+    return M;
+}
+
 float * fim_maxproj(const float * V, size_t M, size_t N, size_t P)
 {
     /* Initialize to first plane */
@@ -1847,7 +1858,7 @@ float * fim_sumproj(const float * V, size_t M, size_t N, size_t P)
 
 float strel333_max(const float * I, size_t M, size_t N,
                    __attribute__((unused))  size_t P,
-                const float * strel)
+                   const float * strel)
 {
 
     float max = 0; /* ok since we handle image data */
@@ -2278,7 +2289,7 @@ int * fim_conncomp6(const float * im, size_t M, size_t N)
 }
 
 int fim_convn1(float * restrict V, size_t M, size_t N, size_t P,
-                float * K, size_t nK,
+               float * K, size_t nK,
                int dim, const int normalized)
 {
     if(dim < 0 || dim > 2)
@@ -2346,9 +2357,9 @@ int fim_convn1(float * restrict V, size_t M, size_t N, size_t P,
 
 
 float * conv1_3(const float * V, size_t M, size_t N, size_t P,
-                      float * K1, size_t nK1,
-                      float * K2, size_t nK2,
-                      float * K3, size_t nK3)
+                float * K1, size_t nK1,
+                float * K2, size_t nK2,
+                float * K3, size_t nK3)
 {
     const int dim = 0;
     const int norm = 0;
@@ -2374,7 +2385,7 @@ float * conv1_3(const float * V, size_t M, size_t N, size_t P,
 }
 
 float * fim_LoG_S(const float * V0, const size_t M, const size_t N, const size_t P0,
-                const float sigmaxy, const float sigmaz)
+                  const float sigmaxy, const float sigmaz)
 {
 
 /* Set up filters */
@@ -2411,11 +2422,11 @@ float * fim_LoG_S(const float * V0, const size_t M, const size_t N, const size_t
     }
 
     float * GGL = conv1_3(V, M, N, P,
-                                lG, nlG, lG, nlG, a2, na2);
+                          lG, nlG, lG, nlG, a2, na2);
     float * GLG = conv1_3(V, M, N, P,
-                                lG, nlG, l2, nl2, aG, naG);
+                          lG, nlG, l2, nl2, aG, naG);
     float * LGG = conv1_3(V, M, N, P,
-                                l2, nl2, lG, nlG, aG, naG);
+                          l2, nl2, lG, nlG, aG, naG);
     free(V);
     float * LoG = GGL;
     for(size_t kk = 0; kk<M*N*P; kk++)
@@ -2600,8 +2611,8 @@ float * fim_LoG(const float * V, const size_t M, const size_t N, const size_t P,
 }
 
 double * fim_get_line_double(fim_t * I,
-                          int x, int y, int z,
-                          int dim, int nPix)
+                             int x, int y, int z,
+                             int dim, int nPix)
 {
     const float * V = I->V;
     int M = I->M;
@@ -2807,7 +2818,7 @@ ftab_t * fim_features_2d(const fim_t * fI)
         sprintf(sbuff, "s%.1f_LoG", sigma);
         ftab_set_colname(T, col++, sbuff);
 
-    /* Gradient Magnitude, 1f (dx.^2 + dy.^2).^(1/2) */
+        /* Gradient Magnitude, 1f (dx.^2 + dy.^2).^(1/2) */
         for(size_t kk = 0; kk<M*N; kk++)
         {
             value[kk] = sqrt( pow(dx->V[kk], 2) + pow(dy->V[kk], 2));
@@ -2817,7 +2828,7 @@ ftab_t * fim_features_2d(const fim_t * fI)
         sprintf(sbuff, "s%.1f_GM", sigma);
         ftab_set_colname(T, col++, sbuff);
 
-    /* Eigenvalues of the Structure Tensor [dx*dx, dx*dy; dx*dy, dy*dy], 2f*/
+        /* Eigenvalues of the Structure Tensor [dx*dx, dx*dy; dx*dy, dy*dy], 2f*/
         for(size_t kk = 0; kk<M*N; kk++)
         {
             float a = dx->V[kk]*dx->V[kk];
@@ -2843,7 +2854,7 @@ ftab_t * fim_features_2d(const fim_t * fI)
         ftab_set_colname(T, col++, sbuff);
 
 
-    /* Eigenvalues of the Hessian of Gaussians [ddx, dxdy; dxdy ddy], 2f */
+        /* Eigenvalues of the Hessian of Gaussians [ddx, dxdy; dxdy ddy], 2f */
         for(size_t kk = 0; kk<M*N; kk++)
         {
             float a = ddx->V[kk];
@@ -2963,4 +2974,58 @@ void fim_ut()
     myfftw_start(1, 1, stdout);
     fim_xcorr2_ut();
     myfftw_stop();
+}
+
+fim_t * fimt_transpose(const fim_t * A)
+{
+    fim_t * B = fimt_copy(A);
+    size_t M = A->M;
+    size_t N = A->N;
+    size_t P = A->P;
+
+    B->N = M;
+    B->M = N;
+    B->P = P;
+
+    for(size_t pp = 0; pp < P; pp++)
+    {
+        for(size_t mm = 0; mm < M; mm++)
+        {
+            for(size_t nn = 0; nn < N; nn++)
+            {
+                B->V[nn + mm*N + pp*M*N] =
+                    A->V[mm + nn*M + pp*M*N];
+            }
+        }
+    }
+    return B;
+}
+
+int fimt_tiff_write(const fim_t * I, const char * fName)
+{
+    return fim_tiff_write_float(fName, I->V, NULL, I->M, I->N, I->P);
+}
+
+void fimt_blit_2D(fim_t * A, const fim_t * B, size_t x0, size_t y0)
+{
+    assert(A != NULL);
+    assert(B != NULL);
+    assert(A->P == 1);
+    assert(B->P == 1);
+
+    assert(A->M >= B->M);
+    assert(A->N >= B->N);
+
+    assert(A->M >= x0 + B->M);
+    assert(A->N >= y0 + B->N);
+
+    for(size_t xx = 0; xx < B->M; xx++)
+    {
+        for( size_t yy = 0; yy < B->N ; yy++)
+        {
+            A->V[xx+x0 + A->M*(yy+y0)] = B->V[xx + B->M*yy];
+        }
+    }
+
+    return;
 }
