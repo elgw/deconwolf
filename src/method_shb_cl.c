@@ -1,12 +1,12 @@
 #include "method_shb_cl.h"
 
-#define use_inplace_clfft 1
+#define use_inplace_clfft 0
 
 /* TODO:
- * // Do this without in-place FFTs. check all inplace as well as the convolve functions.
+ * FIX so that it works with use_inplace_clfft, probably an issue with cl_new
  * */
 
-//#define here(x) printf("%s %s %d\n", __FILE__, __FUNCTION__, __LINE__);
+// #define here(x) printf("%s %s %d\n", __FILE__, __FUNCTION__, __LINE__);
 #define here(x) ;
 
 fimcl_t  * initial_guess_cl(clu_env_t * clu,
@@ -391,10 +391,12 @@ float iter_shb_cl(clu_env_t * clu,
     const size_t wMNP = wM*wN*wP;
 
 
-
 #if use_inplace_clfft
+    here();
+    clu->verbose = 10;
     fimcl_t * _Pk = fimcl_new(clu, fimcl_real_inplace, pk, wM, wN, wP);
 #else
+    here();
     fimcl_t * _Pk = fimcl_new(clu, fimcl_real, pk, wM, wN, wP);
 #endif
 

@@ -270,7 +270,7 @@ fimcl_t * fimcl_new(clu_env_t * clu, fimcl_type type,
                                         CL_TRUE, // blocking_write
                                         0,
                                         fimcl_ncx(Y)*2*sizeof( float ),
-                                        X,
+                                        X, // TODO PX ?
                                         0, // num_events_in_wait_list
                                         NULL,
                                         &Y->wait_ev ) );

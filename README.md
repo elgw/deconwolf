@@ -65,6 +65,8 @@ Deconwolf uses:
    of code, used in **dw**.
  * [POSIX Threads](https://en.wikipedia.org/wiki/Pthreads) for
    explicit paralellization (in **dw_bw**)
+ * [libclfft2](https://github.com/clMathLibraries/clFFT) for FFTs on
+   the GPU. Optional during compilation.
 
 If these libraries are available for your platform, chances are that that it can
 be built. FFTW can also be replaced by Intel MKL or NVIDIA CUFFTW.
