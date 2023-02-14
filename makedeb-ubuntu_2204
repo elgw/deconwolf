@@ -45,7 +45,7 @@ cat > $pkgdir/DEBIAN/control << END
 Package: deconwolf
 Version: $pkgver
 Architecture: $arch
-Depends: libfftw3-single3, libgsl27, libtiff5, libpng16-16
+Depends: libfftw3-single3, libgsl27, libtiff5, libpng16-16, libclfft2
 Conflicts:
 Maintainer: $NAME <$EMAIL>
 Installed-Size: $size

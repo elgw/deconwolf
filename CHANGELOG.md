@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## v 0.2.6
+- Using ISO 8601 in log files, e.g., `2023-02-14T11:14:14`.
+
 ## v 0.2.5
 - Added the **--xyz** option to **dw maxproj**, for creating max
   projections along the three axes and collecting them on a single 2D

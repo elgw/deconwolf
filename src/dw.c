@@ -1793,9 +1793,15 @@ void dw_unittests()
 void show_time(FILE * f)
 {
     f == NULL ? f = stdout : 0;
+    int buf_len = 256;
+    char buf[256];
+
     time_t now = time(NULL);
-    char * tstring = ctime(&now);
-    fprintf(f, "%s\n", tstring);
+    struct tm * ptm = localtime(&now);
+    strftime(buf, buf_len, "%FT%T", ptm);
+
+    fprintf(f, "%s\n", buf);
+    return;
 }
 
 float * psf_makeOdd(float * psf, int64_t * pM, int64_t * pN, int64_t *pP)
