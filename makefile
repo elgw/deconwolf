@@ -50,8 +50,14 @@ dwbw_LIBRARIES = -lm -ltiff -lpthread
 
 ### GSL
 CFLAGS += `gsl-config --cflags`
-dwbw_LIBRARIES += `gsl-config --libs`
-dw_LIBRARIES += `gsl-config --libs`
+MOSTLYSTATIC?=0
+ifeq ($(MOSTLYSTATIC), 0)
+    dwbw_LIBRARIES += `gsl-config --libs`
+    dw_LIBRARIES += `gsl-config --libs`
+else
+   dwbw_LIBRARIES += -l:libgsl.a -l:libgslcblas.a
+   dw_LIBRARIES += -l:libgsl.a -l:libgslcblas.a
+endif
 
 ### FFT Backend
 FFTW3=1
@@ -80,8 +86,13 @@ endif
 ifeq ($(FFTW3), 1)
 $(info FFTW backend: FFTW3)
 CFLAGS += `pkg-config fftw3 fftw3f --cflags`
+ifeq ($(MOSTLYSTATIC), 0)
 dw_LIBRARIES += `pkg-config fftw3 fftw3f --libs`
 dwbw_LIBRARIES += `pkg-config fftw3 fftw3f --libs`
+else
+dw_LIBRARIES += -l:libfftw3.a -l:libfftw3f.a
+dwbw_LIBRARIES += -l:libfftw3.a -l:libfftw3f.a
+endif
 ifneq ($(WINDOWS),1)
 dw_LIBRARIES += -lfftw3f_threads
 dwbw_LIBRARIES += -lfftw3f_threads
