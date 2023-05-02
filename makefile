@@ -147,7 +147,7 @@ dw_LIBRARIES+=-lclFFT
 endif
 
 ifneq ($(UNAME_S),Darwin)
-    CFLAGS+=-march=native -mtune=native
+    CFLAGS+=
 endif
 
 ifeq ($(WINDOWS),1)
