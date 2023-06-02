@@ -18,12 +18,10 @@
 //#define CL_USE_DEPRECATED_OPENCL_1_2_APIS
 //#define CL_TARGET_OPENCL_VERSION 120
 
-// Did also work to ask for the latest version
-// however it would warn that clCreateCommandQueue
-// is depreciated. Will keep it at 1.2.0 until I need
-// something specific from never versions.
-//
-// #define CL_TARGET_OPENCL_VERSION 300
+
+// TODO: see how to replace clCreateCommandQueue for more recent targets
+
+#define CL_TARGET_OPENCL_VERSION 120
 #ifdef __APPLE__
 #include <OpenCL/cl.h>
 #else

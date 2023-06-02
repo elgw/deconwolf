@@ -1131,7 +1131,11 @@ clu_env_t * clu_new(int verbose, int cl_device)
     {
         printf("Found %d CL platforms\n", ret_num_platforms);
     }
-    assert(ret_num_platforms > 0);
+    if(ret_num_platforms < 1)
+    {
+        fprintf(stderr, "Unable to find a CL platform\n");
+        return NULL;
+    }
 
     /* Get the number of devices */
     check_CL( clGetDeviceIDs(env->platform_id,
@@ -1139,14 +1143,18 @@ clu_env_t * clu_new(int verbose, int cl_device)
                              0,
                              NULL,
                              &ret_num_devices));
-
+    if(ret_num_devices < 1)
+    {
+        fprintf(stderr, "Could not find any OpenCL devices\n");
+        return NULL;
+    }
     cl_device_id * devices = malloc(ret_num_devices*sizeof(cl_device_id));
     /* Get the devices */
     check_CL( clGetDeviceIDs(env->platform_id,
                              CL_DEVICE_TYPE_ALL,
-                             10,
+                             ret_num_devices,
                              devices,
-                             &ret_num_devices));
+                             NULL));
 
 
     if(env->verbose > 1)

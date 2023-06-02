@@ -134,9 +134,9 @@ CFLAGS+=-DOPENCL
 ifeq ($(UNAME_S), Darwin)
 dw_LIBRARIES+=-framework OpenCL
 else
-CFLAGS+=-I/opt/nvidia/hpc_sdk/Linux_x86_64/21.3/cuda/11.2/targets/x86_64-linux/include/
-LDFLAGS=-L/opt/nvidia/hpc_sdk/Linux_x86_64/21.3/cuda/11.2/targets/x86_64-linux/lib/
-dw_LIBRARIES+=-lOpenCL
+# CFLAGS+=-I/opt/nvidia/hpc_sdk/Linux_x86_64/21.3/cuda/11.2/targets/x86_64-linux/include/
+# LDFLAGS=-L/opt/nvidia/hpc_sdk/Linux_x86_64/21.3/cuda/11.2/targets/x86_64-linux/lib/
+dw_LIBRARIES+=`pkg-config OpenCL --libs`
 endif
 dw_OBJECTS+=method_shb_cl.o method_shb_cl2.o cl_util.o
 endif
@@ -160,31 +160,46 @@ ifeq ($(UNAME_S),Darwin)
 	MANPATH=/usr/local/share/man/man1
 endif
 
-# Extra protection
-CC+=-g3
-
-CCF = $(CC) $(CFLAGS)
 SRCDIR = src/
 
-dw_OBJECTS += fim.o tiling.o fft.o fim_tiff.o dw.o deconwolf.o dw_maxproj.o dw_util.o method_eve.o method_identity.o method_rl.o method_ave.o method_shb.o dw_imshift.o fft.o dw_nuclei.o dw_dots.o fwhm.o ftab.o dw_psf.o dw_tiff_merge.o dw_psf_sted.o
+dw_OBJECTS += fim.o \
+tiling.o \
+fft.o \
+fim_tiff.o \
+dw.o deconwolf.o \
+dw_maxproj.o \
+dw_util.o \
+method_eve.o \
+method_identity.o \
+method_rl.o \
+method_ave.o \
+method_shb.o \
+dw_imshift.o \
+fft.o \
+dw_nuclei.o \
+dw_dots.o \
+fwhm.o \
+ftab.o \
+dw_psf.o \
+dw_tiff_merge.o \
+dw_psf_sted.o
 
-dwbw_OBJECTS = fim.o fim_tiff.o dw_bwpsf.o bw_gsl.o lanczos.o li.o fft.o dw_util.o
+dwbw_OBJECTS = fim.o fim_tiff.o dw_bwpsf.o \
+bw_gsl.o lanczos.o li.o fft.o dw_util.o
 
 # dwtm = bin/dw_tiffmax
 # dwtm_OBJECTS = fim.o fim_tiff.o deconwolf_tif_max.o
 
 all: $(dw) $(dwtm) $(dwbw)
-# all: $(dw) $(dwtm) $(dwbw)
-
 
 $(dw): $(dw_OBJECTS)
-	$(CCF) -o $@ $^ $(dw_LIBRARIES)
+	$(CC) $(CFLAGS) -o $@ $^ $(dw_LIBRARIES)
 
 $(dwbw): $(dwbw_OBJECTS)
-	$(CCF) -o $@ $^ $(dwbw_LIBRARIES)
+	$(CC) $(CFLAGS) -o $@ $^ $(dwbw_LIBRARIES)
 
 %.o: $(SRCDIR)%.c
-	$(CCF) -c $<
+	$(CC) $(CFLAGS) -c $<
 
 clean:
 	rm -f *.o
