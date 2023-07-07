@@ -1057,7 +1057,7 @@ ttags * ttags_new()
     T->zresolution = 1;
     T->imagedescription = NULL;
     T->software = NULL;
-    T-> resolutionunit = RESUNIT_NONE;
+    T->resolutionunit = RESUNIT_NONE;
     T->IJIJinfo = NULL;
     T->nIJIJinfo = 0;
     // Image size MxNxP
@@ -1094,8 +1094,10 @@ void ttags_set_pixelsize(ttags * T, double xres, double yres, double zres)
         free(T->imagedescription);
     }
     T->imagedescription = malloc(1024);
-    //sprintf(T->imagedescription, "ImageJ=1.11a.images=%d.slices=%d.hyperstack=true.mode=grayscale.unit=nm.spacing=%.3f.", T->P, T->P, T->zresolution);
-    sprintf(T->imagedescription, "ImageJ=1.52r\nimages=%d\nslices=%d\nunit=nm\nspacing=%.1f\nloop=false.", T->P, T->P, T->zresolution);
+    sprintf(T->imagedescription,
+            "ImageJ=1.52r\nimages=%d\nslices=%d\nunit=nm\nspacing=%.1f\nloop=false.",
+            T->P, T->P, T->zresolution);
+    return;
 }
 
 void ttags_free(ttags ** Tp)

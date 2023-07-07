@@ -1,4 +1,4 @@
-#include "method_shb_cl.h"
+#include "method_shb_cl2.h"
 
 #define use_inplace_clfft 0
 
@@ -58,6 +58,11 @@ fimcl_t * create_initial_W(clu_env_t * clu,
     fimcl_t * W_pre_gpu = fimcl_convolve_conj(fft_block_ones_gpu, fft_PSF_gpu, CLU_KEEP_2ND);
     fft_block_ones_gpu = NULL; // freed already
     here();
+
+    //TODO: Don't download and upload, do it directly on the GPU.
+    // took 0.2 s for a job of size 2240x2240x25 (total time with 15 iter 5.1 s)
+
+
     float * W_pre = fimcl_download(W_pre_gpu);
     fimcl_free(W_pre_gpu);
     here();
@@ -78,6 +83,7 @@ fimcl_t * create_initial_W(clu_env_t * clu,
     }
 
     fimcl_t * W_gpu = fimcl_new(clu, fimcl_real, W_pre, wM, wN, wP);
+
     fftwf_free(W_pre);
     return W_gpu;
 }

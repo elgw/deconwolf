@@ -47,8 +47,8 @@ prf_forest.o: random_forest/prf_forest.c
 	$(cc) -c $(cflags) random_forest/prf*.c random_forest/qsort.c
 
 # Test the float image module
-fim_ut: fim_ut.c fim.c fim.h
-	$(cc) -fopenmp fim_ut.c fft.c fim.c fim_tiff.c ftab.c $(CFLAGS) -lm -o fim_ut -lfftw3f -lfftw3f_threads -ltiff
+fim_ut: fim_ut.c fim.c fim.h dw_util.c
+	$(cc) -fopenmp fim_ut.c fft.c fim.c fim_tiff.c ftab.c dw_util.c $(CFLAGS) -lm -o fim_ut -lfftw3f -lfftw3f_threads -ltiff
 
 ftab_ut: ftab.c
 	$(cc) ftab_ut.c ftab.c $(CFLAGS) -o ftab_ut

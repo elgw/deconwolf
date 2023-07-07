@@ -80,29 +80,13 @@ int fim_maxAtOrigo(const float * restrict V, const int64_t M, const int64_t N, c
     int64_t mN = (N-1)/2;
     int64_t mP = (P-1)/2;
 
-    float maxV = 0;
-    int64_t m = 0, n = 0, p = 0;
-    // TODO reduction(max:maxV)
-    for(int64_t pp = 0; pp < P; pp++) {
-        for(int64_t nn = 0; nn < N; nn++) {
-            for(int64_t mm = 0; mm < M; mm++) {
-                size_t idx = mm + nn*M + pp*M*N;
-                if(V[idx] > maxV)
-                {
-                    maxV = V[idx];
-                    m = mm; n = nn; p = pp;
-                }
-            }
-        }
-    }
-
+    float maxV = fim_max(V, M*N*P);
     float midValue = V[mM + mN*M + mP*M*N];
-
 
     if(maxV > midValue)
     {
-        printf("max I(%" PRId64 ", %" PRId64 ", %" PRId64 ")=%f > mid I(%" PRId64 ", %" PRId64 ", %" PRId64 ")=%f\n",
-               m, n, p, maxV, mM, mN, mP, midValue);
+        printf("max I = %f > mid I(%" PRId64 ", %" PRId64 ", %" PRId64 ")=%f\n",
+               maxV, mM, mN, mP, midValue);
         return 0;
     }
 
@@ -118,10 +102,77 @@ void fim_argmax(const float * I,
     return;
 }
 
+
 void fim_argmax_max(const float * I,
                     size_t M, size_t N, size_t P,
                     int64_t * _aM, int64_t *_aN, int64_t *_aP,
                     float * max_value)
+{
+    float max = I[0];
+    size_t amax = 0;
+
+    size_t MNP = M*N*P;
+
+#pragma omp parallel
+    {
+        size_t n = MNP/omp_get_num_threads();   // step = MAX/number of threads.
+        size_t id = omp_get_thread_num();       // id is one of 0, 1, ..., (num_threads-1)
+        size_t start = id * n;
+        size_t stop = start;
+        if ( id + 1 == (size_t) omp_get_num_threads() ) {
+            stop = MNP;
+        }
+        else {
+            stop = start + n;
+        }
+
+        size_t local_amax = start;
+        float local_max = I[local_amax];
+
+        for(size_t kk = start; kk<stop; kk++)
+        {
+            if(I[kk] > local_max)
+            {
+                local_max = I[kk];
+                local_amax = kk;
+            }
+        }
+#pragma omp critical
+        {
+            // printf("local_max = %f, local_amax = %zu, th=%zu [%zu, %zu]\n",
+            //       local_max, local_amax, id, start, stop-1);
+            if(local_max == max)
+            {
+                if(local_amax < amax)
+                {
+                    max = local_max;
+                    amax = local_amax;
+                }
+            }
+            if(local_max > max)
+            {
+                max = local_max;
+                amax = local_amax;
+            }
+        }
+    }
+
+    int64_t amP = amax / (M*N);
+    int64_t amN = (amax - (amP*M*N)) / M;
+    int64_t amM = amax - amP*M*N - amN*M;
+
+    _aM[0] = amM;
+    _aN[0] = amN;
+    _aP[0] = amP;
+    max_value[0] = max;
+    return;
+}
+
+
+void fim_argmax0_max(const float * I,
+                     size_t M, size_t N, size_t P,
+                     int64_t * _aM, int64_t *_aN, int64_t *_aP,
+                     float * max_value)
 {
     float max = I[0];
     int64_t aM = 0;
@@ -183,7 +234,8 @@ float fim_mean(const float * A, size_t N)
 
 float fim_min(const float * A, size_t N)
 {
-    float amin = INFINITY;
+    float amin = A[0];
+#pragma omp parallel for reduction(min:amin)
     for(size_t kk = 0; kk<N; kk++)
     {
         if(A[kk] < amin)
@@ -542,13 +594,7 @@ size_t fimt_nel(fim_t * F)
 
 float fimt_sum(fim_t * F)
 {
-    double sum = 0;
-    const size_t N = fimt_nel(F);
-    for(size_t kk = 0; kk<N; kk++)
-    {
-        sum += F->V[kk];
-    }
-    return (float) sum;
+    return fim_sum(F->V, fimt_nel(F));
 }
 
 float * fim_constant(const size_t N, const float value)
@@ -2928,12 +2974,150 @@ void fim_features_2d_ut()
 }
 
 
+void fim_argmax_max_ut()
+{
+    struct timespec tstart, tend;
+    size_t M = 2048;
+    size_t N = 2048;
+    size_t P = 60;
+    size_t MNP = M*N*P;
+    float * A = calloc(MNP, sizeof(float));
+
+    for(size_t kk = 0 ; kk < MNP; kk ++)
+    {
+        A[kk] = (float) rand()/ (float) RAND_MAX;
+    }
+    clock_gettime(CLOCK_REALTIME, &tstart);
+
+    float ref_max = A[0];
+    size_t ref_argmax = 0;
+    for(size_t kk = 0 ; kk < MNP; kk++)
+    {
+        if(A[kk] > ref_max)
+        {
+            ref_max = A[kk];
+            ref_argmax = kk;
+        }
+    }
+    int64_t ref_amP = ref_argmax / (M*N);
+    int64_t ref_amN = (ref_argmax - (ref_amP*M*N)) / M;
+    int64_t ref_amM = ref_argmax - ref_amP*M*N - ref_amN*M;
+    clock_gettime(CLOCK_REALTIME, &tend);
+
+    double t_ref_amax = clockdiff(&tend, &tstart);
+
+    clock_gettime(CLOCK_REALTIME, &tstart);
+    int64_t amM, amN, amP;
+    float lib_max;
+    fim_argmax_max(A, M, N, P, &amM, &amN, &amP, &lib_max);
+    clock_gettime(CLOCK_REALTIME, &tend);
+    double t_lib_amax = clockdiff(&tend, &tstart);
+
+    if( (lib_max == ref_max) &&
+        (amM + amN*M + amP*M*N == ref_argmax))
+    {
+        printf("lib: A(%ld, %ld, %ld) = %f\n", amM, amN, amP, lib_max);
+        printf("ref: A(%zu) = A(%ld, %ld, %ld) = %f\n", ref_argmax,
+               ref_amM, ref_amN, ref_amP, ref_max);
+        printf("fim_argmax_max_ut passed (%e s, ref-implementation: %e s)\n",
+               t_lib_amax, t_ref_amax);
+    } else {
+        fprintf(stderr, "fim_argmax_max_ut failed\n");
+        printf("lib: A(%ld, %ld, %ld) = %f\n", amM, amN, amP, lib_max);
+        printf("ref: A(%zu) = A(%ld, %ld, %ld) = %f\n", ref_argmax,
+               ref_amM, ref_amN, ref_amP, ref_max);
+        exit(EXIT_FAILURE);
+    }
+    free(A);
+    return;
+}
+
+
+void fim_max_ut()
+{
+    struct timespec tstart, tend;
+    size_t N = 2024*1024*60;
+    float * A = calloc(N, sizeof(float));
+
+    for(size_t kk = 0 ; kk < N; kk ++)
+    {
+        A[kk] = (float) rand()/ (float) RAND_MAX;
+    }
+    clock_gettime(CLOCK_REALTIME, &tstart);
+    float ref_max = A[0];
+    for(size_t kk = 0 ; kk < N; kk++)
+    {
+        if(A[kk] > ref_max)
+        {
+            ref_max = A[kk];
+        }
+    }
+    clock_gettime(CLOCK_REALTIME, &tend);
+    double t_ref_max = clockdiff(&tend, &tstart);
+
+    clock_gettime(CLOCK_REALTIME, &tstart);
+    float lib_max = fim_max(A, N);
+    clock_gettime(CLOCK_REALTIME, &tend);
+    double t_lib_max = clockdiff(&tend, &tstart);
+
+    if(lib_max == ref_max)
+    {
+        printf("fim_max_ut passed (%e s, ref-implementation: %e s)\n", t_lib_max, t_ref_max);
+    } else {
+        fprintf(stderr, "fim_max_ut failed\n");
+        exit(EXIT_FAILURE);
+    }
+    free(A);
+    return;
+}
+
+void fim_min_ut()
+{
+    struct timespec tstart, tend;
+    size_t N = 2024*1024*60;
+    float * A = calloc(N, sizeof(float));
+
+    for(size_t kk = 0 ; kk < N; kk ++)
+    {
+        A[kk] = (float) rand()/ (float) RAND_MAX;
+    }
+    clock_gettime(CLOCK_REALTIME, &tstart);
+    float ref_min = A[0];
+    for(size_t kk = 0 ; kk < N; kk++)
+    {
+        if(A[kk] < ref_min)
+        {
+            ref_min = A[kk];
+        }
+    }
+    clock_gettime(CLOCK_REALTIME, &tend);
+    double t_ref_min = clockdiff(&tend, &tstart);
+
+    clock_gettime(CLOCK_REALTIME, &tstart);
+    float lib_min = fim_min(A, N);
+    clock_gettime(CLOCK_REALTIME, &tend);
+    double t_lib_min = clockdiff(&tend, &tstart);
+
+    if(lib_min == ref_min)
+    {
+        printf("fim_min_ut passed (%e s, ref-implementation: %e s)\n",
+               t_lib_min, t_ref_min);
+    } else {
+        fprintf(stderr, "fim_min_ut failed\n");
+        exit(EXIT_FAILURE);
+    }
+    free(A);
+    return;
+}
 
 void fim_ut()
 {
-    fim_features_2d_ut();
-    exit(EXIT_SUCCESS);
+
+    fim_argmax_max_ut();
+    fim_min_ut();
+    fim_max_ut();
     fim_LoG_ut();
+    fim_features_2d_ut();
     fim_conv1_vector_ut();
     fim_conncomp6_ut();
     exit(EXIT_SUCCESS);
