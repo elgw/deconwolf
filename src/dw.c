@@ -452,15 +452,28 @@ void fulldump(dw_opts * s, float * A, size_t M, size_t N, size_t P, char * name)
 void dw_fprint_info(FILE * f, dw_opts * s)
 {
     f == NULL ? f = stdout : 0;
-    fprintf(f, "deconwolf: '%s' PID: %d\n", deconwolf_version, (int) getpid());
+
+    fprintf(f, "deconwolf: '%s'\n", deconwolf_version);
+
+    if(f != stdout)
+    {
+    fprintf(f, "PID: %d\n",  (int) getpid());
+    }
+
+    if(f != stdout)
+    {
     char cwd[1024];
     if (getcwd(cwd, sizeof(cwd)) != NULL) {
         fprintf(f, "PWD: %s\n", cwd);
     }
+    }
 
+    if(f != stdout)
+    {
     if(s->commandline != NULL)
     {
         fprintf(f, "CMD: %s\n", s->commandline);
+    }
     }
 
 #ifdef GIT_VERSION
@@ -471,14 +484,16 @@ void dw_fprint_info(FILE * f, dw_opts * s)
     fprintf(f, "COMPILER: '%s'\n", CC_VERSION);
 #endif
 
-    fprintf(f, "BUILD_DATE: '%s'\n'", __DATE__);
+    fprintf(f, "BUILD_DATE: '%s'\n", __DATE__);
 #ifdef CUDA
     fprintf(f, "FFT Backend: 'cuFFT\n");
 #else
     fprintf(f, "FFT Backend: '%s'\n", fftwf_version);
 #endif
-    fprintf(f, "TIFF: '%s'\n", TIFFGetVersion());
+    fprintf(f, "TIFF Backend: '%s'\n", TIFFGetVersion());
 
+    if(f != stdout)
+    {
 #ifndef WINDOWS
     char * user = getenv("USER");
     if(user != NULL)
@@ -493,6 +508,7 @@ void dw_fprint_info(FILE * f, dw_opts * s)
         free(hname);
     }
 #endif
+    }
 
 #ifdef _OPENMP
     fprintf(f, "OpenMP: YES\n");
@@ -500,6 +516,8 @@ void dw_fprint_info(FILE * f, dw_opts * s)
 
 #ifdef OPENCL
     fprintf(f, "OpenCL: YES\n");
+    #else
+    fprintf(f, "OpenCL: No. (Rebuild with OPENCL=1 to enable)\n");
 #endif
 
     fprintf(f, "\n");
