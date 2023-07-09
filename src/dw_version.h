@@ -3,7 +3,7 @@
 
 #define DW_VERSION_MAJOR "0"
 #define DW_VERSION_MINOR "2"
-#define DW_VERSION_PATCH "6"
+#define DW_VERSION_PATCH "7"
 #define deconwolf_version DW_VERSION_MAJOR "." \
     DW_VERSION_MINOR "." \
     DW_VERSION_PATCH

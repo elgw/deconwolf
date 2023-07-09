@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v 0.2.7
+- Converted a few minor code paths to execute in parallel by OpenMP
+  directives.
+
 ## v 0.2.6
 - Using ISO 8601 in log files, e.g., `2023-02-14T11:14:14`.
 
