@@ -94,8 +94,11 @@ dw_LIBRARIES += -l:libfftw3.a -l:libfftw3f.a
 dwbw_LIBRARIES += -l:libfftw3.a -l:libfftw3f.a
 endif
 ifneq ($(WINDOWS),1)
-dw_LIBRARIES += -lfftw3f_threads
-dwbw_LIBRARIES += -lfftw3f_threads
+# _omp is faster than _threads on my machines
+dw_LIBRARIES += -lfftw3f_omp
+dwbw_LIBRARIES += -lfftw3f_omp
+#dw_LIBRARIES += -lfftw3f_threads
+#dwbw_LIBRARIES += -lfftw3f_threads
 endif
 endif
 

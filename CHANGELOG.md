@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v 0.2.8
+ - Switched from `fftw3f_threads` to `fftw3f_omp`. This reduced the
+   run time by about 10% on a Intel i7-6700K. Can be reverted by
+   commenting in/out the corresponding lines in the makefile.
+ - Cleaned up the output of `dw --version`
+
 ## v 0.2.7
 - Converted a few minor code paths to execute in parallel by OpenMP
   directives.
