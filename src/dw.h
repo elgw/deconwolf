@@ -155,6 +155,7 @@ struct _dw_opts{
     char * commandline;
     int borderQuality;
     int outFormat; // 16 (=16 bit int) or 32 (=32 bit float)
+    float scaling; // fixed scaling for 16 bit output, automatic scaling is used if this value <= 0
 
     /* sigma of Gaussian used for pre filtering of the image and the PSF
      * this was found beneficial a paper by Van Kempen

@@ -189,6 +189,7 @@ dw_opts * dw_opts_new(void)
     s->onetile = 0;
     s->borderQuality = 2;
     s->outFormat = 16; // write 16 bit int
+    s->scaling = -1.0;
     s->experimental1 = 0;
     s->fulldump = 0;
     s->positivity = 1;
@@ -379,6 +380,16 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
     default:
         fprintf(f, "ERROR: Unknown\n");
         break;
+    }
+    if(s->outFormat == 16)
+    {
+        if(s->scaling <= 0)
+        {
+            fprintf(f, "Scaling: Automatic\n");
+        } else {
+            fprintf(f, "Scaling value: %f\n", s->scaling);
+        }
+
     }
 
     fprintf(f, "Border Quality: ");
@@ -588,6 +599,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         { "mse",       no_argument,       NULL,  'M' },
         { "maxiter",   required_argument, NULL,  'N' },
         { "ref",       required_argument, NULL,  'R' },
+        { "scaling",   required_argument, NULL,  'S' },
         { "onetile",   no_argument,       NULL,  'T' },
         { "nopos",     no_argument,       NULL,  'P' },
         { "psigma",    required_argument, NULL,  'Q' },
@@ -600,7 +612,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     int ch;
     int prefix_set = 0;
     while((ch = getopt_long(argc, argv,
-                            "12349ab:c:f:ghil:m:n:o:p:r:s:tvwx:B:C:DFI:L:MR:TPQ:X:",
+                            "12349ab:c:f:ghil:m:n:o:p:r:s:tvwx:B:C:DFI:L:MR:S:TPQ:X:",
                             longopts, NULL)) != -1)
     {
         switch(ch) {
@@ -704,6 +716,8 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         case 's':
             s->tiling_maxSize = atoi(optarg);
             break;
+        case 'S':
+            s->scaling = atof(optarg);
         case 'p':
             s->tiling_padding = atoi(optarg);
             break;
@@ -1212,6 +1226,10 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
     printf(" --relax F\n\t Multiply the central pixel of the PSF by F. (F>1 relaxation)\n");
     printf(" --xyfactor F\n\t Discard outer planes of the PSF with sum < F of the central. Use 0 for no cropping.\n");
     printf(" --bq Q\n\t Set border handling to 0 'none', 1 'compromise', or 2 'normal' which is default\n");
+    printf(" --scale s\n\t"
+          "Set the scaling factor for the output image manually to s.\n\t"
+          "Warning: Might cause clipping or discretization artifacts\n\t"
+           "This option is only used for 16-bit images\n");
     printf(" --float\n\t Set output format to 32-bit float (default is 16-bit int) and disable scaling\n");
     printf(" --bg l\n\t Set background level, l\n");
     printf(" --biggs N\n\t Set how agressive the Biggs acceleration should be. 0=off, 1=low/default, 2=intermediate, 3=max\n");
@@ -2185,7 +2203,7 @@ int dw_run(dw_opts * s)
                     fim_tiff_write(outFile, out, T, M, N, P);
                     free(outFile);
                 } else {
-                    fim_tiff_write(s->outFile, out, T, M, N, P);
+                    fim_tiff_write_opt(s->outFile, out, T, M, N, P, s->scaling);
                 }
             }
         }

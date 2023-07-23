@@ -83,7 +83,13 @@ void fim_tiff_init(void);
 /* Redirect all output here */
 void fim_tiff_set_log(FILE * fp);
 
-/* Scale and write data */
+/* Write to disk, if scaling <= 0 : automatic scaling will be used. Else the provided value. */
+int fim_tiff_write_opt(const char * fName, const float * V,
+                       ttags * T,
+                       int64_t N, int64_t M, int64_t P, float scaling);
+
+
+/* Scale between 0 and 2^16-1 and write data */
 int fim_tiff_write(const char * fName, const float * V,
                    ttags * T,
     int64_t M, int64_t N, int64_t P);

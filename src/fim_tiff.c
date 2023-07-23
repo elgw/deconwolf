@@ -39,9 +39,6 @@ void readUint16(TIFF * tfile, float * V,
                 const uint32_t perDirectory); // elements per plane
 
 
-int fim_tiff_write_opt(const char * fName, const float * V,
-                       ttags * T,
-                       int64_t N, int64_t M, int64_t P, int scaling);
 
 FILE * fim_tiff_log = NULL; /* Indicates stdout */
 void fim_tiff_init(void)
@@ -887,21 +884,20 @@ int fim_tiff_write(const char * fName, const float * V,
                    int64_t N, int64_t M, int64_t P)
 {
     /* Default, use scaling */
-    return fim_tiff_write_opt(fName, V, T, N, M, P, 1);
+    return fim_tiff_write_opt(fName, V, T, N, M, P, -1.0);
 }
 
 int fim_tiff_write_noscale(const char * fName, const float * V,
                            ttags * T,
                            int64_t N, int64_t M, int64_t P)
 {
-    /* Default, use scaling */
-    return fim_tiff_write_opt(fName, V, T, N, M, P, 0);
+    return fim_tiff_write_opt(fName, V, T, N, M, P, 1);
 }
 
 
 int fim_tiff_write_opt(const char * fName, const float * V,
                        ttags * T,
-                       int64_t N, int64_t M, int64_t P, int scale)
+                       int64_t N, int64_t M, int64_t P, float scaling)
 {
     if(fim_tiff_log == NULL)
     {
@@ -909,9 +905,7 @@ int fim_tiff_write_opt(const char * fName, const float * V,
     }
     // if V == NULL and empty file will be written
 
-    float scaling = 1;
-
-    if(scale)
+    if(scaling <= 0)
     {
         if(V != NULL)
         {

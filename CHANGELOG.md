@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v 0.2.9
+ - Added the command line option **--scaling** for setting bypassing the
+   automatic image scaling in 16-bit output mode.
+
 ## v 0.2.8
  - Switched from `fftw3f_threads` to `fftw3f_omp`. This reduced the
    run time by about 10% on a Intel i7-6700K. Can be reverted by
