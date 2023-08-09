@@ -2,6 +2,7 @@
 
 ## 0.3.0
 - Respects the NO_COLOR environmental variable in accord with https://no-color.org/.
+- Fixed correct capping of pixel values when **--scaling** is used.
 
 ## v 0.2.9
  - Added the command line option **--scaling** for setting bypassing the

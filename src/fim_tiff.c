@@ -968,6 +968,9 @@ int fim_tiff_write_opt(const char * fName, const float * V,
                 for(size_t ll = 0; ll < (size_t) N; ll++)
                 {
                     float value = V[M*N*dd + kk*N + ll]*scaling;
+
+                    value > 65535 ? value = 65535 : 0;
+
                     if(!isfinite(value))
                     { value = 0; }
 
