@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## 0.3.0
+- Respects the NO_COLOR environmental variable in accord with https://no-color.org/.
+
 ## v 0.2.9
  - Added the command line option **--scaling** for setting bypassing the
    automatic image scaling in 16-bit output mode.

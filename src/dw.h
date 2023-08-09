@@ -128,6 +128,7 @@ struct _dw_opts{
     dw_iter_type iter_type;
 
     int verbosity;
+    int color; /* Show colored things in terminal */
     int showTime; /* For dev: show detailed timings */
     int iterdump; /* Dump each iteration to file */
 

@@ -175,6 +175,7 @@ dw_opts * dw_opts_new(void)
     s->prefix = malloc(10*sizeof(char));
     sprintf(s->prefix, "dw");
     s->log = NULL;
+    s->color = 1;
     s->verbosity = 1;
     s->showTime = 0;
     s->overwrite = 0;
@@ -204,6 +205,14 @@ dw_opts * dw_opts_new(void)
     clock_gettime(CLOCK_REALTIME, &s->tstart);
     s->fftw3_planning = FFTW_MEASURE;
     s->alphamax = 1;
+
+    /* https://no-color.org/ */
+    char *no_color = getenv("NO_COLOR");
+    if (no_color != NULL && no_color[0] != '\0')
+    {
+        s->color = 0;
+    }
+
     return s;
 }
 
@@ -1165,7 +1174,12 @@ void putdot(const dw_opts *s)
 {
     if(s->verbosity > 0)
     {
-        printf(ANSI_COLOR_GREEN "." ANSI_COLOR_RESET);
+        if(s->color)
+        {
+            printf(ANSI_COLOR_GREEN "." ANSI_COLOR_RESET);
+        } else {
+            printf(".");
+        }
         fflush(stdout);
     }
     return;
