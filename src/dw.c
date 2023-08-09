@@ -718,6 +718,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             break;
         case 'S':
             s->scaling = atof(optarg);
+            break;
         case 'p':
             s->tiling_padding = atoi(optarg);
             break;
