@@ -523,10 +523,11 @@ void uint16toraw(TIFF * tfile, const char * ofile,
                  const uint32_t nstrips)
 {
     uint16_t * buf = _TIFFmalloc(ssize);
-    float * wbuf = malloc(ssize/sizeof(uint16_t)*sizeof(float));
-    FILE * fout = fopen(ofile, "w");
-
     assert(buf != NULL);
+    float * wbuf = malloc(ssize/sizeof(uint16_t)*sizeof(float));
+    assert(wbuf != NULL);
+    FILE * fout = fopen(ofile, "w");
+    assert(fout != NULL);
 
     for(int64_t dd=0; dd<ndirs; dd++) {
         TIFFSetDirectory(tfile, dd);
@@ -553,10 +554,12 @@ void floattoraw(TIFF * tfile, const char * ofile,
                 const uint32_t nstrips)
 {
     float * buf = _TIFFmalloc(ssize);
-    float * wbuf = malloc(ssize/sizeof(float)*sizeof(float));
-    FILE * fout = fopen(ofile, "w");
-
     assert(buf != NULL);
+    float * wbuf = malloc(ssize/sizeof(float)*sizeof(float));
+    assert(wbuf != NULL);
+    FILE * fout = fopen(ofile, "w");
+    assert(fout != NULL);
+
 
     for(int64_t dd=0; dd<ndirs; dd++) {
         TIFFSetDirectory(tfile, dd);
@@ -717,7 +720,9 @@ int fim_tiff_from_raw(const char * fName, // Name of tiff file to be written
 
     size_t linbytes = M*bytesPerSample;
     uint16_t * buf = _TIFFmalloc(linbytes);
+    assert(buf != NULL);
     float * rbuf = malloc(M*sizeof(float));
+    assert(rbuf != NULL);
     memset(buf, 0, linbytes);
 
     // Determine max value
@@ -824,6 +829,7 @@ int fim_tiff_write_float(const char * fName, const float * V,
 
     size_t linbytes = (M+N)*bytesPerSample;
     float * buf = _TIFFmalloc(linbytes);
+    assert(buf != NULL);
     memset(buf, 0, linbytes);
 
     for(size_t dd = 0; dd < (size_t) P; dd++)
@@ -939,6 +945,7 @@ int fim_tiff_write_opt(const char * fName, const float * V,
 
     size_t linbytes = (M+N)*bytesPerSample;
     uint16_t * buf = _TIFFmalloc(linbytes);
+    assert(buf != NULL);
     memset(buf, 0, linbytes);
 
     for(size_t dd = 0; dd < (size_t) P; dd++)
@@ -1028,6 +1035,7 @@ fim_t * fimt_tiff_read(const char * fName)
     int64_t M, N, P;
     float * V = fim_tiff_read(fName, NULL, &M, &N, &P, 0);
     fim_t * I = malloc(sizeof(fim_t));
+    assert(I != NULL);
     I->V = V;
     I->M = M;
     I->N = N;
@@ -1049,6 +1057,7 @@ float * fim_tiff_read(const char * fName,
 ttags * ttags_new()
 {
     ttags * T  = malloc(sizeof(ttags));
+    assert(T != NULL);
     T->xresolution = 1;
     T->yresolution = 1;
     T->zresolution = 1;
@@ -1091,6 +1100,7 @@ void ttags_set_pixelsize(ttags * T, double xres, double yres, double zres)
         free(T->imagedescription);
     }
     T->imagedescription = malloc(1024);
+    assert(T->imagedescription != NULL);
     sprintf(T->imagedescription,
             "ImageJ=1.52r\nimages=%d\nslices=%d\nunit=nm\nspacing=%.1f\nloop=false.",
             T->P, T->P, T->zresolution);
@@ -1124,6 +1134,7 @@ void ttags_set_software(ttags * T, char * sw)
         free(T->software);
     }
     T->software = malloc(strlen(sw)+2);
+    assert(T->software != NULL);
     sprintf(T->software, "%s", sw);
 }
 
@@ -1160,6 +1171,7 @@ void ttags_get(TIFF * tfile, ttags * T)
     if(TIFFGetField(tfile, TIFFTAG_IMAGEDESCRIPTION, &desc) == 1)
     {
         T->imagedescription = malloc(strlen(desc)+2);
+        assert(T->imagedescription != NULL);
         strcpy(T->imagedescription, desc);
     }
 
@@ -1167,6 +1179,7 @@ void ttags_get(TIFF * tfile, ttags * T)
     if(TIFFGetField(tfile, TIFFTAG_SOFTWARE, &software) == 1)
     {
         T->software = malloc(strlen(software)+2);
+        assert(T->software != NULL);
         strcpy(T->software, software);
         //    printf("! Got software tag: %s\n", T->software);
     }
@@ -1196,6 +1209,7 @@ void ttags_get(TIFF * tfile, ttags * T)
     {
         T->nIJIJinfo = count;
         T->IJIJinfo = malloc(count);
+        assert(T->IJIJinfo != NULL);
         memcpy(T->IJIJinfo, data, count);
         uint8_t * udata = (uint8_t*) data;
         for(int kk = 0; kk<count; kk++)
@@ -1533,6 +1547,7 @@ int main(int argc, char ** argv)
         outname = argv[2];
     } else {
         outname = malloc(100*sizeof(char));
+        assert(outname != NULL);
         sprintf(outname, "foo.tif");
     }
     printf("Will read from %s and write to %s.\n", inname, outname);
@@ -1540,6 +1555,7 @@ int main(int argc, char ** argv)
     int64_t M = 0, N = 0, P = 0;
 
     ttags * T = malloc(sizeof(ttags));
+    assert( T!= NULL);
     float * I = (float *) fim_tiff_read(inname, T, &M, &N, &P, 1);
 
     ttags_show(stdout, T);
@@ -1569,6 +1585,7 @@ int main(int argc, char ** argv)
 char * tiff_is_supported(TIFF * tiff)
 {
     char * errStr = malloc(1024);
+    assert(errStr != NULL);
     if(tiff == NULL) {
         sprintf(errStr, "Can't be opened!");
         return errStr;
@@ -1682,6 +1699,7 @@ int fim_tiff_maxproj_XYZ(const char * in, const char * out)
     fim_free(I);
 
     fim_t * xview = malloc(sizeof(fim_t));
+    assert(xview != NULL);
     xview->M = MM;
     xview->N = NN;
     xview->P = 1;
@@ -1734,7 +1752,8 @@ int fim_tiff_maxproj(char * in, char * out)
         return -1;
     }
 
-    ttags * T = malloc(sizeof(ttags));;
+    ttags * T = malloc(sizeof(ttags));
+    assert(T != NULL);
     ttags_get(input, T);
     ttags_set_software(T, "deconwolf " deconwolf_version);
 
@@ -1813,7 +1832,9 @@ int fim_tiff_maxproj(char * in, char * out)
     {
 
         uint16_t * mstrip = _TIFFmalloc(ssize); // For max over all directories
+        assert(mstrip != NULL);
         uint16_t * strip    = _TIFFmalloc(ssize);
+        assert(strip != NULL);
 
         for(int64_t nn = 0; nn<nstrips; nn++) // Each strip
         {
@@ -1847,11 +1868,9 @@ int fim_tiff_maxproj(char * in, char * out)
         //TIFFSetField(output, TIFFTAG_STRIPBYTECOUNTS, 1);
 
         float * mstrip = _TIFFmalloc(ssize); // For max over all directories
+        assert(mstrip != NULL);
         float * strip    = _TIFFmalloc(ssize);
-#if 0
-        float * outbuffer = malloc(M*N*sizeof(float));
-        size_t outbufferpos = 0;
-#endif
+
         for(int64_t ss = 0; ss < nstrips; ss++) // Each strip
         {
             memset(mstrip, 0, ssize);
@@ -1958,7 +1977,9 @@ int fim_tiff_extract_slice(char * in, char * out, int slice)
     if(SF == SAMPLEFORMAT_UINT)
     {
         uint16_t * mstrip = _TIFFmalloc(ssize); // For max over all directories
+        assert(mstrip != NULL);
         uint16_t * strip    = _TIFFmalloc(ssize);
+        assert(strip != NULL);
 
         TIFFSetDirectory(input, slice-1); // Does it keep the location for each directory?
 
@@ -1986,7 +2007,9 @@ int fim_tiff_extract_slice(char * in, char * out, int slice)
     if(SF == SAMPLEFORMAT_IEEEFP)
     {
         float * mstrip = _TIFFmalloc(ssize); // For max over all directories
+        assert(mstrip != NULL);
         float * strip    = _TIFFmalloc(ssize);
+        assert(strip != NULL);
 
         TIFFSetDirectory(input, slice-1); // Does it keep the location for each directory?
         for(int64_t nn = 0; nn<nstrips; nn++) // Each strip

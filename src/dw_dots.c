@@ -26,7 +26,8 @@ static void argparsing(int argc, char ** argv, opts * s);
 
 static opts * opts_new()
 {
-    opts * s = malloc(sizeof(opts));
+    opts * s = calloc(1, sizeof(opts));
+    assert(s != NULL);
 
     s->overwrite = 0;
     s->verbose = 1;
@@ -52,11 +53,17 @@ static void opts_free(opts * s)
     dw_nullfree(s->outfile);
     dw_nullfree(s->image);
     dw_nullfree(s->logfile);
+    if(s->log != NULL)
+    {
+        fclose(s->log);
+    }
     free(s);
 }
 
 static void opts_print(FILE * f, opts * s)
 {
+    assert(s != NULL);
+    assert(f != NULL);
     fprintf(f, "overwrite = %d\n", s->overwrite);
     fprintf(f, "verbose = %d\n", s->verbose);
     if(s->image != NULL)
@@ -123,6 +130,7 @@ ftab_t * ftab_insert_col(ftab_t * T, float * C, char * cname)
         ftab_set_colname(T2, cc, T->colnames[cc]);
     }
     float * row = malloc((T->nrow+1)*sizeof(float));
+    assert(row != NULL);
     for(size_t rr = 0; rr<T->nrow; rr++)
     {
         memcpy(row, T->T+rr*T->ncol, T->ncol*sizeof(float));
@@ -161,10 +169,12 @@ static void argparsing(int argc, char ** argv, opts * s)
         case 'L':
             dw_nullfree(s->logfile);
             s->logfile = strdup(optarg);
+            assert(s->logfile != NULL);
             break;
         case 'O':
             dw_nullfree(s->outfile);
             s->outfile = strdup(optarg);
+            assert(s->outfile != NULL);
             break;
         case 'a':
             s->asigma = atof(optarg);
@@ -187,6 +197,7 @@ static void argparsing(int argc, char ** argv, opts * s)
             break;
         case 'p':
             s->fout = strdup(optarg);
+            assert(s->fout != NULL);
             break;
         case 't':
             s->nthreads = atoi(optarg);
@@ -220,6 +231,7 @@ static ftab_t * append_fwhm(opts * s, ftab_t * T, fim_t * V, char * cname)
     }
     clock_gettime(CLOCK_REALTIME, &tstart);
     fwhm = malloc(T->nrow*sizeof(float));
+    assert(fwhm != NULL);
 #pragma omp parallel for
     for(size_t kk = 0; kk<T->nrow; kk++)
     {
@@ -255,11 +267,17 @@ void detect_dots(opts * s, char * inFile)
         exit(1);
     }
 
+    assert(inFile != NULL);
+    free(s->image);
     s->image = strdup(inFile);
+    assert(s->image != NULL);
 
     /* Set up the log file for this image */
     dw_nullfree(s->logfile);
+    assert(s != NULL);
+    assert(s->image != NULL);
     s->logfile = malloc(strlen(s->image) + 64);
+    assert(s->logfile != NULL);
     sprintf(s->logfile, "%s.dots.log.txt", s->image);
     s->log = fopen(s->logfile, "w");
     opts_print(s->log, s);
@@ -268,6 +286,7 @@ void detect_dots(opts * s, char * inFile)
     /* Set up the name for the output file */
     dw_nullfree(s->outfile);
     s->outfile = malloc(strlen(s->image) + 64);
+    assert(s->outfile != NULL);
     sprintf(s->outfile, "%s.dots.tsv", s->image);
 
     char * outFile = s->outfile;
@@ -323,6 +342,7 @@ void detect_dots(opts * s, char * inFile)
                    s->lsigma, s->asigma);
         }
         feature = malloc(M*N*P*sizeof(float));
+        assert(feature != NULL);
         memcpy(feature, A, M*N*P*sizeof(float));
         fim_gsmooth_aniso(feature, M, N, P, s->lsigma, s->asigma);
     }
@@ -360,6 +380,7 @@ void detect_dots(opts * s, char * inFile)
     }
     /* Get a threshold suggestion */
     float * values = malloc(sizeof(float)*T->nrow);
+    assert(values != NULL);
     for(size_t kk = 0; kk<T->nrow; kk++)
     {
         values[kk] = T->T[kk*T->ncol + 3];
@@ -385,6 +406,7 @@ void detect_dots(opts * s, char * inFile)
     fim_histogram_free(H);
 
     float * use = malloc(T->nrow*sizeof(float));
+    assert(use != NULL);
     int vcol = ftab_get_col(T, "value");
     for(size_t kk = 0; kk<T->nrow; kk++)
     {
@@ -399,6 +421,7 @@ void detect_dots(opts * s, char * inFile)
         T = append_fwhm(s, T, fI, "fwhm_filtered");
         if(0){
             fim_t * fimA = malloc(sizeof(fim_t));
+            assert(fimA != NULL);
             fimA->V = A;
             fimA->M = M;
             fimA->N = N;
@@ -431,6 +454,7 @@ void detect_dots(opts * s, char * inFile)
 
     ftab_free(T);
     fclose(s->log);
+    s->log = NULL;
     return;
 }
 
@@ -439,6 +463,7 @@ int dw_dots(int argc, char ** argv)
 
     fim_tiff_init();
     opts * s = opts_new();
+
 
     argparsing(argc, argv, s);
     omp_set_num_threads(s->nthreads);

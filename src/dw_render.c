@@ -29,6 +29,7 @@ static int file_exist(char * fname);
 static opts * opts_new()
 {
     opts * s = malloc(sizeof(opts));
+    assert(s != NULL);
 
     s->overwrite = 0;
     s->verbose = 1;
@@ -194,12 +195,14 @@ static void argparsing(int argc, char ** argv, opts * s)
     if(s->outfile == NULL)
     {
         s->outfile = malloc(strlen(s->image) + 64);
+        assert(s->outfile != NULL);
         sprintf(s->outfile, "%s.dots.svg", s->image);
     }
 
     if(s->dotfile == NULL)
     {
         s->dotfile = malloc(strlen(s->image) + 64);
+        assert(s->dotfile != NULL);
         sprintf(s->dotfile, "%s.dots.tsv", s->image);
     }
 
@@ -235,9 +238,9 @@ cairo_surface_t * fim_to_cairo_surface(fim_t * I,
     cairo_surface_flush(result);
     current_row = cairo_image_surface_get_data(result);
     stride = cairo_image_surface_get_stride(result);
-    for (int y = 0; y < I->N; y++) {
+    for (size_t y = 0; y < I->N; y++) {
         uint32_t *row = (void *) current_row;
-        for (int x = 0; x < I->M; x++) {
+        for (size_t x = 0; x < I->M; x++) {
             float v =  ((I->V[x + I->M*y])-low) / (high-low);
             v*=255;
             v > 255? v = 255 : 0;
@@ -359,6 +362,7 @@ void render(opts * s, const fim_t * I, ftab_t * T)
     if(s->drawtext){
         size_t bufflen = 1024;
         char * buff = malloc(bufflen);
+        assert(buff != NULL);
         float ypos = 30;
         float dy = 30;
         float xpos = 20;

@@ -23,6 +23,7 @@ if needed when using **--bq 0**
       `CL_TARGET_OPENCL_VERSION` to define.
 
 ## Nice to have
+- [ ] Skip libtiff, especially for writing.
 - [ ] Switch to/add vkFFT over clFFT
 - [ ] See if Pinned memory allocations can improve the performance for shbcl (don't expect anything drastic from shbcl2).
 - [ ] Adjust the PSF cropping so that the working image size has at

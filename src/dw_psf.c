@@ -54,7 +54,7 @@ static int file_exist(char * fname);
 static opts * opts_new()
 {
     opts * s = malloc(sizeof(opts));
-
+    assert(s != NULL);
     s->overwrite = 0;
     s->verbose = 1;
     s->outfile = NULL;
@@ -293,6 +293,7 @@ static void argparsing(int argc, char ** argv, opts * s)
     if(optind == argc)
     {
         s->outfile = malloc(1024);
+        assert(s->outfile != NULL);
         if(s->optical.lambda2 == 0)
         {
         sprintf(s->outfile,
@@ -325,6 +326,7 @@ static void argparsing(int argc, char ** argv, opts * s)
     }
 
     s->logfile = malloc(strlen(s->outfile) + 32);
+    assert(s->logfile != NULL);
     sprintf(s->logfile, "%s.log.txt", s->outfile);
     s->log = fopen(s->logfile, "w");
     if(s->log == NULL)
@@ -365,6 +367,7 @@ static int file_exist(char * fname)
 void shift_double(double * V, int N, int stride, int shift)
 {
     double * buff = malloc(N*sizeof(double));
+    assert(buff != NULL);
     for(int kk = 0; kk<N; kk++)
     {
         buff[kk] = V[kk*stride];
@@ -388,6 +391,7 @@ void shift_double(double * V, int N, int stride, int shift)
 void shift_float(float * V, int N, int stride, int shift)
 {
     float * buff = malloc(N*sizeof(float));
+    assert(buff != NULL);
     for(int kk = 0; kk<N; kk++)
     {
         buff[kk] = V[kk*stride];
@@ -412,6 +416,7 @@ void shift_float(float * V, int N, int stride, int shift)
 void shift_complex(fftw_complex * V, int N, int stride, int shift)
 {
     fftw_complex * buff = malloc(N*sizeof(fftw_complex));
+    assert(buff != NULL);
     for(int kk = 0; kk<N; kk++)
     {
         buff[kk][0] = V[kk*stride][0];
@@ -525,6 +530,7 @@ static void downsample_integrate(float * A, float * B, int nA, int nB)
     memset(A, 0, nA*nA*sizeof(float));
 
     float * K = malloc(sizeof(float)*factor);
+    assert(K != NULL);
     for(int kk = 0; kk<factor; kk++)
     {
         K[kk] = 1;
@@ -567,6 +573,7 @@ fim_t * gen_psf(opts * s, double lambda)
     /* Phase of Phase Propagator */
     if(s->verbose > 2) { printf("Setting up phase propagator\n"); fflush(stdout); }
     double * ph = malloc(XM*XM*sizeof(double));
+    assert(ph != NULL);
     memset(ph, 0, XM*XM*sizeof(double));
     for(int kk = 0; kk< (int) XM; kk++)
     {
@@ -592,6 +599,7 @@ fim_t * gen_psf(opts * s, double lambda)
 
     /* Pupil function, limited by the NA */
     fftw_complex * pu = fftw_malloc(XM*XM*sizeof(fftw_complex));
+    assert(pu != NULL);
 
     double pur2 = pow(s->optical.NA/lambda, 2);
     for(int kk = 0; kk< (int) XM; kk++)
@@ -624,7 +632,9 @@ fim_t * gen_psf(opts * s, double lambda)
     if(s->verbose > 2) { printf("Calculating\n"); fflush(stdout); }
 
     fftw_complex * h = fftw_malloc(XM*XM*sizeof(fftw_complex));
+    assert(h != NULL);
     fftw_complex * H = fftw_malloc(XM*XM*sizeof(fftw_complex));
+    assert(H != NULL);
     fftw_plan plan = fftw_plan_dft_2d(XM, XM,
                                       h, /* In */
                                       H, /* Out */
@@ -671,6 +681,7 @@ fim_t * gen_psf(opts * s, double lambda)
     if(s->oversampling > 1)
     {
         float * Vout = malloc(s->M*s->M*s->P*sizeof(double));
+        assert(Vout != NULL);
         for(int pp = 0; pp< (int) PSF->P; pp++)
         {
             downsample_integrate(Vout + pp*s->M*s->M,
@@ -726,8 +737,9 @@ static float * conv2d_float(float * A, float * B,
                             size_t M, size_t N)
 {
     fftwf_complex * FA = fftw_malloc(M*N*sizeof(fftwf_complex));
+    assert(FA != NULL);
     fftwf_complex * FB = fftw_malloc(M*N*sizeof(fftwf_complex));
-
+    assert(FB != NULL);
     fftwf_plan plan1 = fftwf_plan_dft_r2c_2d(M, N,
                                       A, /* In */
                                       FA, /* Out */
@@ -752,6 +764,7 @@ static float * conv2d_float(float * A, float * B,
     }
 
     float * out = fftwf_malloc(M*N*sizeof(float));
+    assert(out != NULL);
     fftwf_plan plan3 = fftwf_plan_dft_c2r_2d(M, N,
                                              FA, /* In */
                                              out, /* Out */
@@ -771,6 +784,7 @@ static void pinhole_convolution(opts * s, fim_t * PSF)
     printf("Pinhole size: %.2f AU / %.0f nm / %.1f pixels\n",
            s->optical.pinhole, pinhole_nm, pinhole_px);
     float * P = malloc(PSF->M*PSF->N*sizeof(float));
+    assert(P != NULL);
     for(int aa = 0; aa < (int) PSF->M; aa++)
     {
         for(int bb = 0; bb < (int) PSF->N; bb++)
@@ -822,7 +836,7 @@ static void pinhole_convolution(opts * s, fim_t * PSF)
         free(C);
     }
 
-
+    free(P);
 
     return;
 }
@@ -870,6 +884,7 @@ static void dw_psf(opts * s)
 
     ttags * T = ttags_new();
     char * swstring = malloc(1024);
+    assert(swstring != NULL);
     sprintf(swstring, "deconwolf %s", deconwolf_version);
     ttags_set_software(T, swstring);
     ttags_set_imagesize(T, PSF->M, PSF->N, PSF->P);

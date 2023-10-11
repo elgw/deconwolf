@@ -17,6 +17,7 @@
 #ifndef __dw_util_h__
 #define __dw_util_h__
 
+#include <assert.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>

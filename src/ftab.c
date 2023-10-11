@@ -20,7 +20,6 @@
 static int parse_floats(char * l, float * row, int nval);
 static size_t count_newlines(const char * fname);
 
-
 void ftab_head(ftab_t * T, int64_t n)
 {
 
@@ -118,12 +117,12 @@ int ftab_print(FILE * fid, const ftab_t * T)
 
 ftab_t * ftab_new(int ncol)
 {
-    ftab_t * T = malloc(sizeof(ftab_t));
+    ftab_t * T = calloc(1, sizeof(ftab_t));
+    assert(T != NULL);
     T->ncol = ncol;
-    T->nrow = 0;
     T->nrow_alloc = 1024;
     T->T = malloc(T->ncol*T->nrow_alloc*sizeof(float));
-    T->colnames = NULL;
+    assert(T->T != NULL);
     return T;
 }
 
@@ -135,6 +134,7 @@ static int parse_col_names(ftab_t * T, const char * _line)
         return 0;
     }
     char * line = strdup(_line);
+    assert(line != NULL);
     int ncol = 1;
     for(size_t kk = 0; kk<strlen(line); kk++)
     {
@@ -147,6 +147,7 @@ static int parse_col_names(ftab_t * T, const char * _line)
 
     /* Allocate memory */
     T->colnames = malloc(ncol*sizeof(char*));
+    assert(T->colnames != NULL);
 
     /* Set columns */
     char * f = strtok(line, "\t");
@@ -209,6 +210,7 @@ ftab_t * ftab_from_tsv(const char * fname)
         return NULL;
     }
     ftab_t * T = malloc(sizeof(ftab_t));
+    assert(T != NULL);
     // Get number of columns
     char * line = NULL;
     size_t len = 0;
@@ -231,6 +233,7 @@ ftab_t * ftab_from_tsv(const char * fname)
 
     // Allocate memory
     T->T = malloc(nrows*ncols*sizeof(float));
+    assert(T->T != NULL);
     T->ncol = ncols;
     T->nrow_alloc = nrows;
     // T->nrow = nrows; // set later
@@ -286,6 +289,7 @@ void ftab_sort(ftab_t * T, int col)
         exit(EXIT_FAILURE);
     }
     ftab_sort_pair * P = malloc(T->nrow*sizeof(ftab_sort_pair));
+    assert(P != NULL);
     /* Extract values from col %d and sort */
 
     for(size_t kk = 0; kk < T->nrow; kk++)
@@ -299,6 +303,7 @@ void ftab_sort(ftab_t * T, int col)
           sizeof(ftab_sort_pair),
           ftab_sort_pair_cmp);
     float * T2 = malloc(T->ncol*T->nrow_alloc*sizeof(float));
+    assert(T2 != NULL);
     for(size_t kk = 0; kk< T->nrow; kk++)
     {
         size_t newpos = P[kk].idx*T->ncol;
@@ -393,6 +398,7 @@ void ftab_set_colname(ftab_t * T, int col, const char * name)
     if(T->colnames == NULL)
     {
         T->colnames = malloc(T->ncol*sizeof(char*));
+        assert(T->colnames != NULL);
         for(size_t kk = 0; kk<T->ncol; kk++)
         {
             T->colnames[kk] = NULL;
@@ -409,6 +415,7 @@ void ftab_set_colname(ftab_t * T, int col, const char * name)
 int ftab_ut()
 {
     ftab_t * T = ftab_new(4);
+    assert(T != NULL);
     printf("T: %zu x %zu\n", T->nrow, T->ncol);
     ftab_set_colname(T, 0, "x");
     ftab_set_colname(T, 1, "y");
@@ -422,6 +429,7 @@ int ftab_ut()
 
     /* Save and read */
     char * fname = malloc(1024);
+    assert(fname != NULL);
     sprintf(fname, "/tmp/ftab-XXXXXX");
     int filedes = mkstemp(fname);
     close(filedes);
@@ -436,6 +444,8 @@ int ftab_ut()
     assert(T2->nrow == T->nrow);
     for(size_t kk = 0; kk<T->ncol; kk++)
     {
+        assert(T->colnames[kk] != NULL);
+        assert(T2->colnames[kk] != NULL);
         assert(strcmp(T->colnames[kk], T2->colnames[kk]) == 0);
     }
 

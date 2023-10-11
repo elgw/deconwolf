@@ -134,6 +134,7 @@ size_t get_peakMemoryKB(void)
 size_t get_peakMemoryKB(void)
 {
     char * statfile = malloc(100*sizeof(char));
+    assert(statfile != NULL);
     sprintf(statfile, "/proc/%d/status", getpid());
     FILE * sf = fopen(statfile, "r");
     if(sf == NULL)
@@ -162,6 +163,10 @@ size_t get_peakMemoryKB(void)
     fclose(sf);
     free(statfile);
 
+    if(peakline == NULL)
+    {
+        return 0;
+    }
     // Parse the line starting with "VmPeak"
     // Seems like it is always in kB
     // (reference: fs/proc/task_mmu.c)
@@ -188,6 +193,7 @@ float dw_read_scaling(char * file)
 {
     float scaling = 1.0;
     char * logfile = malloc(strlen(file)+32);
+    assert(logfile != NULL);
     sprintf(logfile, "%s.log.txt", file);
     if( ! dw_file_exist(logfile))
     {

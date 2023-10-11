@@ -53,7 +53,9 @@ void fim_free(fim_t * F)
 fim_t * fim_image_from_array(const float * V, size_t M, size_t N, size_t P)
 {
     fim_t * I = malloc(sizeof(fim_t));
+    assert(I != NULL);
     I->V = malloc(M*N*P*sizeof(float));
+    assert(I->V != NULL);
     memcpy(I->V, V, M*N*P*sizeof(float));
     I->M = M;
     I->N = N;
@@ -510,14 +512,17 @@ float * fim_subregion_ref(float * A, int64_t M, int64_t N, int64_t P, int64_t m,
     return S;
 }
 
-void fim_set_min_to_zero(float * I, size_t N)
+void fim_set_min_to_zero(float * restrict I, const size_t N)
 {
     float min = fim_min(I, N);
-#pragma omp parallel for shared(I)
+
+#pragma omp parallel for
     for(size_t kk = 0; kk<N; kk++)
     {
         I[kk] -= min;
     }
+
+    return;
 }
 
 void fim_mult_scalar(float * I, size_t N, float x)
@@ -550,6 +555,7 @@ float * fim_copy(const float * restrict V, const size_t N)
 // Return a newly allocated copy of V
 {
     float * C = fftwf_malloc(N*sizeof(float));
+    assert(C != NULL);
     memcpy(C, V, N*sizeof(float));
     return C;
 }
@@ -557,6 +563,7 @@ float * fim_copy(const float * restrict V, const size_t N)
 fim_t * fimt_copy(const fim_t * F)
 {
     fim_t * C = malloc(sizeof(fim_t));
+    assert(C != NULL);
     C->V = fim_copy(F->V, F->M*F->N*F->P);
     C->M = F->M;
     C->N = F->N;
@@ -578,6 +585,7 @@ fim_t * fimt_zeros(const size_t M, const size_t N, const size_t P)
 {
     size_t n = M*N*P;
     fim_t * F = malloc(sizeof(fim_t));
+    assert(F != NULL);
     F->V = fftwf_malloc(n*sizeof(float));
     assert(F->V != NULL);
     F->M = M;
@@ -601,6 +609,7 @@ float * fim_constant(const size_t N, const float value)
 // Allocate and return an array of N floats sets to a constant value
 {
     float * A = fftwf_malloc(N*sizeof(float));
+    assert(A != NULL);
 #pragma omp parallel for shared(A)
     for(size_t kk = 0; kk<N; kk++)
     {
@@ -628,6 +637,7 @@ void fim_circshift(float * restrict A,
 
     const size_t bsize = fmax(fmax(M, N), P);
     float * restrict buf = malloc(bsize*sizeof(float)*nThreads);
+    assert(buf != NULL);
 
 
     /* Dimension 1 */
@@ -695,6 +705,7 @@ static float * kernel_linear_shift(float delta, int * _N)
     }
     *_N = 3; /* Always three elements */
     float * K = malloc(3*sizeof(float));
+    assert(K != NULL);
     K[2] = delta;
     K[2] < 0 ? K[2] = 0 : 0;
     K[1] = fabs(1.0-fabs(delta));
@@ -740,6 +751,7 @@ void fim_shift(float * restrict A,
 
     const size_t bsize = fmax(fmax(M, N), P);
     float * restrict buf = malloc(bsize*sizeof(float)*nThreads);
+    assert(buf != NULL);
 
 
     /* Dimension 1 */
@@ -887,6 +899,7 @@ void shift_vector(float * restrict V,
 {
 
     float * buffer = malloc(N*sizeof(float));
+    assert(buffer != NULL);
     shift_vector_buf(V, S, N, k, buffer);
     free(buffer);
     return;
@@ -904,10 +917,12 @@ float * fim_expand(const float * restrict in,
     assert(pM<=M);
     assert(pN<=N);
     assert(pP<=P);
+    assert(in != NULL);
 
     float * out = fftwf_malloc(M*N*P*sizeof(float));
-    assert(in != NULL);
     assert(out != NULL);
+
+
     for(size_t kk = 0; kk < (size_t) M*N*P; kk++)
         out[kk] = 0;
     fim_insert(out, M, N, P, in, pM, pN, pP);
@@ -918,8 +933,11 @@ void fim_flipall_ut()
 {
 
     float * a = fftwf_malloc(3*3*3*sizeof(float));
+    assert(a != NULL);
     float * b = fftwf_malloc(3*3*3*sizeof(float));
+    assert(b != NULL);
     float * c = fftwf_malloc(3*3*3*sizeof(float));
+    assert(c != NULL);
 
     for(int64_t kk = 0; kk<27; kk++)
     {
@@ -961,6 +979,7 @@ void shift_vector_ut()
     int64_t N = 5;
     int64_t S = 1; // stride
     float * V = fftwf_malloc(N*sizeof(float));
+    assert(V != NULL);
 
     for(int64_t k = -7; k<7; k++)
     {
@@ -1070,6 +1089,7 @@ void fim_otsu_ut()
     size_t N = 10;
     size_t P = 1;
     float * Im = calloc(M*N*P, sizeof(float));
+    assert(Im != NULL);
     for(size_t kk = 0; kk<M*N; kk++)
     {
         if(kk < M*N/2)
@@ -1092,6 +1112,7 @@ void fim_conncomp6_ut()
     size_t M = 10;
     size_t N = 10;
     float * Im = calloc(M*N, sizeof(float));
+    assert(Im != NULL);
     for(size_t kk = 0; kk < M*N/4; kk++)
     {
         size_t idx = rand() % (M*N);
@@ -1112,6 +1133,7 @@ void fim_conv1_vector_ut()
     int normalized = 1;
     const size_t nV = 5;
     float * V = malloc(nV*sizeof(float));
+    assert(V != NULL);
     for(size_t kk = 0; kk<nV; kk++)
     {
         V[kk] = kk+1;
@@ -1127,6 +1149,7 @@ void fim_conv1_vector_ut()
             V[kk] = kk+1;
         }
         float * K = malloc(nK*sizeof(float));
+        assert(K != NULL);
         for(int kk = 0; kk<nK; kk++)
         {
             K[kk] = 1.0;
@@ -1151,6 +1174,7 @@ void fim_LoG_ut()
     float sigma_l = 3.1;
     float sigma_a = 1.1;
     float * V = malloc(M*N*P*sizeof(float));
+    assert(V != NULL);
     for(size_t kk = 0; kk<M*N*P; kk++)
     {
         V[kk] = kk % 100;
@@ -1219,6 +1243,7 @@ void fim_LoG_ut()
 
     float maxabs = fabs(LoG[0]-LoG2[0]);
     float * Delta = malloc(M*N*P*sizeof(float));
+    assert(Delta != NULL);
     for(size_t kk = 0; kk<M*N*P; kk++)
     {
         float diff = fabs(LoG[kk]-LoG2[kk]);
@@ -1285,6 +1310,7 @@ void fim_conv1_vector(float * restrict V, const int stride, float * restrict W,
     if(W == NULL)
     {
         W = malloc(nV*sizeof(float));
+        assert(W != NULL);
         Walloc = 1;
     }
 
@@ -1398,6 +1424,7 @@ static float * gaussian_kernel(float sigma, size_t * nK)
     int N = 2*len + 1;
 
     float * K = malloc(N*sizeof(float));
+    assert(K != NULL);
     float mid = (N-1)/2;
 
     float s2 = pow(sigma, 2);
@@ -1432,6 +1459,7 @@ static float * gaussian_kernel_d1(float sigma, size_t * nK)
     int N = 2*len + 1;
 
     float * K = malloc(N*sizeof(float));
+    assert(K != NULL);
     float mid = (N-1)/2;
 
     float s2 = pow(sigma, 2);
@@ -1497,6 +1525,7 @@ void fim_gsmooth_old(float * restrict V, size_t M, size_t N, size_t P, float sig
 
     /* Temporary storage/buffer for conv1 */
     float * W = malloc(nW*sizeof(float));
+    assert(W != NULL);
 
     /* Create a kernel  */
     size_t nK = 0;
@@ -1856,6 +1885,7 @@ fim_t * fimt_maxproj(const fim_t * F)
 {
     float * _M = fim_maxproj(F->V, F->M, F->N, F->P);
     fim_t * M = malloc(sizeof(fim_t));
+    assert(M != NULL);
     M->V = _M;
     M->M = F->M;
     M->N = F->N;
@@ -1935,6 +1965,7 @@ ftab_t * fim_lmax(const float * I, size_t M, size_t N, size_t P)
 
     /* 3x3x3 structuring element with 26-connectivity */
     float * strel = malloc(27*sizeof(float));
+    assert(strel != NULL);
     for(int kk = 0; kk<27; kk++)
     {
         strel[kk] = 1;
@@ -1974,10 +2005,12 @@ fim_histogram_t * fim_histogram(const float * Im, size_t N)
     delta = (right-left)/((float) nbin);
     //printf("Histogram: #=%zu [%f, %f], delta=%f\n", nbin, left, right, delta);
     fim_histogram_t * H = malloc(sizeof(fim_histogram_t));
+    assert(H != NULL);
     H->left = left;
     H->right = right;
     H->nbin = nbin;
     H->C = calloc(nbin, sizeof(double));
+    assert(H->C != NULL);
 
 
     for(size_t kk = 0; kk<N; kk++)
@@ -2095,6 +2128,7 @@ float * fim_otsu(float * Im, size_t M, size_t N)
     //    printf("Threshold = %f\n", th);
     fim_histogram_free(H);
     float * B = malloc(M*N*1*sizeof(float));
+    assert(B != NULL);
     for(size_t kk = 0; kk < M*N; kk++)
     {
         if( Im[kk] > th )
@@ -2121,6 +2155,7 @@ float * fim_remove_small(const float * im,
 
     /* Histogram on the number of pixels per label */
     uint32_t * H = calloc((ncomp+1), sizeof(uint32_t));
+    assert(H != NULL);
     for(size_t kk = 0; kk<M*N; kk++)
     {
         H[L[kk]]++;
@@ -2129,6 +2164,7 @@ float * fim_remove_small(const float * im,
     /* Set  */
     size_t npix = 0;
     float * out = malloc(M*N*sizeof(float));
+    assert(out != NULL);
     for(size_t kk = 0; kk<M*N; kk++)
     {
         out[kk] = im[kk];
@@ -2177,6 +2213,7 @@ float * fim_fill_holes(const float * im, size_t M, size_t N, float max_size)
 
     /* Find regions connected to the boundary */
     int * boundary = calloc(ncomp+1, sizeof(int));
+    assert(boundary != NULL);
 
     for(size_t kk = 0; kk<M; kk++)
     {
@@ -2200,6 +2237,7 @@ float * fim_fill_holes(const float * im, size_t M, size_t N, float max_size)
 
     /* Histogram on the number of pixels per label */
     uint32_t * H = calloc((ncomp+1), sizeof(uint32_t));
+    assert(H != NULL);
     for(size_t kk = 0; kk<M*N; kk++)
     {
         H[L[kk]]++;
@@ -2211,6 +2249,7 @@ float * fim_fill_holes(const float * im, size_t M, size_t N, float max_size)
      * boundary are set to zero. */
     size_t nfilled = 0;
     float * out = malloc(M*N*sizeof(float));
+    assert(out != NULL);
     for(size_t kk = 0; kk<M*N; kk++)
     {
         out[kk] = im[kk];
@@ -2232,6 +2271,7 @@ float * fim_fill_holes(const float * im, size_t M, size_t N, float max_size)
 int * fim_conncomp6(const float * im, size_t M, size_t N)
 {
     int * lab = calloc(M*N, sizeof(float));
+    assert(lab != NULL);
     int label = 0;
 
     //    printf("First pass\n");
@@ -2313,6 +2353,7 @@ int * fim_conncomp6(const float * im, size_t M, size_t N)
 
     //    printf("Third pass, set pixel values\n");
     int * E2 = calloc(label, sizeof(int));
+    assert(E2 != NULL);
     int newlabel = 1;
     for(size_t kk = 0; kk<M*N; kk++)
     {
@@ -2355,6 +2396,7 @@ int fim_convn1(float * restrict V, size_t M, size_t N, size_t P,
 
 
     float * W = malloc(nThreads*nW*sizeof(float));
+    assert(W != NULL);
 
     if(dim == 0)
     {
@@ -2457,6 +2499,7 @@ float * fim_LoG_S(const float * V0, const size_t M, const size_t N, const size_t
     /* Pad in Z-direction */
     size_t P = P0 + 2*apad;
     float * V = malloc(M*N*P*sizeof(float));
+    assert(V != NULL);
     for(size_t kk = 0; kk< (size_t) apad; kk++)
     {
         memcpy(V+kk*M*N, V0, M*N*sizeof(float));
@@ -2520,6 +2563,7 @@ float * fim_LoG_S(const float * V0, const size_t M, const size_t N, const size_t
 
     /* Unpad in the axial direction */
     float * uLoG = malloc(M*N*P0*sizeof(float));
+    assert(uLoG != NULL);
     memcpy(uLoG, LoG+M*N*apad, M*N*P0*sizeof(float));
     free(LoG);
     return uLoG;
@@ -2666,6 +2710,7 @@ double * fim_get_line_double(fim_t * I,
     int P = I->P;
     int pos = z*M*N + y*M + x;
     double * L = calloc(nPix, sizeof(double));
+    assert(L != NULL);
     if(dim == 0)
     {
         for(int kk = 0; kk<nPix; kk++)
@@ -2708,7 +2753,9 @@ fim_t * fim_shiftdim(fim_t * I)
 
     /* Output image */
     fim_t * O = malloc(sizeof(fim_t));
+    assert(O != NULL);
     O->V = malloc(M*N*P*sizeof(float));
+    assert(O->V != NULL);
     O->M = N;
     O->N = P;
     O->P = M;
@@ -2783,6 +2830,7 @@ static float total_gm(const float * I0, size_t M, size_t N, float sigma)
 float * fim_focus_gm(const fim_t * I, float sigma)
 {
     float * gm = malloc(I->P*sizeof(float));
+    assert(gm != NULL);
     for(size_t kk = 0; kk<I->P; kk++)
     {
         gm[kk] = total_gm(I->V + kk*I->M*I->N, I->M, I->N, sigma);
@@ -2812,9 +2860,11 @@ ftab_t * fim_features_2d(const fim_t * fI)
     int nfeatures = nsigma*f_per_s;
     printf("Will produce %d features\n", nfeatures);
     ftab_t * T = malloc(sizeof(ftab_t));
+    assert(T != NULL);
     T->nrow = fI->M*fI->N;
     T->ncol = nfeatures;
     T->T = malloc(T->ncol*T->nrow*sizeof(float));
+    assert(T->T != NULL);
     T->nrow_alloc = T->nrow;
     T->colnames = NULL;
 
@@ -2826,10 +2876,12 @@ ftab_t * fim_features_2d(const fim_t * fI)
     if(debug)
     {
         debug_image = malloc(M*N*nfeatures*sizeof(float));
+        assert(debug_image != NULL);
     }
     printf("Extracting features ... \n");
     int col = 0;
     char * sbuff = malloc(1024);
+    assert(sbuff != NULL);
     for(int ss = 0; ss<nsigma; ss++)
     {
         float sigma = sigmas[ss];
@@ -2962,6 +3014,7 @@ void fim_features_2d_ut()
     float * V = fim_tiff_read(file, NULL, &M, &N, &P, 0);
     printf("%s is %ld %ld %ld image\n", file, M, N, P);
     fim_t * I = malloc(sizeof(fim_t));
+    assert(I != NULL);
     I->V = V;
     I->M = M;
     I->N = N;
@@ -2982,6 +3035,7 @@ void fim_argmax_max_ut()
     size_t P = 60;
     size_t MNP = M*N*P;
     float * A = calloc(MNP, sizeof(float));
+    assert(A != NULL);
 
     for(size_t kk = 0 ; kk < MNP; kk ++)
     {
@@ -3038,6 +3092,7 @@ void fim_max_ut()
     struct timespec tstart, tend;
     size_t N = 2024*1024*60;
     float * A = calloc(N, sizeof(float));
+    assert(A != NULL);
 
     for(size_t kk = 0 ; kk < N; kk ++)
     {
@@ -3076,6 +3131,7 @@ void fim_min_ut()
     struct timespec tstart, tend;
     size_t N = 2024*1024*60;
     float * A = calloc(N, sizeof(float));
+    assert(A != NULL);
 
     for(size_t kk = 0 ; kk < N; kk ++)
     {
@@ -3139,6 +3195,7 @@ void fim_ut()
 
     int nV = 10;
     float * V = malloc(nV*sizeof(float));
+    assert(V != NULL);
     for(int kk = 0; kk<nV; kk++)
     {
         V[kk] = kk;

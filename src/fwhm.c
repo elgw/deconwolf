@@ -501,6 +501,7 @@ float fwhm_lateral(fim_t * I,
     assert(nPix % 2 == 1);
     /* Line length */
     double * X = malloc(nPix*sizeof(double));
+    assert(X != NULL);
     for(int kk = 0; kk<nPix; kk++)
     {
         X[kk] = kk - (nPix-1)/2;

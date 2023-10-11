@@ -35,6 +35,7 @@ printf(" -> test_weights\n");
 
   printf("Generating weight map ... \n"); fflush(stdout);
   float * W = malloc(M*N*sizeof(float));
+  assert(W != NULL);
   for(int aa = 0; aa<M; aa++)
   {
     for(int bb = 0; bb<N; bb++)
@@ -49,18 +50,19 @@ printf(" -> test_weights\n");
   printf("Writing weights from all tiles to %s\n", outFile); fflush(stdout);
 
   // Assuming that is it same behaviour for all P
- for(size_t kk = 0; kk<M*N; kk++)
+  for(size_t kk = 0; kk< (size_t) M*N; kk++)
   {
     assert(W[kk] > 0);
   }
 
 
- fim_tiff_write(outFile, W, M, N, 1, stdout);
+  fim_tiff_write(outFile, W, NULL, M, N, 1);
+
   for(int aa = 0; aa<M; aa++)
   {
     for(int bb = 0; bb<N; bb++)
     {
-      float w = tile_getWeight(T->tiles[1], aa, bb, 0, 0);
+      float w = tile_getWeight(T->tiles[1], aa, bb, 0);
       assert(w>=0);
       W[aa + bb*M] = w;
     }
@@ -68,11 +70,11 @@ printf(" -> test_weights\n");
 
   char outFileTile[] = "tiling_ut_weights_tile1.tif";
   printf("Writing weights from the first tile to %s\n", outFileTile); fflush(stdout);
-  fim_tiff_write(outFileTile, W, M, N, 1, stdout);
+  fim_tiff_write(outFileTile, W, NULL, M, N, 1);
 
 
   // Assuming that is it same behaviour for all P
- for(size_t kk = 0; kk<M*N; kk++)
+  for(size_t kk = 0; kk< (size_t) M*N; kk++)
   {
     assert(W[kk] >= 0);
   }
@@ -93,13 +95,16 @@ void test_copy_paste(int M, int N, int P, int maxSize, int overlap)
   size_t MNP = M*N*P;
 
   float * source = malloc(MNP*sizeof(float));
+  assert(source != NULL);
   for(size_t kk = 0; kk < MNP; kk++)
   {
     source[kk] = 7; //rand()/RAND_MAX;
   }
 
   float * target = calloc(MNP, sizeof(float));
+  assert(target != NULL);
   char * fname = malloc(100);
+  assert(fname != NULL);
 
   for(int tt = 0; tt < T->nTiles; tt++)
   {
@@ -112,7 +117,8 @@ void test_copy_paste(int M, int N, int P, int maxSize, int overlap)
     }
 
     sprintf(fname, "tile%d.tif", tt);
-    fim_tiff_write(fname, Ttile, tl->xsize[0], tl->xsize[1], tl->xsize[2], stdout);
+    fim_tiff_write(fname, Ttile, NULL,
+                   tl->xsize[0], tl->xsize[1], tl->xsize[2]);
 
     // P has size T->tiles[kk]->xsize;
     tiling_put_tile(T, tt, target, Ttile);
@@ -120,7 +126,7 @@ void test_copy_paste(int M, int N, int P, int maxSize, int overlap)
   }
 
   free(fname);
-  fim_tiff_write("joined.tif", target, M, N, P, stdout);
+  fim_tiff_write("joined.tif", target, NULL, M, N, P);
 
   if(MNP < 500)
   {
