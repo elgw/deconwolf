@@ -54,6 +54,7 @@ void * __attribute__((__aligned__(64))) fim_malloc(size_t nbytes)
         }
         }
     }
+    memset(p, 0, nbytes);
 
     return p;
 }
@@ -564,7 +565,6 @@ void fim_set_min_to_zero(float * restrict I, const size_t N)
     {
         I[kk] -= min;
     }
-
     return;
 }
 
@@ -575,11 +575,12 @@ void fim_mult_scalar(float * restrict I, size_t N, float x)
     {
         I[kk]*=x;
     }
+    return;
 }
 
 void fim_normalize_sum1(float * restrict psf, int64_t M, int64_t N, int64_t P)
 {
-    size_t pMNP = M*N*P;;
+    const size_t pMNP = M*N*P;;
     double psf_sum = 0;
 #pragma omp parallel for shared(psf) reduction(+:psf_sum)
     for(size_t kk = 0; kk<pMNP; kk++)
@@ -588,6 +589,7 @@ void fim_normalize_sum1(float * restrict psf, int64_t M, int64_t N, int64_t P)
 #pragma omp parallel for shared(psf)
     for(size_t kk = 0; kk<pMNP; kk++)
     { psf[kk]/=psf_sum; }
+    return;
 }
 
 float * fim_copy(const float * restrict V, const size_t N)
@@ -599,7 +601,7 @@ float * fim_copy(const float * restrict V, const size_t N)
     return C;
 }
 
-fim_t * fimt_copy(const fim_t * F)
+fim_t * fimt_copy(const fim_t * restrict F)
 {
     fim_t * C = malloc(sizeof(fim_t));
     assert(C != NULL);
@@ -614,7 +616,7 @@ float * fim_zeros(const size_t N)
 // Allocate and return an array of N floats
 {
     float * A = fim_malloc(N*sizeof(float));
-    memset(A, 0, N*sizeof(float));
+    //memset(A, 0, N*sizeof(float));
     return A;
 }
 
@@ -629,7 +631,7 @@ fim_t * fimt_zeros(const size_t M, const size_t N, const size_t P)
     F->M = M;
     F->N = N;
     F->P = P;
-    memset(F->V, 0, n*sizeof(float));
+    //memset(F->V, 0, n*sizeof(float));
     return F;
 }
 

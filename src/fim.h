@@ -63,7 +63,7 @@ typedef struct{
  *
  * Does more or less what fftw_malloc but can be freed with free.
  * Calls exit if the allocation fails.
- *
+ * The memory is initialized to 0.
  */
 void * __attribute__((__aligned__(64))) fim_malloc(size_t n);
 
