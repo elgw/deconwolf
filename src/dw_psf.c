@@ -598,8 +598,7 @@ fim_t * gen_psf(opts * s, double lambda)
     if(s->verbose > 2) { printf("Setting up pupil function\n"); fflush(stdout); }
 
     /* Pupil function, limited by the NA */
-    fftw_complex * pu = fftw_malloc(XM*XM*sizeof(fftw_complex));
-    assert(pu != NULL);
+    fftw_complex * pu = fim_malloc(XM*XM*sizeof(fftw_complex));
 
     double pur2 = pow(s->optical.NA/lambda, 2);
     for(int kk = 0; kk< (int) XM; kk++)
@@ -631,9 +630,9 @@ fim_t * gen_psf(opts * s, double lambda)
 
     if(s->verbose > 2) { printf("Calculating\n"); fflush(stdout); }
 
-    fftw_complex * h = fftw_malloc(XM*XM*sizeof(fftw_complex));
+    fftw_complex * h = fim_malloc(XM*XM*sizeof(fftw_complex));
     assert(h != NULL);
-    fftw_complex * H = fftw_malloc(XM*XM*sizeof(fftw_complex));
+    fftw_complex * H = fim_malloc(XM*XM*sizeof(fftw_complex));
     assert(H != NULL);
     fftw_plan plan = fftw_plan_dft_2d(XM, XM,
                                       h, /* In */
@@ -736,10 +735,10 @@ double square_overlap(double x0, double x1, double y0, double y1,
 static float * conv2d_float(float * A, float * B,
                             size_t M, size_t N)
 {
-    fftwf_complex * FA = fftw_malloc(M*N*sizeof(fftwf_complex));
-    assert(FA != NULL);
-    fftwf_complex * FB = fftw_malloc(M*N*sizeof(fftwf_complex));
-    assert(FB != NULL);
+    fftwf_complex * FA = fim_malloc(M*N*sizeof(fftwf_complex));
+
+    fftwf_complex * FB = fim_malloc(M*N*sizeof(fftwf_complex));
+
     fftwf_plan plan1 = fftwf_plan_dft_r2c_2d(M, N,
                                       A, /* In */
                                       FA, /* Out */
@@ -763,7 +762,7 @@ static float * conv2d_float(float * A, float * B,
         FA[kk][1] = ra*cb + rb*ca;
     }
 
-    float * out = fftwf_malloc(M*N*sizeof(float));
+    float * out = fim_malloc(M*N*sizeof(float));
     assert(out != NULL);
     fftwf_plan plan3 = fftwf_plan_dft_c2r_2d(M, N,
                                              FA, /* In */

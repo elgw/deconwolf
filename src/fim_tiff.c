@@ -1458,8 +1458,7 @@ float * fim_tiff_read_sub(const char * fName,
         nel = wM*wN*wP;
     }
 
-    V = fftwf_malloc(nel*sizeof(float));
-    assert(V != NULL);
+    V = fim_malloc(nel*sizeof(float));
     memset(V, 0, nel*sizeof(float));
 
     if(isFloat)

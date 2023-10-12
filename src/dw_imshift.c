@@ -228,8 +228,8 @@ int dw_imshift(int argc, char ** argv)
             printf("Calculating normalized cross correlation\n");
         }
         float * XC = fim_xcorr2(mA, mR, M, N);
-        fftw_free(mA);
-        fftw_free(mR);
+        free(mA);
+        free(mR);
 
         //fim_tiff_write_float("XC.tif", XC, NULL, 2*M-1, 2*N-1, 1);
 
@@ -255,7 +255,7 @@ int dw_imshift(int argc, char ** argv)
             printf("Normalized cross correlation: %f\n", corr);
             printf("Shifting image by %f, %f, %f\n", s->dx, s->dy, s->dz);
         }
-        fftwf_free(XC);
+        free(XC);
         fim_shift(A, M, N, P, s->dx, s->dy, s->dz);
         if(s->verbose > 0)
         {

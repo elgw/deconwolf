@@ -173,6 +173,7 @@ dw_opts * dw_opts_new(void)
     s->tsv = NULL;
     s->ref = NULL;
     s->prefix = malloc(10*sizeof(char));
+    assert(s->prefix != NULL);
     sprintf(s->prefix, "dw");
     s->log = NULL;
     s->color = 1;
@@ -253,6 +254,7 @@ char * gen_iterdump_name(
     // Generate a name for the an iterdump file
     // at iteration it
     char * name = malloc(strlen(s->outFolder) + 100*sizeof(char));
+    assert(name != NULL);
     sprintf(name, "%sitd%05d.tif", s->outFolder, it);
     return name;
 }
@@ -522,6 +524,7 @@ void dw_fprint_info(FILE * f, dw_opts * s)
 
 #ifndef WINDOWS
     char * hname = malloc(1024*sizeof(char));
+    assert(hname != NULL);
     if(gethostname(hname, 1023) == 0)
     {
         fprintf(f, "HOSTNAME: '%s'\n", hname);
@@ -555,6 +558,7 @@ static void getCmdLine(int argc, char ** argv, dw_opts * s)
     }
     lcmd += argc+2;
     s->commandline = malloc(lcmd);
+
     int pos = 0;
     for(int kk = 0; kk<argc; kk++)
     {
@@ -698,7 +702,9 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             exit(0);
             break;
         case 'o':
+            free(s->outFile);
             s->outFile = malloc(strlen(optarg)+1);
+            assert(s->outFile != NULL);
             strcpy(s->outFile, optarg);
             break;
         case 'n':
@@ -737,6 +743,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         case 'f':
             free(s->prefix);
             s->prefix = malloc(strlen(optarg) + 1);
+            assert(s->prefix != NULL);
             strcpy(s->prefix, optarg);
             prefix_set = 1;
             break;
@@ -895,15 +902,19 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         char * dname = dirname(dirc);
         char * bname = basename(basec);
         s->outFile = malloc(strlen(dname) + strlen(bname) + strlen(s->prefix) + 10);
+        assert(s->outFile != NULL);
         sprintf(s->outFile, "%s/%s_%s", dname, s->prefix, bname);
         s->outFolder = malloc(strlen(dname) + 16);
+        assert(s->outFolder != NULL);
         sprintf(s->outFolder, "%s/", dname);
         free(dirc);
         free(basec);
     } else {
         char * dirc = strdup(s->outFile);
         char * dname = dirname(dirc);
+        free(s->outFolder);
         s->outFolder = malloc(strlen(dname) + 16);
+        assert(s->outFolder != NULL);
         sprintf(s->outFolder, "%s/", dname);
         free(dirc);
     }
@@ -925,6 +936,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     }
 
     s->logFile = malloc(strlen(s->outFile) + 10);
+    assert(s->logFile != NULL);
     sprintf(s->logFile, "%s.log.txt", s->outFile);
 
 
@@ -956,8 +968,15 @@ void fsetzeros(const char * fname, size_t N)
 {
     size_t bsize = 1024*1024;
     char * buffer = malloc(bsize);
+    assert(buffer != NULL);
     memset(buffer, 0, bsize);
     FILE * fid = fopen(fname, "wb");
+    if(fid == NULL)
+    {
+        fprintf(stderr, "%s (%d): Unable to open %s\n",
+                __FILE__, __LINE__, fname);
+        exit(EXIT_FAILURE);
+    }
     size_t written = 0;
     while(written + bsize < N)
     {
@@ -1006,7 +1025,7 @@ void benchmark_write(dw_opts * s, int iter, double fMSE,
             }
         }
     }
-    fftw_free(x);
+    free(x);
     struct timespec tnow;
     clock_gettime(CLOCK_REALTIME, &tnow);
     double time = clockdiff(&tnow, &s->tstart);
@@ -1364,7 +1383,7 @@ float * psf_autocrop_centerZ(float * psf, int64_t * pM, int64_t * pN, int64_t * 
 
     float * psf_cropped = fim_get_cuboid(psf, m, n, p,
                                          m0, m1, n0, n1, p0, p1);
-    fftwf_free(psf);
+    free(psf);
     pP[0] = p1-p0+1;
     return psf_cropped;
 
@@ -1448,7 +1467,7 @@ float * psf_autocrop_byImage(float * psf,/* psf and size */
         }
         float * psf_cropped = fim_get_cuboid(psf, m, n, p,
                                              m0, m1, n0, n1, p0, p1);
-        fftwf_free(psf);
+        free(psf);
 
         pM[0] = m1-m0+1;
         pN[0] = n1-n0+1;
@@ -1575,7 +1594,7 @@ float * psf_autocrop_XY(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  
     fprintf(s->log, "PSF XY-crop [%" PRId64 " x %" PRId64 " x %" PRId64 "] -> [%" PRId64 " x %" PRId64 " x %" PRId64 "]\n",
             m, n, p, pM[0], pN[0], pP[0]);
 
-    fftwf_free(psf);
+    free(psf);
     return crop;
 }
 
@@ -1633,6 +1652,7 @@ int deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
      * will be updated block by block
      */
     char * tfile = malloc(strlen(s->outFile)+10);
+    assert(tfile != NULL);
     sprintf(tfile, "%s.raw", s->outFile);
 
     if(s->verbosity > 0)
@@ -1642,6 +1662,7 @@ int deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
     fsetzeros(tfile, (size_t) M* (size_t) N* (size_t) P*sizeof(float));
 
     char * imFileRaw = malloc(strlen(s->imFile) + 10);
+    assert(imFileRaw != NULL);
     sprintf(imFileRaw, "%s.raw", s->imFile);
 
     if(s->verbosity > 0)
@@ -1708,7 +1729,7 @@ int deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
         float * dw_im_tile = s->fun(im_tile, tileM, tileN, tileP, // input image and size
                                     tpsf, tpM, tpN, tpP, // psf and size
                                     s);
-        fftwf_free(im_tile);
+        free(im_tile);
         tiling_put_tile_raw(T, tt, tfile, dw_im_tile);
         free(dw_im_tile);
         // free(tpsf);
@@ -1749,10 +1770,10 @@ void timings()
     toc(usleep_1000)
 
         tic
-        float * V = malloc(M*N*P*sizeof(float));
+        float * V = fim_malloc(M*N*P*sizeof(float));
     toc(malloc)
 
-        float * A = malloc(M*N*P*sizeof(float));
+        float * A = fim_malloc(M*N*P*sizeof(float));
 
     tic
         memset(V, 0, M*N*P*sizeof(float));
@@ -2070,6 +2091,7 @@ int dw_run(dw_opts * s)
 
     // Set up the string for the TIFFTAG_SOFTWARE
     char * swstring = malloc(1024);
+    assert(swstring != NULL);
     sprintf(swstring, "deconwolf %s", deconwolf_version);
     ttags_set_software(T, swstring);
     free(swstring);
@@ -2092,6 +2114,7 @@ int dw_run(dw_opts * s)
     } else {
         pM = 3; pN = 3; pP = 3;
         psf = malloc(27*sizeof(float));
+        assert(psf != NULL);
         memset(psf, 0, 27*sizeof(float));
         psf[13] = 1;
     }
@@ -2161,7 +2184,7 @@ int dw_run(dw_opts * s)
         }
         deconvolve_tiles(M, N, P, psf, pM, pN, pP, // psf and size
                          s);// settings
-        fftwf_free(psf);
+        free(psf);
     } else {
         fim_normalize_sum1(psf, pM, pN, pP);
         if(s->flatfieldFile != NULL)
@@ -2181,7 +2204,7 @@ int dw_run(dw_opts * s)
 
     if(tiling == 0)
     {
-        fftwf_free(im);
+        free(im);
 
 
         if(out == NULL)
@@ -2231,7 +2254,7 @@ int dw_run(dw_opts * s)
         printf("Finalizing "); fflush(stdout);
     }
 
-    if(out != NULL) fftwf_free(out);
+    if(out != NULL) free(out);
     myfftw_stop();
 
 
@@ -2283,6 +2306,6 @@ fftwf_complex * initial_guess(const int64_t M, const int64_t N, const int64_t P,
 
     fftwf_complex * Fone = fft(one, wM, wN, wP);
 
-    fftwf_free(one);
+    free(one);
     return Fone;
 }

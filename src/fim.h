@@ -35,6 +35,9 @@
 #include <omp.h>
 #endif
 
+#ifdef __linux__
+#include <sys/mman.h>
+#endif
 
 #define INLINED inline __attribute__((always_inline))
 
@@ -56,13 +59,20 @@ typedef struct{
     size_t P;
 } fim_t;
 
+/** @brief Aligned allocations
+ *
+ * Does more or less what fftw_malloc but can be freed with free.
+ * Calls exit if the allocation fails.
+ *
+ */
+void * __attribute__((__aligned__(64))) fim_malloc(size_t n);
+
 void fim_free(fim_t *);
 
 fim_t * fimt_zeros(size_t M, size_t N, size_t P);
 
 /* Create a new object with a pointer to V */
 fim_t * fim_image_from_array(const float * V, size_t M, size_t N, size_t P);
-
 
 /* Return a new copy */
 fim_t * fimt_copy(const fim_t * );
@@ -181,12 +191,14 @@ float * fim_subregion(const float * restrict A, const int64_t M, const int64_t N
 
 float * fim_subregion_ref(float * A, int64_t M, int64_t N, int64_t P, int64_t m, int64_t n, int64_t p);
 
-/* Normalize an image to have the sum 1.0 */
-void fim_normalize_sum1(float * psf, int64_t M, int64_t N, int64_t P);
+/** @brief Normalize an image to have the sum 1.0
+* MATLAB:
+* Y = X/max(X(:))
+*/
+void fim_normalize_sum1(float * restrict psf, int64_t M, int64_t N, int64_t P);
 
 /* Return a newly allocated copy of V */
 float * fim_copy(const float * restrict V, const size_t N);
-
 
 /* Allocate and return an array of N floats */
 float * fim_zeros(const size_t N);
@@ -241,7 +253,7 @@ void shift_vector_float_buf(float * restrict V, // data
                             float * restrict buffer);
 
 /* Multiply a float array of size N by x */
-void fim_mult_scalar(float * fim, size_t N, float x);
+void fim_mult_scalar(float * restrict fim, size_t N, float x);
 
 void fim_ut(void);
 

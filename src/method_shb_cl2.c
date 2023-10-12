@@ -12,7 +12,7 @@ static void fimcl_to_tiff(fimcl_t * I_gpu, char * filename)
     float * I = fimcl_download(I_gpu);
     printf("Writing to %s\n", filename);
     fim_tiff_write_float(filename, I, NULL, I_gpu->M, I_gpu->N, I_gpu->P);
-    fftwf_free(I);
+    free(I);
 }
 
 static fimcl_t  * fft_block_of_ones(clu_env_t * clu,
@@ -40,7 +40,7 @@ static fimcl_t  * fft_block_of_ones(clu_env_t * clu,
     here();
     fimcl_sync(gOne);
     here();
-    fftwf_free(one);
+    free(one);
     fimcl_t * gfOne = fimcl_fft(gOne);
     fimcl_free(gOne);
     return gfOne;
@@ -84,7 +84,7 @@ fimcl_t * create_initial_W(clu_env_t * clu,
 
     fimcl_t * W_gpu = fimcl_new(clu, fimcl_real, W_pre, wM, wN, wP);
 
-    fftwf_free(W_pre);
+    free(W_pre);
     return W_gpu;
 }
 
@@ -174,7 +174,7 @@ float * deconvolve_shb_cl2(float * restrict im,
 
     if(s->nIter == 0)
     {
-        fftw_free(psf);
+        free(psf);
         return fim_copy(im, M*N*P);
     }
 
@@ -268,7 +268,7 @@ float * deconvolve_shb_cl2(float * restrict im,
 
     /* Prepare the PSF */
     // cK : "full size" fft of the PSF
-    float * Z = fftwf_malloc(wMNP*sizeof(float));
+    float * Z = fim_malloc(wMNP*sizeof(float));
     memset(Z, 0, wMNP*sizeof(float));
     /* Insert the psf into the bigger Z */
     fim_insert(Z, wM, wN, wP,
@@ -301,14 +301,14 @@ float * deconvolve_shb_cl2(float * restrict im,
     fimcl_fft_inplace(PSF_gpu);
     fimcl_t * fft_PSF_gpu = PSF_gpu;
     PSF_gpu = NULL;
-    fftwf_free(Z);
+    free(Z);
 #else
     fimcl_t * PSF_gpu = fimcl_new(clu, fimcl_real,
                                   Z, wM, wN, wP);
 
     fimcl_t * fft_PSF_gpu = fimcl_fft(PSF_gpu);
     fimcl_free(PSF_gpu);
-    fftwf_free(Z);
+    free(Z);
 #endif
 
     /* Prepare the image */
@@ -321,7 +321,7 @@ float * deconvolve_shb_cl2(float * restrict im,
         printf("Experimental pre-processing path. Don't use. Work in progress.\n");
         /* Leaves some artifacts at the boundaries. FFT-based
            pre-filtering is a tricky path. */
-        float * im_full = fftwf_malloc(wMNP*sizeof(float));
+        float * im_full = fim_malloc(wMNP*sizeof(float));
         memset(im_full, 0, wMNP*sizeof(float));
         /* Insert the psf into the bigger Z */
         fim_insert(im_full, wM, wN, wP,
@@ -335,10 +335,10 @@ float * deconvolve_shb_cl2(float * restrict im,
         im_full_gpu = fimcl_ifft(fft_im_full_gpu);
         float * im_filt = fimcl_download(im_full_gpu);
         float * im_filt_cropped = fim_subregion(im_filt, wM, wN, wP, M, N, P);
-        fftwf_free(im_filt);
+        free(im_filt);
         im_gpu = fimcl_new(clu, fimcl_real, im_filt_cropped, M, N, P);
         fimcl_to_tiff(im_gpu, "ifft_fft_input.tif");
-        fftwf_free(im_filt_cropped);
+        free(im_filt_cropped);
     }
 
     putdot(s);
@@ -376,7 +376,7 @@ float * deconvolve_shb_cl2(float * restrict im,
         xp_gpu = fimcl_copy(x_gpu);
 
 
-        fftwf_free(x);
+        free(x);
     }
 
     if(s->verbosity > 0)
@@ -462,7 +462,7 @@ float * deconvolve_shb_cl2(float * restrict im,
     here();
 
     float * out = fim_subregion(out_full, wM, wN, wP, M, N, P);
-    fftwf_free(out_full);
+    free(out_full);
 
     here();
 

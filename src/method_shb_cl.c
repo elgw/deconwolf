@@ -36,7 +36,7 @@ fimcl_t  * initial_guess_cl(clu_env_t * clu,
     here();
     fimcl_sync(gOne);
     here();
-    fftwf_free(one);
+    free(one);
     fimcl_t * gfOne = fimcl_fft(gOne);
 
     return gfOne;
@@ -71,7 +71,7 @@ float * deconvolve_shb_cl(float * restrict im,
 
     if(s->nIter == 0)
     {
-        fftw_free(psf);
+        free(psf);
         return fim_copy(im, M*N*P);
     }
 
@@ -166,7 +166,7 @@ float * deconvolve_shb_cl(float * restrict im,
     }
 
     // cK : "full size" fft of the PSF
-    float * Z = fftwf_malloc(wMNP*sizeof(float));
+    float * Z = fim_malloc(wMNP*sizeof(float));
     memset(Z, 0, wMNP*sizeof(float));
     /* Insert the psf into the bigger Z */
     fim_insert(Z, wM, wN, wP,
@@ -199,7 +199,7 @@ float * deconvolve_shb_cl(float * restrict im,
     fimcl_t * clfftPSF = fimcl_fft(_clfftPSF);
     fimcl_free(_clfftPSF);
 
-    fftwf_free(Z);
+    free(Z);
 
     putdot(s);
 
@@ -304,7 +304,7 @@ float * deconvolve_shb_cl(float * restrict im,
             M, N, P, // Original size
             s);
 
-        fftwf_free(p); // i.e. p
+        free(p); // i.e. p
 
         dw_iterator_set_error(it, err);
         if(1){
@@ -313,7 +313,7 @@ float * deconvolve_shb_cl(float * restrict im,
             x = xp;
             xp = t;
         }
-        //fftwf_free(p);
+
         /* Enforce a priori information about the lowest possible value */
         if(s->positivity)
         {
@@ -343,7 +343,7 @@ float * deconvolve_shb_cl(float * restrict im,
 
     if(xp != NULL)
     {
-        fftwf_free(xp);
+        free(xp);
     }
 
     if(s->verbosity > 0) {
@@ -352,7 +352,7 @@ float * deconvolve_shb_cl(float * restrict im,
 
     if(W != NULL)
     {
-        fftwf_free(W); /* Allocated as P1 */
+        free(W); /* Allocated as P1 */
     }
 
     fimcl_free(clfftPSF);
@@ -367,7 +367,7 @@ float * deconvolve_shb_cl(float * restrict im,
 
     if(x != NULL)
     {
-        fftwf_free(x);
+        free(x);
     }
 
     clu_destroy(clu);
@@ -465,7 +465,7 @@ float iter_shb_cl(clu_env_t * clu,
     fimcl_free(_Y);
 
     clFinish(Y->clu->command_queue);
-    fftwf_free(y);
+    free(y);
     fimcl_t * gx = fimcl_convolve_conj(Y, cK, CLU_KEEP_2ND); // TODO
     here();
     float * x = fimcl_download(gx);

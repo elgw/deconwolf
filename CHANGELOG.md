@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 0.3.1
+- Introduced **fim_malloc** for all allocations that might benefit
+  from a stricter alignment than malloc provides by default. Tested
+  with `MADV_HUGEPAGE` for the allocations but the results are
+  inconclusive (but it uses more RAM when enabled). Cleared all uses
+  of `fftw_free` and `fftw_malloc`.
+
 ## 0.3.0
 - Respects the NO_COLOR environmental variable in accord with https://no-color.org/.
 - Fixed correct capping of pixel values when **--scaling** is used.
