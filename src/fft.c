@@ -56,7 +56,7 @@ fftwf_plan plan_c2r_inplace = NULL;
  * Forward declarations
  */
 /* Pad data for inplace FFT transforms  */
-void fft_inplace_pad(float ** pX,
+static void fft_inplace_pad(float ** pX,
                      const size_t M,
                      const size_t N,
                      const size_t P);
@@ -71,7 +71,7 @@ static void fft_inplace_unpad(float ** pX,
  * Hermitian representation  */
 static size_t nch(size_t M, size_t N, size_t P);
 
-void fft_inplace_pad(float ** pX,
+static void fft_inplace_pad(float ** pX,
                      const size_t M,
                      const size_t N,
                      const size_t P)
@@ -81,13 +81,7 @@ void fft_inplace_pad(float ** pX,
     const size_t chunk_size = M*sizeof(float);
 
     /* WARNING TODO will not work on windows */
-    size_t add_0 = (size_t) pX;
     *pX = realloc(*pX, 2*nch(M, N, P) * sizeof(float));
-    size_t add_1 = (size_t) pX;
-    if(add_0 != add_1)
-    {
-        printf("fft_inplace_unpad: adress changed from %zu to %zu\n", add_0, add_1);;
-    }
 
     assert(*pX != NULL);
 
@@ -97,12 +91,15 @@ void fft_inplace_pad(float ** pX,
     {
         for(size_t c = nchunk-1; c != (size_t) -1; c--)
         {
-            memcpy(*pX+c*(M+2), *pX + c*M, chunk_size);
+            memmove(*pX+c*(M+2), *pX + c*M, chunk_size);
         }
     } else {
         for(size_t c = nchunk-1; c != (size_t) -1; c--)
         {
-            memcpy(*pX+c*(M+1), *pX + c*M, chunk_size);
+            // TODO On arm64, got:
+            // BUG: Source and destination overlap in memcpy(0xbd28080, 0xbd27c28, 1116)
+            //
+            memmove(*pX+c*(M+1), *pX + c*M, chunk_size);
         }
     }
 
@@ -124,26 +121,22 @@ static void fft_inplace_unpad(float ** pX,
     {
         for(size_t c = 0; c < nchunk; c++)
         {
-            memcpy(*pX + c*M, *pX+c*(M+2), chunk_size);
+            memmove(*pX + c*M, *pX+c*(M+2), chunk_size);
         }
     } else {
         for(size_t c = 0; c < nchunk; c++)
         {
-            memcpy(*pX + c*M, *pX+c*(M+1), chunk_size);
+            memmove(*pX + c*M, *pX+c*(M+1), chunk_size);
         }
     }
 
     /* WARNING TODO Will not work on Windows */
-    size_t add_0 = (size_t) pX;
+
 
     *pX = realloc(*pX, M*N*P * sizeof(float));
 
     assert(*pX != NULL);
-    size_t add_1 = (size_t) pX;
-    if(add_0 != add_1)
-    {
-        printf("fft_inplace_unpad: adress changed from %zu to %zu\n", add_0, add_1);;
-    }
+
     return;
 }
 
