@@ -149,6 +149,17 @@ sudo apt-get install libomp-dev
 sudo apt-get install libpng-dev
 
 ```
+
+## Ubuntu 23.04
+Same as Ubuntu 22.04.
+
+For the OpenCL headers, required to build:
+
+``` shell
+apt-get install opencl-headers
+apt-get install libclfft-dev libclfft2
+```
+
 ## FreeBSD
 Differences to building on Linux.
  - `pkgconf` replaces `pkg-config`
@@ -194,4 +205,14 @@ sudo pacman -S fftw, gsl, openmp, libtiff
 make
 sudo make install
 
+```
+
+## Rapsberry PI (64-bit Debian bookworm)
+### Dependencies for build
+``` shell
+sudo apt-get update
+sudo apt-get upgrade
+sudo apt-get install libfftw3-dev \
+libtiff-dev \
+libgsl-dev
 ```

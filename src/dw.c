@@ -543,6 +543,14 @@ void dw_fprint_info(FILE * f, dw_opts * s)
     fprintf(f, "OpenCL: No. (Rebuild with OPENCL=1 to enable)\n");
 #endif
 
+    if(s->verbosity > 1)
+    {
+        fprintf(f, "sizeof(int) = %zu\n", sizeof(int));
+        fprintf(f, "sizeof(float) = %zu\n", sizeof(float));
+        fprintf(f, "sizeof(double) = %zu\n", sizeof(double));
+        fprintf(f, "sizeof(size_t) = %zu\n", sizeof(size_t));
+    }
+
     fprintf(f, "\n");
     fflush(f);
     return;

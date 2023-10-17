@@ -10,7 +10,7 @@
 #
 # To build with clang, specify CC=clang
 
-CC?=gcc -std=gnu99
+CC=gcc -std=gnu11
 # CC=clang # also requires the package libomp-14-dev
 
 UNAME_S := $(shell uname -s)
