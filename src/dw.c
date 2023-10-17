@@ -2062,6 +2062,12 @@ int dw_run(dw_opts * s)
         im = fim_tiff_read(s->imFile, T, &M, &N, &P, s->verbosity);
         if(s->verbosity > 4)
         {
+            printf("image data: ");
+            for(size_t kk = 0; kk<10; kk++)
+            {
+                printf("%f ", im[kk]);
+            }
+            printf("\n");
             printf("Done reading\n"); fflush(stdout);
         }
         if(fim_min(im, M*N*P) < 0)
