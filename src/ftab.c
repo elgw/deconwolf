@@ -338,7 +338,7 @@ void ftab_insert(ftab_t * T, float * row)
     FILE * fid = fopen(fname, "r");
     assert(fid != NULL);
     size_t N = 0;
-    char c = EOF;
+    int c = EOF;
     while( (c = fgetc(fid) ) != EOF )
     {
         if( c == '\n')

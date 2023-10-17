@@ -48,7 +48,7 @@ static void argparsing(int argc, char ** argv, tm_config_t * conf)
         { NULL,           0,                 NULL,   0   }
     };
 
-    char ch;
+    int ch;
     while((ch = getopt_long(argc, argv,
                             "hv:ot",
                             longopts, NULL)) != -1)
