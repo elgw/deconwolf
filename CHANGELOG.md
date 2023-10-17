@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.3.2
+- Tested on raspberry pi 4 using 64-bit bookworm.
+- Found a bug in `fft.c` where `memcpy` was used wrongly (replaced by
+  `memmove`). Strangely that bug never manifested under
+  Ubuntu/x86_64.
+
 ## 0.3.1
 - Introduced **fim_malloc** for all allocations that might benefit
   from a stricter alignment than malloc provides by default. Tested

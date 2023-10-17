@@ -28,10 +28,7 @@
 
 /* This provides some utility functions for using fftw3.
  *
- * Note about memory fftw3 requires that array are aligned by
- * MIN_ALIGNMENT, relevant files to look at are: fftw3/kernel/kalloc.c
- * and fftw3/api/malloc.c On linux posix_memalign/free is used but
- * that can not be assumed.
+ * Please see the fftw3 alignment requirements before making changes.
  */
 
 
