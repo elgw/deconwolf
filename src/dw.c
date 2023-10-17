@@ -2062,12 +2062,15 @@ int dw_run(dw_opts * s)
         im = fim_tiff_read(s->imFile, T, &M, &N, &P, s->verbosity);
         if(s->verbosity > 4)
         {
+            if(M > 9)
+            {
             printf("image data: ");
             for(size_t kk = 0; kk<10; kk++)
             {
                 printf("%f ", im[kk]);
             }
             printf("\n");
+            }
             printf("Done reading\n"); fflush(stdout);
         }
         if(fim_min(im, M*N*P) < 0)
@@ -2124,6 +2127,15 @@ int dw_run(dw_opts * s)
         {
             fprintf(stderr, "Failed to open %s\n", s->psfFile);
             exit(1);
+        }
+        if(M > 9)
+        {
+            printf("image data: ");
+            for(size_t kk = 0; kk<10; kk++)
+            {
+                printf("%f ", psf[kk]);
+            }
+            printf("\n");
         }
     } else {
         pM = 3; pN = 3; pP = 3;
