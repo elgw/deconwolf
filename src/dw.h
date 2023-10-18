@@ -14,8 +14,7 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef deconwolf_h
-#define deconwolf_h
+#pragma once
 
 #include <assert.h>
 #include <inttypes.h>
@@ -43,8 +42,19 @@
 #include <mkl.h>
 #endif
 
-#include "deconwolf_tif_max.h"
+#include "dw_util.h"
+#include "dw_maxproj.h"
+#include "dw_tiff_merge.h"
+#include "dw_imshift.h"
 #include "dw_version.h"
+/* Uncomment to include, requires linking with libpng and libz
+ * can be build separately by the makefile in the src folder
+ */
+// #include "dw_otsu.h"
+#include "dw_dots.h"
+#include "dw_psf.h"
+#include "dw_psf_sted.h"
+
 #include "fim.h"
 #include "fim_tiff.h"
 #include "fft.h"
@@ -64,6 +74,10 @@ typedef enum {
     DW_METHOD_ID, /* Identity/nothing. For checking image loading/saving. */
     DW_METHOD_AVE, /* Biggs-Andrews Additive Vector Extrapolation */
     DW_METHOD_SHB, /* Wang and Miller, Scaled Heavy Ball */
+    #ifdef OPENCL
+    DW_METHOD_SHBCL, /* GPU used only for FFT */
+    DW_METHOD_SHBCL2, /* GPU used as much as possible */
+    #endif
 } dw_method;
 
 typedef enum {
@@ -77,26 +91,26 @@ typedef enum {
     DW_ITER_FIXED
 } dw_iter_type;
 
-typedef float afloat;
-
 
 struct _dw_opts; /* Forward declaration */
 typedef struct _dw_opts dw_opts;
 
-typedef float * (*dw_function) (afloat * restrict im, const int64_t M, const int64_t N, const int64_t P,
-                              afloat * restrict psf, const int64_t pM, const int64_t pN, const int64_t pP,
+typedef float * (*dw_function) (float * restrict im, const int64_t M, const int64_t N, const int64_t P,
+                              float * restrict psf, const int64_t pM, const int64_t pN, const int64_t pP,
                               dw_opts * s);
 
 struct _dw_opts{
-    int nThreads;
+    int nThreads_FFT;
+    int nThreads_OMP;
 
     char * imFile;
     char * psfFile;
     char * refFile; /* Name of reference image */
     char * tsvFile; /* Where to write tsv benchmark data */
-    afloat * ref; /* Reference image */
+    float * ref; /* Reference image */
     char * outFile;
     char * logFile;
+    char * outFolder; /* Where iterdump files should go etc */
     char * prefix;
     char * flatfieldFile;
     FILE * log;
@@ -113,13 +127,14 @@ struct _dw_opts{
     dw_iter_type iter_type;
 
     int verbosity;
+    int color; /* Show colored things in terminal */
     int showTime; /* For dev: show detailed timings */
-    fftwf_plan fft_plan;
-    fftwf_plan ifft_plan;
     int iterdump; /* Dump each iteration to file */
 
     float relax;
-    float bg; /* Background level, 0 by default */
+    float bg; /* Background level, set automatically by default */
+    int bg_auto; /* Indicator if background was set on CLI */
+    float psf_pass; /* For low-pass filtering by the PSF */
 
     /* Selection of method */
     dw_method method; /* what algorithm to use */
@@ -140,6 +155,7 @@ struct _dw_opts{
     char * commandline;
     int borderQuality;
     int outFormat; // 16 (=16 bit int) or 32 (=32 bit float)
+    float scaling; // fixed scaling for 16 bit output, automatic scaling is used if this value <= 0
 
     /* sigma of Gaussian used for pre filtering of the image and the PSF
      * this was found beneficial a paper by Van Kempen
@@ -155,6 +171,14 @@ struct _dw_opts{
     int lookahead;
     int eve; /* Use Exponential vector extrapolation */
 
+    float alphamax;
+
+  int cl_device; /* OpenCL device number, default 0 */
+
+    fftwf_plan fft_plan;
+    fftwf_plan ifft_plan;
+    int fftw3_planning;
+    int fft_inplace;
     struct timespec tstart;
 };
 
@@ -171,14 +195,14 @@ void dw_unittests();
 int  dw_run(dw_opts *);
 
 /* Additive Vector Extrapolation (AVE) */
-float * deconvolve_ave(afloat * restrict im, const int64_t M, const int64_t N, const int64_t P,
-                       afloat * restrict psf, const int64_t pM, const int64_t pN, const int64_t pP,
+float * deconvolve_ave(float * restrict im, const int64_t M, const int64_t N, const int64_t P,
+                       float * restrict psf, const int64_t pM, const int64_t pN, const int64_t pP,
                        dw_opts * s);
 
 
 /* Determine Biggs' acceleration parameter alpha  */
-float biggs_alpha(const afloat * restrict g,
-                  const afloat * restrict gm,
+float biggs_alpha(const float * restrict g,
+                  const float * restrict gm,
                   const size_t wMNP, int mode);
 
 
@@ -204,20 +228,20 @@ float * psf_autocrop(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  // 
 void fulldump(dw_opts * s, float * A, size_t M, size_t N, size_t P, char * name);
 
 /* Passes on to got_fMSE at the moment */
-float getError(const afloat * restrict y, const afloat * restrict g,
+float getError(const float * restrict y, const float * restrict g,
                const int64_t M, const int64_t N, const int64_t P,
                const int64_t wM, const int64_t wN, const int64_t wP, dw_metric);
 
 
 /* Mean squared error between the input, y, and the forward propagated
  * current guess */
-float get_fMSE(const afloat * restrict y, const afloat * restrict g,
+float get_fMSE(const float * restrict y, const float * restrict g,
                const int64_t M, const int64_t N, const int64_t P,
                const int64_t wM, const int64_t wN, const int64_t wP);
 
 /* Idiv between the input, y, and the forward propagated current
  * guess */
-float get_fIdiv(const afloat * restrict y, const afloat * restrict g,
+float get_fIdiv(const float * restrict y, const float * restrict g,
                 const int64_t M, const int64_t N, const int64_t P,
                 const int64_t wM, const int64_t wN, const int64_t wP);
 
@@ -248,9 +272,10 @@ int64_t int64_t_max(int64_t a, int64_t b);
 /* Write diagostics to s->tsv if open
  * To do: add timings as well (excluding) this function
 */
-void benchmark_write(dw_opts * s, int iter, double fMSE,const afloat * x,
+void benchmark_write(dw_opts * s, int iter, double fMSE, const float * x,
                      const int64_t M, const int64_t N, const int64_t P,
                      const int64_t wM, const int64_t wN, const int64_t wP);
+
 
 
 /* "WARNING" in some formatting */
@@ -273,10 +298,13 @@ void dw_iterator_set_error(dw_iterator_t *, float);
 void dw_iterator_show(dw_iterator_t *, const dw_opts *);
 void dw_iterator_free(dw_iterator_t * );
 
+#ifdef OPENCL
+#include "method_shb_cl.h"
+#include "method_shb_cl2.h"
+#endif
+
 #include "method_eve.h"
 #include "method_identity.h"
 #include "method_rl.h"
 #include "method_ave.h"
 #include "method_shb.h"
-
-#endif

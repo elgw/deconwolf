@@ -1,10 +1,26 @@
+/*    Copyright (C) 2020 Erik L. G. Wernersson
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation, either version 3 of the License, or
+ *    (at your option) any later version.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include "method_eve.h"
 
 /* Exponential vector extrapolation (eve) alpha */
- float biggs_alpha_eve(const afloat * restrict Xk,
-                       const afloat * restrict Xkm1,
-                       const afloat * restrict Ukm1,
-                       const afloat * restrict Ukm2,
+ float biggs_alpha_eve(const float * restrict Xk,
+                       const float * restrict Xkm1,
+                       const float * restrict Ukm1,
+                       const float * restrict Ukm2,
                        const size_t wMNP)
  {
      /* These calculations take considerable time due to the logf.
@@ -45,11 +61,11 @@
 
 /* One RL iteration */
  float iter_eve(
-                afloat ** xp, // Output, f_(t+1) xkp1
+                float ** xp, // Output, f_(t+1) xkp1
                 const float * restrict im, // Input image
                 fftwf_complex * restrict fftPSF,
-                afloat * restrict f, // Current guess, xk
-                afloat * restrict W, // Bertero Weights
+                float * restrict f, // Current guess, xk
+                float * restrict W, // Bertero Weights
                 const int64_t wM, const int64_t wN, const int64_t wP, // expanded size
                 const int64_t M, const int64_t N, const int64_t P, // input image size
                 __attribute__((unused)) const dw_opts * s)
@@ -58,7 +74,7 @@
 
      fftwf_complex * F = fft(f, wM, wN, wP); /* FFT#1 */
      putdot(s);
-     afloat * y = fft_convolve_cc_f2(fftPSF, F, wM, wN, wP); /* FFT#2 */
+     float * y = fft_convolve_cc_f2(fftPSF, F, wM, wN, wP); /* FFT#2 */
      putdot(s);
      float error = getError(y, im, M, N, P, wM, wN, wP, s->metric);
 
@@ -95,9 +111,9 @@
 
 
      fftwf_complex * F_sn = fft(y, wM, wN, wP); /* FFT#3 */
-     fftwf_free(y);
+     free(y);
      putdot(s);
-     afloat * x = fft_convolve_cc_conj_f2(fftPSF, F_sn, wM, wN, wP); /* FFT#4 */
+     float * x = fft_convolve_cc_conj_f2(fftPSF, F_sn, wM, wN, wP); /* FFT#4 */
      putdot(s);
 
      /* Eq. 18 in Bertero */
@@ -121,8 +137,8 @@
  }
 
 
- float * deconvolve_eve(afloat * restrict im, const int64_t M, const int64_t N, const int64_t P,
-                        afloat * restrict psf, const int64_t pM, const int64_t pN, const int64_t pP,
+ float * deconvolve_eve(float * restrict im, const int64_t M, const int64_t N, const int64_t P,
+                        float * restrict psf, const int64_t pM, const int64_t pN, const int64_t pP,
                         dw_opts * s)
  {
 
@@ -209,7 +225,7 @@
      fflush(s->log);
 
      fft_train(wM, wN, wP,
-               s->verbosity, s->nThreads,
+               s->verbosity, s->nThreads_FFT,
                s->log);
 
      if(s->verbosity > 0)
@@ -220,12 +236,12 @@
      /* 1. Expand the PSF to the job size,
       *    transform it and free the original allocation
       */
-     afloat * Z = fftwf_malloc(wMNP*sizeof(float));
+     float * Z = fim_malloc(wMNP*sizeof(float));
      memset(Z, 0, wMNP*sizeof(float));
      /* Insert the psf into the bigger Z */
      fim_insert(Z, wM, wN, wP,
                 psf, pM, pN, pP);
-     fftwf_free(psf);
+     free(psf);
 
      /* Shift the PSF so that the mid is at (0,0,0) */
      int64_t midM, midN, midP = -1;
@@ -246,13 +262,13 @@
      }
 
      fftwf_complex * fftPSF = fft(Z, wM, wN, wP);
-     fftwf_free(Z);
+     free(Z);
 
      putdot(s);
 
 
      /* Step 2. Create the Weight map for Bertero boundary handling  */
-     afloat * W = NULL;
+     float * W = NULL;
      if(s->borderQuality > 0)
      {
          /* F_one is 1 over the image domain */
@@ -287,17 +303,17 @@
 
      float alpha = 0;
 
-     afloat * f = fim_constant(wMNP, sumg/(float) wMNP); /* Initial guess */
-     afloat * y = fim_copy(f, wMNP);
-     afloat * x1 = fim_copy(f, wMNP);
-     afloat * x2 = fim_copy(f, wMNP);
+     float * f = fim_constant(wMNP, sumg/(float) wMNP); /* Initial guess */
+     float * y = fim_copy(f, wMNP);
+     float * x1 = fim_copy(f, wMNP);
+     float * x2 = fim_copy(f, wMNP);
 
-     afloat * x = x1;
-     afloat * xp = x2;
-     afloat * xm = x2;
+     float * x = x1;
+     float * xp = x2;
+     float * xm = x2;
 
-     afloat * gm = fim_zeros(wMNP); /* Previous and current quotient */
-     afloat * g = fim_zeros(wMNP);
+     float * gm = fim_zeros(wMNP); /* Previous and current quotient */
+     float * g = fim_zeros(wMNP);
      double alpha_last = 0;
 
      dw_iterator_t * it = dw_iterator_new(s);
@@ -307,7 +323,7 @@
          if(s->iterdump > 0){
              if(it->iter % s->iterdump == 0)
              {
-                 afloat * temp = fim_subregion(x, wM, wN, wP, M, N, P);
+                 float * temp = fim_subregion(x, wM, wN, wP, M, N, P);
                  char * outname = gen_iterdump_name(s, it->iter);
                  //fulldump(s, temp, M, N, P, outname);
                  if(s->outFormat == 32)
@@ -382,7 +398,7 @@
          putdot(s);
 
          xp = xm;
-         fftwf_free(xp);
+         free(xp);
          double err = iter_eve(
                                &xp, // xp is updated to the next guess
                                im,
@@ -398,7 +414,7 @@
          dw_iterator_show(it, s);
 
          {
-             afloat * swap = g;
+             float * swap = g;
              g = gm; gm = swap;
          }
 
@@ -452,31 +468,31 @@
 
      if(W != NULL)
      {
-         fftwf_free(W);
+         free(W);
      }
 
      fulldump(s, x, wM, wN, wP, "fulldump_x.tif");
 
 
-     fftwf_free(f);
+     free(f);
 
      if(xm != NULL)
      {
-         fftwf_free(xm);
+         free(xm);
          xm = NULL;
      }
 
-     fftwf_free(g);
-     fftwf_free(gm);
-     fftwf_free(fftPSF);
-     fftwf_free(y);
+     free(g);
+     free(gm);
+     free(fftPSF);
+     free(y);
 
      /* Extract the observed region from the last iteration */
-     afloat * out = fim_subregion(x, wM, wN, wP, M, N, P);
+     float * out = fim_subregion(x, wM, wN, wP, M, N, P);
 
      if(x != NULL)
      {
-         fftwf_free(x); x = NULL;
+         free(x); x = NULL;
      }
      return out;
  }

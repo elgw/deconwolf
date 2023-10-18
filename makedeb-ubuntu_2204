@@ -1,0 +1,60 @@
+#!/bin/bash
+set -e
+
+NAME="Erik Wernersson"
+EMAIL="https://github.com/elgw/deconwolf/issues"
+
+set -e # exit on error
+
+if [ $EUID = 0 ]; then
+    echo "WARNING: You are running as root, please abort!"
+    echo "Sleeping for 10 s"
+    sleep 10
+fi
+
+savedir="$(pwd)"
+builddir=$(mktemp -d)
+cd $builddir
+pkgdir=$(mktemp -d)/deconwolf
+echo "pkgdir=$pkgdir"
+
+ver_major=`sed -rn 's/^#define.*DW_VERSION_MAJOR.*([0-9]+).*$/\1/p' < $savedir/src/dw_version.h`
+ver_minor=`sed -rn 's/^#define.*DW_VERSION_MINOR.*([0-9]+).*$/\1/p' < $savedir/src/dw_version.h`
+ver_patch=`sed -rn 's/^#define.*DW_VERSION_PATCH.*([0-9]+).*$/\1/p' < $savedir/src/dw_version.h`
+pkgver="${ver_major}.${ver_minor}.${ver_patch}"
+echo "pkgver=$pkgver"
+arch=$(dpkg --print-architecture)
+echo "arch=$arch"
+
+echo "Preparing files"
+# Copy files to the correct places
+# binaries
+mkdir -p $pkgdir/usr/local/bin
+cp $savedir/bin/dw $pkgdir/usr/local/bin/dw
+cp $savedir/bin/dw_bw $pkgdir/usr/local/bin/dw_bw
+# man pages
+mkdir -p $pkgdir/usr/share/man/man1/
+cp $savedir/doc/dw.1 $pkgdir/usr/share/man/man1/
+cp $savedir/doc/dw_bw.1 $pkgdir/usr/share/man/man1/
+
+cd $pkgdir
+size=$(du -k usr | tail -n1 | sed 's/usr//')
+
+mkdir $pkgdir/DEBIAN/
+cat > $pkgdir/DEBIAN/control << END
+Package: deconwolf
+Version: $pkgver
+Architecture: $arch
+Depends: libfftw3-single3, libgsl27, libtiff5, libpng16-16, libclfft2
+Conflicts:
+Maintainer: $NAME <$EMAIL>
+Installed-Size: $size
+Section: custom
+Priority: optional
+Homepage: https://github.com/elgw/deconwolf/
+Description: Deconwolf a deconvolution tool for wide-field-microscopy.
+END
+
+cd $pkgdir/../
+dpkg-deb --build deconwolf deconwolf_${pkgver}_${arch}.deb
+mv deconwolf_${pkgver}_${arch}.deb "$savedir"

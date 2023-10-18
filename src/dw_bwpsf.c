@@ -87,7 +87,8 @@ void bw_conf_printf(FILE * out, bw_conf * conf)
     double fwhm_z = 2*2.783115/M_PI*conf->ni/pow(conf->NA, 2)*conf->lambda;
 
     fprintf(out, "FWHM_r (lateral plane) %.2f nm\n", fwhm_r);
-    fprintf(out, "Resolution_r = %.2f nm\n", 0.61*conf->NA / conf->ni);
+    fprintf(out, "Rayleigh Resolution (lateral) = %.2f nm\n",
+            0.61*conf->lambda / conf->NA);
     double qlateral = fwhm_r/conf->resLateral;
     fprintf(out, "FWHM_r / dr = %.2f\n", qlateral);
     if(qlateral < 2)
@@ -109,6 +110,7 @@ void bw_conf_printf(FILE * out, bw_conf * conf)
 bw_conf * bw_conf_new()
 {
     bw_conf * conf = malloc(sizeof(bw_conf));
+    assert(conf != NULL);
 
     /* Physical settings */
     conf->lambda = 600;
@@ -161,12 +163,6 @@ void bw_conf_free(bw_conf ** _conf)
     return;
 }
 
-static double timespec_diff(struct timespec* end, struct timespec * start)
-{
-    double elapsed = (end->tv_sec - start->tv_sec);
-    elapsed += (end->tv_nsec - start->tv_nsec) / 1000000000.0;
-    return elapsed;
-}
 
 void getCmdLine(int argc, char ** argv, bw_conf * s)
 {
@@ -178,6 +174,7 @@ void getCmdLine(int argc, char ** argv, bw_conf * s)
     }
     lcmd += argc+2;
     s->cmd = malloc(lcmd);
+    assert(s->cmd != NULL);
     int pos = 0;
     for(int kk = 0; kk<argc; kk++)
     {
@@ -185,16 +182,6 @@ void getCmdLine(int argc, char ** argv, bw_conf * s)
         pos += strlen(argv[kk])+1;
     }
     s->cmd[pos-1] = '\0';
-}
-
-
-int file_exist(char * fname)
-{
-    if( access( fname, F_OK ) != -1 ) {
-        return 1; // File exist
-    } else {
-        return 0;
-    }
 }
 
 void fprint_time(FILE * f)
@@ -265,7 +252,8 @@ void usage(__attribute__((unused)) int argc, char ** argv, bw_conf * s)
 
 void bw_argparsing(int argc, char ** argv, bw_conf * s)
 {
-    bw_conf * defaults = malloc(sizeof(bw_conf));
+    bw_conf * defaults = calloc(1, sizeof(bw_conf));
+    assert(defaults != NULL);
     memcpy(defaults, s, sizeof(bw_conf));
 
     if(argc < 2)
@@ -449,18 +437,21 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
     if(optind + 1 == argc)
     {
         s->outFile = malloc(strlen(argv[argc-1]) + 1);
+        assert(s->outFile != NULL);
         sprintf(s->outFile, "%s", argv[argc-1]);
     }
 
     if(s->outFile == NULL)
     {
         s->outFile = malloc(100*sizeof(char));
+        assert(s->outFile != NULL);
         sprintf(s->outFile, "PSFBW_%.2f_%.2f_%.1f_%.1f_%.1f.tif",
                 s->NA, s->ni, s->lambda, s->resLateral, s->resAxial);
     }
 
 
     s->logFile = malloc(strlen(s->outFile) + 10);
+    assert(s->logFile != NULL);
     sprintf(s->logFile, "%s.log.txt", s->outFile);
 
     /* Not more threads than slices */
@@ -518,6 +509,7 @@ void BW(bw_conf * conf)
     assert(conf->V == NULL);
     assert(conf->nThreads > 0);
     conf->V = malloc(conf->M*conf->N*conf->P*sizeof(float));
+    assert(conf->V != NULL);
 
     float * V = conf->V;
     int M = conf->M;
@@ -527,11 +519,14 @@ void BW(bw_conf * conf)
 
     int nThreads = conf->nThreads;
     pthread_t * threads = malloc(nThreads*sizeof(pthread_t));
+    assert(threads != NULL);
     bw_conf ** confs = malloc(nThreads*sizeof(bw_conf*));
+    assert(confs != NULL);
 
     for(int kk = 0; kk<nThreads; kk++)
     {
         confs[kk] = (bw_conf*) malloc(sizeof(bw_conf));
+        assert(confs[kk] != NULL);
         memcpy(confs[kk], conf, sizeof(bw_conf));
         confs[kk]->thread = kk;
         // printf("Creating thread %d\n", kk);
@@ -647,9 +642,11 @@ void BW_slice(float * V, float z, bw_conf * conf)
 
     size_t nr = (radmax+1)*conf->oversampling_R+2;
     double * r = malloc(nr * sizeof(double));
+    assert(r != NULL);
 
     // abs(x)^2
     double * radprofile = malloc(nr * sizeof(double));
+    assert(radprofile != NULL);
 
     /* Calculate the radial profile
        possibly by integrating over Z */
@@ -770,7 +767,7 @@ int main(int argc, char ** argv)
     bw_conf * conf = bw_conf_new();
     bw_argparsing(argc, argv, conf);
 
-    if( conf->overwrite == 0 && file_exist(conf->outFile))
+    if( conf->overwrite == 0 && dw_file_exist(conf->outFile))
     {
         printf("%s already exist. Doing nothing\n", conf->outFile);
         bw_conf_free(&conf);
@@ -826,6 +823,7 @@ int main(int argc, char ** argv)
 
     ttags * T = ttags_new();
     char * swstring = malloc(1024);
+    assert(swstring != NULL);
     sprintf(swstring, "deconwolf %s", deconwolf_version);
     ttags_set_software(T, swstring);
     ttags_set_imagesize(T, conf->M, conf->N, conf->P);

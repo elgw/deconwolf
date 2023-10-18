@@ -21,8 +21,7 @@
  * https://github.com/Biomedical-Imaging-Group/PSFGenerator/tree/master/src/psf/bornwolf
  */
 
-#ifndef dw_bwpsf_h
-#define dw_bwpsf_h
+#pragma once
 
 #include <stdio.h>
 #include <math.h>
@@ -37,6 +36,7 @@
 #include <locale.h>
 #include <gsl/gsl_integration.h>
 
+#include "dw_util.h"
 #include "fim_tiff.h"
 #include "dw_version.h"
 #include "lanczos.h"
@@ -121,6 +121,3 @@ typedef struct {
 #define ANSI_COLOR_MAGENTA "\x1b[35m"
 #define ANSI_COLOR_CYAN    "\x1b[36m"
 #define ANSI_COLOR_RESET   "\x1b[0m"
-
-
-#endif

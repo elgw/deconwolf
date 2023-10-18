@@ -1,8 +1,23 @@
+/*    Copyright (C) 2020 Erik L. G. Wernersson
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation, either version 3 of the License, or
+ *    (at your option) any later version.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include "method_ave.h"
 
-
-float alpha_ave(const afloat * restrict g,
-                  const afloat * restrict gm,
+float alpha_ave(const float * restrict g,
+                  const float * restrict gm,
                   const size_t wMNP, int mode)
 {
     /* Biggs, eq. 18 */
@@ -41,11 +56,11 @@ float alpha_ave(const afloat * restrict g,
 
 
 static float iter_ave(
-            afloat ** xp, // Output, f_(t+1)
+            float ** xp, // Output, f_(t+1)
             const float * restrict im, // Input image
             fftwf_complex * restrict cK, // fft(psf)
-            afloat * restrict f, // Current guess
-            afloat * restrict W, // Bertero Weights
+            float * restrict f, // Current guess
+            float * restrict W, // Bertero Weights
             const int64_t wM, const int64_t wN, const int64_t wP, // expanded size
             const int64_t M, const int64_t N, const int64_t P, // input image size
             __attribute__((unused)) const dw_opts * s)
@@ -56,7 +71,7 @@ static float iter_ave(
 
      fftwf_complex * F = fft(f, wM, wN, wP);
      putdot(s);
-     afloat * y = fft_convolve_cc_f2(cK, F, wM, wN, wP); // F is freed
+     float * y = fft_convolve_cc_f2(cK, F, wM, wN, wP); // F is freed
      float error = getError(y, im, M, N, P, wM, wN, wP, s->metric);
      putdot(s);
 
@@ -80,9 +95,9 @@ static float iter_ave(
      }
 
      fftwf_complex * F_sn = fft(y, wM, wN, wP);
-     fftwf_free(y);
+     free(y);
 
-     afloat * x = fft_convolve_cc_conj_f2(cK, F_sn, wM, wN, wP);
+     float * x = fft_convolve_cc_conj_f2(cK, F_sn, wM, wN, wP);
 
      /* Eq. 18 in Bertero */
      if(W != NULL)
@@ -105,9 +120,9 @@ static float iter_ave(
  }
 
 
-float * deconvolve_ave(afloat * restrict im,
+float * deconvolve_ave(float * restrict im,
                        const int64_t M, const int64_t N, const int64_t P,
-                       afloat * restrict psf,
+                       float * restrict psf,
                        const int64_t pM, const int64_t pN, const int64_t pP,
                        dw_opts * s)
  {
@@ -196,7 +211,7 @@ float * deconvolve_ave(afloat * restrict im,
      fflush(s->log);
 
      fft_train(wM, wN, wP,
-               s->verbosity, s->nThreads,
+               s->verbosity, s->nThreads_FFT,
                s->log);
 
      if(s->verbosity > 0)
@@ -205,13 +220,13 @@ float * deconvolve_ave(afloat * restrict im,
      }
 
      // cK : "full size" fft of the PSF
-     afloat * Z = fftwf_malloc(wMNP*sizeof(float));
+     float * Z = fim_malloc(wMNP*sizeof(float));
      memset(Z, 0, wMNP*sizeof(float));
      /* Insert the psf into the bigger Z */
      fim_insert(Z, wM, wN, wP,
                 psf, pM, pN, pP);
 
-     fftwf_free(psf);
+     free(psf);
 
      /* Shift the PSF so that the mid is at (0,0,0) */
      int64_t midM, midN, midP = -1;
@@ -233,13 +248,13 @@ float * deconvolve_ave(afloat * restrict im,
 
      fftwf_complex * cK = fft(Z, wM, wN, wP);
      //fim_tiff_write("Z.tif", Z, wM, wN, wP);
-     fftwf_free(Z);
+     free(Z);
 
      putdot(s);
 
      /* <-- This isn't needed ...
         fftwf_complex * cKr = NULL;
-        float * Zr = fftwf_malloc(wMNP*sizeof(float));
+        float * Zr = fim_malloc(wMNP*sizeof(float));
         memset(Zr, 0, wMNP*sizeof(float));
         float * psf_flipped = malloc(wMNP*sizeof(float));
         memset(psf_flipped, 0, sizeof(float)*wMNP);
@@ -249,15 +264,15 @@ float * deconvolve_ave(afloat * restrict im,
         fim_circshift(Zr, wM, wN, wP, -(pM-1)/2, -(pN-1)/2, -(pP-1)/2);
         cKr = fft(Zr, wM, wN, wP);
         // Not needed since f(-x) = ifft(conf(fft(f)))
-        fftwf_free(Zr);
+        free(Zr);
         --> */
 
      //printf("initial guess\n"); fflush(stdout);
-     afloat * W = NULL;
+     float * W = NULL;
      if(s->borderQuality > 0)
      {
          fftwf_complex * F_one = initial_guess(M, N, P, wM, wN, wP);
-         afloat * P1 = fft_convolve_cc_conj_f2(cK, F_one, wM, wN, wP); // can't replace this one with cK!
+         float * P1 = fft_convolve_cc_conj_f2(cK, F_one, wM, wN, wP); // can't replace this one with cK!
          //printf("P1\n");
          //fim_stats(P1, pM*pN*pP);
          //  writetif("P1.tif", P1, wM, wN, wP);
@@ -284,7 +299,7 @@ float * deconvolve_ave(afloat * restrict im,
      //writetif("W.tif", W, wM, wN, wP);
 
      // Original image -- expanded
-     //  float * G = fftwf_malloc(wMNP*sizeof(float));
+     //  float * G = fim_malloc(wMNP*sizeof(float));
      // memset(G, 0, wMNP*sizeof(float));
      // fim_insert(G, wM, wN, wP, im, M, N, P);
      //  writetif("G.tif", G, wM, wN, wP);
@@ -293,17 +308,17 @@ float * deconvolve_ave(afloat * restrict im,
      float sumg = fim_sum(im, M*N*P);
 
      float alpha = 0;
-     afloat * f = fim_constant(wMNP, sumg/(float) wMNP);
-     afloat * y = fim_copy(f, wMNP);
+     float * f = fim_constant(wMNP, sumg/(float) wMNP);
+     float * y = fim_copy(f, wMNP);
 
-     afloat * x1 = fim_copy(f, wMNP);
-     afloat * x2 = fim_copy(f, wMNP);
-     afloat * x = x1;
-     afloat * xp = x2;
-     afloat * xm = x2; // fim_copy(f, wMNP);
+     float * x1 = fim_copy(f, wMNP);
+     float * x2 = fim_copy(f, wMNP);
+     float * x = x1;
+     float * xp = x2;
+     float * xm = x2; // fim_copy(f, wMNP);
 
-     afloat * gm = fim_zeros(wMNP);
-     afloat * g = fim_zeros(wMNP);
+     float * gm = fim_zeros(wMNP);
+     float * g = fim_zeros(wMNP);
 
      dw_iterator_t * it = dw_iterator_new(s);
      while(dw_iterator_next(it) >= 0)
@@ -312,7 +327,7 @@ float * deconvolve_ave(afloat * restrict im,
          if(s->iterdump > 0){
              if(it->iter % s->iterdump == 0)
              {
-                 afloat * temp = fim_subregion(x, wM, wN, wP, M, N, P);
+                 float * temp = fim_subregion(x, wM, wN, wP, M, N, P);
                  char * outname = gen_iterdump_name(s, it->iter);
                  //printf(" Writing current guess to %s\n", outname);
                  if(s->outFormat == 32)
@@ -359,7 +374,7 @@ float * deconvolve_ave(afloat * restrict im,
          putdot(s);
 
          xp = xm;
-         fftwf_free(xp);
+         free(xp);
          double err = iter_ave(
                            &xp, // xp is updated to the next guess
                            im,
@@ -375,7 +390,7 @@ float * deconvolve_ave(afloat * restrict im,
          dw_iterator_show(it, s);
 
 
-         afloat * swap = g;
+         float * swap = g;
          g = gm; gm = swap;
 
          fim_minus(g, xp, y, wMNP); // g = xp - y
@@ -400,7 +415,7 @@ float * deconvolve_ave(afloat * restrict im,
 
      if(W != NULL)
      {
-         fftwf_free(W); // is P1
+         free(W); // is P1
      }
 
      if(s->fulldump)
@@ -409,26 +424,26 @@ float * deconvolve_ave(afloat * restrict im,
          fim_tiff_write("fulldump.tif", x, NULL, wM, wN, wP);
      }
 
-     afloat * out = fim_subregion(x, wM, wN, wP, M, N, P);
+     float * out = fim_subregion(x, wM, wN, wP, M, N, P);
 
 
      //  printf("DEBUG: writing final_full_tif\n");
      //  fim_tiff_write("final_full.tif", x, wM, wN, wP);
-     fftwf_free(f);
+     free(f);
      if(x != NULL)
      {
-         fftwf_free(x); x = NULL;
+         free(x); x = NULL;
      }
      if(xm != NULL)
      {
-         fftwf_free(xm);
+         free(xm);
          xm = NULL;
      }
-     fftwf_free(g);
-     fftwf_free(gm);
-     fftwf_free(cK);
+     free(g);
+     free(gm);
+     free(cK);
      //  if(cKr != NULL)
-     //  { fftwf_free(cKr); }
-     fftwf_free(y);
+     //  { free(cKr); }
+     free(y);
      return out;
  }

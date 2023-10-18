@@ -1,5 +1,4 @@
-#ifndef __bw_gsl_h__
-#define __bw_gsl_h__
+#pragma once
 
 #include <math.h>
 #include <stdlib.h>
@@ -69,6 +68,4 @@ double bw_gsl_integrate_xy(bw_gsl_conf_t *,
 
 #ifndef j0f
 #define j0f j0
-#endif
-
 #endif

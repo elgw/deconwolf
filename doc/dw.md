@@ -52,10 +52,11 @@ to the str.
 **\--tilesize s**
 : Set the size (axial side length, in pixels) of the largest portion that
 can be deconvolved at a time. E.g., if s is 2048 any image larger than 2048
-will be deconvolved in tiles.
+will be deconvolved in tiles. See separate section on tiling below.
 
 **\--tilepad p**
-: Set how many pixels the tiles should overlap.
+: Set how many pixels the tiles should overlap.  See separate section
+  on tiling below.
 
 **\--overwrite**
 : Overwrite the target if it exists.
@@ -84,6 +85,7 @@ format, see the log files for scaling factor used.
   iii/ **ave** Additive Vector Extrapolation by Biggs and Andrews.
   iv/ **eve** Exponential Vector Extrapolation by Biggs.
   v/ **shb** Scaled Heavy Ball.
+  vi/ **shbcl** Scaled Heavy Ball using OpenCl (not compiled by default)
 
 **\--mse**
 : Show the Mean Square Error between the input image and the current
@@ -94,6 +96,16 @@ format, see the log files for scaling factor used.
 : Pre-process the image and the PSF by convolving it by a 3-D isotropic
 Gaussian with sigma=s. This acts as a low pass filter.
 Have been found useful for very noisy image.
+
+**\--noplan**
+: disable FFTW3 planning. This means that FFTW3 uses the default plan
+  for the given problem size.
+
+**\--no-inplace**
+: disable the use of in-place FFT transformations with fftw3. This
+  will cause fftw3 to use more memory and is typically slower. This
+  option is mostly for debugging. On some platforms it is expected
+  that deconwolf will only work with this flag.
 
 **maxproj**
 : With *maxproj* as the first argument deconwolf will create max
@@ -129,6 +141,34 @@ deconvolve one image. For maximal throughput it is better to run
 several copies of **dw** using fewer cores each. E.g. on an 8-core
 machine the maximal throughput can be reached by deconvolving eight
 images in parallel using one core each (if enough RAM is available).
+
+# Tiling
+In order to use less RAM and deconvolve really large scans deconwolf
+can process images in a memory efficient way by dividing them into
+smaller portions, or tiles. This process is completely transparent to
+the user although the **--tilesize T** parameter has to be set
+explicitly.
+
+Tile processing would typically be slow and introduce artifacts at the
+boundaries. To reduce the boundary artifacts tiles are overlapped by
+up to **--tilepad p** pixels. This artifact remedy does,
+unfortunately, slow down the processing even more.
+
+Internally the tile processing performs the following steps:
+
+ 1. The tif input image is written to disk as raw float data, without
+    loading the full image to RAM.
+ 2. A tiling grid is set up which divides the lateral domain of the
+    image into tiles of size at most $TxT$.
+ 3. Each tile then is loaded from disk, including extra padding $p$
+    where it isn't in contact with the edge. The tile is then
+    deconvolved and the data is written to disk.
+ 4. Where the padding is overlapping another tile, the
+    image data is weighted linearly to reduce artifacts.
+ 5. The raw output images is converted to tif, again without loading
+    the full image to RAM.
+
+Tiling is enabled only when **--tilesize** is specified.
 
 # SEE ALSO
 **dw_bw** for generation of point spread functions according to

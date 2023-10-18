@@ -1,5 +1,79 @@
 # CHANGELOG
 
+## 0.3.2
+- Tested on raspberry pi 4 using 64-bit bookworm.
+- Found a bug in `fft.c` where `memcpy` was used wrongly (replaced by
+  `memmove`). Strangely that bug never manifested under
+  Ubuntu/x86_64.
+- Added **fim_realloc** for aligned reallocs. This function could be
+  branched depending on the OS since there are platform specific
+  aligned reallocation functions.
+- Header files: Using `#pragma once` instead of the `#ifndef file_h_`
+  pattern.
+
+## 0.3.1
+- Introduced **fim_malloc** for all allocations that might benefit
+  from a stricter alignment than malloc provides by default. Tested
+  with `MADV_HUGEPAGE` for the allocations but the results are
+  inconclusive (but it uses more RAM when enabled). Cleared all uses
+  of `fftw_free` and `fftw_malloc`.
+
+## 0.3.0
+- Respects the NO_COLOR environmental variable in accord with https://no-color.org/.
+- Fixed correct capping of pixel values when **--scaling** is used.
+
+## v 0.2.9
+ - Added the command line option **--scaling** for setting bypassing the
+   automatic image scaling in 16-bit output mode.
+
+## v 0.2.8
+ - Switched from `fftw3f_threads` to `fftw3f_omp`. This reduced the
+   run time by about 10% on a Intel i7-6700K. Can be reverted by
+   commenting in/out the corresponding lines in the makefile.
+ - Cleaned up the output of `dw --version`
+
+## v 0.2.7
+- Converted a few minor code paths to execute in parallel by OpenMP
+  directives.
+
+## v 0.2.6
+- Using ISO 8601 in log files, e.g., `2023-02-14T11:14:14`.
+
+## v 0.2.5
+- Added the **--xyz** option to **dw maxproj**, for creating max
+  projections along the three axes and collecting them on a single 2D
+  image.
+
+## v 0.2.4
+- **dw --help** now shows the additional commands/modules available.
+- Reading 16-bit tif files with **TIFFReadEncodedStrip** instead of
+  **TIFFReadRawStrip**. Some programs saves tiff files in other ways
+  :)
+- Added the command psf-STED for 3D STED PSFs. Use at your own risk.
+- Building with meson is temporarily broken and to be fixed.
+- Fixed dw chashing when combining --method rl with --iterdump
+- Setting the background level automatically to min(image) unless
+  specified with **--bg**.
+
+## v 0.2.3
+- Fixed some errors introduced in v 0.2.2, especially the **dw
+  maxproj** was broken.
+- added the subcommand **dw merge**. To be used to merge single z-planes
+  into a 3D volume.
+
+## v 0.2.2
+- Can deconvolve using clFFT, when compiled with **OPENCL=1** two new
+  methods appear, **--method shbcl** and **--shbcl2**, the first using
+  clFFT only for the Fourier transforms, the latter using OpenCL for
+  the whole deconvolution procedure. Uses quite much GPU memory which
+  is something to improve upon in future version, possibly by
+  switching to vkFFT.
+
+## v 0.1.1
+- Added experimental **dw imshift** for shifting images, also shift
+  estimation using normalized cross correlation with **dw imshift
+  --ref file.tif**. Might be extended to basic tiling etc.
+
 ## v 0.1.0
 - Implements the 'Scaled Heavy Ball'. More
 memory efficient than eve and about the same speed and image

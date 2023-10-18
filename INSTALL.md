@@ -39,6 +39,7 @@ brew install libomp
 brew install libtiff
 brew install fftw
 brew install gsl
+# brew install clfft # see note below.
 ```
 
 Build and install deconwolf
@@ -47,8 +48,15 @@ make -B
 sudo make install
 ```
 
+clFFT does unfortunately not work on MacOS according to [this issue](https://github.com/clMathLibraries/clFFT/issues/183)
 
 ## Windows 10
+Although it might be possible to build native windows executables, it
+is suggested that WSL is used.
+
+With the following instructions it was possible to build deconwolf
+0.1.0 on Windows 10 (the --inplace option might not work on the
+current version).
 
 The simplest way to build native windows binaries seems to be using msys2.
 Follow all steps of the [msys2](https://www.msys2.org/) installation guide,
@@ -130,14 +138,28 @@ sudo python3 -m pip install meson ninja
 ## Ubuntu 16.04
 ``` shell
 sudo apt-get update
-# find out actual names with command like
-# sudo apt-cache search fftw
+sudo apt-get install gcc
+sudo apt-get install pkg-config
 sudo apt-get install libfftw3-single3
 sudo apt-get install libfftw3-dev
+sudo apt-get install openmp
+sudo apt-get install libtiff-dev # only difference to 20.04
 sudo apt-get install libgsl-dev
 sudo apt-get install libomp-dev
-sudo apt-get install libtiff-dev
+sudo apt-get install libpng-dev
+
 ```
+
+## Ubuntu 23.04
+Same as Ubuntu 22.04.
+
+For the OpenCL headers, required to build:
+
+``` shell
+apt-get install opencl-headers
+apt-get install libclfft-dev libclfft2
+```
+
 ## FreeBSD
 Differences to building on Linux.
  - `pkgconf` replaces `pkg-config`
@@ -171,4 +193,26 @@ To set the number of threads, set the environmental variable
 ``` shell
 export MKL_NUM_THREADS=8
 dw ...
+```
+
+## Arch/ Manjaro
+
+``` shell
+# remember to update system
+sudo pacman -Suuyy
+# install dependencies
+sudo pacman -S fftw, gsl, openmp, libtiff
+make
+sudo make install
+
+```
+
+## Rapsberry PI (64-bit Debian bookworm)
+### Dependencies for build
+``` shell
+sudo apt-get update
+sudo apt-get upgrade
+sudo apt-get install libfftw3-dev \
+libtiff-dev \
+libgsl-dev
 ```

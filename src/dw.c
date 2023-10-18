@@ -17,9 +17,6 @@
 
 #include "dw.h"
 
-#define tictoc struct timespec tictoc_start, tictoc_end;
-#define tic clock_gettime(CLOCK_REALTIME, &tictoc_start);
-#define toc(X) clock_gettime(CLOCK_REALTIME, &tictoc_end); printf(#X); printf(" %f s\n", timespec_diff(&tictoc_end, &tictoc_start)); fflush(stdout);
 
 
 /* GLOBALS */
@@ -152,17 +149,15 @@ void dw_iterator_free(dw_iterator_t * it)
 
 dw_opts * dw_opts_new(void)
 {
-    dw_opts * s = malloc(sizeof(dw_opts));
-    s->nThreads = 4;
-    #ifndef WINDOWS
-    /* Reports #threads, typically 2x#cores */
-    s->nThreads = sysconf(_SC_NPROCESSORS_ONLN)/2;
-    #endif
-    #ifdef OMP
-    /* Reports number of cores */
-    s->nThreads = omp_get_num_procs();
-    #endif
-    s->nThreads < 1 ? s->nThreads = 1 : 0;
+    dw_opts * s = calloc(1, sizeof(dw_opts));
+    s->nThreads_FFT = dw_get_threads();
+    s->nThreads_OMP = s->nThreads_FFT;
+
+    s->nThreads_FFT < 1 ? s->nThreads_FFT = 1 : 0;
+    s->nThreads_OMP < 1 ? s->nThreads_OMP = 1 : 0;
+
+    s->fft_inplace = 1;
+
     s->nIter = 1; /* Always overwritten if used */
     s->maxiter = 250;
     s->err_rel = 0.02;
@@ -178,8 +173,10 @@ dw_opts * dw_opts_new(void)
     s->tsv = NULL;
     s->ref = NULL;
     s->prefix = malloc(10*sizeof(char));
+    assert(s->prefix != NULL);
     sprintf(s->prefix, "dw");
     s->log = NULL;
+    s->color = 1;
     s->verbosity = 1;
     s->showTime = 0;
     s->overwrite = 0;
@@ -194,10 +191,12 @@ dw_opts * dw_opts_new(void)
     s->onetile = 0;
     s->borderQuality = 2;
     s->outFormat = 16; // write 16 bit int
+    s->scaling = -1.0;
     s->experimental1 = 0;
     s->fulldump = 0;
     s->positivity = 1;
-    s->bg = 1e-5; /* Should be strictly positive or pixels will be freezed */
+    s->bg = 1e-2; /* Should be strictly positive or pixels will be freezed */
+    s->bg_auto = 1;
     s->flatfieldFile = NULL;
     s->lookahead = 0;
     s->psigma = 0;
@@ -205,6 +204,16 @@ dw_opts * dw_opts_new(void)
     s->eve = 1;
     s->metric = DW_METRIC_IDIV;
     clock_gettime(CLOCK_REALTIME, &s->tstart);
+    s->fftw3_planning = FFTW_MEASURE;
+    s->alphamax = 1;
+
+    /* https://no-color.org/ */
+    char *no_color = getenv("NO_COLOR");
+    if (no_color != NULL && no_color[0] != '\0')
+    {
+        s->color = 0;
+    }
+
     return s;
 }
 
@@ -237,22 +246,16 @@ void dw_show_iter(dw_opts * s, int it, int nIter, float err)
     }
 }
 
-void nullfree(void * p)
-{
-    if(p != NULL)
-    {
-        free(p);
-    }
-}
 
 char * gen_iterdump_name(
-                         __attribute__((unused)) const dw_opts * s,
-                         int it)
+    __attribute__((unused)) const dw_opts * s,
+    int it)
 {
     // Generate a name for the an iterdump file
     // at iteration it
-    char * name = malloc(100*sizeof(char));
-    sprintf(name, "itd%05d.tif", it);
+    char * name = malloc(strlen(s->outFolder) + 100*sizeof(char));
+    assert(name != NULL);
+    sprintf(name, "%sitd%05d.tif", s->outFolder, it);
     return name;
 }
 
@@ -266,16 +269,16 @@ int64_t int64_t_max(int64_t a, int64_t b)
 void dw_opts_free(dw_opts ** sp)
 {
     dw_opts * s = sp[0];
-    nullfree(s->imFile);
-    nullfree(s->psfFile);
-    nullfree(s->outFile);
-    nullfree(s->logFile);
-    nullfree(s->flatfieldFile);
-    nullfree(s->prefix);
-    nullfree(s->commandline);
-    nullfree(s->ref);
-    nullfree(s->refFile);
-    nullfree(s->tsvFile);
+    dw_nullfree(s->imFile);
+    dw_nullfree(s->psfFile);
+    dw_nullfree(s->outFile);
+    dw_nullfree(s->logFile);
+    dw_nullfree(s->flatfieldFile);
+    dw_nullfree(s->prefix);
+    dw_nullfree(s->commandline);
+    dw_nullfree(s->ref);
+    dw_nullfree(s->refFile);
+    dw_nullfree(s->tsvFile);
     if(s->tsv != NULL)
     {
         fclose(s->tsv);
@@ -297,9 +300,15 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
     fprintf(f, "output: %s\n", s->outFile);
     fprintf(f, "log file: %s\n", s->logFile);
     fprintf(f, "nIter:  %d\n", s->nIter);
-    fprintf(f, "nThreads: %d\n", s->nThreads);
+    fprintf(f, "nThreads for FFT: %d\n", s->nThreads_FFT);
+    fprintf(f, "nThreads for OMP: %d\n", s->nThreads_OMP);
     fprintf(f, "verbosity: %d\n", s->verbosity);
-    fprintf(f, "background level: %f\n", s->bg);
+    if(s->bg_auto == 1)
+    {
+        fprintf(f, "background level: auto\n");
+    } else {
+        fprintf(f, "background level: %f\n", s->bg);
+    }
 
     switch(s->method)
     {
@@ -318,6 +327,14 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
     case DW_METHOD_SHB:
         fprintf(f, "method: Scaled Heavy Ball (SHB)\n");
         break;
+#ifdef OPENCL
+    case DW_METHOD_SHBCL:
+        fprintf(f, "method: Scaled Heavy Ball + OpenCL for FFT (SHBCL)\n");
+        break;
+    case DW_METHOD_SHBCL2:
+        fprintf(f, "method: Scaled Heavy Ball + OpenCL (SHBCL2)\n");
+        break;
+#endif
     }
     switch(s->metric)
     {
@@ -375,6 +392,16 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
         fprintf(f, "ERROR: Unknown\n");
         break;
     }
+    if(s->outFormat == 16)
+    {
+        if(s->scaling <= 0)
+        {
+            fprintf(f, "Scaling: Automatic\n");
+        } else {
+            fprintf(f, "Scaling value: %f\n", s->scaling);
+        }
+
+    }
 
     fprintf(f, "Border Quality: ");
     switch(s->borderQuality){
@@ -397,6 +424,26 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
         fprintf(f, "DEBUG OPTION: ONETILE = TRUE (only first tile will be deconvolved)\n");
     }
     fprintf(f, "\n");
+
+    fprintf(f, "FFTW3 plan: ");
+    switch(s->fftw3_planning)
+    {
+    case FFTW_ESTIMATE:
+        fprintf(f, "FFTW_ESTIMATE (--noplan)\n");
+        break;
+    case FFTW_MEASURE:
+        fprintf(f, "FFTW_MEASURE\n");
+        break;
+    case FFTW_PATIENT:
+        fprintf(f, "FFTW_PATIENT\n");
+        break;
+    case FFTW_EXHAUSTIVE:
+        fprintf(f, "FFTW_EXHAUSTIVE\n");
+        break;
+    default:
+        fprintf(f, "UNKNOWN/Wrongly Set\n");
+        break;
+    }
 }
 
 void warning(FILE * fid)
@@ -406,21 +453,6 @@ void warning(FILE * fid)
     return;
 }
 
-static double timespec_diff(struct timespec* end, struct timespec * start)
-{
-    double elapsed = (end->tv_sec - start->tv_sec);
-    elapsed += (end->tv_nsec - start->tv_nsec) / 1000000000.0;
-    return elapsed;
-}
-
-int file_exist(char * fname)
-{
-    if( access( fname, F_OK ) != -1 ) {
-        return 1; // File exist
-    } else {
-        return 0;
-    }
-}
 
 void fulldump(dw_opts * s, float * A, size_t M, size_t N, size_t P, char * name)
 {
@@ -442,15 +474,28 @@ void fulldump(dw_opts * s, float * A, size_t M, size_t N, size_t P, char * name)
 void dw_fprint_info(FILE * f, dw_opts * s)
 {
     f == NULL ? f = stdout : 0;
-    fprintf(f, "deconwolf: '%s' PID: %d\n", deconwolf_version, (int) getpid());
-    char cwd[1024];
-    if (getcwd(cwd, sizeof(cwd)) != NULL) {
-        fprintf(f, "PWD: %s\n", cwd);
+
+    fprintf(f, "deconwolf: '%s'\n", deconwolf_version);
+
+    if(f != stdout)
+    {
+        fprintf(f, "PID: %d\n",  (int) getpid());
     }
 
-    if(s->commandline != NULL)
+    if(f != stdout)
     {
-        fprintf(f, "CMD: %s\n", s->commandline);
+        char cwd[1024];
+        if (getcwd(cwd, sizeof(cwd)) != NULL) {
+            fprintf(f, "PWD: %s\n", cwd);
+        }
+    }
+
+    if(f != stdout)
+    {
+        if(s->commandline != NULL)
+        {
+            fprintf(f, "CMD: %s\n", s->commandline);
+        }
     }
 
 #ifdef GIT_VERSION
@@ -461,32 +506,50 @@ void dw_fprint_info(FILE * f, dw_opts * s)
     fprintf(f, "COMPILER: '%s'\n", CC_VERSION);
 #endif
 
-    fprintf(f, "BUILD_DATE: '%s'\n'", __DATE__);
+    fprintf(f, "BUILD_DATE: '%s'\n", __DATE__);
 #ifdef CUDA
     fprintf(f, "FFT Backend: 'cuFFT\n");
 #else
     fprintf(f, "FFT Backend: '%s'\n", fftwf_version);
 #endif
-    fprintf(f, "TIFF: '%s'\n", TIFFGetVersion());
+    fprintf(f, "TIFF Backend: '%s'\n", TIFFGetVersion());
 
-#ifndef WINDOWS
-    char * user = getenv("USER");
-    if(user != NULL)
-    { fprintf(f, "USER: '%s'\n", user); }
-#endif
-
-#ifndef WINDOWS
-    char * hname = malloc(1024*sizeof(char));
-    if(gethostname(hname, 1023) == 0)
+    if(f != stdout)
     {
-        fprintf(f, "HOSTNAME: '%s'\n", hname);
-        free(hname);
-    }
+#ifndef WINDOWS
+        char * user = getenv("USER");
+        if(user != NULL)
+        { fprintf(f, "USER: '%s'\n", user); }
 #endif
+
+#ifndef WINDOWS
+        char * hname = malloc(1024*sizeof(char));
+        assert(hname != NULL);
+        if(gethostname(hname, 1023) == 0)
+        {
+            fprintf(f, "HOSTNAME: '%s'\n", hname);
+            free(hname);
+        }
+#endif
+    }
 
 #ifdef _OPENMP
     fprintf(f, "OpenMP: YES\n");
 #endif
+
+#ifdef OPENCL
+    fprintf(f, "OpenCL: YES\n");
+#else
+    fprintf(f, "OpenCL: No. (Rebuild with OPENCL=1 to enable)\n");
+#endif
+
+    if(s->verbosity > 1)
+    {
+        fprintf(f, "sizeof(int) = %zu\n", sizeof(int));
+        fprintf(f, "sizeof(float) = %zu\n", sizeof(float));
+        fprintf(f, "sizeof(double) = %zu\n", sizeof(double));
+        fprintf(f, "sizeof(size_t) = %zu\n", sizeof(size_t));
+    }
 
     fprintf(f, "\n");
     fflush(f);
@@ -503,6 +566,7 @@ static void getCmdLine(int argc, char ** argv, dw_opts * s)
     }
     lcmd += argc+2;
     s->commandline = malloc(lcmd);
+
     int pos = 0;
     for(int kk = 0; kk<argc; kk++)
     {
@@ -521,6 +585,12 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
 
 
     struct option longopts[] = {
+        { "no-inplace",no_argument,       NULL, '1' },
+        { "ompthreads",required_argument, NULL, '2' },
+        { "psf-pass",  required_argument, NULL, '3' },
+	{ "cldevice",  required_argument, NULL, '4' },
+        { "temp",      required_argument, NULL, '9' },
+        { "noplan",    no_argument,       NULL, 'a' },
         { "bg",        required_argument, NULL, 'b' },
         { "threads",   required_argument, NULL, 'c' },
         { "tsv",       required_argument, NULL, 'd' },
@@ -550,6 +620,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         { "mse",       no_argument,       NULL,  'M' },
         { "maxiter",   required_argument, NULL,  'N' },
         { "ref",       required_argument, NULL,  'R' },
+        { "scaling",   required_argument, NULL,  'S' },
         { "onetile",   no_argument,       NULL,  'T' },
         { "nopos",     no_argument,       NULL,  'P' },
         { "psigma",    required_argument, NULL,  'Q' },
@@ -562,15 +633,34 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     int ch;
     int prefix_set = 0;
     while((ch = getopt_long(argc, argv,
-                            "a:b:c:f:ghil:m:n:o:p:r:s:tvwx:B:C:DFI:L:MR:TPQ:X:",
+                            "12349ab:c:f:ghil:m:n:o:p:r:s:tvwx:B:C:DFI:L:MR:S:TPQ:X:",
                             longopts, NULL)) != -1)
     {
         switch(ch) {
+        case '1':
+            s->fft_inplace = 0;
+            break;
+        case '2':
+            s->nThreads_OMP = atoi(optarg);
+            break;
+        case '3':
+            s->psf_pass = atof(optarg);
+            break;
+	case '4':
+            s->cl_device = atoi(optarg);
+            break;
+        case '9':
+            s->alphamax = atof(optarg);
+            break;
         case 'C':
             s->flatfieldFile = strdup(optarg);
             break;
+        case 'a':
+            s->fftw3_planning = FFTW_ESTIMATE;
+            break;
         case 'b':
             s->bg = atof(optarg);
+            s->bg_auto = 0;
             break;
         case 'd': /* diagnostics */
             s->tsvFile = strdup(optarg);
@@ -620,7 +710,9 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             exit(0);
             break;
         case 'o':
+            free(s->outFile);
             s->outFile = malloc(strlen(optarg)+1);
+            assert(s->outFile != NULL);
             strcpy(s->outFile, optarg);
             break;
         case 'n':
@@ -628,7 +720,8 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             s->iter_type = DW_ITER_FIXED;
             break;
         case 'c':
-            s->nThreads = atoi(optarg);
+            s->nThreads_FFT = atoi(optarg);
+            s->nThreads_OMP = atoi(optarg);
             break;
         case 'i':
             s->iterdump = 1;
@@ -646,6 +739,9 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         case 's':
             s->tiling_maxSize = atoi(optarg);
             break;
+        case 'S':
+            s->scaling = atof(optarg);
+            break;
         case 'p':
             s->tiling_padding = atoi(optarg);
             break;
@@ -655,6 +751,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         case 'f':
             free(s->prefix);
             s->prefix = malloc(strlen(optarg) + 1);
+            assert(s->prefix != NULL);
             strcpy(s->prefix, optarg);
             prefix_set = 1;
             break;
@@ -665,7 +762,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
                 s->method = DW_METHOD_EVE;
                 if(prefix_set == 0)
                 {
-                sprintf(s->prefix, "eve");
+                    sprintf(s->prefix, "eve");
                 }
                 s->fun = &deconvolve_eve;
                 known_method = 1;
@@ -710,9 +807,35 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
                 s->fun = &deconvolve_shb;
                 known_method = 1;
             }
+#ifdef OPENCL
+            if(strcmp(optarg, "shbcl") == 0)
+            {
+                s->method = DW_METHOD_SHBCL;
+                if(prefix_set == 0)
+                {
+                    sprintf(s->prefix, "shbcl");
+                }
+                s->fun = &deconvolve_shb_cl;
+                known_method = 1;
+            }
+            if(strcmp(optarg, "shbcl2") == 0)
+            {
+                s->method = DW_METHOD_SHBCL2;
+                if(prefix_set == 0)
+                {
+                    sprintf(s->prefix, "shbcl2");
+                }
+                s->fun = &deconvolve_shb_cl2;
+                known_method = 1;
+            }
+#endif
             if(known_method == 0)
             {
-                fprintf(stderr, "--method %s is unknown. Please specify ave, eve (default), shb, rl or id\n", optarg);
+                fprintf(stderr, "--method %s is unknown. Please specify ",  optarg);
+#ifdef OPENCL
+                fprintf(stderr, "shbcl, shbcl2, ");
+#endif
+                fprintf(stderr, "ave, eve, shb (default), rl or id\n");
                 exit(EXIT_FAILURE);
             }
             break;
@@ -787,29 +910,44 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         char * dname = dirname(dirc);
         char * bname = basename(basec);
         s->outFile = malloc(strlen(dname) + strlen(bname) + strlen(s->prefix) + 10);
+        assert(s->outFile != NULL);
         sprintf(s->outFile, "%s/%s_%s", dname, s->prefix, bname);
+        s->outFolder = malloc(strlen(dname) + 16);
+        assert(s->outFolder != NULL);
+        sprintf(s->outFolder, "%s/", dname);
         free(dirc);
         free(basec);
+    } else {
+        char * dirc = strdup(s->outFile);
+        char * dname = dirname(dirc);
+        free(s->outFolder);
+        s->outFolder = malloc(strlen(dname) + 16);
+        assert(s->outFolder != NULL);
+        sprintf(s->outFolder, "%s/", dname);
+        free(dirc);
     }
 
     if(! s->iterdump)
     {
-        if( s->overwrite == 0 && file_exist(s->outFile))
+        if( s->overwrite == 0 && dw_file_exist(s->outFile))
         {
             printf("%s already exist. Doing nothing\n", s->outFile);
             exit(0);
         }
     }
 
-    if(s->nThreads < 1)
+    if(s->nThreads_FFT < 1 || s->nThreads_OMP < 1)
     {
         printf("Invalid number of threads (%d), "
-               "please verify your command line\n", s->nThreads);
+               "please verify your command line\n", s->nThreads_FFT);
         exit(EXIT_FAILURE);
     }
 
     s->logFile = malloc(strlen(s->outFile) + 10);
+    assert(s->logFile != NULL);
     sprintf(s->logFile, "%s.log.txt", s->outFile);
+
+
 
     if(s->tsvFile != NULL)
     {
@@ -822,7 +960,13 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         fprintf(s->tsv, "iteration\ttime\tKL\n");
     }
 
-    //  printf("Options received\n"); fflush(stdout);
+    /* Set the plan to be used with fftw3 */
+    fft_set_plan(s->fftw3_planning);
+    fft_set_inplace(s->fft_inplace);
+    if(s->verbosity > 2)
+    {
+        printf("Command line arguments accepted\n");
+    }
 }
 
 
@@ -832,8 +976,15 @@ void fsetzeros(const char * fname, size_t N)
 {
     size_t bsize = 1024*1024;
     char * buffer = malloc(bsize);
+    assert(buffer != NULL);
     memset(buffer, 0, bsize);
     FILE * fid = fopen(fname, "wb");
+    if(fid == NULL)
+    {
+        fprintf(stderr, "%s (%d): Unable to open %s\n",
+                __FILE__, __LINE__, fname);
+        exit(EXIT_FAILURE);
+    }
     size_t written = 0;
     while(written + bsize < N)
     {
@@ -847,74 +998,6 @@ void fsetzeros(const char * fname, size_t N)
     free(buffer);
 }
 
-#ifdef WINDOWS
-size_t get_peakMemoryKB(void)
-{
-    return 0;
-}
-#else
-
-#ifdef __APPLE__
-size_t get_peakMemoryKB(void)
-{
-    struct rusage r_usage;
-    getrusage(RUSAGE_SELF, &r_usage);
-    return (size_t) round((double) r_usage.ru_maxrss/1024.0);
-}
-#endif
-
-#ifndef __APPLE__
-size_t get_peakMemoryKB(void)
-{
-    char * statfile = malloc(100*sizeof(char));
-    sprintf(statfile, "/proc/%d/status", getpid());
-    FILE * sf = fopen(statfile, "r");
-    if(sf == NULL)
-    {
-        fprintf(stderr, "Failed to open %s\n", statfile);
-        free(statfile);
-        return 0;
-    }
-
-    char * peakline = NULL;
-
-    char * line = NULL;
-    size_t len = 0;
-
-    while( getline(&line, &len, sf) > 0)
-    {
-        if(strlen(line) > 6)
-        {
-            if(strncmp(line, "VmPeak", 6) == 0)
-            {
-                peakline = strdup(line);
-            }
-        }
-    }
-    free(line);
-    fclose(sf);
-    free(statfile);
-
-    // Parse the line starting with "VmPeak"
-    // Seems like it is always in kB
-    // (reference: fs/proc/task_mmu.c)
-    // actually in kiB i.e., 1024 bytes
-    // since the last three characters are ' kb' we can skip them and parse in between
-    size_t peakMemoryKB = 0;
-    //  printf("peakline: '%s'\n", peakline);
-    if(strlen(peakline) > 11)
-    {
-        peakline[strlen(peakline) -4] = '\0';
-
-        //    printf("peakline: '%s'\n", peakline+7);
-        peakMemoryKB = (size_t) atol(peakline+7);
-    }
-
-    free(peakline);
-    return peakMemoryKB;
-}
-#endif
-#endif
 
 void fprint_peakMemory(FILE * fout)
 {
@@ -926,9 +1009,8 @@ void fprint_peakMemory(FILE * fout)
     return;
 }
 
-
 void benchmark_write(dw_opts * s, int iter, double fMSE,
-                     const afloat * x0, // current guess of work size
+                     const float * x0, // current guess of work size
                      const int64_t M, const int64_t N, const int64_t P,
                      const int64_t wM, const int64_t wN, const int64_t wP)
 {
@@ -937,7 +1019,7 @@ void benchmark_write(dw_opts * s, int iter, double fMSE,
         return;
     }
 
-    afloat * x = fim_subregion(x0, wM, wN, wP, M, N, P);
+    float * x = fim_subregion(x0, wM, wN, wP, M, N, P);
 
     size_t MNP = M*N*P;
     double KL = 0;
@@ -951,7 +1033,7 @@ void benchmark_write(dw_opts * s, int iter, double fMSE,
             }
         }
     }
-    fftw_free(x);
+    free(x);
     struct timespec tnow;
     clock_gettime(CLOCK_REALTIME, &tnow);
     double time = clockdiff(&tnow, &s->tstart);
@@ -987,7 +1069,7 @@ float getErrorX(const float * restrict y, const float * restrict g, const int64_
 }
 
 
-float getError_idiv(const afloat * restrict y, const afloat * restrict g,
+float getError_idiv(const float * restrict y, const float * restrict g,
                     const int64_t M, const int64_t N, const int64_t P,
                     const int64_t wM, const int64_t wN, const int64_t wP)
 {
@@ -1011,7 +1093,7 @@ float getError_idiv(const afloat * restrict y, const afloat * restrict g,
                 float est = g[a + b*M + c * M*N];
                 if(est > 0)
                 {
-                    idiv += obs*log(obs/est) - obs + est;
+                    idiv += obs*logf(obs/est) - obs + est;
                 }
             }
         }
@@ -1024,7 +1106,7 @@ float getError_idiv(const afloat * restrict y, const afloat * restrict g,
 /* Return the "error" or distance between the input image and the
    current guess convolved with the PSF. Also known as the forward
    error */
-float getError(const afloat * restrict y, const afloat * restrict g,
+float getError(const float * restrict y, const float * restrict g,
                const int64_t M, const int64_t N, const int64_t P,
                const int64_t wM, const int64_t wN, const int64_t wP,
                dw_metric metric)
@@ -1049,7 +1131,7 @@ float getError(const afloat * restrict y, const afloat * restrict g,
     return error;
 }
 
-float get_fMSE(const afloat * restrict y, const afloat * restrict g,
+float get_fMSE(const float * restrict y, const float * restrict g,
                const int64_t M, const int64_t N, const int64_t P,
                const int64_t wM, const int64_t wN, const int64_t wP)
 {
@@ -1080,7 +1162,7 @@ float get_fMSE(const afloat * restrict y, const afloat * restrict g,
     return (double) mse;
 }
 
-float get_fIdiv(const afloat * restrict y, const afloat * restrict g,
+float get_fIdiv(const float * restrict y, const float * restrict g,
                 const int64_t M, const int64_t N, const int64_t P,
                 const int64_t wM, const int64_t wN, const int64_t wP)
 {
@@ -1104,7 +1186,7 @@ float get_fIdiv(const afloat * restrict y, const afloat * restrict g,
                 double gval = g[a + b*M + c * M*N];
                 if(yval > 0 && gval > 0)
                 {
-                    I += gval*log(gval/yval) - (gval-yval);
+                    I += gval*logf(gval/yval) - (gval-yval);
                 }
             }
         }
@@ -1119,7 +1201,12 @@ void putdot(const dw_opts *s)
 {
     if(s->verbosity > 0)
     {
-        printf(ANSI_COLOR_GREEN "." ANSI_COLOR_RESET);
+        if(s->color)
+        {
+            printf(ANSI_COLOR_GREEN "." ANSI_COLOR_RESET);
+        } else {
+            printf(".");
+        }
         fflush(stdout);
     }
     return;
@@ -1159,37 +1246,10 @@ float getError_ref(const float * restrict y,
 }
 
 
-fftwf_complex * initial_guess(const int64_t M, const int64_t N, const int64_t P,
-                              const int64_t wM, const int64_t wN, const int64_t wP)
-{
-    /* Create initial guess: the fft of an image that is 1 in MNP and 0 outside
-     * M, N, P is the dimension of the microscopic image
-     *
-     * Possibly more stable to use the mean of the input image rather than 1
-     */
-
-    assert(wM >= M); assert(wN >= N); assert(wP >= P);
-
-    afloat * one = fim_zeros(wM*wN*wP);
-
-#pragma omp parallel for shared(one)
-    for(int64_t cc = 0; cc < P; cc++) {
-        for(int64_t bb = 0; bb < N; bb++) {
-            for(int64_t aa = 0; aa < M; aa++) {
-                one[aa + wM*bb + wM*wN*cc] = 1;
-            }
-        }
-    }
-    //  writetif("one.tif", one, wM, wN, wP);
-
-    fftwf_complex * Fone = fft(one, wM, wN, wP);
-
-    fftwf_free(one);
-    return Fone;
-}
 
 void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opts * s)
 {
+    printf("deconwolf: %s\n", deconwolf_version);
     printf("usage: %s [<options>] image.tif psf.tif\n", argv[0]);
 
     printf("\n");
@@ -1208,6 +1268,10 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
     printf(" --relax F\n\t Multiply the central pixel of the PSF by F. (F>1 relaxation)\n");
     printf(" --xyfactor F\n\t Discard outer planes of the PSF with sum < F of the central. Use 0 for no cropping.\n");
     printf(" --bq Q\n\t Set border handling to 0 'none', 1 'compromise', or 2 'normal' which is default\n");
+    printf(" --scale s\n\t"
+           "Set the scaling factor for the output image manually to s.\n\t"
+           "Warning: Might cause clipping or discretization artifacts\n\t"
+           "This option is only used for 16-bit images\n");
     printf(" --float\n\t Set output format to 32-bit float (default is 16-bit int) and disable scaling\n");
     printf(" --bg l\n\t Set background level, l\n");
     printf(" --biggs N\n\t Set how agressive the Biggs acceleration should be. 0=off, 1=low/default, 2=intermediate, 3=max\n");
@@ -1218,12 +1282,28 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
     printf(" --lookahead N"
            "\n\t Try to do a speed-for-memory trade off by using a N pixels larger"
            "\n\t job size that is better suited for FFT.\n");
-    printf("\n");
-    printf("max-projections of tif files can be created with:\n");
-    printf("\t%s maxproj image.tif\n", argv[0]);
-    printf("\tsee %s maxproj --help\n", argv[0]);
 
+    printf(" --noplan\n\t Don't use any planning optimization for fftw3\n");
+    printf(" --no-inplace\n\t Disable in-place FFTs (for fftw3), uses more "
+           "memory but could potentially be faster for some problem sizes.\n");
     printf("\n");
+
+    printf("Additional commands with separate help sections:\n");
+    printf("   maxproj    maximum Z-projections\n");
+    printf("   merge      merge individual slices to volume\n");
+#ifdef __dw_dots_h__
+    printf("   dots       detect dots\n");
+#endif
+#ifdef __dw_psf_h__
+    printf("   psf        generate PSFs for Widefield and Confocal\n");
+#endif
+#ifdef __dw_psf_sted_h__
+    printf("   psf-STED   PSFs for 3D STED\n");
+#endif
+    printf("\n");
+    printf("see: %s [command] --help\n", argv[0]);
+    printf("\n");
+
     printf("Web page: https://www.github.com/elgw/deconwolf/\n");
 }
 
@@ -1311,7 +1391,7 @@ float * psf_autocrop_centerZ(float * psf, int64_t * pM, int64_t * pN, int64_t * 
 
     float * psf_cropped = fim_get_cuboid(psf, m, n, p,
                                          m0, m1, n0, n1, p0, p1);
-    fftwf_free(psf);
+    free(psf);
     pP[0] = p1-p0+1;
     return psf_cropped;
 
@@ -1323,18 +1403,30 @@ float * psf_autocrop_byImage(float * psf,/* psf and size */
                              dw_opts * s)
 {
 
-    /* Purpose: Crop the PSF if it is more
-       than 2x the size of the image in any dimension. */
+    /* Purpose:
+     * For bq=0
+     *  Crop the PSF so it is not larger than the image.
+     * For bq > 0
+     *   Crop the PSF if it is more
+     *   than 2x the size of the image in any dimension.
+     */
 
     const int64_t m = pM[0];
     const int64_t n = pN[0];
     const int64_t p = pP[0];
 
 
-    // Optimal size
+    /* Optimal size */
     int64_t mopt = (M-1)*2 + 1;
     int64_t nopt = (N-1)*2 + 1;
     int64_t popt = (P-1)*2 + 1;
+
+    if(s->borderQuality == 0)
+    {
+        mopt = M;
+        nopt = N;
+        popt = P;
+    }
 
     if(p < popt)
     {
@@ -1347,8 +1439,13 @@ float * psf_autocrop_byImage(float * psf,/* psf and size */
 
     if((p % 2) == 0)
     {
-        fprintf(stderr, "Error: The PSF should have odd number of slices\n");
-        fprintf(stderr, "Possibly it will be auto-cropped wrong\n");
+        if(s->verbosity > 0)
+        {
+            fprintf(stderr, " ! The PSF should have odd number of slices\n");
+            fprintf(stderr, "   Possibly it will be auto-cropped wrong\n");
+        }
+        fprintf(s->log, " ! The PSF should have odd number of slices\n");
+        fprintf(s->log, "   Possibly it will be auto-cropped wrong\n");
     }
 
 
@@ -1378,7 +1475,7 @@ float * psf_autocrop_byImage(float * psf,/* psf and size */
         }
         float * psf_cropped = fim_get_cuboid(psf, m, n, p,
                                              m0, m1, n0, n1, p0, p1);
-        fftwf_free(psf);
+        free(psf);
 
         pM[0] = m1-m0+1;
         pN[0] = n1-n0+1;
@@ -1505,7 +1602,7 @@ float * psf_autocrop_XY(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  
     fprintf(s->log, "PSF XY-crop [%" PRId64 " x %" PRId64 " x %" PRId64 "] -> [%" PRId64 " x %" PRId64 " x %" PRId64 "]\n",
             m, n, p, pM[0], pN[0], pP[0]);
 
-    fftwf_free(psf);
+    free(psf);
     return crop;
 }
 
@@ -1514,13 +1611,18 @@ float * psf_autocrop(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  // 
                      dw_opts * s)
 {
     float * p = psf;
-    // p = psf_autocrop_centerZ(p, pM, pN, pP, s);
     assert(pM[0] > 0);
     /* Crop the PSF if it is larger than necessary */
-    p = psf_autocrop_byImage(p, pM, pN, pP, M, N, P, s);
-    assert(pM[0] > 0);
-    // Crop the PSF by removing outer planes that has very little information
-    p = psf_autocrop_XY(p, pM, pN, pP, M, N, P, s);
+    p = psf_autocrop_byImage(p, pM, pN, pP,
+                             M, N, P,
+                             s);
+
+    /* Crop the PSF by removing outer planes that has very little information.
+     * Only if the PSF is larger than the image in some dimension. */
+    if((s->borderQuality > 0))
+    {
+        p = psf_autocrop_XY(p, pM, pN, pP, M, N, P, s);
+    }
     assert(pM[0] > 0);
     assert(p != NULL);
     return p;
@@ -1558,6 +1660,7 @@ int deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
      * will be updated block by block
      */
     char * tfile = malloc(strlen(s->outFile)+10);
+    assert(tfile != NULL);
     sprintf(tfile, "%s.raw", s->outFile);
 
     if(s->verbosity > 0)
@@ -1567,6 +1670,7 @@ int deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
     fsetzeros(tfile, (size_t) M* (size_t) N* (size_t) P*sizeof(float));
 
     char * imFileRaw = malloc(strlen(s->imFile) + 10);
+    assert(imFileRaw != NULL);
     sprintf(imFileRaw, "%s.raw", s->imFile);
 
     if(s->verbosity > 0)
@@ -1633,7 +1737,7 @@ int deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
         float * dw_im_tile = s->fun(im_tile, tileM, tileN, tileP, // input image and size
                                     tpsf, tpM, tpN, tpP, // psf and size
                                     s);
-        fftwf_free(im_tile);
+        free(im_tile);
         tiling_put_tile_raw(T, tt, tfile, dw_im_tile);
         free(dw_im_tile);
         // free(tpsf);
@@ -1674,10 +1778,10 @@ void timings()
     toc(usleep_1000)
 
         tic
-        float * V = malloc(M*N*P*sizeof(float));
+        float * V = fim_malloc(M*N*P*sizeof(float));
     toc(malloc)
 
-        float * A = malloc(M*N*P*sizeof(float));
+        float * A = fim_malloc(M*N*P*sizeof(float));
 
     tic
         memset(V, 0, M*N*P*sizeof(float));
@@ -1760,7 +1864,7 @@ void dw_unittests()
     fprint_peakMemory(NULL);
     timings();
 
-    fim_ut();
+    //fim_ut();
     fim_tiff_ut();
     fft_ut();
     printf("done\n");
@@ -1769,9 +1873,15 @@ void dw_unittests()
 void show_time(FILE * f)
 {
     f == NULL ? f = stdout : 0;
+    int buf_len = 256;
+    char buf[256];
+
     time_t now = time(NULL);
-    char * tstring = ctime(&now);
-    fprintf(f, "%s\n", tstring);
+    struct tm * ptm = localtime(&now);
+    strftime(buf, buf_len, "%FT%T", ptm);
+
+    fprintf(f, "%s\n", buf);
+    return;
 }
 
 float * psf_makeOdd(float * psf, int64_t * pM, int64_t * pN, int64_t *pP)
@@ -1839,7 +1949,7 @@ void flatfieldCorrection(dw_opts * s, float * im, int64_t M, int64_t N, int64_t 
     printf("Experimental: applying flat field correction using %s\n", s->flatfieldFile);
     ttags * T = ttags_new();
     int64_t m = 0, n = 0, p = 0;
-    afloat * C = fim_tiff_read(s->flatfieldFile, T, &m, &n, &p, s->verbosity);
+    float * C = fim_tiff_read(s->flatfieldFile, T, &m, &n, &p, s->verbosity);
     ttags_free(&T);
 
     assert(m == M);
@@ -1865,7 +1975,7 @@ void prefilter(dw_opts * s,
                float * psf, int64_t pM, int64_t pN, int64_t pP)
 {
 
-    if(s->psigma <= 0)
+    if(s->psigma<= 0)
     {
         return;
     }
@@ -1883,11 +1993,11 @@ int dw_run(dw_opts * s)
 
 #ifdef _OPENMP
 #ifdef MKL
-    mkl_set_num_threads(s->nThreads);
-    fprintf(s->log, "Set the number of MKL threads to %d\n", s->nThreads);
+    mkl_set_num_threads(s->nThreads_FFT);
+    fprintf(s->log, "Set the number of MKL threads to %d\n", s->nThreads_FFT);
 #else
-    omp_set_num_threads(s->nThreads);
-    fprintf(s->log, "Set the number of OMP threads to %d\n", s->nThreads);
+    omp_set_num_threads(s->nThreads_OMP);
+    fprintf(s->log, "Set the number of OMP threads to %d\n", s->nThreads_OMP);
     /* Fastest of static, dynamic and guided in limited tests */
     omp_set_dynamic(false);
     omp_set_schedule(omp_sched_static, 0);
@@ -1939,7 +2049,7 @@ int dw_run(dw_opts * s)
     }
 
 
-    afloat * im = NULL;
+    float * im = NULL;
     ttags * T = ttags_new();
 
     if(tiling == 0)
@@ -1952,6 +2062,15 @@ int dw_run(dw_opts * s)
         im = fim_tiff_read(s->imFile, T, &M, &N, &P, s->verbosity);
         if(s->verbosity > 4)
         {
+            if(M > 9)
+            {
+                printf("image data: ");
+                for(size_t kk = 0; kk<10; kk++)
+                {
+                    printf("%f ", im[kk]);
+                }
+                printf("\n");
+            }
             printf("Done reading\n"); fflush(stdout);
         }
         if(fim_min(im, M*N*P) < 0)
@@ -1989,6 +2108,7 @@ int dw_run(dw_opts * s)
 
     // Set up the string for the TIFFTAG_SOFTWARE
     char * swstring = malloc(1024);
+    assert(swstring != NULL);
     sprintf(swstring, "deconwolf %s", deconwolf_version);
     ttags_set_software(T, swstring);
     free(swstring);
@@ -2008,9 +2128,22 @@ int dw_run(dw_opts * s)
             fprintf(stderr, "Failed to open %s\n", s->psfFile);
             exit(1);
         }
+        if(s->verbosity > 4)
+        {
+            if(M > 9)
+            {
+                printf("image data: ");
+                for(size_t kk = 0; kk<10; kk++)
+                {
+                    printf("%f ", psf[kk]);
+                }
+                printf("\n");
+            }
+        }
     } else {
         pM = 3; pN = 3; pP = 3;
         psf = malloc(27*sizeof(float));
+        assert(psf != NULL);
         memset(psf, 0, 27*sizeof(float));
         psf[13] = 1;
     }
@@ -2021,8 +2154,12 @@ int dw_run(dw_opts * s)
     if(fim_maxAtOrigo(psf, pM, pN, pP) == 0)
     {
         /* It might still be centered between pixels */
-        warning(stdout);
-        printf("The PSF is not centered!\n");
+        if(s->verbosity > 0)
+        {
+            warning(stdout);
+            printf("The PSF is not centered!\n");
+        }
+        fprintf(s->log, " ! The PSF is not centered\n");
     }
 
     // Possibly the PSF will be cropped even more per tile later on
@@ -2063,7 +2200,7 @@ int dw_run(dw_opts * s)
         printf("Output: %s(.log.txt)\n", s->outFile);
     }
 
-    myfftw_start(s->nThreads, s->verbosity, s->log);
+    myfftw_start(s->nThreads_FFT, s->verbosity, s->log);
 
     float * out = NULL;
 
@@ -2076,7 +2213,7 @@ int dw_run(dw_opts * s)
         }
         deconvolve_tiles(M, N, P, psf, pM, pN, pP, // psf and size
                          s);// settings
-        fftwf_free(psf);
+        free(psf);
     } else {
         fim_normalize_sum1(psf, pM, pN, pP);
         if(s->flatfieldFile != NULL)
@@ -2096,7 +2233,7 @@ int dw_run(dw_opts * s)
 
     if(tiling == 0)
     {
-        fftwf_free(im);
+        free(im);
 
 
         if(out == NULL)
@@ -2133,7 +2270,7 @@ int dw_run(dw_opts * s)
                     fim_tiff_write(outFile, out, T, M, N, P);
                     free(outFile);
                 } else {
-                    fim_tiff_write(s->outFile, out, T, M, N, P);
+                    fim_tiff_write_opt(s->outFile, out, T, M, N, P, s->scaling);
                 }
             }
         }
@@ -2146,7 +2283,7 @@ int dw_run(dw_opts * s)
         printf("Finalizing "); fflush(stdout);
     }
 
-    if(out != NULL) fftwf_free(out);
+    if(out != NULL) free(out);
     myfftw_stop();
 
 
@@ -2171,4 +2308,33 @@ int dw_run(dw_opts * s)
     dw_opts_free(&s);
 
     return 0;
+}
+
+fftwf_complex * initial_guess(const int64_t M, const int64_t N, const int64_t P,
+                              const int64_t wM, const int64_t wN, const int64_t wP)
+{
+    /* Create initial guess: the fft of an image that is 1 in MNP and 0 outside
+     * M, N, P is the dimension of the microscopic image
+     *
+     * Possibly more stable to use the mean of the input image rather than 1
+     */
+
+    assert(wM >= M); assert(wN >= N); assert(wP >= P);
+
+    float * one = fim_zeros(wM*wN*wP);
+
+#pragma omp parallel for shared(one)
+    for(int64_t cc = 0; cc < P; cc++) {
+        for(int64_t bb = 0; bb < N; bb++) {
+            for(int64_t aa = 0; aa < M; aa++) {
+                one[aa + wM*bb + wM*wN*cc] = 1;
+            }
+        }
+    }
+    //  writetif("one.tif", one, wM, wN, wP);
+
+    fftwf_complex * Fone = fft(one, wM, wN, wP);
+
+    free(one);
+    return Fone;
 }

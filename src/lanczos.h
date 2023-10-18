@@ -1,5 +1,4 @@
-#ifndef __lanczos_h__
-#define __lanczos_h__
+#pragma once
 
 #include <assert.h>
 #include <stdlib.h>
@@ -19,6 +18,3 @@ double lanczos5(const double * v, size_t nV, double x);
 
 /* Lanczos-7 interpolation. */
 double lanczos7(const double * v, size_t nV, double x);
-
-
-#endif

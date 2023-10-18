@@ -10,10 +10,10 @@ it from a terminal. However, here is also a
 [GUI](https://github.com/elgw/deconwolf-gui) that might be handy.
 
 ## Command line usage:
-To deconvolve an image (say `dapi_001.tif`) you need an approximation of
-the PSF of your particular microscope. If you don't
-have one you can create one according to the Born-Wolf model
-with `dw_bw` that is shipped with deconwolf.
+To deconvolve an image (say `dapi_001.tif`) you need an approximation
+of the PSF of your particular microscope. If you don't have one you
+can create one according to the Born-Wolf model with `dw_bw` that is
+shipped with deconwolf.
 
 The basic information that you need to know is
  * The numerical aperture, NA.
@@ -26,59 +26,77 @@ For example, if you have NA = 1.45, ni = 1.515 pixel size = 130 nm,
 distance between planes = 250 nm, generate a PSF (`PSF_DAPI.tif`) with:
 
 ``` shell
-dw_bw --resxy 130 --resz 250 --lambda 461 --NA 1.45 --ni 1.515 PSF_DAPI.tif
+dw_bw --resxy 130 --resz 250 --lambda 461 --NA 1.45 --ni 1.515 psf_dapi.tif
 ```
 
 To deconvolve the image, type:
 
 ``` shell
-dw --iter 40 dapi_001.tif PSF_dapi.tif
+dw --iter 40 dapi_001.tif psf_dapi.tif
 ```
 
-that will produce a new image called `dw_dapi_001.tif` along with
-a log file
-called `dw_dapi_001.tif.log.txt` which in particular say if the output
-image was scaled. Since you deserve better than the
-default settings, see other options:
+that will produce a new image called `dw_dapi_001.tif` along with a
+log file called `dw_dapi_001.tif.log.txt` which in particular say if
+the output image was scaled. We have tried to make the default options
+as sane as possible, but for more options see:
 
 ``` shell
 dw_bw --help
 dw --help
 ```
-or
+for a brief overview or
 
 ``` shell
 man dw
 man dw_bw
 ```
+for more details.
 
-Please note that deconwolf requires that the pixel size is the same for
-both the PSF and the input image and does not attempt to read any metadata
-from the tif files.
+Please note that deconwolf requires that the pixel size (nm per pixel)
+is the same for both the PSF and the input image and does not attempt
+to read any metadata from the tif files.
 
 ## Test data
-There is a single nuclei in the `demo` subfolder (descibed in README.md).
-You can get more images from the
+There is a single nuclei in the `demo` subfolder (descibed in
+README.md).  You can get more images from the
 [DeconvolutionLab2](http://bigwww.epfl.ch/deconvolution/deconvolutionlab2/)
-web page. Please note that in some cases the PSFs do not contain enough z-planes.
+web page. Please note that in some cases the PSFs do not contain
+enough z-planes for a proper deconvolution.
 
 ## Memory considerations
-The peak memory usage is written at the end of the log file. If you have 16
-GB of RAM, images up to [1024x1024x60] pixels should work without tiling.
+If you have 16 GB of RAM, images up to [1024x1024x60] pixels should
+work without tiling. If deconwolf crashes because it runs of out
+memory you can:
+
+ 1. Use fewer threads, i.e. specify **--threads N**.
+ 2. Consider switching to a lower quality on the boundaries with
+    **--bq 1**. The option **--bq 0** is not recommended for normal
+    images (since it assumes that the image repeats itself around the
+    edges which is bad particularly in the axial direction).
+
+Accordingly the lowest memory usage will be when you combine these
+things i.e. calling dw with **--threads 1 --bq 1**. If that still uses
+too much memory you have to tell dw to process the image in tiles with
+the **--tilesize N** option.
+
+The peak memory usage is written at the end of the log file.
 
 ## PSF considerations
-deconwolf requires that the PSF is centered, i.e.,
-that the largest value is in the middle.
-If you generate the PSF with some
-other program you might have to center it first.
+deconwolf requires that the PSF is centered, i.e., that the largest
+value is in the middle.  If you generate the PSF with some other
+program you might have to center it first. In our experience it is
+better to have a PSF with odd sizes, i.e. that the PSF is centered at
+a certain pixel and not between them.
 
 ## Supported image formats
-Currently deconwolf does only support tif images,
-specifically: multipage, 16-bit unsigned or 32-bit floats,
-written in strip mode. The output is either 16-bit unsigned or 32-bit
-floating point and can be read by Matlab, ImageJ, etc.
-If you use 16-bit output note that images will be scaled in order to not be
-saturated. The scaling value can be found at the end of the log files.
+Currently deconwolf does only support tif images, specifically:
+multi-page, 8-bit unsigned, 16-bit unsigned or 32-bit floats. The data
+should be written in strip mode (typically the default output
+format). The output is either 16-bit unsigned or 32-bit floating point
+(with the **--float** flag) and can be read by Matlab, ImageJ, etc.
+If you use 16-bit output note that images will be scaled in order to
+not be saturated. The scaling value can be found at the end of the log
+files.
 
 ## Log files and output
  * The reported error is the mean square error between the input image
@@ -114,21 +132,24 @@ saturated. The scaling value can be found at the end of the log files.
    by deconwolf in `~/config/deconwolf/`. Those files can in general
    not be transferred to other machines.
 
-   This self-tuning can take considerable time but should only be needed
-   once per problem size.
+   This self-tuning can take considerable time but should only be
+   needed once per problem size. To turn of the self-tuning use the
+   **--noplan** flag.
 
 <a name="qa" />
 
 # Questions and Answers
 
 ## How can I prepare tif files for deconwolf?
-Deconwolf only accept tif files with one channel per file. For ND2 files
-check out [randiantkit](https://github.com/ggirelli/radiantkit).
+Deconwolf only accept tif files with one channel per file. ImageJ/FIJI
+is typically helpful for conversions. For ND2 files check out
+[randiantkit](https://github.com/ggirelli/radiantkit) or
+[nd2tool](https://github.com/elgw/nd2tool).
 
 ## How do I get metadata from ND2-files?
-You could use the
-[command line tools](https://www.openmicroscopy.org/bio-formats/downloads/) from
-openmicroscopy. Then you could do something like:
+You could use either [nd2tool](https://github.com/elgw/nd2tool) or the
+more mature [showinf](https://www.openmicroscopy.org/bio-formats/downloads/) from
+openmicroscopy. With showinf you could do something like:
 
 ```
 $ bftools/showinf -nopix -omexml iAM337_20190830_001.nd2 > omexml
@@ -181,3 +202,34 @@ skimage reports the size **40x201x101** by
 In general this is nothing to worry about, see
 [https://en.wikipedia.org/wiki/Row-_and_column-major_order]
 for a discussion around this topic.
+
+## Maximizing throughput
+To get a high throughput, i.e., many processed images / hour it is
+typically a little faster to process many images in parallel (if
+enough RAM).  Here are some example timings based on images:
+[2048x2048x20], psf: [117x117x39] **\--iter 20**, **\--bq 2**. Using
+dw version 0.1.0 on an AMD Ryzen 3700X:
+
+ - One dw (using **\--threads 8**) took 88 s using 7294 MB RAM.
+
+ -> 40 images / hour or 88 s / image
+
+ - Two dw in parallel (using **\--threads 4**) took 2 m 44 s using 2x7106 =
+   14212 MB RAM
+
+ -> 43 images / hour or 82 s / image
+
+ - Four dw in parallel (using **\--threads 2**) took 297 s using 6795x4 =
+   27181 MB RAM
+
+ -> 48 images / hour or 74 s / image
+
+ - Eight dw in parallel (using **\--threads 1**) took 9 m 12 s, using
+   6712x8 = 53696 MB RAM
+
+-> 52 images / hour or 69 s / image
+
+
+It is also possible to mix a few instances of dw using the CPU and a
+few offloading calculations to the GPU (with **--method
+shbcl**). Results would depends on the GPU/CPU combination.

@@ -7,3 +7,10 @@ lanczos_ut
 li_ut
 rawmax
 tiling_ut
+dw_dots
+dw_nuclei
+dw_psf
+dw_render
+ftab_ut
+*.backup
+dw_utsu

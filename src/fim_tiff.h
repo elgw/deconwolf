@@ -22,10 +22,12 @@
  * fim_tiff_init()
  * and should probably also redirect the output by
  * fim_tiff_set_log(FILE *)
+ *
+ * TODO:
+ * Flags to dw_write_tif for scaling on/off
 */
 
-#ifndef fim_tiff_h
-#define fim_tiff_h
+#pragma once
 
 #include <assert.h>
 #include <stdlib.h>
@@ -39,6 +41,8 @@
 #include <stdint.h>
 #include <inttypes.h>
 #include "fim.h"
+#include "ftab.h"
+#include "dw_version.h"
 
 
 #define INLINED inline __attribute__((always_inline))
@@ -78,10 +82,21 @@ void fim_tiff_init(void);
 /* Redirect all output here */
 void fim_tiff_set_log(FILE * fp);
 
-// Last argument: where to print output
+/* Write to disk, if scaling <= 0 : automatic scaling will be used. Else the provided value. */
+int fim_tiff_write_opt(const char * fName, const float * V,
+                       ttags * T,
+                       int64_t N, int64_t M, int64_t P, float scaling);
+
+
+/* Scale between 0 and 2^16-1 and write data */
 int fim_tiff_write(const char * fName, const float * V,
                    ttags * T,
     int64_t M, int64_t N, int64_t P);
+
+/* Don't scale data */
+int fim_tiff_write_noscale(const char * fName, const float * V,
+                           ttags * T,
+                           int64_t N, int64_t M, int64_t P);
 
 
 int fim_tiff_write_float(const char * fName, const float * V,
@@ -123,7 +138,10 @@ int fim_tiff_get_size(char * fname,
 /* Max projection from input to output file */
 int fim_tiff_maxproj(char * in, char * out);
 
+/* Max projection from input to output file
+*  This version produces XY XZ and YZ */
+int fim_tiff_maxproj_XYZ(const char * in, const char * out);
+
+
 /* Extract a single slice from input to output file */
 int fim_tiff_extract_slice(char *in, char *out, int slice);
-
-#endif

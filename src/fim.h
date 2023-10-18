@@ -14,24 +14,32 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef fim_h
-#define fim_h
+#pragma once
 
-#include <math.h>
-#include <fftw3.h>
 #include <assert.h>
+#include <inttypes.h>
+#include <fftw3.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#include <inttypes.h>
+#include <time.h>
+
+#include "fft.h"
+#include "fim_tiff.h"
+#include "ftab.h"
 
 #ifdef _OPENMP // turned on with -fopenmp
 #include <omp.h>
 #endif
 
+#ifdef __linux__
+#include <sys/mman.h>
+#endif
 
 #define INLINED inline __attribute__((always_inline))
+
 
 /* fim : operations on 3D floating point images
  * all allocations are done with fftw3f_malloc (for alignment)
@@ -40,55 +48,160 @@
  * tweaked or alternative versions.
  * */
 
+/* Set verbosity level, default = 0 */
+void fim_set_verbose(int);
+
+typedef struct{
+    float * V;
+    size_t M;
+    size_t N;
+    size_t P;
+} fim_t;
+
+/* Alignment of fim_malloc and fim_realloc, in bytes */
+
+#define FIM_ALIGNMENT 64UL
+// #define FIM_ALIGNMENT 4096UL // page size
+
+/* __attribute__((__aligned__(x))) will only allow values up to 4096 */
+
+/** @brief Aligned allocations
+ *
+ * Does more or less what fftw_malloc but can be freed with free.
+ * Calls exit if the allocation fails.
+ * The memory is initialized to 0 and aligned according to FIM_ALIGNMENT
+ */
+void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_malloc(size_t n);
+
+/** @brief Resize p, keeping the same alignment as fim_malloc
+ *
+ * This function could use some attention, in worst case it will result in
+ * two allocation and two memcpy.
+ */
+void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_realloc(void * p, size_t n);
+
+
+/** @brief Free a fim_t object. */
+void fim_free(fim_t *);
+
+fim_t * fimt_zeros(size_t M, size_t N, size_t P);
+
+/** @brief Create a new object with a copy of V
+ *
+ * Note: Both V and the returned object has to be freed eventually
+ *
+ * @return A newly allocated fim_t which contains a copy of V
+ *
+ */
+fim_t * fim_image_from_array(const float * V,
+                             size_t M, size_t N, size_t P);
+
+/* Return a new copy */
+fim_t * fimt_copy(const fim_t * );
+
+/* Extract a line centered at (x, y, z) with nPix pixels along dimension dim */
+double * fim_get_line_double(fim_t * Im,
+                             int x, int y, int z,
+                             int dim, int nPix);
+
+/* Similar to MATLABs shiftfim, [M,N,P] -> [N,P,M] */
+fim_t * fim_shiftdim(const fim_t *);
+
+/* [M, N, P] -> [N, M, P] */
+fim_t * fimt_transpose(const fim_t * );
+
+/* Partial derivative along dimension dim */
+fim_t * fimt_partial(const fim_t *, int dim, float sigma);
+
+/* Features for 2D image classification
+ * the input image should be 2D.
+ * Uses similar features a Ilastic
+ * Returns one row per pixel
+ */
+ftab_t * fim_features_2d(const fim_t *);
+
+/* Return a I->P long vector with the integral
+ * gradient magnitude per slice in I */
+float * fim_focus_gm(const fim_t * image, float sigma);
+
+/* Number of elements */
+size_t fimt_nel(fim_t * );
+/* Sum of elements */
+float fimt_sum(fim_t * );
+
+/*
+ * API not using fim_t
+ */
 
 float fim_min(const float * A, size_t N);
 float fim_mean(const float * A, size_t N);
 float fim_max(const float * A, size_t N);
 float fim_sum(const float * restrict A, size_t N);
 
+/* Standard deviation, normalizing by (N-1) */
+float fim_std(const float * V, size_t N);
+
+fim_t * fimt_maxproj(const fim_t * Im);
+
+float * fim_maxproj(const float * A, size_t M, size_t N, size_t P);
+
+float * fim_sumproj(const float * A, size_t M, size_t N, size_t P);
+
+/* Cumulative sum along dimension dim
+ * Only supports 2D images
+ */
+void fim_cumsum2(float *, size_t M, size_t N, int dim);
+
 /* A = B - C */
 void fim_minus(float * restrict  A,
-    const float * restrict B,
-    const float * restrict C,
-    const size_t N);
-
-/* A = B / C */
-void fim_div(float * restrict  A,
                const float * restrict B,
                const float * restrict C,
                const size_t N);
 
+/* A = B / C */
+void fim_div(float * restrict  A,
+             const float * restrict B,
+             const float * restrict C,
+             const size_t N);
+
+/* A[kk] += B[kk] */
+void fim_add(float * restrict A,
+             const float * restrict B,
+             size_t N);
 
 void fim_invert(float * restrict A, const size_t N);
 
 void fim_set_min_to_zero(float * , size_t N);
 
 int fim_maxAtOrigo(const float * restrict V, const int64_t M, const int64_t N, const int64_t P);
-  /* Check that the MAX of the fim is in the middle
-   * returns 1 on success.
-   * Returns 0 if any of the image dimensions are even
-   */
+/* Check that the MAX of the fim is in the middle
+ * returns 1 on success.
+ * Returns 0 if any of the image dimensions are even
+ */
 
 void fim_stats(const float * A, size_t N);
 // Print some info about A to stdout
 
 void fim_flipall(float * restrict T, const float * restrict A, const int64_t a1, const int64_t a2, const int64_t a3);
-  /*
-   * MATLAB:
-   * T = flip(flip(flip(A,1),2),3)*/
+/*
+ * MATLAB:
+ * T = flip(flip(flip(A,1),2),3)*/
 
 
-void fim_insert(float * restrict T, const int64_t t1, const int64_t t2, const int64_t t3,
-    const float * restrict F, const int64_t f1, const int64_t f2, const int64_t f3);
-  /* Insert F [f1xf2xf3] into T [t1xt2xt3] in the "upper left" corner
-   * MATLAB:
-   * T(1:size(F,1), 1:size(F,2), 1:sizes(F,3) = F;
-   * */
+void fim_insert(float * restrict T,
+                const int64_t t1, const int64_t t2, const int64_t t3,
+                const float * restrict F,
+                const int64_t f1, const int64_t f2, const int64_t f3);
+/* Insert F [f1xf2xf3] into T [t1xt2xt3] in the "upper left" corner
+ * MATLAB:
+ * T(1:size(F,1), 1:size(F,2), 1:sizes(F,3) = F;
+ * */
+
 void fim_insert_ref(float * T, int64_t t1, int64_t t2, int64_t t3,
-    float * F, int64_t f1, int64_t f2, int64_t f3);
+                    float * F, int64_t f1, int64_t f2, int64_t f3);
 
 float * fim_get_cuboid(float * restrict A, const int64_t M, const int64_t N, const int64_t P,
-    const int64_t m0, const int64_t m1, const int64_t n0, const int64_t n1, const int64_t p0, const int64_t p1);
+                       const int64_t m0, const int64_t m1, const int64_t n0, const int64_t n1, const int64_t p0, const int64_t p1);
 /* MATLAB:
  * Y = A(m0:m1, n0:n1, p0:p1)
  */
@@ -100,60 +213,191 @@ float * fim_subregion(const float * restrict A, const int64_t M, const int64_t N
 
 float * fim_subregion_ref(float * A, int64_t M, int64_t N, int64_t P, int64_t m, int64_t n, int64_t p);
 
-void fim_normalize_sum1(float * psf, int64_t M, int64_t N, int64_t P);
+/** @brief Normalize an image to have the sum 1.0
+* MATLAB:
+* Y = X/max(X(:))
+*/
+void fim_normalize_sum1(float * restrict psf, int64_t M, int64_t N, int64_t P);
 
-
+/* Return a newly allocated copy of V */
 float * fim_copy(const float * restrict V, const size_t N);
-  // Return a newly allocated copy of V
 
+/* Allocate and return an array of N floats */
 float * fim_zeros(const size_t N);
-  // Allocate and return an array of N floats
 
+
+/* Allocate and return an array of N floats sets to a constant value */
 float * fim_constant(const size_t N, const float value);
-  // Allocate and return an array of N floats sets to a constant value
 
+
+/* Shift the image A [MxNxP] by sm, sn, sp in each dimension */
 void fim_circshift(float * restrict A,
-    const int64_t M, const int64_t N, const int64_t P,
-    const int64_t sm, const int64_t sn, const int64_t sp);
-  /* Shift the image A [MxNxP] by sm, sn, sp in each dimension */
+                   const int64_t M, const int64_t N, const int64_t P,
+                   const int64_t sm, const int64_t sn, const int64_t sp);
+
+/* Shift the image A [MxNxP] by dm, dn, dp in each dimension,
+ * What is outside of the image is interpreted as zero */
+void fim_shift(float * restrict A,
+               const int64_t M, const int64_t N, const int64_t P,
+               const float dm, const float dn, const float dp);
+
 
 float * fim_expand(const float * restrict in,
-    const int64_t pM, const int64_t pN, const int64_t pP,
-    const int64_t M, const int64_t N, const int64_t P);
-  /* "expand an image" by making it larger
-   * pM, ... current size
-   * M, Nm ... new size
-   * */
+                   const int64_t pM, const int64_t pN, const int64_t pP,
+                   const int64_t M, const int64_t N, const int64_t P);
+/* "expand an image" by making it larger
+ * pM, ... current size
+ * M, Nm ... new size
+ * */
 
 float fim_mse(float * A, float * B, size_t N);
-  /* mean( (A(:)-B(:)).^(1/2) )
-   */
+/* mean( (A(:)-B(:)).^(1/2) )
+ */
 
 void shift_vector(float * restrict V,
-    const int64_t S,
-    const int64_t N,
-    const int64_t k);
-  /* Circular shift of a vector of length N with stride S by step k */
+                  const int64_t S,
+                  const int64_t N,
+                  const int64_t k);
+/* Circular shift of a vector of length N with stride S by step k */
 
 void shift_vector_buf(float * restrict V,
-    const int64_t S,
-    const int64_t N,
-    int64_t k, float * restrict buffer);
+                      const int64_t S,
+                      const int64_t N,
+                      int64_t k, float * restrict buffer);
+
+/* Shift vector by interpolation */
+void shift_vector_float_buf(float * restrict V, // data
+                            const int64_t S, // stride
+                            const int64_t N, // elements
+                            int n, // integer shift
+                            float * restrict kernel, // centered kernel used for sub pixels shift
+                            const int nkernel, // kernel size (odd!)
+                            float * restrict buffer);
 
 /* Multiply a float array of size N by x */
-void fim_mult_scalar(float * fim, size_t N, float x);
+void fim_mult_scalar(float * restrict fim, size_t N, float x);
 
 void fim_ut(void);
 
-/* Gaussian smoothing, normalized at edges */
-void fim_gsmooth(float * restrict V, size_t M, size_t N, size_t P, float sigma);
 
 /* Arg max: find coordinates of largest element
-* If more than one maxima, return the first found
-*/
+ * If more than one maxima, return the first found
+ */
 void fim_argmax(const float * fim,
                 size_t M, size_t N, size_t P,
                 int64_t * _aM, int64_t *_aN, int64_t *_aP);
 
+/* Like fim_argmax but also sets the max value found */
+void fim_argmax_max(const float * fim,
+                    size_t M, size_t N, size_t P,
+                    int64_t * _aM, int64_t *_aN, int64_t *_aP,
+                    float * max_value);
 
-#endif
+/*  */
+float * fim_local_sum(const float * A, size_t M, size_t N, size_t pM, size_t pN);
+
+/* Cumulative sum along dimension dim */
+void fim_cumsum(float * A, const size_t M, const size_t N, const int dim);
+
+
+
+/* Normalized cross correlation between T and A
+ * See MATLAB's normxcorr2
+ * This function requires that T and A have the same size
+ * The returned image is of size [2xM-1, 2xN-1] and the values
+ * should be in the range [0,1]
+ */
+float * fim_xcorr2(const float * T, const float * A,
+                   const size_t M, const size_t N);
+
+/* Image binarization with Otsu's method */
+float * fim_otsu(float * Im, size_t M, size_t N);
+
+
+typedef struct{
+    double * C; /* Counts */
+    float left; /* Left edge of first bin */
+    float right; /* Right edge of last bin */
+    size_t nbin; /* Number of bins */
+} fim_histogram_t;
+
+/* Return a histogram, the number of bins as well as the bin edges are
+ * set automatically. The smallest end largest value should end up in
+ * the middle of the first and last bin. */
+fim_histogram_t * fim_histogram(const float * Im, size_t N);
+
+/* Return a threshold that separates H at percentile p */
+float fim_histogram_percentile(const fim_histogram_t * H, float p);
+
+/* Return a global threshold by Otsu's method */
+float fim_histogram_otsu(fim_histogram_t * H);
+
+/* Replace count C[kk] = log(1+C[kk]) */
+void fim_histogram_log(fim_histogram_t * H);
+
+void fim_histogram_free(fim_histogram_t * H);
+
+/* 2D connected components using 6-connectivity. TODO: see
+ * wu2005optimizing for something smarter. */
+int * fim_conncomp6(const float * Im, size_t M, size_t N);
+
+/* 2D hole filling using fim_conncomp6 */
+float * fim_fill_holes(const float * im, size_t M, size_t N, float max_size);
+/* 2D remove small objects, only keep those that has at least
+ * min_pixels  */
+float * fim_remove_small(const float * im, size_t M, size_t N,
+                         float min_pixels);
+
+/* Find local maxima in I */
+//ftab_t * fim_lmax(const float * I, size_t M, size_t N, size_t P);
+ftab_t * fim_lmax(const float * Im, size_t M, size_t N, size_t P);
+/* Sort with largest value first */
+void ftab_sort(ftab_t * T, int col);
+
+/* Spatial convolution */
+
+/* Convolution of a single vector
+ * In MATLAB that would be
+ * Y = convn(V, K, 'same') / convn(ones(size(V)), K, 'same')
+ * With normalized == 1 it would be
+ * Y = convn(V, K, 'same') / convn(ones(size(V)), K, 'same')
+ * That is only useful for gaussians
+ */
+void fim_conv1_vector(float * restrict V, int stride, float * restrict W,
+                      const size_t nV,
+                      const float * restrict K, const size_t nKu,
+                      const int normalized);
+
+/* In-place convolution of a 3D volume, V, with a 1D filter, K along
+ * dimension dim (0,1 or 2). The value of normalized is passed on to
+ * fim_conv1_vector
+ */
+int fim_convn1(float * restrict V, size_t M, size_t N, size_t P,
+               float * K, size_t nK,
+               int dim, const int normalized);
+
+
+/* Gaussian smoothing, normalized at edges */
+void fim_gsmooth(float * restrict V, size_t M, size_t N, size_t P, float sigma);
+
+/* Gaussian smoothing, normalized at edges, separate values for lateral and axial
+ * filter */
+void fim_gsmooth_aniso(float * restrict V,
+                       size_t M, size_t N, size_t P,
+                       float lsigma, float asigma);
+
+/* Laplacian of Gaussian filter */
+float * fim_LoG(const float * V, size_t M, size_t N, size_t P,
+                float sigmaxy, float sigmaz);
+
+/* Different implementation, using shiftdim */
+float * fim_LoG_S(const float * V, size_t M, size_t N, size_t P,
+                  float sigmaxy, float sigmaz);
+
+
+/* Simple interface to write 2D or 3D images without any meta data */
+int fimt_tiff_write(const fim_t * Im, const char * fName);
+
+
+/* Insert into B into A, with upper left corner at x0, y0 */
+void fimt_blit_2D(fim_t * A, const fim_t * B, size_t x0, size_t y0);

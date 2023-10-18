@@ -1,8 +1,10 @@
 #include "method_shb.h"
 
-float * deconvolve_shb(afloat * restrict im,
+//#define here() printf("\n%s %s %d\n", __FILE__, __FUNCTION__, __LINE__);
+#define here() ;
+float * deconvolve_shb(float * restrict im,
                        const int64_t M, const int64_t N, const int64_t P,
-                       afloat * restrict psf,
+                       float * restrict psf,
                        const int64_t pM, const int64_t pN, const int64_t pP,
                        dw_opts * s)
 {
@@ -22,11 +24,24 @@ float * deconvolve_shb(afloat * restrict im,
         printf("Deconvolving\n");
     }
 
+
     if(s->nIter == 0)
     {
-        fftw_free(psf);
+        free(psf);
         return fim_copy(im, M*N*P);
     }
+
+
+    if(s->bg_auto)
+    {
+        s->bg = fim_min(im, M*N*P);
+        s->bg < 1e-2 ? s->bg = 1e-2 : 0;
+        if(s->verbosity > 1)
+        {
+            printf("Setting the background level to %f\n", s->bg);
+        }
+    }
+
 
     if(fim_maxAtOrigo(psf, pM, pN, pP) == 0)
     {
@@ -63,27 +78,14 @@ float * deconvolve_shb(afloat * restrict im,
         wP = int64_t_max(P, pP);
     }
 
-    if(wP %2 == 1)
-    {
-        /*  The jobb size is not divisable by 2.
-         * potentially it could be faster to extend the job by
-         * one slice in Z, but for some sizes, e.g. 85->86 it gets slower
-         * some benchmarking or prediction should guide this, not just a flag.
-         */
-        if(s->experimental1)
-        {
-            printf("      Adding one extra slice to the job for performance"
-                   " this is still experimental. \n");
-            // One slice of the "job" should be cleared every iterations.
-            wP++;
-        }
-    }
-
     /* Total number of pixels */
     size_t wMNP = wM*wN*wP;
 
     if(s->verbosity > 0)
-    { printf("image: [%" PRId64 "x%" PRId64 "x%" PRId64 "], psf: [%" PRId64 "x%" PRId64 "x%" PRId64 "], job: [%" PRId64 "x%" PRId64 "x%" PRId64 "]\n",
+    {
+        printf("image: [%" PRId64 "x%" PRId64 "x%" PRId64 "], "
+               "psf: [%" PRId64 "x%" PRId64 "x%" PRId64 "], "
+               "job: [%" PRId64 "x%" PRId64 "x%" PRId64 "]\n",
              M, N, P, pM, pN, pP, wM, wN, wP);
     }
     if(s->verbosity > 1)
@@ -96,8 +98,10 @@ float * deconvolve_shb(afloat * restrict im,
             M, N, P, pM, pN, pP, wM, wN, wP, wMNP);
     fflush(s->log);
 
+    //myfftw_stop(); nope that was not the problem
+    //myfftw_start(s->nThreads_FFT, s->verbosity, s->log);
     fft_train(wM, wN, wP,
-              s->verbosity, s->nThreads,
+              s->verbosity, s->nThreads_FFT,
               s->log);
 
     if(s->verbosity > 0)
@@ -106,7 +110,7 @@ float * deconvolve_shb(afloat * restrict im,
     }
 
     // cK : "full size" fft of the PSF
-   afloat * Z = fftwf_malloc(wMNP*sizeof(float));
+    float * Z = fim_malloc(wMNP*sizeof(float));
     memset(Z, 0, wMNP*sizeof(float));
     /* Insert the psf into the bigger Z */
     fim_insert(Z, wM, wN, wP,
@@ -132,41 +136,19 @@ float * deconvolve_shb(afloat * restrict im,
         fim_tiff_write_float("fullPSF.tif", Z, NULL, wM, wN, wP);
     }
 
-    fftwf_complex * cK = fft(Z, wM, wN, wP);
-    //fim_tiff_write("Z.tif", Z, wM, wN, wP);
-    fftwf_free(Z);
-
+    here();
+    fftwf_complex * cK = fft_and_free(Z, wM, wN, wP);
+    here();
     putdot(s);
 
-    /* <-- This isn't needed ...
-       fftwf_complex * cKr = NULL;
-       float * Zr = fftwf_malloc(wMNP*sizeof(float));
-       memset(Zr, 0, wMNP*sizeof(float));
-       float * psf_flipped = malloc(wMNP*sizeof(float));
-       memset(psf_flipped, 0, sizeof(float)*wMNP);
-       fim_flipall(psf_flipped, psf, pM, pN, pP);
-       fim_insert(Zr, wM, wN, wP, psf_flipped, pM, pN, pP);
-       free(psf_flipped);
-       fim_circshift(Zr, wM, wN, wP, -(pM-1)/2, -(pN-1)/2, -(pP-1)/2);
-       cKr = fft(Zr, wM, wN, wP);
-       // Not needed since f(-x) = ifft(conf(fft(f)))
-       fftwf_free(Zr);
-       --> */
-
-
-
-    //printf("P1\n");
-    //fim_stats(P1, pM*pN*pP);
-    //  writetif("P1.tif", P1, wM, wN, wP);
-
-    putdot(s);
-
-    afloat * W = NULL;
+    float * W = NULL;
     /* Sigma in Bertero's paper, introduced for Eq. 17 */
     if(s->borderQuality > 0)
     {
         fftwf_complex * F_one = initial_guess(M, N, P, wM, wN, wP);
-        afloat * P1 = fft_convolve_cc_conj_f2(cK, F_one, wM, wN, wP); // can't replace this one with cK!
+        here();
+        float * P1 = fft_convolve_cc_conj_f2(cK, F_one, wM, wN, wP);
+        here();
         float sigma = 0.01; // Until 2021.11.25 used 0.001
 #pragma omp parallel for shared(P1)
         for(size_t kk = 0; kk<wMNP; kk++)
@@ -181,35 +163,23 @@ float * deconvolve_shb(afloat * restrict im,
         W = P1;
     }
 
-
-
     float sumg = fim_sum(im, M*N*P);
-
-
 
     /* x is the initial guess, initially the previous iteration,
      *  xp is
      *  set to be the same */
 
-    afloat * x = fim_constant(wMNP, sumg/wMNP);
-
-    if(0)
-    {
-        printf("EXPERIMENTAL\n");
-        /* If only few iterations can be afforded it makes sense to
-         * start with the observed images as the starting guess */
-        fim_insert(x, wM, wN, wP, im, M, N, P);
-    }
-    afloat * xp = fim_copy(x, wMNP);
+    float * x = fim_constant(wMNP, sumg/wMNP);
+    float * xp = fim_copy(x, wMNP);
 
     dw_iterator_t * it = dw_iterator_new(s);
     while(dw_iterator_next(it) >= 0)
     {
-
+        here();
         if(s->iterdump > 0){
             if(it->iter % s->iterdump == 0)
             {
-                afloat * temp = fim_subregion(x, wM, wN, wP, M, N, P);
+                float * temp = fim_subregion(x, wM, wN, wP, M, N, P);
                 char * outname = gen_iterdump_name(s, it->iter);
                 //printf(" Writing current guess to %s\n", outname);
                 if(s->outFormat == 32)
@@ -223,14 +193,13 @@ float * deconvolve_shb(afloat * restrict im,
             }
         }
 
-        //afloat * p = fim_copy(x, wMNP);
-        afloat * p = xp; /* We don't need xp more */
+        //float * p = fim_copy(x, wMNP);
+        float * p = xp; /* We don't need xp more */
 
         /* Eq. 10 in SHB paper */
         double alpha = ((float) it->iter-1.0)/((float) it->iter+2.0);
-        //alpha /= 1.5;
         alpha < 0 ? alpha = 0: 0;
-
+        alpha > s->alphamax ? alpha = s->alphamax : 0;
 
 
 #pragma omp parallel for shared(p, x, xp)
@@ -238,6 +207,7 @@ float * deconvolve_shb(afloat * restrict im,
             for(size_t kk = 0; kk<wMNP; kk++)
             {
                 p[kk] = x[kk] + alpha*(x[kk]-xp[kk]);
+                p[kk] < s->bg ? p[kk] = s->bg : 0; // TODO
             }
 
         if(s->psigma > 0)
@@ -258,15 +228,17 @@ float * deconvolve_shb(afloat * restrict im,
             wM, wN, wP, // Expanded size
             M, N, P, // Original size
             s);
-        fftwf_free(p); // i.e. p
+        here();
+	//        free(p); // free'ed in iter_shb
+        here();
         dw_iterator_set_error(it, err);
         if(1){
             /* Swap so that the current is named x */
-            afloat * t = x;
+            float * t = x;
             x = xp;
             xp = t;
         }
-        //fftwf_free(p);
+        //free(p);
         /* Enforce a priori information about the lowest possible value */
         if(s->positivity)
         {
@@ -279,7 +251,7 @@ float * deconvolve_shb(afloat * restrict im,
                 }
             }
         }
-
+        here();
         putdot(s);
         dw_iterator_show(it, s);
         benchmark_write(s, it->iter, it->error, x, M, N, P, wM, wN, wP);
@@ -289,14 +261,14 @@ float * deconvolve_shb(afloat * restrict im,
 
     {
         /* Swap back so that x is the final iteration */
-        afloat * t = x;
+        float * t = x;
         x = xp;
         xp = t;
     }
 
     if(xp != NULL)
     {
-        fftwf_free(xp);
+        free(xp);
     }
 
     if(s->verbosity > 0) {
@@ -305,9 +277,9 @@ float * deconvolve_shb(afloat * restrict im,
 
     if(W != NULL)
     {
-        fftwf_free(W); /* Allocated as P1 */
+        free(W); /* Allocated as P1 */
     }
-    fftwf_free(cK);
+    free(cK);
 
     if(s->fulldump)
     {
@@ -315,11 +287,11 @@ float * deconvolve_shb(afloat * restrict im,
         fim_tiff_write("fulldump.tif", x, NULL, wM, wN, wP);
     }
 
-    afloat * out = fim_subregion(x, wM, wN, wP, M, N, P);
+    float * out = fim_subregion(x, wM, wN, wP, M, N, P);
 
     if(x != NULL)
     {
-        fftwf_free(x);
+        free(x);
     }
 
 
@@ -329,24 +301,25 @@ float * deconvolve_shb(afloat * restrict im,
 
 
 float iter_shb(
-    afloat ** xp, // Output, f_(t+1)
+    float ** xp, // Output, f_(t+1)
     const float * restrict im, // Input image
     fftwf_complex * restrict cK, // fft(psf)
-    afloat * restrict pk, // p_k, estimation of the gradient
-    afloat * restrict W, // Bertero Weights
+    float * restrict pk, // p_k, estimation of the gradient
+    float * restrict W, // Bertero Weights
     const int64_t wM, const int64_t wN, const int64_t wP, // expanded size
     const int64_t M, const int64_t N, const int64_t P, // input image size
     __attribute__((unused)) const dw_opts * s)
 {
-    // We could reduce memory even further by using
-    // the allocation for xp
     const size_t wMNP = wM*wN*wP;
 
     fftwf_complex * Pk = fft(pk, wM, wN, wP);
+
     putdot(s);
-    afloat * y = fft_convolve_cc_f2(cK, Pk, wM, wN, wP); // Pk is freed
+    float * y = fft_convolve_cc_f2(cK, Pk, wM, wN, wP); // Pk is freed
+
     float error = getError(y, im, M, N, P, wM, wN, wP, s->metric);
     putdot(s);
+
 
     const double mindiv = 1e-6; /* Smallest allowed divisor */
 #pragma omp parallel for shared(y, im)
@@ -367,11 +340,11 @@ float iter_shb(
         }
     }
 
-    fftwf_complex * Y = fft(y, wM, wN, wP);
-    fftwf_free(y);
-
-    afloat * x = fft_convolve_cc_conj_f2(cK, Y, wM, wN, wP); // Y is freed
-
+    here();
+    fftwf_complex * Y = fft_and_free(y, wM, wN, wP);
+    here();
+    float * x = fft_convolve_cc_conj_f2(cK, Y, wM, wN, wP); // Y is freed
+    here();
     /* Eq. 18 in Bertero */
     if(W != NULL)
     {
@@ -387,7 +360,8 @@ float iter_shb(
             x[cc] *= pk[cc];
         }
     }
-
+    free(pk);
+    here();
     xp[0] = x;
     return error;
 }

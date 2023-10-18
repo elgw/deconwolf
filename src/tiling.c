@@ -259,7 +259,7 @@ float * tiling_get_tile_raw(tiling * T, const int tid, const char * fName)
 
   size_t npixels = m*n*p;
 //  printf("To populate %zu pixels (%zu x %zu x %zu)\n", npixels, m, n, p);
-  float * R = fftwf_malloc(npixels*sizeof(float));
+  float * R = fim_malloc(npixels*sizeof(float));
   if(R == NULL)
   {
     printf("ERROR: memory allocation failed\n");
@@ -322,7 +322,7 @@ float * tiling_get_tile(tiling * T, const int tid, const float * restrict V)
   int64_t m = t->xsize[0];
   int64_t n = t->xsize[1];
   int64_t p = t->xsize[2];
-  float * R = fftwf_malloc(m*n*p*sizeof(float));
+  float * R = fim_malloc(m*n*p*sizeof(float));
   for(int64_t cc = t->xpos[4]; cc <= t->xpos[5]; cc++)
   {
     for(int64_t bb = t->xpos[2]; bb <= t->xpos[3]; bb++)

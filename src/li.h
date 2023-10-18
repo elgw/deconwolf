@@ -34,8 +34,7 @@
  *   for some extra speed.
  */
 
-#ifndef __li_h__
-#define __li_h__
+#pragma once
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -75,5 +74,3 @@ li_conf * li_free(li_conf ** LP);
 double complex li_calc(li_conf * L, const double r);
 
 void li_show(li_conf * L);
-
-#endif
