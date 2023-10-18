@@ -1,9 +1,14 @@
+# Build deconwolf
+#
+# Usage:
 # meson setup builddir
 # cd builddir
 # meson compile
-
+#
 # Inspired by
 # https://gitlab.surrey.ac.uk/ri0005/binary_c/-/blob/455a3598c506cc157b45b90016ce896645d6ca0d/meson.build
+#
+# TODO: Add OpenCL support to the meson.build file
 
 project('deconwolf', 'c',
                  default_options : ['c_std=gnu11'])
@@ -11,7 +16,6 @@ project('deconwolf', 'c',
 subdir('src/')
 subdir('src/random_forest/')
 subdir('doc/')
-
 
 # basic system requirements
 system_requirements = {
