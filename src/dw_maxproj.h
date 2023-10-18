@@ -1,5 +1,4 @@
-#ifndef _dw_maxproj_h_
-#define _dw_maxproj_h_
+#pragma once
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,5 +10,3 @@
 #include "dw_version.h"
 
 int dw_tiff_max(int argc, char ** argv);
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef _dw_nuclei_h_
-#define _dw_nuclei_h_
+#pragma once
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,5 +16,3 @@
 #include "random_forest/prf_forest.h"
 
 int dw_nuclei(int argc, char ** argv);
-
-#endif

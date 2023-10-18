@@ -14,8 +14,7 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef _fim_h_
-#define _fim_h_
+#pragma once
 
 #include <assert.h>
 #include <inttypes.h>
@@ -401,6 +400,3 @@ int fimt_tiff_write(const fim_t * Im, const char * fName);
 
 /* Insert into B into A, with upper left corner at x0, y0 */
 void fimt_blit_2D(fim_t * A, const fim_t * B, size_t x0, size_t y0);
-
-
-#endif /* _fim_h_ */

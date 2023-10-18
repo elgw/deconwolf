@@ -14,8 +14,7 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef __method_identity_h__
-#define __method_identity_h__
+#pragma once
 
 #include "dw.h"
 
@@ -23,5 +22,3 @@
 float * deconvolve_identity(float * restrict im, const int64_t M, const int64_t N, const int64_t P,
                        float * restrict psf, const int64_t pM, const int64_t pN, const int64_t pP,
                        dw_opts * s);
-
-#endif

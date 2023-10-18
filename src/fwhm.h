@@ -14,8 +14,7 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef __fwhm_h__
-#define __fwhm_h__
+#pragma once
 
 /* Only thread safe when logFile == NULL */
 
@@ -71,7 +70,4 @@ int findmin(double , double , gsl_spline *, gsl_interp_accel *, double * , doubl
 
 #ifdef STANDALONE_FWHM
 static void createGaussian(double * , double * , size_t , float );
-#endif
-
-
 #endif

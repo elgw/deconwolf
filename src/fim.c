@@ -82,10 +82,9 @@ void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_realloc(void * p, size_t 
     {
         return out;
     }
-    printf("realloc1\n"); fflush(stdout);
+
     if( (uintptr_t)(const void *)(out) % FIM_ALIGNMENT != 0 )
     {
-        printf("realloc2\n"); fflush(stdout);
         void * out2 = fim_malloc(nbytes);
         memcpy(out2, out, nbytes);
         free(out);

@@ -1,5 +1,4 @@
-#ifndef __dw_tiff_merge_h__
-#define __dw_tiff_merge_h__
+#pragma once
 
 #include <assert.h>
 #include <stdio.h>
@@ -14,5 +13,3 @@
  * ... argv[argc-1] */
 
 int dw_tiff_merge(int argc, char ** argv);
-
-#endif

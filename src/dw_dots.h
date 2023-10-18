@@ -1,5 +1,4 @@
-#ifndef __dw_dots_h__
-#define __dw_dots_h__
+#pragma once
 
 #include <getopt.h>
 #include <libgen.h>
@@ -16,5 +15,3 @@
 #include "fwhm.h"
 
 int dw_dots(int argc, char ** argv);
-
-#endif

@@ -14,8 +14,7 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef __dw_util_h__
-#define __dw_util_h__
+#pragma once
 
 #include <assert.h>
 #include <dirent.h>
@@ -68,5 +67,3 @@ size_t get_peakMemoryKB(void);
 
 /* Read the scaling of file from the .log.txt file if exists */
 float dw_read_scaling(char * file);
-
-#endif

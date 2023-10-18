@@ -1,5 +1,4 @@
-#ifndef _dw_render_h_
-#define _dw_render_h_
+#pragma once
 
 #include <getopt.h>
 #include <libgen.h>
@@ -17,5 +16,3 @@
 #include "dw_util.h"
 
 int dw_render(int argc, char ** argv);
-
-#endif

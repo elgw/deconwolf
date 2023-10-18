@@ -1,5 +1,4 @@
-#ifndef dw_version_h
-#define dw_version_h
+#pragma once
 
 #define DW_VERSION_MAJOR "0"
 #define DW_VERSION_MINOR "3"
@@ -7,5 +6,3 @@
 #define deconwolf_version DW_VERSION_MAJOR "." \
     DW_VERSION_MINOR "." \
     DW_VERSION_PATCH
-
-#endif

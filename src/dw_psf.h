@@ -1,6 +1,4 @@
-#ifndef __dw_psf_h__
-#define __dw_psf_h__
-
+#pragma once
 
 #include <getopt.h>
 #include <libgen.h>
@@ -22,5 +20,3 @@
 */
 
 int dw_psf_cli(int argc, char ** argv);
-
-#endif

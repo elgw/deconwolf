@@ -18,8 +18,7 @@
  * is not thread safe since it has some global data
  */
 
-#ifndef fft_h
-#define fft_h
+#pragma once
 
 #include <fftw3.h>
 #include <stdint.h>
@@ -133,5 +132,3 @@ void fft_ut(void);
  * return time for each size
  */
 double * fft_bench_1d(int64_t from, int64_t to, int niter);
-
-#endif
