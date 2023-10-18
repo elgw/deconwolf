@@ -68,6 +68,15 @@ static void fft_inplace_unpad(float ** pX,
  * Hermitian representation  */
 static size_t nch(size_t M, size_t N, size_t P);
 
+/** @brief Pad for inplace FFT
+ *
+ * Pad the input array along the first dimension to make room for
+ * the inplace FFT. Example: If the input is:
+ * [ ----- | ----- | ---- | ... ,where there is a '|' every M elements
+ * then they array is converted to
+ * [ -----P | -----P | ----P | ... ,where P is the padding
+ *
+ */
 static void fft_inplace_pad(float ** pX,
                      const size_t M,
                      const size_t N,
@@ -77,9 +86,7 @@ static void fft_inplace_pad(float ** pX,
     const size_t nchunk = N*P;
     const size_t chunk_size = M*sizeof(float);
 
-    /* WARNING TODO will not work on windows */
-    *pX = realloc(*pX, 2*nch(M, N, P) * sizeof(float));
-
+    *pX = fim_realloc(*pX, 2*nch(M, N, P) * sizeof(float));
     assert(*pX != NULL);
 
     // Think twice before trying to parallelize!
@@ -93,9 +100,6 @@ static void fft_inplace_pad(float ** pX,
     } else {
         for(size_t c = nchunk-1; c != (size_t) -1; c--)
         {
-            // TODO On arm64, got:
-            // BUG: Source and destination overlap in memcpy(0xbd28080, 0xbd27c28, 1116)
-            //
             memmove(*pX+c*(M+1), *pX + c*M, chunk_size);
         }
     }
@@ -103,7 +107,9 @@ static void fft_inplace_pad(float ** pX,
     return;
 }
 
-/* Reverse the effect of fft_inplace_pad  */
+/** @brief Reverse the effect of fft_inplace_pad
+ *
+*/
 static void fft_inplace_unpad(float ** pX,
                               const size_t M,
                               const size_t N,
@@ -127,11 +133,7 @@ static void fft_inplace_unpad(float ** pX,
         }
     }
 
-    /* WARNING TODO Will not work on Windows */
-
-
-    *pX = realloc(*pX, M*N*P * sizeof(float));
-
+    *pX = fim_realloc(*pX, M*N*P * sizeof(float));
     assert(*pX != NULL);
 
     return;

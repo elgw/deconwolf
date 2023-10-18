@@ -36,9 +36,9 @@ DEBUG?=0
 ifeq ($(DEBUG),1)
     # TODO: only compiles with flto on, why?
     # TODO: does not compile without -O1 or above
-    CFLAGS += -O1 -g3 -Wno-unknown-pragmas -fanalyzer
+    CFLAGS += -O3 -Wno-unknown-pragmas -fanalyzer
 else
-    CFLAGS += -O3 -flto=auto
+    CFLAGS += -O1 -flto=auto -g3
     # -O2 -ftree-vectorize and -O3 give about the same performance
     # -DNDEBUG will not make it faster so don't use it
     # -fno-math-errno no relevant performance gain

@@ -59,13 +59,26 @@ typedef struct{
     size_t P;
 } fim_t;
 
+/* Alignment of fim_malloc and fim_realloc, in bytes */
+
+#define FIM_ALIGNMENT 64
+// #define FIM_ALIGNMENT 4096
+
+
 /** @brief Aligned allocations
  *
  * Does more or less what fftw_malloc but can be freed with free.
  * Calls exit if the allocation fails.
- * The memory is initialized to 0.
+ * The memory is initialized to 0 and aligned according to FIM_ALIGNMENT
  */
-void * __attribute__((__aligned__(64))) fim_malloc(size_t n);
+void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_malloc(size_t n);
+
+/** @brief Resize p, keeping the same alignment as fim_malloc
+ *
+ * This function could use some attention, in worst case it will result in
+ * two allocation and two memcpy.
+ */
+void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_realloc(void * p, size_t n);
 
 
 /** @brief Free a fim_t object. */

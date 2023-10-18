@@ -23,23 +23,24 @@ static void cumsum_array(float * A, size_t N, size_t stride);
 static void fim_show(float * A, size_t M, size_t N, size_t P);
 static void fim_show_int(int * A, size_t M, size_t N, size_t P);
 
+
+
 #ifdef __linux__
-void * __attribute__((__aligned__(64))) fim_malloc(size_t nbytes)
+void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_malloc(size_t nbytes)
 {
 
     const size_t HPAGE_SIZE  = (1 << 21); // 2 Mb
     // const size_t PAGE_SIZE = 4096;
-    const size_t alignment = 64;
 
     void * p;
-    if(posix_memalign(&p, alignment, nbytes))
+    if(posix_memalign(&p, FIM_ALIGNMENT, nbytes))
     {
         fprintf(stderr, "fim_malloc: unable to allocate %zu bytes\n", nbytes);
         assert(0);
         exit(EXIT_FAILURE);
     }
 
-    if(alignment == HPAGE_SIZE)
+    if(FIM_ALIGNMENT == HPAGE_SIZE)
     {
         /* Has to be done before writing the first byte */
         if(madvise( p, nbytes, MADV_HUGEPAGE ))
@@ -61,10 +62,8 @@ void * __attribute__((__aligned__(64))) fim_malloc(size_t nbytes)
 #else
 void * fim_malloc(size_t nbytes)
 {
-    size_t alignment = 64;
-
     void * p;
-    if(posix_memalign(&p, alignment, nbytes))
+    if(posix_memalign(&p, FIM_ALIGNMENT, nbytes))
     {
         fprintf(stderr, "Unable to allocate %zu bytes\n", nbytes);
         assert(0);
@@ -74,6 +73,28 @@ void * fim_malloc(size_t nbytes)
     return p;
 }
 #endif
+
+void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_realloc(void * p, size_t nbytes)
+{
+    void * out = realloc(p, nbytes);
+    /* If address didn't change, we are good */
+    if(p == out)
+    {
+        return out;
+    }
+    printf("realloc1\n"); fflush(stdout);
+    if( (uintptr_t)(const void *)(out) % FIM_ALIGNMENT != 0 )
+    {
+        printf("realloc2\n"); fflush(stdout);
+        void * out2 = fim_malloc(nbytes);
+        memcpy(out2, out, nbytes);
+        free(out);
+        return out2;
+    }
+
+    return out;
+}
+
 
 void fim_set_verbose(int v)
 {

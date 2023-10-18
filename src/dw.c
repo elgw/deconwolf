@@ -479,23 +479,23 @@ void dw_fprint_info(FILE * f, dw_opts * s)
 
     if(f != stdout)
     {
-    fprintf(f, "PID: %d\n",  (int) getpid());
+        fprintf(f, "PID: %d\n",  (int) getpid());
     }
 
     if(f != stdout)
     {
-    char cwd[1024];
-    if (getcwd(cwd, sizeof(cwd)) != NULL) {
-        fprintf(f, "PWD: %s\n", cwd);
-    }
+        char cwd[1024];
+        if (getcwd(cwd, sizeof(cwd)) != NULL) {
+            fprintf(f, "PWD: %s\n", cwd);
+        }
     }
 
     if(f != stdout)
     {
-    if(s->commandline != NULL)
-    {
-        fprintf(f, "CMD: %s\n", s->commandline);
-    }
+        if(s->commandline != NULL)
+        {
+            fprintf(f, "CMD: %s\n", s->commandline);
+        }
     }
 
 #ifdef GIT_VERSION
@@ -517,19 +517,19 @@ void dw_fprint_info(FILE * f, dw_opts * s)
     if(f != stdout)
     {
 #ifndef WINDOWS
-    char * user = getenv("USER");
-    if(user != NULL)
-    { fprintf(f, "USER: '%s'\n", user); }
+        char * user = getenv("USER");
+        if(user != NULL)
+        { fprintf(f, "USER: '%s'\n", user); }
 #endif
 
 #ifndef WINDOWS
-    char * hname = malloc(1024*sizeof(char));
-    assert(hname != NULL);
-    if(gethostname(hname, 1023) == 0)
-    {
-        fprintf(f, "HOSTNAME: '%s'\n", hname);
-        free(hname);
-    }
+        char * hname = malloc(1024*sizeof(char));
+        assert(hname != NULL);
+        if(gethostname(hname, 1023) == 0)
+        {
+            fprintf(f, "HOSTNAME: '%s'\n", hname);
+            free(hname);
+        }
 #endif
     }
 
@@ -539,7 +539,7 @@ void dw_fprint_info(FILE * f, dw_opts * s)
 
 #ifdef OPENCL
     fprintf(f, "OpenCL: YES\n");
-    #else
+#else
     fprintf(f, "OpenCL: No. (Rebuild with OPENCL=1 to enable)\n");
 #endif
 
@@ -647,8 +647,8 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             s->psf_pass = atof(optarg);
             break;
 	case '4':
-	  s->cl_device = atoi(optarg);
-	  break;
+            s->cl_device = atoi(optarg);
+            break;
         case '9':
             s->alphamax = atof(optarg);
             break;
@@ -807,7 +807,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
                 s->fun = &deconvolve_shb;
                 known_method = 1;
             }
-            #ifdef OPENCL
+#ifdef OPENCL
             if(strcmp(optarg, "shbcl") == 0)
             {
                 s->method = DW_METHOD_SHBCL;
@@ -828,13 +828,13 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
                 s->fun = &deconvolve_shb_cl2;
                 known_method = 1;
             }
-            #endif
+#endif
             if(known_method == 0)
             {
                 fprintf(stderr, "--method %s is unknown. Please specify ",  optarg);
-                #ifdef OPENCL
+#ifdef OPENCL
                 fprintf(stderr, "shbcl, shbcl2, ");
-                #endif
+#endif
                 fprintf(stderr, "ave, eve, shb (default), rl or id\n");
                 exit(EXIT_FAILURE);
             }
@@ -1269,8 +1269,8 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
     printf(" --xyfactor F\n\t Discard outer planes of the PSF with sum < F of the central. Use 0 for no cropping.\n");
     printf(" --bq Q\n\t Set border handling to 0 'none', 1 'compromise', or 2 'normal' which is default\n");
     printf(" --scale s\n\t"
-          "Set the scaling factor for the output image manually to s.\n\t"
-          "Warning: Might cause clipping or discretization artifacts\n\t"
+           "Set the scaling factor for the output image manually to s.\n\t"
+           "Warning: Might cause clipping or discretization artifacts\n\t"
            "This option is only used for 16-bit images\n");
     printf(" --float\n\t Set output format to 32-bit float (default is 16-bit int) and disable scaling\n");
     printf(" --bg l\n\t Set background level, l\n");
@@ -1291,15 +1291,15 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
     printf("Additional commands with separate help sections:\n");
     printf("   maxproj    maximum Z-projections\n");
     printf("   merge      merge individual slices to volume\n");
-    #ifdef __dw_dots_h__
+#ifdef __dw_dots_h__
     printf("   dots       detect dots\n");
-    #endif
-    #ifdef __dw_psf_h__
+#endif
+#ifdef __dw_psf_h__
     printf("   psf        generate PSFs for Widefield and Confocal\n");
-    #endif
-    #ifdef __dw_psf_sted_h__
+#endif
+#ifdef __dw_psf_sted_h__
     printf("   psf-STED   PSFs for 3D STED\n");
-    #endif
+#endif
     printf("\n");
     printf("see: %s [command] --help\n", argv[0]);
     printf("\n");
@@ -2064,12 +2064,12 @@ int dw_run(dw_opts * s)
         {
             if(M > 9)
             {
-            printf("image data: ");
-            for(size_t kk = 0; kk<10; kk++)
-            {
-                printf("%f ", im[kk]);
-            }
-            printf("\n");
+                printf("image data: ");
+                for(size_t kk = 0; kk<10; kk++)
+                {
+                    printf("%f ", im[kk]);
+                }
+                printf("\n");
             }
             printf("Done reading\n"); fflush(stdout);
         }
@@ -2128,14 +2128,17 @@ int dw_run(dw_opts * s)
             fprintf(stderr, "Failed to open %s\n", s->psfFile);
             exit(1);
         }
-        if(M > 9)
+        if(s->verbosity > 4)
         {
-            printf("image data: ");
-            for(size_t kk = 0; kk<10; kk++)
+            if(M > 9)
             {
-                printf("%f ", psf[kk]);
+                printf("image data: ");
+                for(size_t kk = 0; kk<10; kk++)
+                {
+                    printf("%f ", psf[kk]);
+                }
+                printf("\n");
             }
-            printf("\n");
         }
     } else {
         pM = 3; pN = 3; pP = 3;
@@ -2308,7 +2311,7 @@ int dw_run(dw_opts * s)
 }
 
 fftwf_complex * initial_guess(const int64_t M, const int64_t N, const int64_t P,
-                                 const int64_t wM, const int64_t wN, const int64_t wP)
+                              const int64_t wM, const int64_t wN, const int64_t wP)
 {
     /* Create initial guess: the fft of an image that is 1 in MNP and 0 outside
      * M, N, P is the dimension of the microscopic image
