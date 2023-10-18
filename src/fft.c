@@ -322,7 +322,8 @@ float * ifft(const fftwf_complex * fX, size_t M, size_t N, size_t P)
 fftwf_complex * fft(const float * restrict in,
                     const int n1, const int n2, const int n3)
 {
-
+    assert(in != NULL);
+    assert(plan_r2c != NULL);
     size_t N = nch(n1, n2, n3);
     fftwf_complex * out = fim_malloc(N*sizeof(fftwf_complex));
     assert(out != NULL);
@@ -639,10 +640,14 @@ void fft_ut_flipall_conj()
 
     fftwf_complex * FA = fft(A, M, N, P);
     fftwf_complex * FB = fft(B, M, N, P);
+    free(A);
+    free(B);
     fftwf_complex * FB_flipall = fft(B_flipall, M, N, P);
 
     float * Y1 = fft_convolve_cc(FA, FB_flipall, M, N, P);
     float * Y2 = fft_convolve_cc_conj(FA, FB, M, N, P);
+    free(FA);
+    free(FB);
 
     float mse = fim_mse(Y1, Y2, M*N*P);
     printf("mse=%f ", mse);
@@ -650,9 +655,9 @@ void fft_ut_flipall_conj()
     { printf("ok!\n"); } else
     { printf("BAD :(\n"); }
 
-    free(A); free(FA);
-    free(B); free(FB);
-    free(B_flipall); free(FB_flipall);
+
+    free(B_flipall);
+    free(FB_flipall);
 
     free(Y1);
     free(Y2);
@@ -708,7 +713,8 @@ double * fft_bench_1d(int64_t from, int64_t to, int niter)
     return t;
 }
 
-float fim_compare(const float * X, const float * Y,
+/* Only used for fft_ut. Should be renamed to fim_max_rel_error */
+static float fim_compare(const float * X, const float * Y,
                   size_t M, size_t N, size_t P)
 {
     float rel_err_max = -1;
@@ -746,6 +752,8 @@ void test_inplace(void)
         size_t M = 51+(rand() % 10);
         size_t N = 25+(rand() % 10);
         size_t P = 20+(rand() % 10);
+        fft_train(M, N, P, 0, 8, stdout);
+
         //M = 2228; N = 2228; P = 208; // caused strange problems
         printf("Test image size: %zu %zu %zu\n", M, N, P);
         size_t MNP = M*N*P;

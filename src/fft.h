@@ -33,19 +33,44 @@
  * Initialization commands.
  *
  */
-/* Set the plan to use, call before myfftw_start */
+
+/* @brief select FFTW planning type
+ *
+ * Set the plan to use, call before myfftw_start
+ * can be FFTW_ESTIMATE, FFTW_MEASURE etc...
+ * see the FFTW3 documentation.
+ * TODO: Integrate with myfftw_start
+*/
 void fft_set_plan(unsigned int plan);
 
-/* Set fft to use in-place transformations when possible
- * call before myfftw_start*/
+/* @brief To enable inplace-FFTs
+ *
+ * Set to use in-place transformations when possible
+ * call before myfftw_start
+ * TODO: integrate with myfftw_start
+*/
 void fft_set_inplace(int use_inplace);
 
-/* Initialize, run before any other commands futher down.
- * log can be NULL */
+/** @brief Required initialization routines
+ *
+ * Initialize, run before any other commands futher down.
+ *log can be NULL */
 void myfftw_start(int nThreads, int verbosity, FILE * log);
 
+/** @brief Generate FFTW plans for the specified size
+ *
+ * Will generate both in-place and out-of place
+ * has to be called before using the fft.
+ */
+void fft_train(size_t M, size_t N, size_t P,
+               int verbosity, int nThreads,
+               FILE * log);
 
-/* Call this when you are done. */
+
+/* @brief Free allocated memory
+ *
+ * Call this when you are done.
+*/
 void myfftw_stop(void);
 
 void dim3_real_float_inverse(fftwf_complex * in, float * out,
@@ -87,19 +112,20 @@ void fft_mul(fftwf_complex * restrict C,
              const size_t n1, const size_t n2, const size_t n3);
 
 /* Y = ifft(A*B) */
-float * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B, int M, int N, int P);
+float *
+fft_convolve_cc(fftwf_complex * A, fftwf_complex * B,
+                int M, int N, int P);
+
 /* Y = ifff(conj(A)*B)) */
-float * fft_convolve_cc_conj(fftwf_complex * A, fftwf_complex * B, int M, int N, int P);
+float *
+fft_convolve_cc_conj(fftwf_complex * A, fftwf_complex * B,
+                     int M, int N, int P);
 
 /* Highly specialised versions where the second argument is freed */
 float * fft_convolve_cc_f2(fftwf_complex * A, fftwf_complex * B, int M, int N, int P);
 float * fft_convolve_cc_conj_f2(fftwf_complex * A, fftwf_complex * B, int M, int N, int P);
 
 
-/* Generate FFTW plans for the specified size */
-void fft_train(size_t M, size_t N, size_t P,
-               int verbosity, int nThreads,
-               FILE * log);
 
 void fft_ut(void);
 

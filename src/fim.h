@@ -67,12 +67,21 @@ typedef struct{
  */
 void * __attribute__((__aligned__(64))) fim_malloc(size_t n);
 
+
+/** @brief Free a fim_t object. */
 void fim_free(fim_t *);
 
 fim_t * fimt_zeros(size_t M, size_t N, size_t P);
 
-/* Create a new object with a pointer to V */
-fim_t * fim_image_from_array(const float * V, size_t M, size_t N, size_t P);
+/** @brief Create a new object with a copy of V
+ *
+ * Note: Both V and the returned object has to be freed eventually
+ *
+ * @return A newly allocated fim_t which contains a copy of V
+ *
+ */
+fim_t * fim_image_from_array(const float * V,
+                             size_t M, size_t N, size_t P);
 
 /* Return a new copy */
 fim_t * fimt_copy(const fim_t * );
@@ -83,7 +92,7 @@ double * fim_get_line_double(fim_t * Im,
                              int dim, int nPix);
 
 /* Similar to MATLABs shiftfim, [M,N,P] -> [N,P,M] */
-fim_t * fim_shiftdim(fim_t *);
+fim_t * fim_shiftdim(const fim_t *);
 
 /* [M, N, P] -> [N, M, P] */
 fim_t * fimt_transpose(const fim_t * );

@@ -47,11 +47,11 @@ void * __attribute__((__aligned__(64))) fim_malloc(size_t nbytes)
             fprintf(stderr, "madvise failed\n");
         }
         if(0){ /* Would this decrease the chances of fragmentation? */
-        /* Set one byte to allocate */
-        /* Set one byte of each page to allocate */
-        for (size_t kk = 0; kk < nbytes; kk += HPAGE_SIZE) {
-            memset(p + kk, 0, 1);
-        }
+            /* Set one byte to allocate */
+            /* Set one byte of each page to allocate */
+            for (size_t kk = 0; kk < nbytes; kk += HPAGE_SIZE) {
+                memset(p + kk, 0, 1);
+            }
         }
     }
     memset(p, 0, nbytes);
@@ -92,10 +92,8 @@ void fim_free(fim_t * F)
 {
     if(F != NULL)
     {
-        if(F->V != NULL)
-        {
-            free(F->V);
-        }
+        free(F->V);
+        F->V = NULL;
         free(F);
     }
     return;
@@ -107,7 +105,7 @@ fim_t * fim_image_from_array(const float * V, size_t M, size_t N, size_t P)
     assert(I != NULL);
     I->V = fim_malloc(M*N*P*sizeof(float));
 
-    memcpy(I->V, V, M*N*P*sizeof(float));
+    I->V = memcpy(I->V, V, M*N*P*sizeof(float));
     I->M = M;
     I->N = N;
     I->P = P;
@@ -1218,6 +1216,7 @@ void fim_LoG_ut()
         V[kk] = kk % 100;
     }
 
+
     fim_t * T = fim_image_from_array(V, M, N, P);
     fim_t * S1 = fim_shiftdim(T);
     fim_t * S2 = fim_shiftdim(S1);
@@ -1231,10 +1230,15 @@ void fim_LoG_ut()
             exit(EXIT_FAILURE);
         }
     }
-    free(S1->V);
-    free(S2->V);
-    free(S3->V);
-    free(S1); free(S2); free(S3);
+    fim_free(T);
+    T = NULL;
+    assert(S1->V != S2->V);
+    fim_free(S1);
+    S1 = NULL;
+    fim_free(S2);
+    S2 = NULL;
+    fim_free(S3);
+
 
     for(size_t kk = 0; kk<M*N*P; kk++)
     {
@@ -1313,8 +1317,6 @@ void fim_LoG_ut()
     free(V);
     free(LoG);
     free(LoG2);
-    free(T->V);
-    free(T);
 }
 
 
@@ -2782,7 +2784,7 @@ double * fim_get_line_double(fim_t * I,
     return L;
 }
 
-fim_t * fim_shiftdim(fim_t * I)
+fim_t * fim_shiftdim(const fim_t * I)
 {
     const float * V = I->V;
     const size_t M = I->M;
