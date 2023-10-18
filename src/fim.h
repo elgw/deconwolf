@@ -60,9 +60,8 @@ typedef struct{
 
 /* Alignment of fim_malloc and fim_realloc, in bytes */
 
-#define FIM_ALIGNMENT 64
-// #define FIM_ALIGNMENT 4096
-
+#define FIM_ALIGNMENT 64UL
+// #define FIM_ALIGNMENT 4096UL
 
 /** @brief Aligned allocations
  *
