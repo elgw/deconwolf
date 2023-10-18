@@ -61,7 +61,9 @@ typedef struct{
 /* Alignment of fim_malloc and fim_realloc, in bytes */
 
 #define FIM_ALIGNMENT 64UL
-// #define FIM_ALIGNMENT 4096UL
+// #define FIM_ALIGNMENT 4096UL // page size
+
+/* __attribute__((__aligned__(x))) will only allow values up to 4096 */
 
 /** @brief Aligned allocations
  *

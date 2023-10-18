@@ -23,15 +23,9 @@ static void cumsum_array(float * A, size_t N, size_t stride);
 static void fim_show(float * A, size_t M, size_t N, size_t P);
 static void fim_show_int(int * A, size_t M, size_t N, size_t P);
 
-
-
 #ifdef __linux__
 void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_malloc(size_t nbytes)
 {
-
-    const size_t HPAGE_SIZE  = (1 << 21); // 2 Mb
-    // const size_t PAGE_SIZE = 4096;
-
     void * p;
     if(posix_memalign(&p, FIM_ALIGNMENT, nbytes))
     {
@@ -40,6 +34,8 @@ void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_malloc(size_t nbytes)
         exit(EXIT_FAILURE);
     }
 
+    #if 0
+    const size_t HPAGE_SIZE  = (1 << 21); // 2 Mb
     if(FIM_ALIGNMENT == HPAGE_SIZE)
     {
         /* Has to be done before writing the first byte */
@@ -55,6 +51,8 @@ void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_malloc(size_t nbytes)
             }
         }
     }
+    #endif
+
     memset(p, 0, nbytes);
 
     return p;

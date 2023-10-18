@@ -38,7 +38,7 @@ ifeq ($(DEBUG),1)
     # TODO: does not compile without -O1 or above
     CFLAGS += -O3 -Wno-unknown-pragmas -fanalyzer
 else
-    CFLAGS += -O1 -flto=auto -g3
+    CFLAGS += -O3 -flto=auto
     # -O2 -ftree-vectorize and -O3 give about the same performance
     # -DNDEBUG will not make it faster so don't use it
     # -fno-math-errno no relevant performance gain

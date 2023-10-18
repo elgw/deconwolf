@@ -5,6 +5,11 @@
 - Found a bug in `fft.c` where `memcpy` was used wrongly (replaced by
   `memmove`). Strangely that bug never manifested under
   Ubuntu/x86_64.
+- Added **fim_realloc** for aligned reallocs. This function could be
+  branched depending on the OS since there are platform specific
+  aligned reallocation functions.
+- Header files: Using `#pragma once` instead of the `#ifndef file_h_`
+  pattern.
 
 ## 0.3.1
 - Introduced **fim_malloc** for all allocations that might benefit
