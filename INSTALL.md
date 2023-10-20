@@ -10,6 +10,13 @@
  - [MKL FFT Backend](#MKL)
 
 
+## OpenCL support
+Requires a working OpenCL installation.
+``` shell
+make kernels
+make OPENCL=1 -B
+```
+
 ## Meson
 deconwolf can also be installed using [meson](https://mesonbuild.com/),
 tested only Ubuntu and MacOS

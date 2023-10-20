@@ -240,6 +240,7 @@ kernels:
 	xxd -i src/kernels/cl_shb_update.c > src/kernels/cl_shb_update.h
 	xxd -i src/kernels/cl_preprocess_image.c > src/kernels/cl_preprocess_image.h
 
+
 install:
 	# Binaries
 	cp bin/dw_bw $(DESTDIR)/dw_bw
