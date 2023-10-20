@@ -1,5 +1,4 @@
-#ifndef __cl_util_h__
-#define __cl_util_h__
+#pragma once
 
 /* This is tailored for a single FFT size. Doing it that way we can
  * do much initialization in bulk at the beginning.
@@ -274,6 +273,3 @@ float * pad_for_inplace(const float * X,
  * X->type == fimcl_real_inplace */
 float * unpad_from_inplace(const float * PX,
                            size_t M, size_t N, size_t P);
-
-
-#endif

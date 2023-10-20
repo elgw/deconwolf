@@ -14,8 +14,7 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef __method_shb_cl2_h__
-#define __method_shb_cl2_h__
+#pragma once
 
 #include "dw.h"
 #include "cl_util.h"
@@ -27,5 +26,3 @@ float * deconvolve_shb_cl2(float * restrict im,
                        float * restrict psf,
                        const int64_t pM, const int64_t pN, const int64_t pP,
                        dw_opts * s);
-
-#endif

@@ -14,8 +14,7 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef _fim_h_
-#define _fim_h_
+#pragma once
 
 #include <assert.h>
 #include <inttypes.h>
@@ -35,6 +34,9 @@
 #include <omp.h>
 #endif
 
+#ifdef __linux__
+#include <sys/mman.h>
+#endif
 
 #define INLINED inline __attribute__((always_inline))
 
@@ -56,13 +58,43 @@ typedef struct{
     size_t P;
 } fim_t;
 
+/* Alignment of fim_malloc and fim_realloc, in bytes */
+
+#define FIM_ALIGNMENT 64UL
+// #define FIM_ALIGNMENT 4096UL // page size
+
+/* __attribute__((__aligned__(x))) will only allow values up to 4096 */
+
+/** @brief Aligned allocations
+ *
+ * Does more or less what fftw_malloc but can be freed with free.
+ * Calls exit if the allocation fails.
+ * The memory is initialized to 0 and aligned according to FIM_ALIGNMENT
+ */
+void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_malloc(size_t n);
+
+/** @brief Resize p, keeping the same alignment as fim_malloc
+ *
+ * This function could use some attention, in worst case it will result in
+ * two allocation and two memcpy.
+ */
+void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_realloc(void * p, size_t n);
+
+
+/** @brief Free a fim_t object. */
 void fim_free(fim_t *);
 
 fim_t * fimt_zeros(size_t M, size_t N, size_t P);
 
-/* Create a new object with a pointer to V */
-fim_t * fim_image_from_array(const float * V, size_t M, size_t N, size_t P);
-
+/** @brief Create a new object with a copy of V
+ *
+ * Note: Both V and the returned object has to be freed eventually
+ *
+ * @return A newly allocated fim_t which contains a copy of V
+ *
+ */
+fim_t * fim_image_from_array(const float * V,
+                             size_t M, size_t N, size_t P);
 
 /* Return a new copy */
 fim_t * fimt_copy(const fim_t * );
@@ -73,7 +105,7 @@ double * fim_get_line_double(fim_t * Im,
                              int dim, int nPix);
 
 /* Similar to MATLABs shiftfim, [M,N,P] -> [N,P,M] */
-fim_t * fim_shiftdim(fim_t *);
+fim_t * fim_shiftdim(const fim_t *);
 
 /* [M, N, P] -> [N, M, P] */
 fim_t * fimt_transpose(const fim_t * );
@@ -181,12 +213,14 @@ float * fim_subregion(const float * restrict A, const int64_t M, const int64_t N
 
 float * fim_subregion_ref(float * A, int64_t M, int64_t N, int64_t P, int64_t m, int64_t n, int64_t p);
 
-/* Normalize an image to have the sum 1.0 */
-void fim_normalize_sum1(float * psf, int64_t M, int64_t N, int64_t P);
+/** @brief Normalize an image to have the sum 1.0
+* MATLAB:
+* Y = X/max(X(:))
+*/
+void fim_normalize_sum1(float * restrict psf, int64_t M, int64_t N, int64_t P);
 
 /* Return a newly allocated copy of V */
 float * fim_copy(const float * restrict V, const size_t N);
-
 
 /* Allocate and return an array of N floats */
 float * fim_zeros(const size_t N);
@@ -241,7 +275,7 @@ void shift_vector_float_buf(float * restrict V, // data
                             float * restrict buffer);
 
 /* Multiply a float array of size N by x */
-void fim_mult_scalar(float * fim, size_t N, float x);
+void fim_mult_scalar(float * restrict fim, size_t N, float x);
 
 void fim_ut(void);
 
@@ -367,6 +401,3 @@ int fimt_tiff_write(const fim_t * Im, const char * fName);
 
 /* Insert into B into A, with upper left corner at x0, y0 */
 void fimt_blit_2D(fim_t * A, const fim_t * B, size_t x0, size_t y0);
-
-
-#endif /* _fim_h_ */

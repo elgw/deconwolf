@@ -1,5 +1,4 @@
-#ifndef __clext_h__
-#define __clext_h__
+#pragma once
 #include <stdio.h>
 
 const char* clGetErrorString(int errorCode) {
@@ -96,6 +95,3 @@ const char* clGetErrorString(int errorCode) {
     default: return "CL_UNKNOWN_ERROR";
     }
 }
-
-
-#endif

@@ -27,8 +27,7 @@
  * Flags to dw_write_tif for scaling on/off
 */
 
-#ifndef fim_tiff_h
-#define fim_tiff_h
+#pragma once
 
 #include <assert.h>
 #include <stdlib.h>
@@ -146,5 +145,3 @@ int fim_tiff_maxproj_XYZ(const char * in, const char * out);
 
 /* Extract a single slice from input to output file */
 int fim_tiff_extract_slice(char *in, char *out, int slice);
-
-#endif

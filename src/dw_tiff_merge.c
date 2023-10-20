@@ -10,6 +10,7 @@ typedef struct {
 tm_config_t * tm_config_new()
 {
     tm_config_t * conf = malloc(sizeof(tm_config_t));
+    assert(conf != NULL);
     conf->overwrite = 0;
     conf->verbose = 1;
     conf->test = 0;
@@ -47,7 +48,7 @@ static void argparsing(int argc, char ** argv, tm_config_t * conf)
         { NULL,           0,                 NULL,   0   }
     };
 
-    char ch;
+    int ch;
     while((ch = getopt_long(argc, argv,
                             "hv:ot",
                             longopts, NULL)) != -1)
@@ -84,6 +85,7 @@ int dw_tiff_merge(int argc, char ** argv)
     if(argc < 3)
     {
         usage();
+        tm_config_free(conf);
         return EXIT_FAILURE;
     }
 
@@ -142,7 +144,7 @@ int dw_tiff_merge(int argc, char ** argv)
     if(im_out == NULL)
     {
         fprintf(stderr, "Failed to allocate memory for the output image\n");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
     size_t plane = 0;
     for(int kk = conf->optind + 1; kk<argc; kk++)

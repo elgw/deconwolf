@@ -110,6 +110,7 @@ void bw_conf_printf(FILE * out, bw_conf * conf)
 bw_conf * bw_conf_new()
 {
     bw_conf * conf = malloc(sizeof(bw_conf));
+    assert(conf != NULL);
 
     /* Physical settings */
     conf->lambda = 600;
@@ -173,6 +174,7 @@ void getCmdLine(int argc, char ** argv, bw_conf * s)
     }
     lcmd += argc+2;
     s->cmd = malloc(lcmd);
+    assert(s->cmd != NULL);
     int pos = 0;
     for(int kk = 0; kk<argc; kk++)
     {
@@ -250,7 +252,8 @@ void usage(__attribute__((unused)) int argc, char ** argv, bw_conf * s)
 
 void bw_argparsing(int argc, char ** argv, bw_conf * s)
 {
-    bw_conf * defaults = malloc(sizeof(bw_conf));
+    bw_conf * defaults = calloc(1, sizeof(bw_conf));
+    assert(defaults != NULL);
     memcpy(defaults, s, sizeof(bw_conf));
 
     if(argc < 2)
@@ -434,18 +437,21 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
     if(optind + 1 == argc)
     {
         s->outFile = malloc(strlen(argv[argc-1]) + 1);
+        assert(s->outFile != NULL);
         sprintf(s->outFile, "%s", argv[argc-1]);
     }
 
     if(s->outFile == NULL)
     {
         s->outFile = malloc(100*sizeof(char));
+        assert(s->outFile != NULL);
         sprintf(s->outFile, "PSFBW_%.2f_%.2f_%.1f_%.1f_%.1f.tif",
                 s->NA, s->ni, s->lambda, s->resLateral, s->resAxial);
     }
 
 
     s->logFile = malloc(strlen(s->outFile) + 10);
+    assert(s->logFile != NULL);
     sprintf(s->logFile, "%s.log.txt", s->outFile);
 
     /* Not more threads than slices */
@@ -503,6 +509,7 @@ void BW(bw_conf * conf)
     assert(conf->V == NULL);
     assert(conf->nThreads > 0);
     conf->V = malloc(conf->M*conf->N*conf->P*sizeof(float));
+    assert(conf->V != NULL);
 
     float * V = conf->V;
     int M = conf->M;
@@ -512,11 +519,14 @@ void BW(bw_conf * conf)
 
     int nThreads = conf->nThreads;
     pthread_t * threads = malloc(nThreads*sizeof(pthread_t));
+    assert(threads != NULL);
     bw_conf ** confs = malloc(nThreads*sizeof(bw_conf*));
+    assert(confs != NULL);
 
     for(int kk = 0; kk<nThreads; kk++)
     {
         confs[kk] = (bw_conf*) malloc(sizeof(bw_conf));
+        assert(confs[kk] != NULL);
         memcpy(confs[kk], conf, sizeof(bw_conf));
         confs[kk]->thread = kk;
         // printf("Creating thread %d\n", kk);
@@ -632,9 +642,11 @@ void BW_slice(float * V, float z, bw_conf * conf)
 
     size_t nr = (radmax+1)*conf->oversampling_R+2;
     double * r = malloc(nr * sizeof(double));
+    assert(r != NULL);
 
     // abs(x)^2
     double * radprofile = malloc(nr * sizeof(double));
+    assert(radprofile != NULL);
 
     /* Calculate the radial profile
        possibly by integrating over Z */
@@ -811,6 +823,7 @@ int main(int argc, char ** argv)
 
     ttags * T = ttags_new();
     char * swstring = malloc(1024);
+    assert(swstring != NULL);
     sprintf(swstring, "deconwolf %s", deconwolf_version);
     ttags_set_software(T, swstring);
     ttags_set_imagesize(T, conf->M, conf->N, conf->P);

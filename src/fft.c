@@ -28,10 +28,7 @@
 
 /* This provides some utility functions for using fftw3.
  *
- * Note about memory fftw3 requires that array are aligned by
- * MIN_ALIGNMENT, relevant files to look at are: fftw3/kernel/kalloc.c
- * and fftw3/api/malloc.c On linux posix_memalign/free is used but
- * that can not be assumed.
+ * Please see the fftw3 alignment requirements before making changes.
  */
 
 
@@ -56,7 +53,7 @@ fftwf_plan plan_c2r_inplace = NULL;
  * Forward declarations
  */
 /* Pad data for inplace FFT transforms  */
-void fft_inplace_pad(float ** pX,
+static void fft_inplace_pad(float ** pX,
                      const size_t M,
                      const size_t N,
                      const size_t P);
@@ -71,7 +68,16 @@ static void fft_inplace_unpad(float ** pX,
  * Hermitian representation  */
 static size_t nch(size_t M, size_t N, size_t P);
 
-void fft_inplace_pad(float ** pX,
+/** @brief Pad for inplace FFT
+ *
+ * Pad the input array along the first dimension to make room for
+ * the inplace FFT. Example: If the input is:
+ * [ ----- | ----- | ---- | ... ,where there is a '|' every M elements
+ * then they array is converted to
+ * [ -----P | -----P | ----P | ... ,where P is the padding
+ *
+ */
+static void fft_inplace_pad(float ** pX,
                      const size_t M,
                      const size_t N,
                      const size_t P)
@@ -80,15 +86,7 @@ void fft_inplace_pad(float ** pX,
     const size_t nchunk = N*P;
     const size_t chunk_size = M*sizeof(float);
 
-    /* WARNING TODO will not work on windows */
-    size_t add_0 = (size_t) pX;
-    *pX = realloc(*pX, 2*nch(M, N, P) * sizeof(float));
-    size_t add_1 = (size_t) pX;
-    if(add_0 != add_1)
-    {
-        printf("fft_inplace_unpad: adress changed from %zu to %zu\n", add_0, add_1);;
-    }
-
+    *pX = fim_realloc(*pX, 2*nch(M, N, P) * sizeof(float));
     assert(*pX != NULL);
 
     // Think twice before trying to parallelize!
@@ -97,19 +95,21 @@ void fft_inplace_pad(float ** pX,
     {
         for(size_t c = nchunk-1; c != (size_t) -1; c--)
         {
-            memcpy(*pX+c*(M+2), *pX + c*M, chunk_size);
+            memmove(*pX+c*(M+2), *pX + c*M, chunk_size);
         }
     } else {
         for(size_t c = nchunk-1; c != (size_t) -1; c--)
         {
-            memcpy(*pX+c*(M+1), *pX + c*M, chunk_size);
+            memmove(*pX+c*(M+1), *pX + c*M, chunk_size);
         }
     }
 
     return;
 }
 
-/* Reverse the effect of fft_inplace_pad  */
+/** @brief Reverse the effect of fft_inplace_pad
+ *
+*/
 static void fft_inplace_unpad(float ** pX,
                               const size_t M,
                               const size_t N,
@@ -124,26 +124,18 @@ static void fft_inplace_unpad(float ** pX,
     {
         for(size_t c = 0; c < nchunk; c++)
         {
-            memcpy(*pX + c*M, *pX+c*(M+2), chunk_size);
+            memmove(*pX + c*M, *pX+c*(M+2), chunk_size);
         }
     } else {
         for(size_t c = 0; c < nchunk; c++)
         {
-            memcpy(*pX + c*M, *pX+c*(M+1), chunk_size);
+            memmove(*pX + c*M, *pX+c*(M+1), chunk_size);
         }
     }
 
-    /* WARNING TODO Will not work on Windows */
-    size_t add_0 = (size_t) pX;
-
-    *pX = realloc(*pX, M*N*P * sizeof(float));
-
+    *pX = fim_realloc(*pX, M*N*P * sizeof(float));
     assert(*pX != NULL);
-    size_t add_1 = (size_t) pX;
-    if(add_0 != add_1)
-    {
-        printf("fft_inplace_unpad: adress changed from %zu to %zu\n", add_0, add_1);;
-    }
+
     return;
 }
 
@@ -174,7 +166,10 @@ static char * get_swf_file_name(int nThreads)
 {
     char * dir_home = getenv("HOME");
     char * dir_config = malloc(1024*sizeof(char));
+    assert(dir_config != NULL);
     char * swf = malloc(1024*sizeof(char));
+    assert(swf != NULL);
+
     if(use_inplace == 0)
     {
         sprintf(swf, "fftw_wisdom_float_threads_%d.dat", nThreads);
@@ -195,6 +190,7 @@ static char * get_swf_file_name(int nThreads)
     if( ensuredir(dir_config) == 0 )
     {
         char * prefered = malloc(1024*sizeof(char));
+        assert(prefered != NULL);
         sprintf(prefered, "%s%s", dir_config, swf);
         free(dir_config);
         free(swf);
@@ -310,8 +306,7 @@ void myfftw_stop(void)
 float * ifft(const fftwf_complex * fX, size_t M, size_t N, size_t P)
 {
 
-    float * X = fftwf_malloc(M*N*P*sizeof(float));
-
+    float * X = fim_malloc(M*N*P*sizeof(float));
     assert(X != NULL);
 
     fftwf_execute_dft_c2r(plan_c2r, (fftwf_complex*) fX, X);
@@ -329,9 +324,11 @@ float * ifft(const fftwf_complex * fX, size_t M, size_t N, size_t P)
 fftwf_complex * fft(const float * restrict in,
                     const int n1, const int n2, const int n3)
 {
-
+    assert(in != NULL);
+    assert(plan_r2c != NULL);
     size_t N = nch(n1, n2, n3);
-    fftwf_complex * out = fftwf_malloc(N*sizeof(fftwf_complex));
+    fftwf_complex * out = fim_malloc(N*sizeof(fftwf_complex));
+    assert(out != NULL);
     memset(out, 0, N*sizeof(fftwf_complex));
 
     fftwf_execute_dft_r2c(plan_r2c, (float*) in, out);
@@ -444,13 +441,15 @@ float * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B,
                         const int M, const int N, const int P)
 {
     size_t n = nch(M, N, P);
-    fftwf_complex * C = fftwf_malloc(n*sizeof(fftwf_complex));
+    fftwf_complex * C = fim_malloc(n*sizeof(fftwf_complex));
+    assert(C != NULL);
     fft_mul(C, A, B, M, N, P);
 
-    float * out = fftwf_malloc(M*N*P*sizeof(float));
+    float * out = fim_malloc(M*N*P*sizeof(float));
+    assert(out != NULL);
 
     fftwf_execute_dft_c2r(plan_r2c, C, out);
-    fftwf_free(C);
+    free(C);
 
     const size_t MNP = M*N*P;
 #pragma omp parallel for shared(out)
@@ -465,14 +464,16 @@ float * fft_convolve_cc_conj(fftwf_complex * A, fftwf_complex * B,
                              const int M, const int N, const int P)
 {
     size_t n = nch(M, N, P);
-    fftwf_complex * C = fftwf_malloc(n*sizeof(fftwf_complex));
+    fftwf_complex * C = fim_malloc(n*sizeof(fftwf_complex));
+    assert(C != NULL);
     fft_mul_conj(C, A, B, M, N, P);
 
-    float * out = fftwf_malloc(M*N*P*sizeof(float));
+    float * out = fim_malloc(M*N*P*sizeof(float));
+    assert(out != NULL);
     assert(plan_c2r != NULL);
 
     fftwf_execute_dft_c2r(plan_c2r, C, out);
-    fftwf_free(C);
+    free(C);
 
     const size_t MNP = M*N*P;
 #pragma omp parallel for shared(out)
@@ -522,8 +523,10 @@ void fft_train(const size_t M, const size_t N, const size_t P,
     fftwf_destroy_plan(plan_r2c_inplace);
     fftwf_destroy_plan(plan_c2r_inplace);
 
-    fftwf_complex * C = fftwf_malloc(nch(M, N, P)*sizeof(fftwf_complex));
-    float * R = fftwf_malloc(nch(M,N,P)*2*sizeof(float));
+    fftwf_complex * C = fim_malloc(nch(M, N, P)*sizeof(fftwf_complex));
+    assert(C != NULL);
+    float * R = fim_malloc(nch(M,N,P)*2*sizeof(float));
+    assert(R != NULL);
 
     /* Hermitian to Real */
 
@@ -577,8 +580,8 @@ void fft_train(const size_t M, const size_t N, const size_t P,
     }
 
 
-    fftwf_free(C);
-    fftwf_free(R);
+    free(C);
+    free(R);
 
     if(updatedWisdom)
     {
@@ -624,22 +627,29 @@ void fft_ut_flipall_conj()
      * flip(X) = ifft(conj(fft(X)))
      */
     int M = 12, N = 13, P = 15;
-    float * A = fftwf_malloc(M*N*P*sizeof(float));
+    float * A = fim_malloc(M*N*P*sizeof(float));
+    assert(A != NULL);
     for(int kk = 0; kk<M*N*P; kk++)
     { A[kk] = (float) rand() / (float) RAND_MAX; }
     fim_stats(A, M*N*P);
-    float * B = fftwf_malloc(M*N*P*sizeof(float));
+    float * B = fim_malloc(M*N*P*sizeof(float));
+    assert(B != NULL);
     memcpy(B, A, M*N*P*sizeof(float));
-    float * B_flipall = fftwf_malloc(M*N*P*sizeof(float));
+    float * B_flipall = fim_malloc(M*N*P*sizeof(float));
+    assert(B_flipall != NULL);
     fim_flipall(B_flipall, B, M, N, P);
 
 
     fftwf_complex * FA = fft(A, M, N, P);
     fftwf_complex * FB = fft(B, M, N, P);
+    free(A);
+    free(B);
     fftwf_complex * FB_flipall = fft(B_flipall, M, N, P);
 
     float * Y1 = fft_convolve_cc(FA, FB_flipall, M, N, P);
     float * Y2 = fft_convolve_cc_conj(FA, FB, M, N, P);
+    free(FA);
+    free(FB);
 
     float mse = fim_mse(Y1, Y2, M*N*P);
     printf("mse=%f ", mse);
@@ -647,12 +657,12 @@ void fft_ut_flipall_conj()
     { printf("ok!\n"); } else
     { printf("BAD :(\n"); }
 
-    fftwf_free(A); fftwf_free(FA);
-    fftwf_free(B); fftwf_free(FB);
-    fftwf_free(B_flipall); fftwf_free(FB_flipall);
 
-    fftwf_free(Y1);
-    fftwf_free(Y2);
+    free(B_flipall);
+    free(FB_flipall);
+
+    free(Y1);
+    free(Y2);
 
     myfftw_stop();
 }
@@ -666,18 +676,21 @@ double * fft_bench_1d(int64_t from, int64_t to, int niter)
 
     struct timespec tictoc_start, tictoc_end;
 
-    double * t = fftwf_malloc(sizeof(double) * (to + 1 - from));
+    double * t = fim_malloc(sizeof(double) * (to + 1 - from));
+    assert( t != NULL);
     memset(t, 0, sizeof(double)*(to+1-from));
     for(int kk = 0; kk<niter; kk++)
     {
         for(int64_t s = from; s <= to; s++)
         {
-            float * fft_in = fftwf_malloc(s*sizeof(float));
+            float * fft_in = fim_malloc(s*sizeof(float));
+            assert(fft_in != NULL);
             for(int64_t kk = 0; kk<s; kk++)
             {
                 fft_in[kk] = (float)  ((double) rand() / (double) RAND_MAX);
             }
-            fftwf_complex * fft_out = fftwf_malloc(s * sizeof(fftwf_complex));
+            fftwf_complex * fft_out = fim_malloc(s * sizeof(fftwf_complex));
+            assert(fft_out != NULL);
             fftwf_plan plan = fftwf_plan_dft_r2c_1d(s,
                                                     fft_in, fft_out,
                                                     FFTW_ESTIMATE);
@@ -695,14 +708,15 @@ double * fft_bench_1d(int64_t from, int64_t to, int niter)
 
 
             fftwf_destroy_plan(plan);
-            fftwf_free(fft_out);
-            fftwf_free(fft_in);
+            free(fft_out);
+            free(fft_in);
         }
     }
     return t;
 }
 
-float fim_compare(const float * X, const float * Y,
+/* Only used for fft_ut. Should be renamed to fim_max_rel_error */
+static float fim_compare(const float * X, const float * Y,
                   size_t M, size_t N, size_t P)
 {
     float rel_err_max = -1;
@@ -722,7 +736,8 @@ float * test_data_rand(size_t M, size_t N, size_t P)
 {
     srand(time(NULL));
     size_t MNP = M*N*P;
-    float * X = fftwf_malloc(M*N*P*sizeof(float));
+    float * X = fim_malloc(M*N*P*sizeof(float));
+    assert(X != NULL);
     for(size_t kk = 0; kk<MNP; kk++)
     {
         X[kk] = 5 + (float) rand() / (float) RAND_MAX;
@@ -739,6 +754,8 @@ void test_inplace(void)
         size_t M = 51+(rand() % 10);
         size_t N = 25+(rand() % 10);
         size_t P = 20+(rand() % 10);
+        fft_train(M, N, P, 0, 8, stdout);
+
         //M = 2228; N = 2228; P = 208; // caused strange problems
         printf("Test image size: %zu %zu %zu\n", M, N, P);
         size_t MNP = M*N*P;
@@ -748,27 +765,34 @@ void test_inplace(void)
         printf("ifft\n");
         float * ffX = ifft(fX, M, N, P);
         float relerr_oo = fim_compare(X, ffX, M, N, P);
+        free(ffX);
         printf("fft:out-of-place ifft:out-of-place max_rel_err: %e\n", relerr_oo);
 
         /* Only forward inplace */
-        float * X2 = fftwf_malloc(M*N*P*sizeof(float));
+        float * X2 = fim_malloc(M*N*P*sizeof(float));
+        assert(X2 != NULL);
         memcpy(X2, X, M*N*P*sizeof(float));
         float * dummy1 = malloc(MNP);
+        assert(dummy1 != NULL);
         printf("fft_inplace\n");
         fftwf_complex * fX2 = fft_inplace(X2, M, N, P);
         float * dummy2 = malloc(MNP);
+        assert(dummy2 != NULL);
         printf("ifft\n");
         float * ffX2 = ifft(fX2, M , N, P);
         float relerr_io = fim_compare(X, ffX2, M, N, P);
         printf("fft:in-place ifft:out-of-place max_rel_err: %e\n", relerr_io);
 
         /* Forward inplace and backward inplace */
-        float * X3 = fftwf_malloc(M*N*P*sizeof(float));
+        float * X3 = fim_malloc(M*N*P*sizeof(float));
+        assert(X3 != NULL);
         float * dummy3 = malloc(MNP);
+        assert(dummy3 != NULL);
         memcpy(X3, X, M*N*P*sizeof(float));
         printf("fft_inplace\n");
         fftwf_complex * fX3 = fft_inplace(X3, M, N, P);
         float * dummy4 = malloc(MNP);
+        assert(dummy4 != NULL);
         printf("ifft_inplace\n");
         float * ffX3 = ifft_inplace(fX3, M , N, P);
         float relerr_ii = fim_compare(X, ffX3, M, N, P);
@@ -786,7 +810,6 @@ void test_inplace(void)
         free(ffX3);
         free(fX2);
         free(ffX2);
-        free(ffX);
         free(fX);
     }
     exit(EXIT_SUCCESS);
@@ -842,7 +865,7 @@ fftwf_complex * fft_and_free(float * restrict in,
         return F;
     } else {
         fftwf_complex * F = fft(in, n1, n2, n3);
-        fftwf_free(in);
+        free(in);
         return F;
     }
 }
@@ -856,7 +879,7 @@ float * ifft_and_free(fftwf_complex * F,
         return f;
     } else {
         float * f = ifft(F, n1, n2, n3);
-        fftwf_free(F);
+        free(F);
         return f;
     }
 }

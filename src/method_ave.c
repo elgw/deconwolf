@@ -95,7 +95,7 @@ static float iter_ave(
      }
 
      fftwf_complex * F_sn = fft(y, wM, wN, wP);
-     fftwf_free(y);
+     free(y);
 
      float * x = fft_convolve_cc_conj_f2(cK, F_sn, wM, wN, wP);
 
@@ -220,13 +220,13 @@ float * deconvolve_ave(float * restrict im,
      }
 
      // cK : "full size" fft of the PSF
-     float * Z = fftwf_malloc(wMNP*sizeof(float));
+     float * Z = fim_malloc(wMNP*sizeof(float));
      memset(Z, 0, wMNP*sizeof(float));
      /* Insert the psf into the bigger Z */
      fim_insert(Z, wM, wN, wP,
                 psf, pM, pN, pP);
 
-     fftwf_free(psf);
+     free(psf);
 
      /* Shift the PSF so that the mid is at (0,0,0) */
      int64_t midM, midN, midP = -1;
@@ -248,13 +248,13 @@ float * deconvolve_ave(float * restrict im,
 
      fftwf_complex * cK = fft(Z, wM, wN, wP);
      //fim_tiff_write("Z.tif", Z, wM, wN, wP);
-     fftwf_free(Z);
+     free(Z);
 
      putdot(s);
 
      /* <-- This isn't needed ...
         fftwf_complex * cKr = NULL;
-        float * Zr = fftwf_malloc(wMNP*sizeof(float));
+        float * Zr = fim_malloc(wMNP*sizeof(float));
         memset(Zr, 0, wMNP*sizeof(float));
         float * psf_flipped = malloc(wMNP*sizeof(float));
         memset(psf_flipped, 0, sizeof(float)*wMNP);
@@ -264,7 +264,7 @@ float * deconvolve_ave(float * restrict im,
         fim_circshift(Zr, wM, wN, wP, -(pM-1)/2, -(pN-1)/2, -(pP-1)/2);
         cKr = fft(Zr, wM, wN, wP);
         // Not needed since f(-x) = ifft(conf(fft(f)))
-        fftwf_free(Zr);
+        free(Zr);
         --> */
 
      //printf("initial guess\n"); fflush(stdout);
@@ -299,7 +299,7 @@ float * deconvolve_ave(float * restrict im,
      //writetif("W.tif", W, wM, wN, wP);
 
      // Original image -- expanded
-     //  float * G = fftwf_malloc(wMNP*sizeof(float));
+     //  float * G = fim_malloc(wMNP*sizeof(float));
      // memset(G, 0, wMNP*sizeof(float));
      // fim_insert(G, wM, wN, wP, im, M, N, P);
      //  writetif("G.tif", G, wM, wN, wP);
@@ -374,7 +374,7 @@ float * deconvolve_ave(float * restrict im,
          putdot(s);
 
          xp = xm;
-         fftwf_free(xp);
+         free(xp);
          double err = iter_ave(
                            &xp, // xp is updated to the next guess
                            im,
@@ -415,7 +415,7 @@ float * deconvolve_ave(float * restrict im,
 
      if(W != NULL)
      {
-         fftwf_free(W); // is P1
+         free(W); // is P1
      }
 
      if(s->fulldump)
@@ -429,21 +429,21 @@ float * deconvolve_ave(float * restrict im,
 
      //  printf("DEBUG: writing final_full_tif\n");
      //  fim_tiff_write("final_full.tif", x, wM, wN, wP);
-     fftwf_free(f);
+     free(f);
      if(x != NULL)
      {
-         fftwf_free(x); x = NULL;
+         free(x); x = NULL;
      }
      if(xm != NULL)
      {
-         fftwf_free(xm);
+         free(xm);
          xm = NULL;
      }
-     fftwf_free(g);
-     fftwf_free(gm);
-     fftwf_free(cK);
+     free(g);
+     free(gm);
+     free(cK);
      //  if(cKr != NULL)
-     //  { fftwf_free(cKr); }
-     fftwf_free(y);
+     //  { free(cKr); }
+     free(y);
      return out;
  }

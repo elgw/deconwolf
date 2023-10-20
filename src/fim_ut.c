@@ -5,6 +5,10 @@
 
 int main(int argc, char ** argv)
 {
-  fim_ut();
-  return 0;
+    if(argc > 1)
+    {
+        printf("WARNING: %s does not use any command line arguments\n", argv[0]);
+    }
+    fim_ut();
+    return EXIT_SUCCESS;
 }

@@ -14,9 +14,7 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef __method_ave_h__
-#define __method_ave_h__
-
+#pragma once
 #include "dw.h"
 
 /* Additive Vector Extrapolation (AVE) */
@@ -30,4 +28,3 @@ float * deconvolve_ave(float * restrict im,
 float alpha_ave(const float * restrict g,
                 const float * restrict gm,
                 const size_t wMNP, int mode);
-#endif

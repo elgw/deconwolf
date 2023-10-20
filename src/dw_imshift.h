@@ -1,5 +1,4 @@
-#ifndef _dw_imshift_h_
-#define _dw_imshift_h_
+#pragma once
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,5 +10,3 @@
 #include "dw_version.h"
 
 int dw_imshift(int argc, char ** argv);
-
-#endif

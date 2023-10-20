@@ -111,7 +111,7 @@
 
 
      fftwf_complex * F_sn = fft(y, wM, wN, wP); /* FFT#3 */
-     fftwf_free(y);
+     free(y);
      putdot(s);
      float * x = fft_convolve_cc_conj_f2(fftPSF, F_sn, wM, wN, wP); /* FFT#4 */
      putdot(s);
@@ -236,12 +236,12 @@
      /* 1. Expand the PSF to the job size,
       *    transform it and free the original allocation
       */
-     float * Z = fftwf_malloc(wMNP*sizeof(float));
+     float * Z = fim_malloc(wMNP*sizeof(float));
      memset(Z, 0, wMNP*sizeof(float));
      /* Insert the psf into the bigger Z */
      fim_insert(Z, wM, wN, wP,
                 psf, pM, pN, pP);
-     fftwf_free(psf);
+     free(psf);
 
      /* Shift the PSF so that the mid is at (0,0,0) */
      int64_t midM, midN, midP = -1;
@@ -262,7 +262,7 @@
      }
 
      fftwf_complex * fftPSF = fft(Z, wM, wN, wP);
-     fftwf_free(Z);
+     free(Z);
 
      putdot(s);
 
@@ -398,7 +398,7 @@
          putdot(s);
 
          xp = xm;
-         fftwf_free(xp);
+         free(xp);
          double err = iter_eve(
                                &xp, // xp is updated to the next guess
                                im,
@@ -468,31 +468,31 @@
 
      if(W != NULL)
      {
-         fftwf_free(W);
+         free(W);
      }
 
      fulldump(s, x, wM, wN, wP, "fulldump_x.tif");
 
 
-     fftwf_free(f);
+     free(f);
 
      if(xm != NULL)
      {
-         fftwf_free(xm);
+         free(xm);
          xm = NULL;
      }
 
-     fftwf_free(g);
-     fftwf_free(gm);
-     fftwf_free(fftPSF);
-     fftwf_free(y);
+     free(g);
+     free(gm);
+     free(fftPSF);
+     free(y);
 
      /* Extract the observed region from the last iteration */
      float * out = fim_subregion(x, wM, wN, wP, M, N, P);
 
      if(x != NULL)
      {
-         fftwf_free(x); x = NULL;
+         free(x); x = NULL;
      }
      return out;
  }

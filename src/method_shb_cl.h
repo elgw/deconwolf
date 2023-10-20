@@ -14,8 +14,7 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef __method_shb_cl_h__
-#define __method_shb_cl_h__
+#pragma once
 
 #include "dw.h"
 #include "cl_util.h"
@@ -38,5 +37,3 @@ float iter_shb_cl(
     const int64_t wM, const int64_t wN, const int64_t wP, // expanded size
     const int64_t M, const int64_t N, const int64_t P, // input image size
     __attribute__((unused)) const dw_opts * s);
-
-#endif

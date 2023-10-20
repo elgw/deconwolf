@@ -27,7 +27,7 @@ float * deconvolve_shb(float * restrict im,
 
     if(s->nIter == 0)
     {
-        fftw_free(psf);
+        free(psf);
         return fim_copy(im, M*N*P);
     }
 
@@ -111,7 +111,7 @@ float * deconvolve_shb(float * restrict im,
     }
 
     // cK : "full size" fft of the PSF
-    float * Z = fftwf_malloc(wMNP*sizeof(float));
+    float * Z = fim_malloc(wMNP*sizeof(float));
     memset(Z, 0, wMNP*sizeof(float));
     /* Insert the psf into the bigger Z */
     fim_insert(Z, wM, wN, wP,
@@ -256,7 +256,7 @@ float * deconvolve_shb(float * restrict im,
             x = xp;
             xp = t;
         }
-        //fftwf_free(p);
+        //free(p);
         /* Enforce a priori information about the lowest possible value */
         if(s->positivity)
         {
@@ -286,7 +286,7 @@ float * deconvolve_shb(float * restrict im,
 
     if(xp != NULL)
     {
-        fftwf_free(xp);
+        free(xp);
     }
 
     if(s->verbosity > 0) {
@@ -295,9 +295,9 @@ float * deconvolve_shb(float * restrict im,
 
     if(W != NULL)
     {
-        fftwf_free(W); /* Allocated as P1 */
+        free(W); /* Allocated as P1 */
     }
-    fftwf_free(cK);
+    free(cK);
 
     if(s->fulldump)
     {
@@ -309,7 +309,7 @@ float * deconvolve_shb(float * restrict im,
 
     if(x != NULL)
     {
-        fftwf_free(x);
+        free(x);
     }
 
 

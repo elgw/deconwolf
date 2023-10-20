@@ -30,6 +30,7 @@ static void argparsing(int argc, char ** argv, opts * s);
 static opts * opts_new()
 {
     opts * s = malloc(sizeof(opts));
+    assert(s != NULL);
 
     s->overwrite = 0;
     s->verbose = 1;
@@ -100,6 +101,7 @@ fim_t * fim_png_read_green_red(char * fname)
         png_bytep buffer;
         image.format = PNG_FORMAT_RGB;
         buffer = malloc(PNG_IMAGE_SIZE(image));
+
         if(buffer == NULL)
         {
             fprintf(stderr, "Unable to allocate memory for the image buffer\n");
@@ -112,10 +114,12 @@ fim_t * fim_png_read_green_red(char * fname)
             //printf("M=%zu, N=%zu image buffer %u b\n", M, N, PNG_IMAGE_SIZE(image));
 
             F = malloc(sizeof(fim_t));
+            assert(F != NULL);
             F->M = M;
             F->N = N;
             F->P = 1;
             F->V = malloc(M*N*sizeof(float));
+            assert(F->V != NULL);
             printf("Reading %s\n", fname); fflush(stdout);
             size_t nfg = 0;
             size_t nbg = 0;
@@ -215,6 +219,7 @@ static void argparsing(int argc, char ** argv, opts * s)
 float * transpose(const float * X, size_t M, size_t N)
 {
     float * Y = malloc(M*N*sizeof(float));
+    assert(Y != NULL);
     size_t pos = 0;
     for(size_t nn = 0; nn<N; nn++)
     {
@@ -230,6 +235,7 @@ float * transpose(const float * X, size_t M, size_t N)
 float * cm_append_column(float * A, size_t nrow, size_t ncol, const float * B)
 {
     float * AA = malloc(nrow*(ncol+1)*sizeof(float));
+    assert(AA != NULL);
     memcpy(AA, A,
            nrow*ncol*sizeof(float));
     memcpy(AA+nrow*ncol, B, nrow*sizeof(float));
@@ -256,6 +262,7 @@ float * subset_cm(float * A,
     }
 
     float * S = malloc(rows*ncol*sizeof(float));
+    assert(S != NULL);
     size_t writepos = 0;
     for(size_t cc = 0; cc<ncol; cc++)
     {
@@ -335,10 +342,12 @@ fim_t * get_reduction(opts * s, char * file)
         float * gm = fim_focus_gm(II, sigma);
         int slice = float_arg_max(gm, II->P);
         fim_t * result = malloc(sizeof(fim_t));
+        assert(result != NULL);
         result->M = M;
         result->N = N;
         result->P = 1;
         result->V = malloc(M*N*sizeof(float));
+        assert(result->V != NULL);
         memcpy(result->V, II->V+slice*M*N, M*N*sizeof(float));
         fim_free(II);
         if(s->verbose > 0)
@@ -367,6 +376,7 @@ void segment_image_rf(opts * s, PrfForest * F, char * file)
         return;
     }
     char * outfile = malloc(strlen(file) + 32);
+    assert(outfile != NULL);
     sprintf(outfile, "%s.mask.tif", file);
     printf("%s -> %s", file, outfile);
     if(dw_file_exist(outfile) && s->overwrite == 0)
@@ -378,9 +388,11 @@ void segment_image_rf(opts * s, PrfForest * F, char * file)
 
     /* Read the image */
     fim_t * redu = get_reduction(s, file);
+    assert(redu != NULL);
     printf("1\n"); fflush(stdout);
     /* Extract features */
     ftab_t * features = fim_features_2d(redu);
+    assert(features != NULL);
     printf("2\n"); fflush(stdout);
     /* Transpose to column-major */
     float * features_cm = transpose(features->T,
@@ -393,6 +405,7 @@ void segment_image_rf(opts * s, PrfForest * F, char * file)
     free(features_cm);
     printf("4\n"); fflush(stdout);
     float * result = malloc(redu->M*redu->N*sizeof(float));
+    assert(result != NULL);
     for(size_t kk = 0; kk < (size_t) (redu->M*redu->N); kk++)
     {
         if(class[kk] == 2)
@@ -459,6 +472,7 @@ PrfForest * loop_training_data(opts * s, float * features_cm,
 
         /* Read annotated image */
         fim_t * anno = fim_png_read_green_red(s->anno_label);
+        assert(anno != NULL);
 
         /* Append one columns for the annotations */
 
@@ -505,6 +519,7 @@ PrfForest * loop_training_data(opts * s, float * features_cm,
 
 
         float * result = malloc(anno->M*anno->N*sizeof(float));
+        assert(result != NULL);
         for(size_t kk = 0; kk < anno->M*anno->N; kk++)
         {
             if(class[kk] == 2)
@@ -536,7 +551,7 @@ PrfForest * loop_training_data(opts * s, float * features_cm,
         }
         free(features_cma);
         free(features_cma_train);
-        free(anno);
+        fim_free(anno);
         free(result);
     }
 

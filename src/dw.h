@@ -14,8 +14,7 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef deconwolf_h
-#define deconwolf_h
+#pragma once
 
 #include <assert.h>
 #include <inttypes.h>
@@ -309,6 +308,3 @@ void dw_iterator_free(dw_iterator_t * );
 #include "method_rl.h"
 #include "method_ave.h"
 #include "method_shb.h"
-
-
-#endif

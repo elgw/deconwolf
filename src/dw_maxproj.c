@@ -15,7 +15,7 @@ typedef struct{
 opts * opts_new()
 {
     opts * s = malloc(sizeof(opts));
-
+    assert(s != NULL);
     s->mode = MODE_MAX;
     s->overwrite = 0;
     s->verbose = 1;
@@ -101,6 +101,7 @@ static char * get_outfile_name_for_max(const char * inFile)
     char * _fname = strdup(inFile);
     char * fname = basename(_fname);
     char * outFile = malloc(strlen(inFile) + 20);
+    assert(outFile != NULL);
     sprintf(outFile, "%s/max_%s", dname, fname);
     free(_dname);
     free(_fname);

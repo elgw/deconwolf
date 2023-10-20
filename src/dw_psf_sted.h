@@ -1,6 +1,4 @@
-#ifndef __dw_psf_sted_h__
-#define __dw_psf_sted_h__
-
+#pragma once
 
 #include <getopt.h>
 #include <libgen.h>
@@ -22,5 +20,3 @@
 
 /* Command line interface */
 int dw_psf_sted_cli(int argc, char ** argv);
-
-#endif

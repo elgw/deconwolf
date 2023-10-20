@@ -44,15 +44,12 @@ At the moment we don't provide pre-built packages. You will have to build
 deconwolf from the source code, instructions follows below.
 
 ## Build and install
-Deconwolf runs on 64-bit machines with x86_64 architecture and require
-no special hardware. Installation instructions for Ubuntu can be found
-below, for macOS, Windows 10, FreeBSD, CentOS etc, see
-[INSTALL.md](INSTALL.md).  To compile and install deconwolf should
-take less than a minute on any platform with a normal computer.
-However to the dependencies is estimated take up to an hour MacOS (due
-to installing Xcode) and Windows due to the extra work of manually
-copying dependencies. We hope to provide pre-compiled version in the
-future.
+Deconwolf runs on 64-bit machines with, both aarch64 and x86_64, and
+require no special hardware. To compile and install deconwolf should
+take less than a minute on a Linux machine but might be more
+cumbersome on MacOS and Windows. For platform specific build
+instructions, see [INSTALL.md].  We hope to provide pre-compiled
+version in the future.
 
 ### Dependencies
 Deconwolf uses:
@@ -72,7 +69,7 @@ If these libraries are available for your platform, chances are that that it can
 be built. FFTW can also be replaced by Intel MKL or NVIDIA CUFFTW.
 
 
-### Ubuntu 20.04 (or Windows with WSL)
+### Ubuntu 22.04 (or Windows with WSL)
 For other platforms, see [INSTALL.md](INSTALL.md).
 
 First install the required packages:
@@ -86,8 +83,7 @@ sudo apt-get install pkg-config
 sudo apt-get install libfftw3-single3
 sudo apt-get install libfftw3-dev
 sudo apt-get install openmp libomp-dev
-sudo apt-get install tiff-5      # or possibly the next line
-sudo apt-get install libtiff-dev # for older versions of Ubuntu
+sudo apt-get install libtiff-dev
 sudo apt-get install libgsl-dev
 sudo apt-get install libpng-dev
 ```
@@ -117,17 +113,15 @@ dw --help
 dw_bw --help
 ```
 
-There is a single nuclei in the `/demo/dapi_001.tif` folder, to
-deconvolve just run:
+To validate that dw does what it should, run it on `/demo/dapi_001.tif`:
 
 ``` shell
 cd demo
 make
 imagej dapi_001.tif dw_dapi_001.tif
 ```
-The run time on an AMD 3700x was 38s the first time. The second time you run it fftw3
-will already know how to handle this specific image size and the run time was
-6 s on the same machine.
+
+The run time on an AMD 3700x was 8s.
 
 For more documentation see the short [usage guide](USAGE.md), and the manual
 pages for both binaries, [man dw](doc/dw.txt) [man dw_bw](doc/dw_bw.txt).

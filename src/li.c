@@ -27,7 +27,8 @@ void li_show(li_conf * L)
 
 li_conf * li_new(double z)
 {
-    li_conf * L = malloc(sizeof(li_conf));
+    li_conf * L = calloc(1, sizeof(li_conf));
+    assert(L != NULL);
 
     /* These can be changed by the user */
     L->z = z;
@@ -154,7 +155,9 @@ double complex li_calc(li_conf * L, const double r)
         gsl_linalg_SV_solve(U, V, S, Fimag, Cimag);
 
         L->Creal = malloc(L->M*sizeof(double));
+        assert(L->Creal != NULL);
         L->Cimag = malloc(L->M*sizeof(double));
+        assert(L->Cimag != NULL);
 
         for(int kk = 0; kk < L->N; kk++)
         {

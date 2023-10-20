@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## 0.3.2
+- Tested on raspberry pi 4 using 64-bit bookworm.
+- Found a bug in `fft.c` where `memcpy` was used wrongly (replaced by
+  `memmove`). Strangely that bug never manifested under
+  Ubuntu/x86_64.
+- Added **fim_realloc** for aligned reallocs. This function could be
+  branched depending on the OS since there are platform specific
+  aligned reallocation functions.
+- Header files: Using `#pragma once` instead of the `#ifndef file_h_`
+  pattern.
+
+## 0.3.1
+- Introduced **fim_malloc** for all allocations that might benefit
+  from a stricter alignment than malloc provides by default. Tested
+  with `MADV_HUGEPAGE` for the allocations but the results are
+  inconclusive (but it uses more RAM when enabled). Cleared all uses
+  of `fftw_free` and `fftw_malloc`.
+
 ## 0.3.0
 - Respects the NO_COLOR environmental variable in accord with https://no-color.org/.
 - Fixed correct capping of pixel values when **--scaling** is used.

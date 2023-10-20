@@ -3,6 +3,7 @@
 bw_gsl_conf_t * bw_gsl_new(size_t limit)
 {
     bw_gsl_conf_t * conf = malloc(sizeof(bw_gsl_conf_t));
+    assert(conf != NULL);
     conf->limit = limit;
     conf->ncalls = 0;
     conf->epsabs = 1e-6; /* 1e-9 would not work ... */

@@ -17,8 +17,7 @@
 /* Floating point-only table stored in row-major format.
 */
 
-#ifndef __ftab_h__
-#define __ftab_h__
+#pragma once
 
 #include <assert.h>
 #include <inttypes.h>
@@ -82,5 +81,3 @@ int ftab_set_coldata(ftab_t * T, int col, const float * data);
 
 /* Keep n head rows */
 void ftab_head(ftab_t * T, int64_t n);
-
-#endif

@@ -71,13 +71,9 @@ static double gamma_from_fwhm_lorentz2(double fwhm)
 
 static opts * opts_new()
 {
-    opts * s = malloc(sizeof(opts));
-
-    s->overwrite = 0;
+    opts * s = calloc(1, sizeof(opts));
+    assert(s != NULL);
     s->verbose = 1;
-    s->outfile = NULL;
-    s->logfile = NULL;
-    s->log = NULL;
     s->nthreads = dw_get_threads();
 
     s->M = 81;

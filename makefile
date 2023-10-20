@@ -10,7 +10,7 @@
 #
 # To build with clang, specify CC=clang
 
-CC?=gcc
+CC=gcc -std=gnu11
 # CC=clang # also requires the package libomp-14-dev
 
 UNAME_S := $(shell uname -s)
@@ -19,7 +19,7 @@ $(info Host type: $(UNAME_S))
 dw = bin/dw
 dwbw = bin/dw_bw
 
-CFLAGS = -Wall -Wextra -std=gnu99
+CFLAGS = -Wall -Wextra
 
 CC_VERSION = "$(shell $(CC) --version | head -n 1)"
 GIT_VERSION = "$(shell git log --pretty=format:'%aD:%H' -n 1)"
@@ -36,9 +36,9 @@ DEBUG?=0
 ifeq ($(DEBUG),1)
     # TODO: only compiles with flto on, why?
     # TODO: does not compile without -O1 or above
-    CFLAGS += -O1 -g3 -Wno-unknown-pragmas -flto
+    CFLAGS += -O3 -Wno-unknown-pragmas -fanalyzer
 else
-    CFLAGS += -O3 -Wno-unknown-pragmas -flto
+    CFLAGS += -O3 -flto=auto
     # -O2 -ftree-vectorize and -O3 give about the same performance
     # -DNDEBUG will not make it faster so don't use it
     # -fno-math-errno no relevant performance gain
