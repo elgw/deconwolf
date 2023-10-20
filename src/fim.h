@@ -93,7 +93,7 @@ fim_t * fimt_zeros(size_t M, size_t N, size_t P);
  * @return A newly allocated fim_t which contains a copy of V
  *
  */
-fim_t * fim_image_from_array(const float * V,
+fim_t * fim_image_from_array(const float * restrict V,
                              size_t M, size_t N, size_t P);
 
 /* Return a new copy */
@@ -105,10 +105,10 @@ double * fim_get_line_double(fim_t * Im,
                              int dim, int nPix);
 
 /* Similar to MATLABs shiftfim, [M,N,P] -> [N,P,M] */
-fim_t * fim_shiftdim(const fim_t *);
+fim_t * fim_shiftdim(const fim_t * restrict );
 
 /* [M, N, P] -> [N, M, P] */
-fim_t * fimt_transpose(const fim_t * );
+fim_t * fimt_transpose(const fim_t * restrict);
 
 /* Partial derivative along dimension dim */
 fim_t * fimt_partial(const fim_t *, int dim, float sigma);
@@ -133,9 +133,9 @@ float fimt_sum(fim_t * );
  * API not using fim_t
  */
 
-float fim_min(const float * A, size_t N);
-float fim_mean(const float * A, size_t N);
-float fim_max(const float * A, size_t N);
+float fim_min(const float * restrict A, size_t N);
+float fim_mean(const float * restrict A, size_t N);
+float fim_max(const float * restrict A, size_t N);
 float fim_sum(const float * restrict A, size_t N);
 
 /* Standard deviation, normalizing by (N-1) */

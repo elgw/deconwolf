@@ -117,7 +117,7 @@ void fim_free(fim_t * F)
     return;
 }
 
-fim_t * fim_image_from_array(const float * V, size_t M, size_t N, size_t P)
+fim_t * fim_image_from_array(const float * restrict V, size_t M, size_t N, size_t P)
 {
     fim_t * I = malloc(sizeof(fim_t));
     assert(I != NULL);
@@ -296,12 +296,12 @@ float fim_sum_double(const double * restrict A, size_t N)
 }
 
 
-float fim_mean(const float * A, size_t N)
+float fim_mean(const float * restrict A, size_t N)
 {
     return fim_sum(A, N)/(float) N;
 }
 
-float fim_min(const float * A, size_t N)
+float fim_min(const float * restrict A, size_t N)
 {
     float amin = A[0];
 #pragma omp parallel for reduction(min:amin)
@@ -363,7 +363,7 @@ void fim_add(float * restrict  A,
 }
 
 
-float fim_max(const float * A, size_t N)
+float fim_max(const float * restrict A, size_t N)
 {
     float amax = A[0];
 #pragma omp parallel for reduction(max:amax)
@@ -2802,7 +2802,7 @@ double * fim_get_line_double(fim_t * I,
     return L;
 }
 
-fim_t * fim_shiftdim(const fim_t * I)
+fim_t * fim_shiftdim(const fim_t * restrict I)
 {
     const float * V = I->V;
     const size_t M = I->M;
@@ -3275,7 +3275,7 @@ void fim_ut()
     myfftw_stop();
 }
 
-fim_t * fimt_transpose(const fim_t * A)
+fim_t * fimt_transpose(const fim_t * restrict A)
 {
     fim_t * B = fimt_copy(A);
     size_t M = A->M;
