@@ -40,6 +40,7 @@ float * deconvolve_shb(float * restrict im,
         {
             printf("Setting the background level to %f\n", s->bg);
         }
+        fprintf(s->log, "Setting the background level to %f\n", s->bg);
     }
 
 
@@ -161,6 +162,23 @@ float * deconvolve_shb(float * restrict im,
             }
         }
         W = P1;
+        if(0){
+        printf("\n\nTesting\n\n");
+        for(size_t kk = 0; kk<wMNP; kk++)
+        {
+            P1[kk] = 0;
+        }
+        for(int mm = 0; mm<M; mm++)
+        {
+            for(int nn = 0; nn<N; nn++)
+            {
+                for(int pp = 0; pp<P; pp++)
+                {
+                    P1[mm + wM*nn + wM*wN*pp] = 1;
+                }
+            }
+        }
+        }
     }
 
     float sumg = fim_sum(im, M*N*P);
