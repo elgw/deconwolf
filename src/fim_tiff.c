@@ -135,7 +135,7 @@ void floatimage_normalize(float * restrict I, const size_t N)
     // Scale image to span the whole 16 bit range.
     float imax = I[0]; float imin = I[0];
     int ok = 1;
-//#pragma omp parallel for reduction(min:imin) reduction(max:imax) shared(I)
+    //#pragma omp parallel for reduction(min:imin) reduction(max:imax) shared(I)
     for(size_t kk=0; kk<N; kk++)
     {
         if(!isfinite(I[kk]))
@@ -307,9 +307,9 @@ void readUint16(TIFF * tfile, float * V,
                 const uint32_t ndirs,
                 const uint32_t  __attribute__((__unused__)) nstrips,
                 const uint32_t perDirectory
-    )
+                )
 {
-//    printf("readUint16\n"); fflush(stdout);
+    //    printf("readUint16\n"); fflush(stdout);
     // Number of elements per strip
     //size_t nes = ssize/sizeof(uint16_t);
     //  uint16_t * buf = _TIFFmalloc(ssize);
@@ -379,7 +379,7 @@ void readUint8(TIFF * tfile, float * V,
                const uint32_t ndirs,
                const uint32_t nstrips,
                const uint32_t perDirectory
-    )
+               )
 {
     // Number of elements per strip
     size_t nes = ssize/sizeof(uint8_t);
@@ -437,7 +437,7 @@ void readFloat(TIFF * tfile, float * V,
                uint32_t ndirs,
                uint32_t nstrips,
                uint32_t perDirectory
-    )
+               )
 {
     // Number of elements per strip
     size_t nes = ssize/sizeof(float);
@@ -1080,20 +1080,12 @@ float * fim_tiff_read(const char * fName,
 
 ttags * ttags_new()
 {
-    ttags * T  = malloc(sizeof(ttags));
+    ttags * T  = calloc(1, sizeof(ttags));
     assert(T != NULL);
     T->xresolution = 1;
     T->yresolution = 1;
     T->zresolution = 1;
-    T->imagedescription = NULL;
-    T->software = NULL;
     T->resolutionunit = RESUNIT_NONE;
-    T->IJIJinfo = NULL;
-    T->nIJIJinfo = 0;
-    // Image size MxNxP
-    T->M = 0;
-    T->N = 0;
-    T->P = 0;
     return T;
 }
 
@@ -1119,10 +1111,9 @@ void ttags_set_pixelsize(ttags * T, double xres, double yres, double zres)
     T->xresolution = 1/xres; // Pixels per nm
     T->yresolution = 1/yres;
     T->zresolution = zres; // nm
-    if(T->imagedescription)
-    {
-        free(T->imagedescription);
-    }
+
+    free(T->imagedescription);
+
     T->imagedescription = malloc(1024);
     assert(T->imagedescription != NULL);
     sprintf(T->imagedescription,
