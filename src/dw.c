@@ -14,10 +14,7 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-
 #include "dw.h"
-
-
 
 /* GLOBALS */
 /* used by tiffErrHandler */
@@ -248,8 +245,8 @@ void dw_show_iter(dw_opts * s, int it, int nIter, float err)
 
 
 char * gen_iterdump_name(
-    __attribute__((unused)) const dw_opts * s,
-    int it)
+                         __attribute__((unused)) const dw_opts * s,
+                         int it)
 {
     // Generate a name for the an iterdump file
     // at iteration it
@@ -1629,9 +1626,10 @@ float * psf_autocrop(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  // 
 }
 
 
-int deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
-                     const float * restrict psf, const int64_t pM, const int64_t pN, const int64_t pP,
-                     dw_opts * s)
+static int
+deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
+                 const float * restrict psf, const int64_t pM, const int64_t pN, const int64_t pP,
+                 dw_opts * s)
 {
 
     tiling * T = tiling_create(M,N,P, s->tiling_maxSize, s->tiling_padding);
@@ -1681,7 +1679,7 @@ int deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
     fim_tiff_to_raw(s->imFile, imFileRaw);
     if(0){
         printf("Writing to imdump.tif\n");
-        fim_tiff_from_raw("imdump.tif", M, N, P, imFileRaw);
+        fim_tiff_from_raw("imdump.tif", M, N, P, imFileRaw, NULL);
     }
 
     //fim_tiff_write_zeros(s->outFile, M, N, P);
@@ -1749,7 +1747,8 @@ int deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
     {
         printf("converting %s to %s\n", tfile, s->outFile);
     }
-    fim_tiff_from_raw(s->outFile, M, N, P, tfile);
+
+    fim_tiff_from_raw(s->outFile, M, N, P, tfile, s->imFile);
 
     if(s->verbosity < 5)
     {
@@ -1942,8 +1941,6 @@ double get_nbg(float * I, size_t N, float bg)
 }
 
 
-
-
 void flatfieldCorrection(dw_opts * s, float * im, int64_t M, int64_t N, int64_t P)
 {
     printf("Experimental: applying flat field correction using %s\n", s->flatfieldFile);
@@ -1984,13 +1981,36 @@ void prefilter(dw_opts * s,
     return;
 }
 
-int dw_run(dw_opts * s)
+/** Create initial guess: the fft of an image that is 1 in MNP and 0
+ * outside M, N, P is the dimension of the microscopic image
+ *
+ * Possibly more stable to use the mean of the input image rather than 1
+ */
+fftwf_complex * initial_guess(const int64_t M, const int64_t N, const int64_t P,
+                              const int64_t wM, const int64_t wN, const int64_t wP)
 {
-    struct timespec tstart, tend;
-    clock_gettime(CLOCK_REALTIME, &tstart);
-    dcw_init_log(s);
+    assert(wM >= M); assert(wN >= N); assert(wP >= P);
 
+    float * one = fim_zeros(wM*wN*wP);
 
+#pragma omp parallel for shared(one)
+    for(int64_t cc = 0; cc < P; cc++) {
+        for(int64_t bb = 0; bb < N; bb++) {
+            for(int64_t aa = 0; aa < M; aa++) {
+                one[aa + wM*bb + wM*wN*cc] = 1;
+            }
+        }
+    }
+    //  writetif("one.tif", one, wM, wN, wP);
+
+    fftwf_complex * Fone = fft(one, wM, wN, wP);
+
+    free(one);
+    return Fone;
+}
+
+static void dw_set_omp_threads(const dw_opts *s)
+{
 #ifdef _OPENMP
 #ifdef MKL
     mkl_set_num_threads(s->nThreads_FFT);
@@ -2006,6 +2026,14 @@ int dw_run(dw_opts * s)
     //omp_set_schedule(omp_sched_guided, 0);
 #endif
 #endif
+    return;
+}
+
+int dw_run(dw_opts * s)
+{
+    struct timespec tstart, tend;
+    clock_gettime(CLOCK_REALTIME, &tstart);
+    dcw_init_log(s);
 
     if(s->verbosity > 1)
     {
@@ -2014,6 +2042,7 @@ int dw_run(dw_opts * s)
     }
 
     s->verbosity > 1 ? dw_fprint_info(NULL, s) : 0;
+    dw_set_omp_threads(s);
 
     logfile = stdout;
 
@@ -2023,7 +2052,6 @@ int dw_run(dw_opts * s)
     {
         fim_tiff_set_log(s->log);
     }
-
 
     int64_t M = 0, N = 0, P = 0;
     if(fim_tiff_get_size(s->imFile, &M, &N, &P))
@@ -2047,7 +2075,6 @@ int dw_run(dw_opts * s)
     {
         tiling = 1;
     }
-
 
     float * im = NULL;
     ttags * T = ttags_new();
@@ -2073,6 +2100,7 @@ int dw_run(dw_opts * s)
             }
             printf("Done reading\n"); fflush(stdout);
         }
+
         if(fim_min(im, M*N*P) < 0)
         {
             printf("min value of the image is %f, shifting to 0\n", fim_min(im, M*N*P));
@@ -2117,39 +2145,29 @@ int dw_run(dw_opts * s)
 
     int64_t pM = 0, pN = 0, pP = 0;
     float * psf = NULL;
-    if(1){
-        if(s->verbosity > 0)
-        {
-            printf("Reading %s\n", s->psfFile);
-        }
-        psf = fim_tiff_read(s->psfFile, NULL, &pM, &pN, &pP, s->verbosity);
-        if(psf == NULL)
-        {
-            fprintf(stderr, "Failed to open %s\n", s->psfFile);
-            exit(1);
-        }
-        if(s->verbosity > 4)
-        {
-            if(M > 9)
-            {
-                printf("image data: ");
-                for(size_t kk = 0; kk<10; kk++)
-                {
-                    printf("%f ", psf[kk]);
-                }
-                printf("\n");
-            }
-        }
-    } else {
-        pM = 3; pN = 3; pP = 3;
-        psf = malloc(27*sizeof(float));
-        assert(psf != NULL);
-        memset(psf, 0, 27*sizeof(float));
-        psf[13] = 1;
-    }
 
-    //psf = psf_makeOdd(psf, &pM, &pN, &pP);
-    //psf = psf_autocrop_centerZ(psf, &pM, &pN, &pP, s);
+    if(s->verbosity > 0)
+    {
+        printf("Reading %s\n", s->psfFile);
+    }
+    psf = fim_tiff_read(s->psfFile, NULL, &pM, &pN, &pP, s->verbosity);
+    if(psf == NULL)
+    {
+        fprintf(stderr, "Failed to open %s\n", s->psfFile);
+        exit(1);
+    }
+    if(s->verbosity > 4)
+    {
+        if(M > 9)
+        {
+            printf("image data: ");
+            for(size_t kk = 0; kk<10; kk++)
+            {
+                printf("%f ", psf[kk]);
+            }
+            printf("\n");
+        }
+    }
 
     if(fim_maxAtOrigo(psf, pM, pN, pP) == 0)
     {
@@ -2211,7 +2229,8 @@ int dw_run(dw_opts * s)
             warning(stdout);
             printf("Flat-field correction can't be used in tiled mode\n");
         }
-        deconvolve_tiles(M, N, P, psf, pM, pN, pP, // psf and size
+        deconvolve_tiles(M, N, P,
+                         psf, pM, pN, pP, // psf and size
                          s);// settings
         free(psf);
     } else {
@@ -2283,7 +2302,7 @@ int dw_run(dw_opts * s)
         printf("Finalizing "); fflush(stdout);
     }
 
-    if(out != NULL) free(out);
+    free(out);
     myfftw_stop();
 
 
@@ -2291,50 +2310,13 @@ int dw_run(dw_opts * s)
     fprintf(s->log, "Took: %f s\n", timespec_diff(&tend, &tstart));
     dcw_close_log(s);
 
-    if(s->verbosity > 1) fprint_peakMemory(NULL);
+    if(s->verbosity > 1)
+    { fprint_peakMemory(NULL); }
 
     if(s->verbosity > 0)
-    {
-        printf("Done!\n");
-        /*
-          stdout = fdopen(0, "w");
-          setlocale(LC_CTYPE, "");
-          //wchar_t star = 0x2605;
-          wchar_t star = 0x2728;
-          wprintf(L"%lc Done!\n", star);
-          stdout = fdopen(0, "w");
-        */
-    }
+    { printf("Done!\n"); }
+
     dw_opts_free(&s);
 
     return 0;
-}
-
-fftwf_complex * initial_guess(const int64_t M, const int64_t N, const int64_t P,
-                              const int64_t wM, const int64_t wN, const int64_t wP)
-{
-    /* Create initial guess: the fft of an image that is 1 in MNP and 0 outside
-     * M, N, P is the dimension of the microscopic image
-     *
-     * Possibly more stable to use the mean of the input image rather than 1
-     */
-
-    assert(wM >= M); assert(wN >= N); assert(wP >= P);
-
-    float * one = fim_zeros(wM*wN*wP);
-
-#pragma omp parallel for shared(one)
-    for(int64_t cc = 0; cc < P; cc++) {
-        for(int64_t bb = 0; bb < N; bb++) {
-            for(int64_t aa = 0; aa < M; aa++) {
-                one[aa + wM*bb + wM*wN*cc] = 1;
-            }
-        }
-    }
-    //  writetif("one.tif", one, wM, wN, wP);
-
-    fftwf_complex * Fone = fft(one, wM, wN, wP);
-
-    free(one);
-    return Fone;
 }

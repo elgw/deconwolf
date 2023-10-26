@@ -343,9 +343,9 @@ void readUint16(TIFF * tfile, float * V,
             //printf("Reading strip %ld of size %ld B\n", ss, ssize); fflush(stdout);
             // vs TIFFReadEncodedStrip vs TIFFReadRawStrip ?
             tsize_t read = TIFFReadEncodedStrip(tfile,
-                                            (tstrip_t) ss, // Strip number
-                                            (tdata_t) buf, // target
-                                            (tsize_t) -1); // The entire strip
+                                                (tstrip_t) ss, // Strip number
+                                                (tdata_t) buf, // target
+                                                (tsize_t) -1); // The entire strip
             //printf("Got %ld\n", read);
             if(read == -1)
             {
@@ -694,10 +694,11 @@ int fim_tiff_to_raw(const char * fName, const char * oName)
     return 0;
 }
 
+
 int fim_tiff_from_raw(const char * fName, // Name of tiff file to be written
                       int64_t M, int64_t N, int64_t P, // Image dimensions
-                      const char * rName) // name of raw file
-/* Convert a raw float file to uint16 tif */
+                      const char * rName,  // name of raw file
+                      const char * meta_tiff_file)
 {
 
     size_t bytesPerSample = sizeof(uint16_t);
@@ -709,13 +710,27 @@ int fim_tiff_from_raw(const char * fName, // Name of tiff file to be written
         fprintf(fim_tiff_log, "fim_tiff WARNING: File is > 2 GB, using BigTIFF format\n");
     }
 
+    ttags * tags = NULL;
+    if(meta_tiff_file != NULL)
+    {
+        tags = ttags_new();
+        TIFF * ref = TIFFOpen(meta_tiff_file, "r");
+        if(ref)
+        {
+            ttags_get(ref, tags);
+            TIFFClose(ref);
+        }
+    }
+
     TIFF * out = TIFFOpen(fName, formatString);
     // printf("Opened %s for writing using formatString: %s\n", fName, formatString);
 
     if(out == NULL)
     {
-        fprintf(stderr, "fim_tiff ERROR: Failed to open %s for writing using formatString: %s\n", fName, formatString);
-        exit(1);
+        fprintf(stderr,
+                "fim_tiff ERROR: Failed to open %s for writing using "
+                "formatString: %s\n", fName, formatString);
+        exit(EXIT_FAILURE);
     }
 
     size_t linbytes = M*bytesPerSample;
@@ -749,6 +764,10 @@ int fim_tiff_from_raw(const char * fName, // Name of tiff file to be written
 
     for(size_t dd = 0; dd < (size_t) P; dd++)
     {
+        if(tags)
+        {
+            ttags_set(out, tags);
+        }
 
         TIFFSetField(out, TIFFTAG_IMAGEWIDTH, M);  // set the width of the image
         TIFFSetField(out, TIFFTAG_IMAGELENGTH, N);    // set the height of the image
@@ -764,7 +783,6 @@ int fim_tiff_from_raw(const char * fName, // Name of tiff file to be written
         TIFFSetField(out, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
         /* Set the page number */
         TIFFSetField(out, TIFFTAG_PAGENUMBER, dd, P);
-
 
         for(size_t nn = 0; nn < (size_t) N; nn++)
         {
@@ -795,6 +813,12 @@ int fim_tiff_from_raw(const char * fName, // Name of tiff file to be written
     TIFFClose(out);
     fclose(rf);
     free(rbuf);
+
+    if(tags)
+    {
+        ttags_free(&tags);
+    }
+
     return 0;
 }
 
@@ -1115,20 +1139,17 @@ void ttags_free(ttags ** Tp)
         fprintf(stderr, "fim_tiff: T = NULL, on line %d in %s\n", __LINE__, __FILE__);
         exit(EXIT_FAILURE);
     }
-    if(T->software != NULL)
-    {
-        free(T->software);
-    }
 
-    if(T->imagedescription != NULL)
-    {
-        free(T->imagedescription);
-    }
+    free(T->IJIJinfo);
+    free(T->software);
+    free(T->imagedescription);
     free(T);
 }
 
-void ttags_set_software(ttags * T, char * sw)
+void ttags_set_software(ttags * T,
+                        const char * sw)
 {
+    assert(T != NULL);
     if(T->software != NULL)
     {
         free(T->software);
@@ -1141,7 +1162,8 @@ void ttags_set_software(ttags * T, char * sw)
 void ttags_get(TIFF * tfile, ttags * T)
 {
     // https://docs.openmicroscopy.org/ome-model/5.6.3/ome-tiff/specification.html
-    // a string of OME-XML metadata embedded in the ImageDescription tag of the first IFD (Image File Directory) of each file. The XML string must be UTF-8 encoded.
+    // a string of OME-XML metadata embedded in the ImageDescription tag of
+    // the first IFD (Image File Directory) of each file. The XML string must be UTF-8 encoded.
 
     T->xresolution = 1;
     T->yresolution = 1;
@@ -1183,44 +1205,12 @@ void ttags_get(TIFF * tfile, ttags * T)
         strcpy(T->software, software);
         //    printf("! Got software tag: %s\n", T->software);
     }
-
-#if 0
-    /*
-     * From https://github.com/imagej/ImageJA/blob/master/src/main/java/ij/io/TiffDecoder.java
-     * 	public static final int META_DATA_BYTE_COUNTS = 50838; // private tag registered with Adobe
-     *      public static final int META_DATA = 50839; // private tag registered with Adobe
-     */
-
-    uint32_t count;
-    void * data;
-    if(TIFFGetField(tfile, XTAG_IJIJUNKNOWN, &count, &data))
-    {
-        uint32_t * dvalue  = (uint32_t*) data;
-
-        for(int kk = 0; kk<count; kk++)
-        {
-            fprintf(fim_tiff_log, "Tag %d: %d, count %d\n", XTAG_IJIJUNKNOWN, dvalue[kk], count);
-        }
-    }
-
-    T->nIJIJinfo = 0;
-    T->IJIJinfo = NULL;
-    if(TIFFGetField(tfile, XTAG_IJIJINFO, &count, &data))
-    {
-        T->nIJIJinfo = count;
-        T->IJIJinfo = malloc(count);
-        assert(T->IJIJinfo != NULL);
-        memcpy(T->IJIJinfo, data, count);
-        uint8_t * udata = (uint8_t*) data;
-        for(int kk = 0; kk<count; kk++)
-        { fprintf(fim_tiff_log, "%02d %c %u\n ", kk, udata[kk], udata[kk]);};
-    }
-#endif
+    return;
 }
 
 void ttags_set(TIFF * tfile, ttags * T)
 {
-    TIFFSetDirectory(tfile, 0);
+    //TIFFSetDirectory(tfile, 0);
     if(T->software != NULL)
     {
         TIFFSetField(tfile, TIFFTAG_SOFTWARE, T->software);
@@ -1230,36 +1220,6 @@ void ttags_set(TIFF * tfile, ttags * T)
     {
         TIFFSetField(tfile, TIFFTAG_IMAGEDESCRIPTION, T->imagedescription);
     }
-
-#if 0
-    if(T->nIJIJinfo > 0)
-    {
-        static TIFFFieldInfo xtiffFieldInfo[] =
-            {
-                { XTAG_IJIJUNKNOWN,TIFF_VARIABLE, TIFF_VARIABLE, TIFF_LONG, FIELD_CUSTOM,
-                  0, 1, "IJIJunknown" },
-                { XTAG_IJIJINFO, TIFF_VARIABLE, TIFF_VARIABLE, TIFF_ASCII, FIELD_CUSTOM,
-                  1, 0, "IJIJinfo" }
-            };
-
-        // Guessing that ImageJ requires IJIJinfo to be of type ASCII
-        // Can't write the full string using ASCII since \0 are used
-        // to determine the length of the data.
-        // Using TIFF_BYTE confuses ImageJ
-        // Can't get direct access with TIFFGetField; it returns a copy
-
-        TIFFMergeFieldInfo(tfile, xtiffFieldInfo, 2*sizeof(TIFFFieldInfo));
-
-        uint32_t  avalue[] = {12, 80};
-        TIFFSetField(tfile, XTAG_IJIJUNKNOWN, 2, &avalue);
-        fprintf(fim_tiff_log, "fim_tiff: -> nIJINFO: %d bytes", T->nIJIJinfo);
-        TIFFSetField(tfile, XTAG_IJIJINFO, T->IJIJinfo, T->nIJIJinfo);
-
-        char * readback = NULL;
-        TIFFGetField(tfile, XTAG_IJIJINFO, &readback);
-        fprintf(fim_tiff_log, "fim_tiff: readback: %s\n", readback);
-    }
-#endif
 
     TIFFSetField(tfile, TIFFTAG_XRESOLUTION, T->xresolution);
     TIFFSetField(tfile, TIFFTAG_YRESOLUTION, T->yresolution);

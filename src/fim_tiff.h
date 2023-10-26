@@ -25,7 +25,7 @@
  *
  * TODO:
  * Flags to dw_write_tif for scaling on/off
-*/
+ */
 
 #pragma once
 
@@ -66,14 +66,22 @@ typedef struct{
     int P;
 } ttags;
 
-// new with everything set to defaults
+/** ttags new with everything set to defaults */
 ttags * ttags_new();
+
+/** Parse metadata from a open tif file */
 void ttags_get(TIFF *, ttags *);
 void ttags_show(FILE *, ttags *);
 void ttags_set(TIFF *, ttags *);
-void ttags_set_software(ttags * , char *);
+
+/** @brief Set software tag to S */
+void ttags_set_software(ttags * ,
+                        const char * S);
+
 void ttags_set_imagesize(ttags *, int M, int N, int P);
 void ttags_set_pixelsize(ttags *, double, double, double);
+
+/** @brief Free all data in a ttag* and set it to NULL */
 void ttags_free(ttags **);
 
 /* Initialization, sets the output file to stdout */
@@ -91,7 +99,7 @@ int fim_tiff_write_opt(const char * fName, const float * V,
 /* Scale between 0 and 2^16-1 and write data */
 int fim_tiff_write(const char * fName, const float * V,
                    ttags * T,
-    int64_t M, int64_t N, int64_t P);
+                   int64_t M, int64_t N, int64_t P);
 
 /* Don't scale data */
 int fim_tiff_write_noscale(const char * fName, const float * V,
@@ -101,45 +109,59 @@ int fim_tiff_write_noscale(const char * fName, const float * V,
 
 int fim_tiff_write_float(const char * fName, const float * V,
                          ttags * T,
-    int64_t M, int64_t N, int64_t P);
+                         int64_t M, int64_t N, int64_t P);
 
 int fim_tiff_write_zeros(const char * fName, int64_t M, int64_t N, int64_t P);
 
-// Write to the tif file fName as uint16, using the raw data
-// in rName
-int fim_tiff_from_raw(const char * fName, int64_t M, int64_t N, int64_t P,
-    const char * rName);
+/** @brief Write raw floating point data to a 16-bit tif file.
+ *
+ * This performs a streaming write, never keeping all the data in memory.
+ * @param output_file_name name of tiff file to write to
+ * @param M, N, P the size of the image
+ * @param raw_data_file_name file containing raw float data
+ * @param meta_tiff_file Specify a tif file to copy metadata from. Can be NULL
+ * @returns EXIT_SUCCESS or EXIT_FAILURE
+ */
 
-// Convert tiff image to raw float image
-int fim_tiff_to_raw(const char *fName, const char * oName);
+int
+fim_tiff_from_raw(const char * output_tif_file_name,
+                  int64_t M, int64_t N, int64_t P,
+                  const char * raw_data_file_name,
+                  const char * meta_tiff_file);
+
+/** Convert a tiff image to raw float image
+*/
+int
+fim_tiff_to_raw(const char *tif_file_name,
+                const char * output_file_name);
 
 // Read a 3D tif stack as a float array
 float * fim_tiff_read(const char * fName,
                       ttags * T,
-    int64_t * M0, int64_t * N0, int64_t * P0, int verbosity);
+                      int64_t * M0, int64_t * N0, int64_t * P0, int verbosity);
 
 // Read a sub region of a 3D stack as float array
 // set sub to 1
 // reads sM:sM+wM-1, sN:sN+wN-1, sP:sP+wP-1
 float * fim_tiff_read_sub(const char * fName,
                           ttags *,
-    int64_t * M0, int64_t * N0, int64_t * P0, int verbosity,
-    int sub,
-   int64_t sM, int64_t sN, int64_t sP, // start
-   int64_t wM, int64_t wN, int64_t wP); // width
+                          int64_t * M0, int64_t * N0, int64_t * P0, int verbosity,
+                          int sub,
+                          int64_t sM, int64_t sN, int64_t sP, // start
+                          int64_t wM, int64_t wN, int64_t wP); // width
 
 void fim_tiff_ut();
 
 // Get the size of a tiff file (by name)
 // Returns 0 upon success.
 int fim_tiff_get_size(char * fname,
-    int64_t * M, int64_t * N, int64_t * P);
+                      int64_t * M, int64_t * N, int64_t * P);
 
 /* Max projection from input to output file */
 int fim_tiff_maxproj(char * in, char * out);
 
 /* Max projection from input to output file
-*  This version produces XY XZ and YZ */
+ *  This version produces XY XZ and YZ */
 int fim_tiff_maxproj_XYZ(const char * in, const char * out);
 
 

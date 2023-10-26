@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## 0.3.3
+- Writing pixel size to output file also when tiling is used.
+
 ## 0.3.2
 - Tested on raspberry pi 4 using 64-bit bookworm.
 - Found a bug in `fft.c` where `memcpy` was used wrongly (replaced by
