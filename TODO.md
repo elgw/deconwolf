@@ -5,6 +5,7 @@ github](https://github.com/elgw/deconwolf/issues). And focuses more on
 changes to the internal machinery.
 
 ## Top priority
+- [ ] Transfer metadata (pixel size) to output images when tiling is used.
 - [ ] Crash-safe writing of output images, write to temporary file and
 move when write is complete to avoid bad luck.
 - [ ] Get documentation up to date.
