@@ -54,9 +54,9 @@ fftwf_plan plan_c2r_inplace = NULL;
  */
 /* Pad data for inplace FFT transforms  */
 static void fft_inplace_pad(float ** pX,
-                     const size_t M,
-                     const size_t N,
-                     const size_t P);
+                            const size_t M,
+                            const size_t N,
+                            const size_t P);
 
 /* Reverse the effect of fft_inplace_pad  */
 static void fft_inplace_unpad(float ** pX,
@@ -78,9 +78,9 @@ static size_t nch(size_t M, size_t N, size_t P);
  *
  */
 static void fft_inplace_pad(float ** pX,
-                     const size_t M,
-                     const size_t N,
-                     const size_t P)
+                            const size_t M,
+                            const size_t N,
+                            const size_t P)
 {
 
     const size_t nchunk = N*P;
@@ -109,7 +109,7 @@ static void fft_inplace_pad(float ** pX,
 
 /** @brief Reverse the effect of fft_inplace_pad
  *
-*/
+ */
 static void fft_inplace_unpad(float ** pX,
                               const size_t M,
                               const size_t N,
@@ -267,13 +267,13 @@ void myfftw_start(const int nThreads, int verbose, FILE * log)
     fftwf_init_threads();
     fftwf_plan_with_nthreads(nThreads);
 
-
     char * swf = get_swf_file_name(nThreads);
     assert(swf != NULL);
     if(log != NULL)
     {
         fprintf(log, "FFTW wisdom file: %s\n", swf);
     }
+
     if(swf == NULL)
     {
         assert(0);
@@ -628,28 +628,34 @@ void fft_ut_flipall_conj()
      */
     int M = 12, N = 13, P = 15;
     float * A = fim_malloc(M*N*P*sizeof(float));
-    assert(A != NULL);
+
     for(int kk = 0; kk<M*N*P; kk++)
     { A[kk] = (float) rand() / (float) RAND_MAX; }
     fim_stats(A, M*N*P);
     float * B = fim_malloc(M*N*P*sizeof(float));
-    assert(B != NULL);
+
     memcpy(B, A, M*N*P*sizeof(float));
     float * B_flipall = fim_malloc(M*N*P*sizeof(float));
-    assert(B_flipall != NULL);
+
     fim_flipall(B_flipall, B, M, N, P);
 
 
     fftwf_complex * FA = fft(A, M, N, P);
-    fftwf_complex * FB = fft(B, M, N, P);
     free(A);
+    fftwf_complex * FB = fft(B, M, N, P);
     free(B);
+
     fftwf_complex * FB_flipall = fft(B_flipall, M, N, P);
 
     float * Y1 = fft_convolve_cc(FA, FB_flipall, M, N, P);
+
     float * Y2 = fft_convolve_cc_conj(FA, FB, M, N, P);
+    assert(FA != FB);
     free(FA);
+    FA = NULL;
+
     free(FB);
+    FB = NULL;
 
     float mse = fim_mse(Y1, Y2, M*N*P);
     printf("mse=%f ", mse);
@@ -717,7 +723,7 @@ double * fft_bench_1d(int64_t from, int64_t to, int niter)
 
 /* Only used for fft_ut. Should be renamed to fim_max_rel_error */
 static float fim_compare(const float * X, const float * Y,
-                  size_t M, size_t N, size_t P)
+                         size_t M, size_t N, size_t P)
 {
     float rel_err_max = -1;
     float tol = 1e-5;

@@ -1150,6 +1150,7 @@ void ttags_set_software(ttags * T,
     sprintf(T->software, "%s", sw);
 }
 
+// TODO: rename
 void ttags_get(TIFF * tfile, ttags * T)
 {
     // https://docs.openmicroscopy.org/ome-model/5.6.3/ome-tiff/specification.html
@@ -1702,8 +1703,8 @@ int fim_tiff_maxproj(char * in, char * out)
         return -1;
     }
 
-    ttags * T = malloc(sizeof(ttags));
-    assert(T != NULL);
+    ttags * T = ttags_new();
+
     ttags_get(input, T);
     ttags_set_software(T, "deconwolf " deconwolf_version);
 

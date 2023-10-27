@@ -39,7 +39,7 @@
  * can be FFTW_ESTIMATE, FFTW_MEASURE etc...
  * see the FFTW3 documentation.
  * TODO: Integrate with myfftw_start
-*/
+ */
 void fft_set_plan(unsigned int plan);
 
 /* @brief To enable inplace-FFTs
@@ -47,7 +47,7 @@ void fft_set_plan(unsigned int plan);
  * Set to use in-place transformations when possible
  * call before myfftw_start
  * TODO: integrate with myfftw_start
-*/
+ */
 void fft_set_inplace(int use_inplace);
 
 /** @brief Required initialization routines
@@ -69,7 +69,7 @@ void fft_train(size_t M, size_t N, size_t P,
 /* @brief Free allocated memory
  *
  * Call this when you are done.
-*/
+ */
 void myfftw_stop(void);
 
 void dim3_real_float_inverse(fftwf_complex * in, float * out,
@@ -120,12 +120,28 @@ float *
 fft_convolve_cc_conj(fftwf_complex * A, fftwf_complex * B,
                      int M, int N, int P);
 
-/* Highly specialised versions where the second argument is freed */
-float * fft_convolve_cc_f2(fftwf_complex * A, fftwf_complex * B, int M, int N, int P);
-float * fft_convolve_cc_conj_f2(fftwf_complex * A, fftwf_complex * B, int M, int N, int P);
+/**
+ * @brief like fft_convolve_cc but 2nd argument freed
+ *
+ * @param B is freed during the call and should be set to NULL afterwards
+ */
+float * fft_convolve_cc_f2(fftwf_complex * A,
+                           fftwf_complex * B,
+                           int M, int N, int P);
+
+/**
+ * @brief like fft_convolve_cc_conj but 2nd argument freed
+ *
+ * @param B is freed during the call and should be set to NULL afterwards
+ */
+float * fft_convolve_cc_conj_f2(fftwf_complex * A,
+                                fftwf_complex * B,
+                                int M, int N, int P);
 
 
-
+/**
+ * @brief run unit tests
+*/
 void fft_ut(void);
 
 /* Benchmark 1D ffts of size from, from+1, ... to

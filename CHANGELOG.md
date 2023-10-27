@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## 0.3.4
+- Minor bug fixes which gives a clean build with `-fanalyzer`.
+
 ## 0.3.3
 - Writing pixel size to output file also when tiling is used.
 

@@ -364,6 +364,8 @@ static void dw_psf_sted(opts * s)
 
     ttags * T = ttags_new();
     char * swstring = malloc(1024);
+    assert(swstring != NULL);
+
     sprintf(swstring, "deconwolf %s", deconwolf_version);
     ttags_set_software(T, swstring);
     ttags_set_imagesize(T, PSF->M, PSF->N, PSF->P);

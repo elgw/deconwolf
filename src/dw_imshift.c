@@ -21,8 +21,8 @@ int dw_imshift(int argc, char ** argv);
 
 static opts * opts_new()
 {
-    opts * s = malloc(sizeof(opts));
-
+    opts * s = calloc(1, sizeof(opts));
+    assert(s != NULL);
     s->overwrite = 0;
     s->verbose = 1;
     s->optpos = -1;

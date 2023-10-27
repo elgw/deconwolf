@@ -27,21 +27,17 @@ GIT_VERSION = "$(shell git log --pretty=format:'%aD:%H' -n 1)"
 CFLAGS += -DCC_VERSION=\"$(CC_VERSION)\"
 CFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
 
-# Since we don't check for these errors, see man math_error
-# we can disable this feature
-CFLAGS += -fno-math-errno
-
 DESTDIR?=/usr/local/bin
 DEBUG?=0
+
 ifeq ($(DEBUG),1)
-    # TODO: only compiles with flto on, why?
-    # TODO: does not compile without -O1 or above
-    CFLAGS += -O3 -Wno-unknown-pragmas -fanalyzer
+    CFLAGS += -O0 -Wno-unknown-pragmas -fanalyzer -g3
 else
-    CFLAGS += -O3 -flto=auto
+    CFLAGS += -O3 -flto=auto -DNDEBUG
+    # Notes:
     # -O2 -ftree-vectorize and -O3 give about the same performance
-    # -DNDEBUG will not make it faster so don't use it
-    # -fno-math-errno no relevant performance gain
+    # -DNDEBUG turns off some self-tests
+    # -fno-math-errno gives no relevant performance gain
 endif
 
 dw_LIBRARIES =  -lm -ltiff
@@ -179,16 +175,22 @@ method_ave.o \
 method_shb.o \
 dw_imshift.o \
 fft.o \
-dw_nuclei.o \
 dw_dots.o \
 fwhm.o \
 ftab.o \
 dw_psf.o \
 dw_tiff_merge.o \
 dw_psf_sted.o
+#dw_nuclei.o
 
-dwbw_OBJECTS = fim.o fim_tiff.o dw_bwpsf.o \
-bw_gsl.o lanczos.o li.o fft.o dw_util.o
+dwbw_OBJECTS = fim.o \
+fim_tiff.o \
+dw_bwpsf.o \
+bw_gsl.o \
+lanczos.o \
+li.o fft.o \
+dw_util.o \
+ftab.o
 
 # dwtm = bin/dw_tiffmax
 # dwtm_OBJECTS = fim.o fim_tiff.o deconwolf_tif_max.o

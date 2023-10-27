@@ -209,7 +209,7 @@ ftab_t * ftab_from_tsv(const char * fname)
         fprintf(stderr, "Can not open %s\n", fname);
         return NULL;
     }
-    ftab_t * T = malloc(sizeof(ftab_t));
+    ftab_t * T = calloc(1, sizeof(ftab_t));
     assert(T != NULL);
     // Get number of columns
     char * line = NULL;
@@ -218,10 +218,9 @@ ftab_t * ftab_from_tsv(const char * fname)
     if(strlen(line) == 0)
     {
         fprintf(stderr, "Empty header line\n");
-        if(line != NULL)
-        {
-            free(line);
-        }
+        free(line);
+        free(T);
+        fclose(fid);
         return NULL;
     }
 
