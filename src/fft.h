@@ -1,3 +1,5 @@
+#pragma once
+
 /*    Copyright (C) 2020 Erik L. G. Wernersson
  *
  *    This program is free software: you can redistribute it and/or modify
@@ -18,7 +20,6 @@
  * is not thread safe since it has some global data
  */
 
-#pragma once
 
 #include <fftw3.h>
 #include <stdint.h>

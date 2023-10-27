@@ -1029,7 +1029,8 @@ int fim_tiff_write_opt(const char * fName, const float * V,
     return 0;
 }
 
-int fim_tiff_get_size(char * fname, int64_t * M, int64_t * N, int64_t * P)
+int fim_tiff_get_size(const char * fname,
+                      int64_t * M, int64_t * N, int64_t * P)
 {
     TIFF * tiff = TIFFOpen(fname, "r");
     uint32_t m, n, p;
@@ -1683,7 +1684,7 @@ int fim_tiff_maxproj_XYZ(const char * in, const char * out)
 }
 
 
-int fim_tiff_maxproj(char * in, char * out)
+int fim_tiff_maxproj(const char * in, const char * out)
 {
     int64_t M, N, P;
     int verbose = 0;
@@ -1804,7 +1805,11 @@ int fim_tiff_maxproj(char * in, char * out)
                 }
             }
             tsize_t written = TIFFWriteRawStrip(output, nn, mstrip, read);
-            assert(written == read);
+            if(written != read)
+            {
+                fprintf(stderr, "Failed to write to %s\n", out);
+                exit(EXIT_FAILURE);
+            }
 
         }
 
@@ -1815,9 +1820,6 @@ int fim_tiff_maxproj(char * in, char * out)
     // Input is 32-bit float
     if(SF == SAMPLEFORMAT_IEEEFP)
     {
-        //TIFFSetField(output, TIFFTAG_STRIPBYTECOUNTS, M*N*sizeof(float));
-        //TIFFSetField(output, TIFFTAG_STRIPBYTECOUNTS, 1);
-
         float * mstrip = _TIFFmalloc(ssize); // For max over all directories
         assert(mstrip != NULL);
         float * strip    = _TIFFmalloc(ssize);
@@ -1841,7 +1843,11 @@ int fim_tiff_maxproj(char * in, char * out)
 
 
             tsize_t written = TIFFWriteRawStrip(output, ss, mstrip, read);
-            assert(written == read);
+            if(written != read)
+            {
+                fprintf(stderr, "Failed to write to %s\n", out);
+                exit(EXIT_FAILURE);
+            }
 
         }
         _TIFFfree(strip);

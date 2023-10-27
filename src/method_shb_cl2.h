@@ -1,3 +1,5 @@
+#pragma once
+
 /*    Copyright (C) 2020 Erik L. G. Wernersson
  *
  *    This program is free software: you can redistribute it and/or modify
@@ -14,7 +16,6 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#pragma once
 
 #include "dw.h"
 #include "cl_util.h"

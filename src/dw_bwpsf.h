@@ -1,3 +1,5 @@
+#pragma once
+
 /*    Copyright (C) 2020 Erik L. G. Wernersson
  *
  *    This program is free software: you can redistribute it and/or modify
@@ -20,8 +22,6 @@
  * Original implementation:
  * https://github.com/Biomedical-Imaging-Group/PSFGenerator/tree/master/src/psf/bornwolf
  */
-
-#pragma once
 
 #include <stdio.h>
 #include <math.h>

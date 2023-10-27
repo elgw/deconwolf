@@ -1,3 +1,5 @@
+#pragma once
+
 /*    Copyright (C) 2020 Erik L. G. Wernersson
  *
  *    This program is free software: you can redistribute it and/or modify
@@ -33,8 +35,6 @@
  * - Consider j0f and j1f (the single precision counterparts to j0 and j1)
  *   for some extra speed.
  */
-
-#pragma once
 
 #include <stdlib.h>
 #include <stdio.h>

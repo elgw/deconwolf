@@ -1,3 +1,5 @@
+#pragma once
+
 /*    Copyright (C) 2020 Erik L. G. Wernersson
  *
  *    This program is free software: you can redistribute it and/or modify
@@ -27,7 +29,7 @@
  * Flags to dw_write_tif for scaling on/off
  */
 
-#pragma once
+
 
 #include <assert.h>
 #include <stdlib.h>
@@ -129,36 +131,55 @@ fim_tiff_from_raw(const char * output_tif_file_name,
                   const char * raw_data_file_name,
                   const char * meta_tiff_file);
 
-/** Convert a tiff image to raw float image
+/** @brief Convert a tiff image to raw float image
+ * Note that the image size is not encoded
 */
 int
 fim_tiff_to_raw(const char *tif_file_name,
                 const char * output_file_name);
 
-// Read a 3D tif stack as a float array
+/* @brief Read a 3D tif stack as a float array
+ * @param fName file name
+ * @param verbosity how verbose the function should be
+ * @param[out] M0, N0, P0, the image size in pixels
+ * @param[out] T tiff tags will be written to T
+ */
 float * fim_tiff_read(const char * fName,
                       ttags * T,
-                      int64_t * M0, int64_t * N0, int64_t * P0, int verbosity);
+                      int64_t * M0, int64_t * N0, int64_t * P0,
+                      int verbosity);
 
-// Read a sub region of a 3D stack as float array
-// set sub to 1
-// reads sM:sM+wM-1, sN:sN+wN-1, sP:sP+wP-1
+/** @breif Read a sub region of a 3D stack as float array
+ * set sub to 1
+ * reads sM:sM+wM-1, sN:sN+wN-1, sP:sP+wP-1
+ */
 float * fim_tiff_read_sub(const char * fName,
                           ttags *,
-                          int64_t * M0, int64_t * N0, int64_t * P0, int verbosity,
+                          int64_t * M0, int64_t * N0, int64_t * P0,
+                          int verbosity,
                           int sub,
                           int64_t sM, int64_t sN, int64_t sP, // start
                           int64_t wM, int64_t wN, int64_t wP); // width
 
+/** @brief Run self-tests
+ *
+*/
 void fim_tiff_ut();
 
-// Get the size of a tiff file (by name)
-// Returns 0 upon success.
-int fim_tiff_get_size(char * fname,
+/** @brief Get image dimensions from tif file
+ * @return 0 upon success.
+ * @param fname Name of tiff file
+ * @param[out] M, N, P the image size
+ */
+
+int fim_tiff_get_size(const char * fname,
                       int64_t * M, int64_t * N, int64_t * P);
 
-/* Max projection from input to output file */
-int fim_tiff_maxproj(char * in, char * out);
+/** @brief Max projection from input to output file
+ * Not loading the full images into memory.
+ * The output file will have the same sample format as the input image.
+ */
+int fim_tiff_maxproj(const char * in, const char * out);
 
 /* Max projection from input to output file
  *  This version produces XY XZ and YZ */

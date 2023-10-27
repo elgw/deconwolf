@@ -339,13 +339,21 @@ static void unit_tests()
         double g0 = gauss1(0, sigma);
         double g1 = gauss1(fwhm/2.0, sigma);
         //printf("G %f %f %f\n", g0, g1, g0/g1);
-        assert(fabs(g0/g1 -2) < 1e-5 );
+        if(fabs(g0/g1 -2) > 1e-5 )
+        {
+            fprintf(stderr, "fabs(g0/g1 -2) > 1e-5\n");
+            exit(EXIT_FAILURE);
+        }
 
         double gamma = gamma_from_fwhm_lorentz2(fwhm);
         double l0 = lorentz2(0, 0, gamma);
         double l1 = lorentz2(fwhm/2.0, 0, gamma);
         //printf("L %f %f %f\n", l0, l1, l0/l1);
-        assert(fabs(l0/l1 -2) < 1e-5 );
+        if(fabs(l0/l1 -2) > 1e-5 )
+        {
+            fprintf(stderr, "fabs(l0/l1 -2) > 1e-5\n");
+            exit(EXIT_FAILURE);
+        }
     }
     return;
 }

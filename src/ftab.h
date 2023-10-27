@@ -1,3 +1,5 @@
+#pragma once
+
 /*    Copyright (C) 2020 Erik L. G. Wernersson
  *
  *    This program is free software: you can redistribute it and/or modify
@@ -17,7 +19,6 @@
 /* Floating point-only table stored in row-major format.
 */
 
-#pragma once
 
 #include <assert.h>
 #include <inttypes.h>
