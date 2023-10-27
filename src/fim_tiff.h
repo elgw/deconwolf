@@ -17,18 +17,13 @@
  */
 
 /* Read and write tiff files to/from single precision floats
- */
-
-/* fim_tiff is not thread safe
+ * fim_tiff is not thread safe
  * You need to initialize with a call to
  * fim_tiff_init()
  * and should probably also redirect the output by
  * fim_tiff_set_log(FILE *)
  *
- * TODO:
- * Flags to dw_write_tif for scaling on/off
  */
-
 
 
 #include <assert.h>
@@ -47,7 +42,6 @@
 #include "dw_version.h"
 
 
-#define INLINED inline __attribute__((always_inline))
 #define XTAG_IJIJUNKNOWN 50838
 #define XTAG_IJIJINFO 50839
 
@@ -71,17 +65,26 @@ typedef struct{
 /** ttags new with everything set to defaults */
 ttags * ttags_new();
 
-/** Parse metadata from a open tif file */
+/** @brief Parse metadata from a open tif file */
 void ttags_get(TIFF *, ttags *);
+
+/** @brief print tags to a file */
 void ttags_show(FILE *, ttags *);
+
+/** @brief set tags to open tiff file*/
 void ttags_set(TIFF *, ttags *);
 
 /** @brief Set software tag to S */
 void ttags_set_software(ttags * ,
                         const char * S);
 
+/** @brief set image size (in pixels) to tags */
 void ttags_set_imagesize(ttags *, int M, int N, int P);
-void ttags_set_pixelsize(ttags *, double, double, double);
+
+/** @brief set pixel size to tags
+ * Note that the resolution unit is not set
+*/
+void ttags_set_pixelsize(ttags *, double xres, double yres, double zres);
 
 /** @brief Free all data in a ttag* and set it to NULL */
 void ttags_free(ttags **);
@@ -186,5 +189,5 @@ int fim_tiff_maxproj(const char * in, const char * out);
 int fim_tiff_maxproj_XYZ(const char * in, const char * out);
 
 
-/* Extract a single slice from input to output file */
-int fim_tiff_extract_slice(char *in, char *out, int slice);
+/** @brief Extract a single slice from input to output file */
+int fim_tiff_extract_slice(const char *in, const char *out, int slice);

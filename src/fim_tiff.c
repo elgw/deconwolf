@@ -27,6 +27,8 @@
  * rows in it.
  */
 
+FILE * fim_tiff_log = NULL;
+
 /*
  * Forward declarations
  */
@@ -40,7 +42,7 @@ void readUint16(TIFF * tfile, float * V,
 
 
 
-FILE * fim_tiff_log = NULL; /* Indicates stdout */
+
 void fim_tiff_init(void)
 {
     fim_tiff_log = stdout;
@@ -176,7 +178,7 @@ void floatimage_show_stats(float * I, size_t N, size_t M, size_t P)
 }
 
 
-INLINED extern void sub2ind(size_t ind,
+static void sub2ind(size_t ind,
                             int64_t M, int64_t N, __attribute__((unused)) int64_t P,
                             int64_t * m, int64_t * n, int64_t * p)
 {
@@ -224,7 +226,8 @@ void readUint16_sub(TIFF * tfile, float * V,
 
                 if(0){
                     if(ipos % 100000 == 0){
-                        printf("%" PRId64 " %" PRId64 " %" PRId64 ", %zu -> (%" PRId64 ", %" PRId64 ", %" PRId64 ")\n", M, N, P, ipos, iM, iN, iP);
+                        printf("%" PRId64 " %" PRId64 " %" PRId64 ", %zu -> (%" PRId64 ", %" PRId64 ", %" PRId64 ")\n",
+                               M, N, P, ipos, iM, iN, iP);
                         getchar();
                     }}
 
@@ -279,7 +282,8 @@ void readUint8_sub(TIFF * tfile, float * V,
 
                 if(0){
                     if(ipos % 100000 == 0){
-                        printf("%" PRId64 " %" PRId64 " %" PRId64 ", %zu -> (%" PRId64 ", %" PRId64 ", %" PRId64 ")\n", M, N, P, ipos, iM, iN, iP);
+                        printf("%" PRId64 " %" PRId64 " %" PRId64 ", %zu -> (%" PRId64 ", %" PRId64 ", %" PRId64 ")\n",
+                               M, N, P, ipos, iM, iN, iP);
                         getchar();
                     }}
 
@@ -1864,7 +1868,7 @@ int fim_tiff_maxproj(const char * in, const char * out)
 }
 
 
-int fim_tiff_extract_slice(char * in, char * out, int slice)
+int fim_tiff_extract_slice(const char * in, const char * out, int slice)
 {
 
     if(slice < 1)

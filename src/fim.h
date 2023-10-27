@@ -39,8 +39,6 @@
 #include <sys/mman.h>
 #endif
 
-#define INLINED inline __attribute__((always_inline))
-
 
 /* fim : operations on 3D floating point images
  * all allocations are done with fftw3f_malloc (for alignment)

@@ -5,18 +5,15 @@ github](https://github.com/elgw/deconwolf/issues). And focuses more on
 changes to the internal machinery.
 
 ## Top priority
-- [ ] Transfer metadata (pixel size) to output images when tiling is used.
+
 - [ ] Crash-safe writing of output images, write to temporary file and
 move when write is complete to avoid bad luck.
 - [ ] Get documentation up to date.
 - [ ] Set default PSF size in `dw_bw` based on the geometry of the PSF
 and expected sample thickness.
-- [ ] Wrap image pointers in some abstraction.
-- [ ] Transfer pixel size to output when doing max projections.
 - [ ] Can deconwolf be built on the M1 mac models without modification?
-- [ ] Why is **-O1** required for building?
 
-### Related to OpenCL/GPU
+Related to OpenCL/GPU
 - [ ] When using clFFT that does not support all sizes, crop the image
 if needed when using **--bq 0**
 - [ ] Possibly replace `clCreateCommandQueue` by
@@ -31,7 +28,7 @@ if needed when using **--bq 0**
 least one power of two. Or even better use **nextfastfft** from
 [LFAT](https://ltfat.github.io/notes/ltfatnote017.pdf),
 [code](https://github.com/ltfat/ltfat/blob/master/fourier/nextfastfft.m)
-- [ ] Wrap malloc to catch allocation errors to the log file.
+- [ ] Wrap malloc to catch allocation errors to the log file?
 - [ ] Provide test data and demos
 - [ ] Decide about default tiling settings based on the PSF.
 - [ ] Demos, for example on the effect of the tiling.
@@ -41,14 +38,11 @@ least one power of two. Or even better use **nextfastfft** from
 detect saturated pixels.
 - [ ] Make sure that something that makes sense happens when a
 Pyramidal tif is supplied.
-
-## Maybe
-
-- [ ] Figure out if there are any performance benefits by buildin
-fftw3 from source for `-march=native -mtune=native`.
-
+- [ ] Wrap image pointers in some abstraction.
 
 ## Done
+- [x] Transfer pixel size to output when doing max projections.
+- [x] Transfer metadata (pixel size) to output images when tiling is used.
 - [x] Clean up the **merge** sub command and test it.
 - [x] fftw3 in-place FFTs for memory saving.
 - [x] Make `FFTW_ESTIMATE` an option. This is set with the argument **--noplan**.

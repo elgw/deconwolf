@@ -878,7 +878,7 @@ void fim_shift(float * restrict A,
 }
 
 
-INLINED static int64_t mod_int(const int64_t a, const int64_t b)
+static int64_t mod_int(const int64_t a, const int64_t b)
 {
     int64_t r = a % b;
     return r < 0 ? r + b : r;
