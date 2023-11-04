@@ -540,6 +540,10 @@ void dw_fprint_info(FILE * f, dw_opts * s)
     fprintf(f, "OpenCL: No. (Rebuild with OPENCL=1 to enable)\n");
 #endif
 
+#ifndef NDEBUG
+    fprintf(f, "Warning: Built in debug mode (NDEBUG not defined)\n");
+#endif
+
     if(s->verbosity > 1)
     {
         fprintf(f, "sizeof(int) = %zu\n", sizeof(int));
@@ -1288,13 +1292,13 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
     printf("Additional commands with separate help sections:\n");
     printf("   maxproj    maximum Z-projections\n");
     printf("   merge      merge individual slices to volume\n");
-#ifdef __dw_dots_h__
+#ifdef dw_module_dots
     printf("   dots       detect dots\n");
 #endif
-#ifdef __dw_psf_h__
+#ifdef dw_module_psf
     printf("   psf        generate PSFs for Widefield and Confocal\n");
 #endif
-#ifdef __dw_psf_sted_h__
+#ifdef dw_module_psf_sted
     printf("   psf-STED   PSFs for 3D STED\n");
 #endif
     printf("\n");

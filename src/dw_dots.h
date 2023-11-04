@@ -1,4 +1,5 @@
 #pragma once
+#define dw_module_dots
 
 #include <getopt.h>
 #include <libgen.h>

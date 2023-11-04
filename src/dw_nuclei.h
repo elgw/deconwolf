@@ -1,4 +1,5 @@
 #pragma once
+#define dw_module_nuclei
 
 #include <stdio.h>
 #include <stdlib.h>

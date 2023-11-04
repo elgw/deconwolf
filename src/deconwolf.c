@@ -37,30 +37,47 @@ int main(int argc, char ** argv)
         {
             return dw_tiff_merge(argc-1, argv+1);
         }
-#ifdef __dw_nuclei_h__
+
         if(strcmp(argv[1], "nuclei") == 0)
         {
+#ifdef dw_module_nuclei
             return dw_nuclei(argc-1, argv+1);
-        }
+#else
+            fprintf(stderr, "dw was built without the 'nuclei' module\n");
+            exit(EXIT_FAILURE);
 #endif
-#ifdef __dw_dots_h__
+        }
+
         if(strcmp(argv[1], "dots") == 0)
         {
+#ifdef dw_module_dots
             return dw_dots(argc-1, argv+1);
-        }
+#else
+            fprintf(stderr, "dw was built without the 'dots' module\n");
+            exit(EXIT_FAILURE);
 #endif
-#ifdef __dw_psf_h__
+        }
+
         if(strcmp(argv[1], "psf") == 0)
         {
+#ifdef dw_module_psf
             return dw_psf_cli(argc-1, argv+1);
-        }
+#else
+            fprintf(stderr, "dw was built without the 'psf' module\n");
+            exit(EXIT_FAILURE);
 #endif
-#ifdef __dw_psf_sted_h__
+        }
+
         if(strcmp(argv[1], "psf-STED") == 0)
         {
+#ifdef dw_module_psf_sted
             return dw_psf_sted_cli(argc-1, argv+1);
-        }
+#else
+            fprintf(stderr, "dw was built without the 'psf-STED' module\n");
+            exit(EXIT_FAILURE);
 #endif
+        }
+
 
     }
 

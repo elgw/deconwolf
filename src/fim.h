@@ -199,18 +199,40 @@ void fim_insert(float * restrict T,
 void fim_insert_ref(float * T, int64_t t1, int64_t t2, int64_t t3,
                     float * F, int64_t f1, int64_t f2, int64_t f3);
 
-float * fim_get_cuboid(float * restrict A, const int64_t M, const int64_t N, const int64_t P,
-                       const int64_t m0, const int64_t m1, const int64_t n0, const int64_t n1, const int64_t p0, const int64_t p1);
-/* MATLAB:
+/** @brief Extract a subregion of an image.
+ *
+ * Also known as cropping.
+ * In MATLAB this would have been described as:
  * Y = A(m0:m1, n0:n1, p0:p1)
+ * @param A an image of size MxNxP
+ * @param [m0, m1] the region of interest along the first dimension
+ * @returns A copy of A in the region [m0,m1] x [n0, n1] x [p0, p1]
  */
 
-float * fim_subregion(const float * restrict A, const int64_t M, const int64_t N, const int64_t P, const int64_t m, const int64_t n, const int64_t p);
-/* MATLAB:
+float * fim_get_cuboid(float * restrict A,
+                       const int64_t M, const int64_t N, const int64_t P,
+                       const int64_t m0, const int64_t m1,
+                       const int64_t n0, const int64_t n1,
+                       const int64_t p0, const int64_t p1);
+
+/** @brief Crop an image from the 0-cornder
+ *
+ * In MATLAB this would correspond to:
  * Y = A(1:m, 1:n, 1:p);
+ *
+ * @return a newly allocated image containing a copy of the region
+ *         [0, m-1], [0, n-1], [0, p-1] from the original image.
  */
 
-float * fim_subregion_ref(float * A, int64_t M, int64_t N, int64_t P, int64_t m, int64_t n, int64_t p);
+float * fim_subregion(const float * restrict A,
+                      const int64_t M, const int64_t N, const int64_t P,
+                      const int64_t m, const int64_t n, const int64_t p);
+
+/** @brief  reference implementation of fim_subregion
+*/
+float * fim_subregion_ref(float * A,
+                          int64_t M, int64_t N, int64_t P,
+                          int64_t m, int64_t n, int64_t p);
 
 /** @brief Normalize an image to have the sum 1.0
 * MATLAB:
