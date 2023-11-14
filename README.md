@@ -78,20 +78,21 @@ First install the required packages:
 sudo apt-get update
 # find out actual names with command like
 # sudo apt-cache search fftw
-sudo apt-get install gcc
-sudo apt-get install pkg-config
-sudo apt-get install libfftw3-single3
-sudo apt-get install libfftw3-dev
-sudo apt-get install openmp libomp-dev
-sudo apt-get install libtiff-dev
-sudo apt-get install libgsl-dev
-sudo apt-get install libpng-dev
+sudo apt-get install \
+ gcc                 \
+ libfftw3-single3    \
+ libfftw3-dev        \
+ libgsl-dev          \
+ libomp-dev          \
+ libpng-dev          \
+ libtiff-dev         \
+ pkg-config
 ```
 
 Build, to build and install deconwolf:
 ``` shell
 make -B
-./makedeb
+./makedeb-ubuntu_2204
 sudo apt-install ./deconwolf_*.deb
 # to remove
 # sudo apt remove deconwolf

@@ -266,16 +266,16 @@ int64_t int64_t_max(int64_t a, int64_t b)
 void dw_opts_free(dw_opts ** sp)
 {
     dw_opts * s = sp[0];
-    dw_nullfree(s->imFile);
-    dw_nullfree(s->psfFile);
-    dw_nullfree(s->outFile);
-    dw_nullfree(s->logFile);
-    dw_nullfree(s->flatfieldFile);
-    dw_nullfree(s->prefix);
-    dw_nullfree(s->commandline);
-    dw_nullfree(s->ref);
-    dw_nullfree(s->refFile);
-    dw_nullfree(s->tsvFile);
+    free(s->imFile);
+    free(s->psfFile);
+    free(s->outFile);
+    free(s->logFile);
+    free(s->flatfieldFile);
+    free(s->prefix);
+    free(s->commandline);
+    free(s->ref);
+    free(s->refFile);
+    free(s->tsvFile);
     if(s->tsv != NULL)
     {
         fclose(s->tsv);

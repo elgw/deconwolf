@@ -2789,7 +2789,7 @@ double * fim_get_line_double(fim_t * I,
             L[kk] = V[pos + d*M];
         }
     }
-    if(dim == 3)
+    if(dim == 2)
     {
         for(int kk = 0; kk<nPix; kk++)
         {

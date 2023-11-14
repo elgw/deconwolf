@@ -54,9 +54,9 @@ static opts * opts_new()
 
 static void opts_free(opts * s)
 {
-    dw_nullfree(s->outfile);
-    dw_nullfree(s->image);
-    dw_nullfree(s->dotfile);
+    free(s->outfile);
+    free(s->image);
+    free(s->dotfile);
     free(s);
 }
 
@@ -142,7 +142,7 @@ static void argparsing(int argc, char ** argv, opts * s)
             s->drawtext = 0;
             break;
         case 'O':
-            dw_nullfree(s->outfile);
+            free(s->outfile);
             s->outfile = strdup(optarg);
             break;
         case 'T':

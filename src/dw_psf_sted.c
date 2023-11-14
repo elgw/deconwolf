@@ -89,8 +89,8 @@ static opts * opts_new()
 
 static void opts_free(opts * s)
 {
-    dw_nullfree(s->outfile);
-    dw_nullfree(s->logfile);
+    free(s->outfile);
+    free(s->logfile);
     if(s->log != NULL)
     {
         fclose(s->log);

@@ -98,14 +98,6 @@ int dw_file_exist(char * fname)
     }
 }
 
-void dw_nullfree(void * p)
-{
-    if(p == NULL)
-        return;
-
-    free(p);
-    return;
-}
 
 float timespec_diff(struct timespec* end, struct timespec * start)
 {

@@ -84,6 +84,10 @@ tiff_from_raw_files=tiff_from_raw.c fim.o fim_tiff.o ftab.o fft.o dw_util.o
 tiff_from_raw:
 	$(CC) $(CFLAGS) $(tiff_from_raw_files) $(LDFLAGS) -o tiff_from_raw
 
+fwhm_ut_files=fwhm_ut.c fwhm.c fim.o ftab.o fim_tiff.o fft.o dw_util.o
+fwhm_ut: $(fwhm_ut_files)
+	$(CC) $(CFLAGS) $(fwhm_ut_files) $(LDFLAGS) -o fwhm_ut
+
 li:
 	$(CC) -DLI_TEST li.c  -o li_ut -lm `pkg-config --CFLAGS --libs gsl`
 

@@ -55,9 +55,6 @@ int dw_get_threads(void);
 /* Return 1 if the file exist, else 0 */
 int dw_file_exist(char * fname);
 
-/* Free if not null */
-void dw_nullfree(void * p);
-
 /* Difference between two timepoints */
 float timespec_diff(struct timespec* end, struct timespec * start);
 

@@ -16,6 +16,55 @@
 
 #include "fwhm.h"
 
+/*
+ * Forward declarations
+ */
+
+static void createGaussian(
+    double * restrict x,
+    double * restrict y,
+    size_t N,
+    const double x0);
+static double my_f(double , void * );
+static int findmin(double , double , gsl_spline *, gsl_interp_accel *, double * , double * );
+static int fwhm1d(const double * x,
+                  const double * y,
+                  size_t N,
+                  double * fwhm);
+
+
+/*
+ * End of forward declarations
+ */
+
+struct dbg_data {
+    double xm; // location of maxima
+    double ym; // value at maxima
+    double xleft;
+    double xright;
+};
+
+// my_f and my_f_params defines the interpolation function that the
+// root-finding functions are run on
+
+struct my_f_params {
+    gsl_spline * spline;
+    gsl_interp_accel * acc;
+    double offset; // shifts the function
+};
+
+
+static void * ck_calloc(size_t nmemb, size_t size)
+{
+    void * p = calloc(nmemb, size);
+    if(p == NULL)
+    {
+        fprintf(stderr, "ERROR: fwhm failed to allocate memory\n");
+        exit(EXIT_FAILURE);
+    }
+    return p;
+}
+
 static double vec_min(const double * v, size_t N)
 {
     double min = v[0];
@@ -28,11 +77,11 @@ static double vec_min(const double * v, size_t N)
 
 /* Search for the intersection of the signal and
  * bg + 0.5*(ym-bg)
-*/
+ */
 static int get_intersection(const double x_mid, const double x_edge,
-                               const double bg, const double ym,
-                               gsl_spline *spline,
-                               gsl_interp_accel *acc,
+                            const double bg, const double ym,
+                            gsl_spline *spline,
+                            gsl_interp_accel *acc,
                             gsl_root_fsolver * rsolve,
                             double * pos)
 {
@@ -143,7 +192,7 @@ static int get_intersection(const double x_mid, const double x_edge,
     }
 }
 
-double my_f(double x, void * p)
+static double my_f(double x, void * p)
 {
     struct my_f_params * params = (struct my_f_params*) p;
 #if verbose > 0
@@ -158,9 +207,9 @@ double my_f(double x, void * p)
     return(y);
 }
 
-int findmin(double a, double b,
-            gsl_spline *spline, gsl_interp_accel * acc,
-            double * xm, double * ym)
+static int findmin(double a, double b,
+                   gsl_spline *spline, gsl_interp_accel * acc,
+                   double * xm, double * ym)
 {
 
 /* domain to test [a, b]*/
@@ -184,11 +233,11 @@ int findmin(double a, double b,
     //const gsl_min_fminimizer_type * T = gsl_min_fminimizer_brent;
     s = gsl_min_fminimizer_alloc (T);
     if(0){
-    fprintf(stderr, "Starting with f(%f) = %f, f(%f) = %f, f(%f) = %f\n",
-           a , gsl_spline_eval(spline, a, acc),
-           m , gsl_spline_eval(spline, m, acc),
-           b , gsl_spline_eval(spline, b, acc));
-    fflush(stderr);
+        fprintf(stderr, "Starting with f(%f) = %f, f(%f) = %f, f(%f) = %f\n",
+                a , gsl_spline_eval(spline, a, acc),
+                m , gsl_spline_eval(spline, m, acc),
+                b , gsl_spline_eval(spline, b, acc));
+        fflush(stderr);
     }
     if(gsl_min_fminimizer_set (s, &F, m, a, b) == GSL_EINVAL)
     {
@@ -230,6 +279,18 @@ int findmin(double a, double b,
     return EXIT_SUCCESS;
 }
 
+/* Calculate the fwhm for the y at the locations x
+ * Stores the result in fwhm
+ *
+ * Algorithm:
+ * 1. Find the interpolated location of the maxima.
+ * 2. Use all pixels in the profile to find the background level as the
+ *    smallest value
+ * 3. Use approx 50% of the central pixels to find the zero crossing of
+ *    the 50% value and the profile.
+ * 4. Return the distance between the left and right zero crossing if both
+ *    look ok, or use 2 mid-zero crossing of only one found.
+ */
 int fwhm1d(const double * x, const double * y, size_t N, double * w)
 {
     int retvalue = EXIT_SUCCESS;
@@ -288,13 +349,13 @@ int fwhm1d(const double * x, const double * y, size_t N, double * w)
     if( findmin(xmin, xmax, spline, acc, &xm, &ym) )
     {
         if(0){
-        fprintf(stderr, "Unable to refine the maxima position\n");
-        fprintf(stderr, "D = [ ");
-        for(size_t kk = 0; kk<N; kk++)
-        {
-            fprintf(stderr, "%f, %f\n", x[kk], y[kk]);
-        }
-        fprintf(stderr, "]\n");
+            fprintf(stderr, "Unable to refine the maxima position\n");
+            fprintf(stderr, "D = [ ");
+            for(size_t kk = 0; kk<N; kk++)
+            {
+                fprintf(stderr, "%f, %f\n", x[kk], y[kk]);
+            }
+            fprintf(stderr, "]\n");
         }
         retvalue = EXIT_FAILURE;
         goto exit1;
@@ -316,22 +377,22 @@ int fwhm1d(const double * x, const double * y, size_t N, double * w)
     //printf("b edge = %f -> ", edge);
     for(int kk = 0; kk+1 < N2; kk++)
     {
-       y[kk] < bg + 0.5*(bg-ym) ? edge = x[kk] : 0;
+        y[kk] < bg + 0.5*(bg-ym) ? edge = x[kk] : 0;
     }
     //printf("edge = %f\n", edge);
     int ok_left = get_intersection(xm, edge, //-N2,
-                                        bg, ym,
+                                   bg, ym,
                                    spline, acc, rsolve,
                                    &intersections[0]);
     edge = (xm+(double) N2)/2.0;
     //printf("a edge = %f -> ", edge);
     for(int kk = N+1; kk < (int) N; kk--)
     {
-       y[kk] < bg + 0.5*(bg-ym) ? edge = x[kk] : 0;
+        y[kk] < bg + 0.5*(bg-ym) ? edge = x[kk] : 0;
     }
     //printf("edge = %f\n", edge);
     int ok_right = get_intersection(xm, edge, // N2,
-                                        bg, ym,
+                                    bg, ym,
                                     spline, acc, rsolve,
                                     &intersections[1]);
     //printf("left = %d (%f), right = %d (%f)\n", ok_left, intersections[0], ok_right, intersections[1]);
@@ -369,17 +430,18 @@ exit2:
 }
 
 
-#ifdef STANDALONE_FWHM
+/* Create a gaussian shaped test signal, y
+ * over the domain x
+ * x0 is the offset from center
+ * */
+
 static void createGaussian(
-    double * x,
-    double * y,
+    double * restrict x,
+    double * restrict y,
     size_t N,
     const double x0)
 {
-    /* Create a gaussian shaped test signal, y
-     * over the domain x
-     * x0 is the offset from center
-     * */
+
     assert(N % 2 == 1);
     int N2 = (N-1)/2; /* middle element index */
     double s = 1.5;
@@ -399,28 +461,178 @@ static void createGaussian(
 }
 
 
-int main(int argc, char ** argv)
-{
 
-    int N = 11; // Size of test signal
-    double * y = malloc(N*sizeof(double));
-    double * x = malloc(N*sizeof(double));
-    memset(x, 0, N*sizeof(double));
-    memset(y, 0, N*sizeof(double));
-    createGaussian(x,y, N, 0);
+/**
+ */
+
+float fwhm_lateral(fim_t * I,
+                   int x, int y, int z,
+                   int verbose)
+{
+    int nPix = 11*2+1;
+    assert(nPix % 2 == 1);
+    /* Line length */
+    double * X = ck_calloc(nPix, sizeof(double));
+    assert(X != NULL);
+    for(int kk = 0; kk<nPix; kk++)
+    {
+        X[kk] = kk - (nPix-1)/2;
+    }
+
+    double * lx = fim_get_line_double(I, x, y, z, 0, nPix);
+    double * ly = fim_get_line_double(I, x, y, z, 1, nPix);
+
+    if(verbose > 4)
+    {
+        for(int kk = 0; kk<nPix; kk++)
+        {
+            printf("%d %f %f %f\n", kk, X[kk], lx[kk], ly[kk]);
+        }
+    }
+
+    double fwhm_x = 0;
+    int status_x = fwhm1d(X, lx, nPix, &fwhm_x);
+    double fwhm_y = 0;
+    int status_y = fwhm1d(X, ly, nPix, &fwhm_y);
+
+    if(verbose > 3)
+    {
+        printf("Status x: %d, y: %d", status_x, status_y);
+        printf(" fwhm x: %f, y: %f\n", fwhm_x, fwhm_y);
+    }
+    free(X);
+    free(lx);
+    free(ly);
+
+    /** Return -1 or the average of the fwhm values that were ok */
+    float fwhm = -1;
+
+    if(status_x == 0 && status_y == 0)
+    {
+        fwhm = 0.5*(fwhm_x + fwhm_y);
+    }
+
+    if(status_x == 0 && status_y != 0)
+    {
+        fwhm = fwhm_x;
+    }
+
+    if(status_x != 0 && status_y == 0)
+    {
+        fwhm = fwhm_y;
+    }
+
+    return fwhm;
+}
+
+float fwhm_axial(fim_t * I,
+                 int x, int y, int z,
+                 int verbose)
+{
+    int nPix = 11*2+1;
+    assert(nPix % 2 == 1);
+    /* Line length */
+    double * X = ck_calloc(nPix, sizeof(double));
+    assert(X != NULL);
+    for(int kk = 0; kk<nPix; kk++)
+    {
+        X[kk] = kk - (nPix-1)/2;
+    }
+
+    double * lz = fim_get_line_double(I, x, y, z,
+                                      2, // dimension
+                                      nPix);
+    //for(int kk = 0; kk<nPix; kk++)
+    //{ printf("%d %f %f\n", kk, X[kk], lz[kk]); }
+
+    double fwhm_z = 0;
+    int status_z = fwhm1d(X, lz, nPix, &fwhm_z);
+    // printf("status_z = %d fwhm_z = %f\n", status_z, fwhm_z);
+    free(X);
+    free(lz);
+
+    /** Return -1 or the average of the fwhm values that were ok */
+    float fwhm = -1;
+
+    if(status_z == 0 )
+    {
+        fwhm = fwhm_z;
+    } else {
+        if(verbose > 2)
+        {
+            printf("fwhm_axial: status=%d for (%d, %d, %d)\n", status_z, x, y, z);
+        }
+    }
+
+    return fwhm;
+}
+
+
+fwhm_res_t * fwhm(fim_t * I,
+                  const int * X, const int * Y, const int * Z,
+                  const size_t N)
+{
+    fwhm_res_t * res = ck_calloc(N, sizeof(fwhm_res_t));
+    for(size_t kk = 0; kk<N; kk++)
+    {
+        res[kk].fwhm_lateral = fwhm_lateral(I, X[kk], Y[kk], Z[kk], 0);
+        res[kk].fwhm_axial = fwhm_axial(I, X[kk], Y[kk], Z[kk], 0);
+    }
+    return res;
+}
+
+static void fwhm_ut_3d(void)
+{
+    printf("-> fwhm_ut_3d\n");
+
+    for(int N = 3; N < 21; N+=2)
+    {
+        printf("   N=%d\n", N);
+        int mid = (N-1)/2;
+        fim_t * I = fimt_zeros(N, N, N);
+        I->V[mid + N*mid + N*N*mid] = 1;
+
+        size_t n_points = 1;
+        int X[1] = {mid};
+        int Y[1] = {mid};
+        int Z[1] = {mid};
+
+        fwhm_res_t * fwhm_res = fwhm(I, X, Y, Z, n_points);
+        for(size_t kk = 0; kk < n_points; kk++)
+        {
+            printf("(%d, %d, %d) fwhm_lateral = %f, fwhm_axial = %f\n",
+                   X[kk], Y[kk], Z[kk],
+                   fwhm_res[kk].fwhm_lateral,
+                   fwhm_res[kk].fwhm_axial);
+        }
+        free(fwhm_res);
+        fim_free(I);
+    }
+    return;
+}
+
+int fwhm_ut(int argc, char ** argv)
+{
+    if(argc > 1)
+    {
+        printf("%s does not use any command line arguments\n", argv[0]);
+    }
+
+    fwhm_ut_3d();
+
+    size_t N = 11; // Size of test signal
+    double * y = ck_calloc(N, sizeof(double));
+    double * x = ck_calloc(N, sizeof(double));
+    createGaussian(x, y, N, 0);
 
     double w = -1; // output
 
-    printf("-> Testing shifted signals\n");
+    printf("-> Testing shifted signals (1D)\n");
     /* Might not be consistent due to background estimation */
     for(double delta = -1; delta <=1; delta +=0.1)
     {
 
         createGaussian(x, y, N, delta);
-        //for(int kk = 0; kk<N; kk++)
-        //{
-        //    printf("%f, %f\n", x[kk], y[kk]);
-        //}
         printf("offset: % .2f pixels, ", delta);
 
         int status = fwhm1d(x, y, N, &w);
@@ -458,7 +670,7 @@ int main(int argc, char ** argv)
 
 
     printf("-> Testing with constant y\n");
-    for(int kk = 0; kk<N; kk++)
+    for(size_t kk = 0; kk<N; kk++)
     {
         y[kk] = 0;
     }
@@ -490,61 +702,4 @@ fail:
     free(y);
     free(x);
     return(EXIT_FAILURE);
-}
-#endif
-
-float fwhm_lateral(fim_t * I,
-                   int x, int y, int z,
-                   int verbose)
-{
-    int nPix = 11*2+1;
-    assert(nPix % 2 == 1);
-    /* Line length */
-    double * X = malloc(nPix*sizeof(double));
-    assert(X != NULL);
-    for(int kk = 0; kk<nPix; kk++)
-    {
-        X[kk] = kk - (nPix-1)/2;
-    }
-    double * lx = fim_get_line_double(I, x, y, z, 0, nPix);
-    double * ly = fim_get_line_double(I, x, y, z, 1, nPix);
-
-    if(verbose > 4)
-    {
-    for(int kk = 0; kk<nPix; kk++)
-    {
-        printf("%d %f %f %f\n", kk, X[kk], lx[kk], ly[kk]);
-    }
-    }
-
-    double fwhm_x = 0;
-    int status_x = fwhm1d(X, lx, nPix, &fwhm_x);
-    double fwhm_y = 0;
-    int status_y = fwhm1d(X, ly, nPix, &fwhm_y);
-
-    if(verbose > 3)
-    {
-        printf("Status x: %d, y: %d", status_x, status_y);
-        printf(" fwhm x: %f, y: %f\n", fwhm_x, fwhm_y);
-    }
-    free(X);
-    free(lx);
-    free(ly);
-
-    /* Use the average if both profiles seemed ok */
-    float fwhm = -1;
-    if(status_x == 0 && status_y == 0)
-    {
-        fwhm = 0.5*(fwhm_x + fwhm_y);
-    }
-    if(status_x == 0 && status_y != 0)
-    {
-        fwhm = fwhm_x;
-    }
-    if(status_x != 0 && status_y == 0)
-    {
-        fwhm = fwhm_y;
-    }
-
-    return fwhm;
 }

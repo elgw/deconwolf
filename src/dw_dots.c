@@ -28,20 +28,12 @@ static opts * opts_new()
 {
     opts * s = calloc(1, sizeof(opts));
     assert(s != NULL);
-
-    s->overwrite = 0;
     s->verbose = 1;
     s->optpos = -1;
-    s->image = NULL;
-    s->outfile = NULL;
     s->nthreads = dw_get_threads();
-    s->log = 0;
-    s->lsigma = 0;
-    s->asigma = 0;
     s->ndots = -1; /* Auto */
     s->log = NULL;
     s->logfile = NULL;
-    s->LoG = 0;
     s->fout = NULL;
     s->fwhm = 1;
     return s;
@@ -50,9 +42,9 @@ static opts * opts_new()
 
 static void opts_free(opts * s)
 {
-    dw_nullfree(s->outfile);
-    dw_nullfree(s->image);
-    dw_nullfree(s->logfile);
+    free(s->outfile);
+    free(s->image);
+    free(s->logfile);
     if(s->log != NULL)
     {
         fclose(s->log);
@@ -121,7 +113,7 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
     free(s);
 }
 
-ftab_t * ftab_insert_col(ftab_t * T, float * C, char * cname)
+ftab_t * ftab_insert_col(ftab_t * T, float * C, const char * cname)
 {
     /* Create a new table with one extra column */
     ftab_t * T2 = ftab_new(T->ncol + 1);
@@ -167,12 +159,12 @@ static void argparsing(int argc, char ** argv, opts * s)
             s->LoG = 1;
             break;
         case 'L':
-            dw_nullfree(s->logfile);
+            free(s->logfile);
             s->logfile = strdup(optarg);
             assert(s->logfile != NULL);
             break;
         case 'O':
-            dw_nullfree(s->outfile);
+            free(s->outfile);
             s->outfile = strdup(optarg);
             assert(s->outfile != NULL);
             break;
@@ -216,27 +208,33 @@ static void argparsing(int argc, char ** argv, opts * s)
     return;
 }
 
-static ftab_t * append_fwhm(opts * s, ftab_t * T, fim_t * V, char * cname)
+static ftab_t * append_fwhm(opts * s, ftab_t * T, fim_t * V,
+                            const char * cname_lateral,
+                            const char * cname_axial)
 {
     int xcol = ftab_get_col(T, "x");
     int ycol = ftab_get_col(T, "y");
     int zcol = ftab_get_col(T, "z");
 
     struct timespec tstart, tend;
-    float * fwhm = NULL;
+
 
     if(s->verbose > 1)
     {
         printf("Calculating fwhm..."); fflush(stdout);
     }
     clock_gettime(CLOCK_REALTIME, &tstart);
-    fwhm = malloc(T->nrow*sizeof(float));
-    assert(fwhm != NULL);
+    float * fwhm_vals_lateral = malloc(T->nrow*sizeof(float));
+    assert(fwhm_vals_lateral != NULL);
+    float * fwhm_vals_axial = malloc(T->nrow*sizeof(float));
+    assert(fwhm_vals_axial != NULL);
+
 #pragma omp parallel for
     for(size_t kk = 0; kk<T->nrow; kk++)
     {
         float * row = T->T + kk*T->ncol;
-        fwhm[kk] = fwhm_lateral(V, row[xcol], row[ycol], row[zcol], s->verbose);
+        fwhm_vals_lateral[kk] = fwhm_lateral(V, row[xcol], row[ycol], row[zcol], s->verbose);
+        fwhm_vals_axial[kk] = fwhm_axial(V, row[xcol], row[ycol], row[zcol], s->verbose);
     }
     clock_gettime(CLOCK_REALTIME, &tend);
     double t = timespec_diff(&tend, &tstart);
@@ -245,9 +243,11 @@ static ftab_t * append_fwhm(opts * s, ftab_t * T, fim_t * V, char * cname)
         printf(" took %.4f s\n", t);
     }
 
-    T = ftab_insert_col(T, fwhm, cname);
+    T = ftab_insert_col(T, fwhm_vals_lateral, cname_lateral);
+    free(fwhm_vals_lateral);
+    T = ftab_insert_col(T, fwhm_vals_axial, cname_axial);
+    free(fwhm_vals_axial);
 
-    free(fwhm);
     return T;
 }
 
@@ -273,7 +273,7 @@ void detect_dots(opts * s, char * inFile)
     assert(s->image != NULL);
 
     /* Set up the log file for this image */
-    dw_nullfree(s->logfile);
+    free(s->logfile);
     assert(s != NULL);
     assert(s->image != NULL);
     s->logfile = malloc(strlen(s->image) + 64);
@@ -284,7 +284,7 @@ void detect_dots(opts * s, char * inFile)
 
 
     /* Set up the name for the output file */
-    dw_nullfree(s->outfile);
+    free(s->outfile);
     s->outfile = malloc(strlen(s->image) + 64);
     assert(s->outfile != NULL);
     sprintf(s->outfile, "%s.dots.tsv", s->image);
@@ -418,17 +418,7 @@ void detect_dots(opts * s, char * inFile)
 
     if(s->fwhm)
     {
-        T = append_fwhm(s, T, fI, "fwhm_filtered");
-        if(0){
-            fim_t * fimA = malloc(sizeof(fim_t));
-            assert(fimA != NULL);
-            fimA->V = A;
-            fimA->M = M;
-            fimA->N = N;
-            fimA->P = P;
-            T = append_fwhm(s, T, fimA, "fwhm");
-            free(fimA);
-        }
+        T = append_fwhm(s, T, fI, "fwhm_lateral_filtered", "fwhm_axial_filtered");
     }
     free(A);
     free(fI);
