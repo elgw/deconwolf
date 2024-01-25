@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 0.3.5
+- **dw maxproj** There were problems reading the output in
+  MATLAB. Updated so that the output image will be written as a single
+  strip.
+
 ## 0.3.4
 - Minor bug fixes which gives a clean build with `-fanalyzer`.
 

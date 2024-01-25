@@ -1205,6 +1205,7 @@ void ttags_get(TIFF * tfile, ttags * T)
     return;
 }
 
+/* Copy some TIFF tags ttags to tfile */
 void ttags_set(TIFF * tfile, ttags * T)
 {
     //TIFFSetDirectory(tfile, 0);
@@ -1688,6 +1689,7 @@ int fim_tiff_maxproj_XYZ(const char * in, const char * out)
 }
 
 
+/* The output will be written as a single strip */
 int fim_tiff_maxproj(const char * in, const char * out)
 {
     int64_t M, N, P;
@@ -1808,7 +1810,11 @@ int fim_tiff_maxproj(const char * in, const char * out)
                     }
                 }
             }
-            tsize_t written = TIFFWriteRawStrip(output, nn, mstrip, read);
+
+            tsize_t written = TIFFWriteRawStrip(output,
+                                                0, /* append to strip number 0 */
+                                                mstrip, /* data */
+                                                read); /* data size */
             if(written != read)
             {
                 fprintf(stderr, "Failed to write to %s\n", out);
@@ -1846,7 +1852,9 @@ int fim_tiff_maxproj(const char * in, const char * out)
             }
 
 
-            tsize_t written = TIFFWriteRawStrip(output, ss, mstrip, read);
+            tsize_t written = TIFFWriteRawStrip(output,
+                                                0,
+                                                mstrip, read);
             if(written != read)
             {
                 fprintf(stderr, "Failed to write to %s\n", out);
