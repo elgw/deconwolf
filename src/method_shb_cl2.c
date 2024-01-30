@@ -1,5 +1,6 @@
 #include "method_shb_cl2.h"
 
+/* Still work to do before this can be enabled */
 #define use_inplace_clfft 0
 
 
@@ -296,12 +297,14 @@ float * deconvolve_shb_cl2(float * restrict im,
     }
 
 #if use_inplace_clfft
+    printf("1\n");
     fimcl_t * PSF_gpu = fimcl_new(clu, fimcl_real_inplace,
                                   Z, wM, wN, wP);
     fimcl_fft_inplace(PSF_gpu);
     fimcl_t * fft_PSF_gpu = PSF_gpu;
     PSF_gpu = NULL;
     free(Z);
+    printf("2\n");
 #else
     fimcl_t * PSF_gpu = fimcl_new(clu, fimcl_real,
                                   Z, wM, wN, wP);

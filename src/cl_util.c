@@ -222,7 +222,11 @@ fimcl_t * fimcl_new(clu_env_t * clu, fimcl_type type,
     Y->wait_ev = NULL;
 
     cl_int ret;
-    /* Create buffer */
+    if(clu->verbose > 2)
+    {
+        printf("Creating cl buffer\n");
+    }
+
     if(type == fimcl_real)
     {
         Y->buf = clCreateBuffer(clu->context,
@@ -232,13 +236,22 @@ fimcl_t * fimcl_new(clu_env_t * clu, fimcl_type type,
 
         Y->buf_size_nf = M*N*P;
         clu->nb_allocated += M*N*P*sizeof(float);
-    } else {
+    }
+
+    if(type == fimcl_real_inplace)
+    {
         Y->buf_size_nf = fimcl_ncx(Y)*2;
         Y->buf = clCreateBuffer(clu->context,
                                 CL_MEM_READ_WRITE,
                                 Y->buf_size_nf*sizeof(float),
                                 NULL, &ret );
         clu->nb_allocated += Y->buf_size_nf*sizeof(float);
+    }
+
+    if(type == fimcl_hermitian)
+    {
+        fprintf(stderr, "fimcl_new with type=fimcl_hermitian is not supported\n");
+        exit(EXIT_FAILURE);
     }
     check_CL(ret);
 
@@ -247,7 +260,11 @@ fimcl_t * fimcl_new(clu_env_t * clu, fimcl_type type,
         goto done;
     }
 
-    /* Copy data */
+    if(clu->verbose > 2)
+    {
+        printf("Uploading data to GPU\n");
+    }
+
     if(type == fimcl_real)
     {
         check_CL( clEnqueueWriteBuffer( clu->command_queue,
@@ -264,19 +281,19 @@ fimcl_t * fimcl_new(clu_env_t * clu, fimcl_type type,
 
     if(type == fimcl_real_inplace)
     {
+        printf("fimcl_ncx(Y)*2: %zu\n", fimcl_ncx(Y)*2);
         float * PX = pad_for_inplace(X, M, N, P);
         check_CL( clEnqueueWriteBuffer( clu->command_queue,
                                         Y->buf,
                                         CL_TRUE, // blocking_write
                                         0,
                                         fimcl_ncx(Y)*2*sizeof( float ),
-                                        X, // TODO PX ?
+                                        PX,
                                         0, // num_events_in_wait_list
                                         NULL,
                                         &Y->wait_ev ) );
         fimcl_sync(Y);
         free(PX);
-        exit(EXIT_FAILURE);
     }
 
     if(type == fimcl_hermitian)
@@ -284,6 +301,11 @@ fimcl_t * fimcl_new(clu_env_t * clu, fimcl_type type,
         fprintf(stderr, "TODO: Unable to upload already ffted data in %s, line %d\n",
                 __FILE__, __LINE__);
         exit(EXIT_FAILURE);
+    }
+
+    if(clu->verbose > 2)
+    {
+        printf("Upload complete\n");
     }
 
 done: ;
@@ -645,11 +667,22 @@ void fimcl_real_mul_inplace(fimcl_t * X, fimcl_t * Y)
     return;
 }
 
+/* P = x + \alpha*((x-xp))
+* It actually does not matter if the arrays are padded along the first dimension
+* as long as we supply the extended size there is just a little more work to do.
+*/
 void fimcl_shb_update(fimcl_t * P, fimcl_t * X, fimcl_t * XP, float alpha)
 {
-    assert(P->type == fimcl_real);
-    assert(X->type == fimcl_real);
-    assert(XP->type == fimcl_real);
+    if( (P->type == fimcl_real)
+        + (X->type == fimcl_real)
+        + (XP->type == fimcl_real) < 3)
+    {
+        fprintf(stderr,
+                "\n"
+                "ERROR: fimcl_shb_update only support non-padded data, "
+                "i.e. only fimcl_real\n");
+        //       exit(EXIT_FAILURE);
+    }
 
     cl_kernel kernel = X->clu->kern_shb_update.kernel;
 
@@ -713,7 +746,10 @@ void fimcl_shb_update(fimcl_t * P, fimcl_t * X, fimcl_t * XP, float alpha)
 void fimcl_positivity(fimcl_t * X, float val)
 {
     assert(X != NULL);
-    assert(X->type == fimcl_real);
+    if(X->type == fimcl_real)
+    {
+        fprintf(stderr, "Warning: fimcl_positivity should only be used for fimcl_real for the moment\n");
+    }
     cl_kernel kernel = X->clu->kern_real_positivity.kernel;
 
     /* Set sizes */
@@ -892,7 +928,13 @@ fimcl_t * fimcl_fft(fimcl_t * X)
     {
         printf("fimcl_fft\n");
     }
-    assert(X->type == fimcl_real);
+    if(X->type != fimcl_real)
+    {
+        fprintf(stderr,
+                "\n"
+                "ERROR: fimcl_fft was not called with a fimcl_real object\n");
+        exit(EXIT_FAILURE);
+    }
     fimcl_sync(X);
 
     /* Number of complex elements in the FFT */
@@ -1344,6 +1386,27 @@ void clu_prepare_kernels(clu_env_t * clu,
                                     0, NULL, NULL));
     clu->n_alloc++;
     clu->clFFT_loaded = 1;
+
+#ifdef VKFFT
+    VkFFTConfiguration configuration = {};
+
+    //Device management + code submission
+    configuration.device = &clu->device_id;
+    configuration.platform = &clu->platform_id;
+    configuration.context = &clu->context;
+    configuration.performR2C = 1; /*  Perform R2C/C2R decomposition */
+    configuration.FFTdim = 3; //FFT dimension
+    configuration.size[0] = wM; //FFT size -- number of complex numbers in this case
+    configuration.size[1] = wN;
+    configuration.size[2] = wP;
+
+    //configuration.isOutputFormatted = 1; // padded for output size
+    configuration.normalize = 1; // Normalize inverse transform (0 - off, 1- on
+    printf("sizeof(VkFFTApplication))=%zu\n", sizeof(VkFFTApplication));;
+
+    VkFFTResult resFFT = initializeVkFFT(&clu->vkfft_app, configuration);
+#endif
+
     return;
 }
 
@@ -1397,6 +1460,10 @@ void clu_destroy(clu_env_t * clu)
 
     check_CL(clReleaseCommandQueue(clu->command_queue) );
     check_CL(clReleaseContext(clu->context));
+
+#ifdef VKFFT
+    deleteVkFFT(&clu->vkfft_app);
+#endif
 
     free(clu);
     return;
@@ -1680,6 +1747,7 @@ clfftPlanHandle  gen_r2h_plan(clu_env_t * clu,
     return planHandle;
 }
 
+/* TEST: Will inplace be much faster when the first dimension is padded? */
 clfftPlanHandle  gen_r2h_inplace_plan(clu_env_t * clu,
                                       size_t M, size_t N, size_t P)
 {
@@ -2086,13 +2154,14 @@ float * pad_for_inplace(const float * X, size_t M, size_t N, size_t P)
     const size_t nchunk = N*P;
     const size_t chunk_size = M*sizeof(float);
     float * PX = calloc(padsize(M)*N*P, sizeof(float));
+    printf("padsize(M)*N*P = %zu\n", padsize(M)*N*P);
     assert(PX != NULL);
     /* P values at a time */
     for(size_t c = 0; c < nchunk; c++)
     {
         memcpy(PX+c*padsize(M), X + c*M, chunk_size);
     }
-
+    printf("5\n");
     return PX;
 }
 

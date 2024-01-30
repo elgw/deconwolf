@@ -1,9 +1,13 @@
 #pragma once
 
-/* This is tailored for a single FFT size. Doing it that way we can
- * do much initialization in bulk at the beginning.
- * Notes:
- * -
+/* Only a single clu should be used at a time.
+ * One clu is only set up for a specific fft size.
+ *
+ * For vkFFT:
+ * - Todo: Forward and backward FFT (inplace and/or out of place)
+ *
+ * For clFFT:
+ * - Fix so that the inplace transforms work! (default is out-of-place, right?)
  */
 
 #include <assert.h>
@@ -15,12 +19,11 @@
 #include "dw_util.h"
 
 //#define CL_USE_DEPRECATED_OPENCL_1_2_APIS
-//#define CL_TARGET_OPENCL_VERSION 120
 
 
-// TODO: see how to replace clCreateCommandQueue for more recent targets
-
+/* VkFFT targets version 1.20 */
 #define CL_TARGET_OPENCL_VERSION 120
+
 #ifdef __APPLE__
 #include <OpenCL/cl.h>
 #else
@@ -31,6 +34,14 @@
 #define CLU_KEEP_ALL 0
 #define CLU_DROP_ALL 1
 #define CLU_KEEP_2ND 2
+
+/* Should be defined in the makefile */
+#ifdef VKFFT_BACKEND
+#include "vkFFT.h"
+#ifndef VKFFT
+#define VKFFT
+#endif
+#endif
 
 
 const char* clGetErrorString(int errorCode);
@@ -72,17 +83,22 @@ typedef struct{
     clu_kernel_t * idiv_kernel;
     clu_kernel_t * update_y_kernel;
 
-
     size_t nb_allocated;
     size_t n_release;
     size_t n_alloc;
+
+#ifdef VKFFT
+    VkFFTApplication vkfft_app;
+#endif
 } clu_env_t;
 
 /* A fimcl object can be one of these types */
 typedef enum {
-    fimcl_real,
-    fimcl_real_inplace,
-    fimcl_hermitian} fimcl_type ;
+    fimcl_real, /* Real without any padding */
+    fimcl_real_inplace, /* 1st dimension padded */
+    fimcl_hermitian /* I.e. interleaved complex */
+}
+    fimcl_type ;
 
 typedef struct{
     size_t M;

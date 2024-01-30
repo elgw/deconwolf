@@ -33,7 +33,7 @@ DEBUG?=0
 ifeq ($(DEBUG),1)
     CFLAGS += -O0 -Wno-unknown-pragmas -fanalyzer -g3
 else
-    CFLAGS += -O3 -flto=auto -DNDEBUG
+    CFLAGS += -O3 -flto=auto -g3 #-DNDEBUG
     # Notes:
     # -O2 -ftree-vectorize and -O3 give about the same performance
     # -DNDEBUG turns off some self-tests
@@ -145,6 +145,11 @@ ifeq ($(OPENCL), 1)
 dw_LIBRARIES+=-lclFFT
 endif
 
+
+CFLAGS+=-DVKFFT_BACKEND=3
+CFLAGS+=-I../../VkFFT/vkFFT/
+
+# Platform specific
 ifneq ($(UNAME_S),Darwin)
     CFLAGS+=
 endif
