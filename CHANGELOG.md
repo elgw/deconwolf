@@ -1,11 +1,11 @@
 # CHANGELOG
 
 ## 0.3.6
-- Changed so that the GPU code uses in-place transformations as much
-  as possible.
+- The GPU code path uses in-place transformations as much as possible
+  to save a little on the memory usage.
 
-- Added the option to use [VkFFT](https://github.com/DTolm/VkFFT) for
-  the FFT calculations on the GPU (still under OpenCL).
+- Switched to [VkFFT](https://github.com/DTolm/VkFFT) for the FFT
+  calculations on the GPU (still under OpenCL).
 
   To build, you will have to download VkFFT and place it in a folder
   next to this one. Then build with:
@@ -15,9 +15,9 @@
   make -B OPENCL=1 VKFFT=1
   ```
 
-  Initial tests show a speed up of about 15%. As a bonus VkFFT will
-  process any sizes while clFFT simply refuse to process the tricky
-  ones.
+  Initial tests show a speed up of about 10-30% depending on the image
+  size. As a bonus VkFFT will process any sizes while clFFT simply
+  refuse to process the tricky ones.
 
 
 ## 0.3.5

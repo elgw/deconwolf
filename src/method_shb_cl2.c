@@ -109,8 +109,12 @@ float iter_shb_cl2(fimcl_t ** _xp_gpu, // Output, f_(t+1)
 
     here();
 
-    // Actually takes some time ...
+    /* We spend 30% of the time here!  Bad enough to be called a
+     * BUG. At least it needs to be improved. In worst case we can
+     * skip calculating it at ever step!
+     */
     float error = fimcl_error_idiv(gy, im_gpu);
+    //float error = 0;
 
     putdot(s);
     here();

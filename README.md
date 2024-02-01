@@ -54,7 +54,8 @@ version in the future.
 ### Dependencies
 Deconwolf uses:
 
- * [FFTW](http://www.fftw.org/fftw3_doc/) for Fourier Transforms.
+ * [FFTW](http://www.fftw.org/fftw3_doc/) for Fourier Transforms. Or
+   alternatively Intel MKL.
  * [libtiff](https://gitlab.com/libtiff/libtiff) to read and write TIFF files.
  * [GNU Scientific Library](https://www.gnu.org/software/gsl/) for
    integration and special functions.
@@ -62,11 +63,16 @@ Deconwolf uses:
    of code, used in **dw**.
  * [POSIX Threads](https://en.wikipedia.org/wiki/Pthreads) for
    explicit paralellization (in **dw_bw**)
- * [libclfft2](https://github.com/clMathLibraries/clFFT) for FFTs on
-   the GPU. Optional during compilation.
 
-If these libraries are available for your platform, chances are that that it can
-be built. FFTW can also be replaced by Intel MKL or NVIDIA CUFFTW.
+If these libraries are available for your platform, chances are that
+that it can be built.
+
+To enable GPU acceleration, deconwolf also requires:
+
+ * A computer/GPU with OpenCL.
+ * [VkFFT](https://github.com/DTolm/VkFFT) for FFT transform on GPUs
+   (the OpenCL backend is used). Alternatively it is possible to use
+   [libclfft2](https://github.com/clMathLibraries/clFFT).
 
 
 ### Ubuntu 22.04 (or Windows with WSL)
@@ -99,8 +105,9 @@ sudo apt-install ./deconwolf_*.deb
 ```
 
 ## Minimal usage example
-To generate a parametric PSF and deconvolve an image, all you need is something
-like this:
+To generate a parametric PSF and deconvolve an image, all you need is
+something like this:
+
 ``` shell
 # generate PSF.tif
 dw_bw --resxy 130 --resz 250 --NA 1.46 --ni 1.518 --lambda 460 PSF.tiff
@@ -114,7 +121,9 @@ dw --help
 dw_bw --help
 ```
 
-To validate that dw does what it should, run it on `/demo/dapi_001.tif`:
+To validate that dw does not create random garbage, run it on
+`/demo/dapi_001.tif`
+
 
 ``` shell
 cd demo
