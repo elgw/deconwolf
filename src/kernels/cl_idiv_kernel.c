@@ -22,7 +22,7 @@ kernel void idiv_kernel( global const float * forward,
     size_t m = rem - n*wM;
 
     size_t imIdx = m + n*M + p*M*N;
-    if(m < M && n < N && p < P )
+    if(m < M0 && n < N && p < P )
     {
         float est = forward[gid];
         float obs = image[imIdx];

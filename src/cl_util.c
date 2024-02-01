@@ -225,8 +225,7 @@ fimcl_t * fimcl_new(clu_env_t * clu, fimcl_type type,
         printf("Creating cl buffer\n");
     }
 
-    if(type == fimcl_real)
-    {
+
         Y->buf_size_nf = fimcl_ncx(Y)*2;
 
         Y->buf = clCreateBuffer(clu->context,
@@ -234,13 +233,7 @@ fimcl_t * fimcl_new(clu_env_t * clu, fimcl_type type,
                                 Y->buf_size_nf*sizeof(float),
                                 NULL, &ret );
         clu->nb_allocated += Y->buf_size_nf*sizeof(float);
-    }
 
-    if(type == fimcl_hermitian)
-    {
-        fprintf(stderr, "fimcl_new with type=fimcl_hermitian is not supported\n");
-        exit(EXIT_FAILURE);
-    }
     check_CL(ret);
 
     if(X == NULL)
@@ -283,7 +276,7 @@ fimcl_t * fimcl_new(clu_env_t * clu, fimcl_type type,
         printf("Upload complete\n");
     }
 
-done: ;
+ done: ;
     return Y;
 }
 
@@ -294,28 +287,19 @@ fimcl_t * fimcl_copy(fimcl_t * G)
         printf("fimcl_copy\n");
     }
 
-    if(G->type == fimcl_hermitian)
-    {
-        fprintf(stderr, "fimcl_copy for type==fimcl_hermitian not implemented \n");
-        exit(EXIT_FAILURE);
-    }
-
     fimcl_t * H = fimcl_new(G->clu, G->type, NULL, G->M, G->N, G->P);
 
-    fimcl_sync(G);
-    if(G->type == fimcl_real)
-    {
-        check_CL(clEnqueueCopyBuffer(
-                     G->clu->command_queue,//cl_command_queue command_queue,
-                     G->buf, //cl_mem src_buffer,
-                     H->buf, //cl_mem dst_buffer,
-                     0, //size_t src_offset,
-                     0, //size_t dst_offset,
-                     padsize(G->M)*G->N*G->P*sizeof(float),//size_t size,
-                     0, //cl_uint num_events_in_wait_list,
-                     NULL, //const cl_event* event_wait_list,
-                     &H->wait_ev)); //cl_event* event);
-    }
+    check_CL(clEnqueueCopyBuffer(
+                                 G->clu->command_queue,//cl_command_queue command_queue,
+                                 G->buf, //cl_mem src_buffer,
+                                 H->buf, //cl_mem dst_buffer,
+                                 0, //size_t src_offset,
+                                 0, //size_t dst_offset,
+                                 padsize(G->M)*G->N*G->P*sizeof(float),//size_t size,
+                                 0, //cl_uint num_events_in_wait_list,
+                                 NULL, //const cl_event* event_wait_list,
+                                 &H->wait_ev)); //cl_event* event);
+
     H->buf_size_nf = G->buf_size_nf;
     assert(H->buf_size_nf == padsize(G->M)*G->N*G->P);
     return H;
@@ -361,11 +345,16 @@ static fimcl_t * _fimcl_convolve(fimcl_t * X, fimcl_t * Y, int mode, int conj)
 
             fimcl_t * fX = NULL;
 
+            if(X->clu->prefer_inplace)
+            {
+                fimcl_ifft_inplace(X);
+                fX = X;
+                X = NULL;
+            } else {
+                fX = fimcl_ifft(X);
+                fimcl_free(X);
+            }
 
-            fX = fimcl_ifft(X);
-            fimcl_free(X);
-
-            clFinish(X->clu->command_queue);
             return fX;
         }
 
@@ -378,8 +367,8 @@ static fimcl_t * _fimcl_convolve(fimcl_t * X, fimcl_t * Y, int mode, int conj)
             assert(X->buf_size_nf > 0);
             fimcl_complex_mul_inplace(Y, X, conj);
 
-            fimcl_t * fX = NULL;
 
+            fimcl_t * fX = NULL;
             fX = fimcl_ifft(X);
             fimcl_sync(fX);
             assert(fX->buf_size_nf > 0);
@@ -635,9 +624,9 @@ void fimcl_real_mul_inplace(fimcl_t * X, fimcl_t * Y)
 }
 
 /* P = x + \alpha*((x-xp))
-* It actually does not matter if the arrays are padded along the first dimension
-* as long as we supply the extended size there is just a little more work to do.
-*/
+ * It actually does not matter if the arrays are padded along the first dimension
+ * as long as we supply the extended size there is just a little more work to do.
+ */
 void fimcl_shb_update(fimcl_t * P, fimcl_t * X, fimcl_t * XP, float alpha)
 {
     if( (P->type == fimcl_real)
@@ -818,6 +807,13 @@ void fimcl_complex_mul_inplace(fimcl_t * X, fimcl_t * Y, int conj)
 
 fimcl_t * fimcl_ifft(fimcl_t * fX)
 {
+
+#ifdef VKFFT
+    fimcl_t * X = fimcl_copy(fX);
+    fimcl_ifft_inplace(X);
+    return X;
+#else
+
     if(fX->clu->verbose > 1)
     {
         printf("fimcl_ifft\n");
@@ -838,11 +834,13 @@ fimcl_t * fimcl_ifft(fimcl_t * fX)
                             padsize(fX->M)*fX->N*fX->P *  sizeof(float),
                             NULL, &ret );
     X->buf_size_nf = padsize(fX->M)*fX->N*fX->P;
-    fX->clu->nb_allocated += fX->M*fX->N*fX->P *  sizeof(float);
+    fX->clu->nb_allocated += fX->M*fX->N*fX->P*sizeof(float);
     check_CL(ret);
 
     /* And back again */
     clFinish(X->clu->command_queue);
+
+
     check_clFFT(clfftEnqueueTransform(fX->clu->h2r_plan, // XXX
                                       CLFFT_BACKWARD,
                                       1, // numQueuesAndEcents
@@ -853,10 +851,12 @@ fimcl_t * fimcl_ifft(fimcl_t * fX)
                                       &fX->buf, // Input buffer
                                       &X->buf, // output buffer
                                       fX->clu->clfft_buffer)); // temp buffer
+
     clFinish(X->clu->command_queue);
     fimcl_sync(X);
     here();
     return X;
+#endif
 }
 
 void fimcl_ifft_inplace(fimcl_t * X)
@@ -870,6 +870,29 @@ void fimcl_ifft_inplace(fimcl_t * X)
 
 
     fimcl_sync(X);
+
+#ifdef VKFFT
+    VkFFTLaunchParams launchParams = {};
+
+    launchParams.commandQueue = &X->clu->command_queue;
+    /* The main buffer is called buffer and it always has to be
+       provided, either during the plan creation or when the plan is
+       executed. All calculations are performed in this buffer and it
+       is always overwritten. */
+
+    launchParams.buffer = &X->buf;
+    /* Buffer size does not have to be supplied with OpenCL */
+    int inverse = 1;
+    VkFFTResult resFFT = VkFFTAppend(&X->clu->vkfft_app,
+                                     inverse, &launchParams);
+    if(resFFT != 0)
+    {
+        fprintf(stderr, "VkFFT failed with error %d\n", resFFT);
+        exit(EXIT_FAILURE);
+    }
+
+
+#else
     check_clFFT(clfftEnqueueTransform(X->clu->h2r_inplace_plan,
                                       CLFFT_BACKWARD,
                                       1, // numQueuesAndEvents
@@ -880,6 +903,7 @@ void fimcl_ifft_inplace(fimcl_t * X)
                                       &X->buf, // Input buffer
                                       NULL, // output buffer
                                       NULL)); // temp buffer
+#endif
     clFinish(X->clu->command_queue);
 
     fimcl_sync(X);
@@ -890,6 +914,13 @@ void fimcl_ifft_inplace(fimcl_t * X)
 
 fimcl_t * fimcl_fft(fimcl_t * X)
 {
+
+#ifdef VKFFT
+    fimcl_t * Y = fimcl_copy(X);
+    fimcl_fft_inplace(Y);
+    return Y;
+#else
+
     if(X->clu->verbose > 1)
     {
         printf("fimcl_fft\n");
@@ -923,6 +954,9 @@ fimcl_t * fimcl_fft(fimcl_t * X)
     X->clu->nb_allocated += fX->buf_size_nf *  sizeof(float);
     check_CL(ret);
 
+
+
+
     check_clFFT(clfftEnqueueTransform(X->clu->r2h_plan,
                                       CLFFT_FORWARD, // direction
                                       1, // numQueuesAndEcents
@@ -933,8 +967,10 @@ fimcl_t * fimcl_fft(fimcl_t * X)
                                       &X->buf, // Input buffer
                                       &fX->buf, // output buffer
                                       X->clu->clfft_buffer)); // temp buffer
+
     fimcl_sync(fX);
     return fX;
+#endif
 }
 
 void fimcl_fft_inplace(fimcl_t * X)
@@ -962,6 +998,33 @@ void fimcl_fft_inplace(fimcl_t * X)
         exit(EXIT_FAILURE);
     }
 
+#ifdef VKFFT
+    VkFFTLaunchParams launchParams = {};
+
+    launchParams.commandQueue = &X->clu->command_queue;
+    /* The main buffer is called buffer and it always has to be
+       provided, either during the plan creation or when the plan is
+       executed. All calculations are performed in this buffer and it
+       is always overwritten. */
+
+    launchParams.buffer = &X->buf;
+    /* Buffer size does not have to be supplied with OpenCL */
+    int inverse = 0;
+    if(X->clu->verbose > 1)
+    {
+        printf("VkFFTAppend (for in-place forward transform)\n");
+    }
+    VkFFTResult resFFT = VkFFTAppend(&X->clu->vkfft_app,
+                                     inverse, &launchParams);
+    if(resFFT != 0)
+    {
+        fprintf(stderr, "VkFFT failed with error %d\n", resFFT);
+        exit(EXIT_FAILURE);
+    }
+
+    clFinish(X->clu->command_queue);
+
+#else
     fimcl_sync(X);
     check_clFFT(clfftEnqueueTransform(X->clu->r2h_inplace_plan,
                                       CLFFT_FORWARD, // direction
@@ -974,6 +1037,8 @@ void fimcl_fft_inplace(fimcl_t * X)
                                       NULL, // output buffer
                                       X->clu->clfft_buffer)); // temp buffer
     fimcl_sync(X);
+#endif
+
     X->type = fimcl_hermitian;
     return;
 }
@@ -1116,6 +1181,12 @@ static char * read_program(const char * fname, size_t * size)
 
 clu_env_t * clu_new(int verbose, int cl_device)
 {
+
+    clu_env_t * env = calloc(1, sizeof(clu_env_t));
+    env->verbose = verbose;
+
+
+#ifndef VKFFT
     /* Might be of use in future releases */
     setenv("CLFFT_REQUEST_LIB_NOMEMALLOC", "1", 1);
 
@@ -1128,13 +1199,12 @@ clu_env_t * clu_new(int verbose, int cl_device)
     setenv("CLFFT_CACHE_PATH", clFFT_cache_path, 1);
     ensuredir(clFFT_cache_path);
     free(clFFT_cache_path);
-
-
-    clu_env_t * env = calloc(1, sizeof(clu_env_t));
-    env->verbose = verbose;
     env->clfft_buffer = NULL;
     env->clfft_buffer_size = 0;
     env->clFFT_loaded = 0;
+#endif
+
+
 
     cl_uint ret_num_devices;
     cl_uint ret_num_platforms;
@@ -1211,11 +1281,16 @@ clu_env_t * clu_new(int verbose, int cl_device)
 
     if(env->verbose > 1)
     {
+#ifdef VKFFT
+        printf("Using VkFFT version %d\n", VkFFTGetVersion());
+#else
         cl_uint major, minor, patch;
         clfftGetVersion(&major, &minor, &patch);
         printf("clfft version: %d.%d.%d\n", major, minor, patch);
+#endif
     }
 
+    env->prefer_inplace = 1;
     return env;
 }
 
@@ -1228,6 +1303,8 @@ void clu_prepare_kernels(clu_env_t * clu,
         printf("Preparing for convolutions of size %zu x %zu x %zu\n",
                wM, wN, wP);
     }
+
+#ifndef VKFFT
     assert(clu->clFFT_loaded == 0);
 
     /* Setup clFFT. */
@@ -1247,6 +1324,8 @@ void clu_prepare_kernels(clu_env_t * clu,
 
     clu->h2r_plan = gen_h2r_plan(clu, wM, wN, wP);
     clu->h2r_inplace_plan = gen_h2r_inplace_plan(clu, wM, wN, wP);
+    clu->clFFT_loaded = 1;
+#endif
 
     char * argstring = malloc(1024);
 
@@ -1256,7 +1335,7 @@ void clu_prepare_kernels(clu_env_t * clu,
 
     /* Kernels for complex floats
      * These kernels only know the number of complex values
-    */
+     */
     sprintf(argstring, "-D cMNP=%zu",
             M_r2h(wM)*wN*wP);
     clu->kern_mul =
@@ -1324,9 +1403,13 @@ void clu_prepare_kernels(clu_env_t * clu,
        without checking capabilities */
     sprintf(argstring,
             "-DNELEMENTS=%zu "
+            "-DM0=%zu "
             "-DM=%zu -DN=%zu -DP=%zu "
             "-DwM=%zu -DwN=%zu -DwP=%zu",
-            padsize(wM)*wN*wP, padsize(M), N, P, padsize(wM), wN, wP);
+            padsize(wM)*wN*wP,
+            M,
+            padsize(M), N, P,
+            padsize(wM), wN, wP);
 
     clu->idiv_kernel = clu_kernel_newa(clu,
                                        "kernels/cl_idiv_kernel.c",
@@ -1359,7 +1442,7 @@ void clu_prepare_kernels(clu_env_t * clu,
                                     &value,
                                     0, NULL, NULL));
     clu->n_alloc++;
-    clu->clFFT_loaded = 1;
+
 
 #ifdef VKFFT
     VkFFTConfiguration configuration = {};
@@ -1376,9 +1459,21 @@ void clu_prepare_kernels(clu_env_t * clu,
 
     //configuration.isOutputFormatted = 1; // padded for output size
     configuration.normalize = 1; // Normalize inverse transform (0 - off, 1- on
-    printf("sizeof(VkFFTApplication))=%zu\n", sizeof(VkFFTApplication));;
+    // printf("sizeof(VkFFTApplication))=%zu\n", sizeof(VkFFTApplication));;
 
+    if(clu->verbose > 1)
+    {
+        printf("Initializing VkFFT for size %zu x %zu x %zu\n",
+               configuration.size[0],
+               configuration.size[1],
+               configuration.size[2]);
+    }
     VkFFTResult resFFT = initializeVkFFT(&clu->vkfft_app, configuration);
+    if(resFFT != 0)
+    {
+        fprintf(stderr, "VkFFT failed with error %d\n", resFFT);
+        exit(EXIT_FAILURE);
+    }
 #endif
 
     return;
@@ -1391,6 +1486,9 @@ void clu_destroy(clu_env_t * clu)
         printf("Closing the OpenCL environment\n");
     }
 
+#ifdef VKFFT
+    deleteVkFFT(&clu->vkfft_app);
+#else
     /* Release clFFT library. */
     if(clu->clFFT_loaded)
     {
@@ -1412,6 +1510,7 @@ void clu_destroy(clu_env_t * clu)
             check_CL(clReleaseMemObject(clu->float_gpu));
         }
     }
+#endif
 
     /* Clear up the OpenCL stuff */
     check_CL(clFlush(clu->command_queue));
@@ -1435,9 +1534,7 @@ void clu_destroy(clu_env_t * clu)
     check_CL(clReleaseCommandQueue(clu->command_queue) );
     check_CL(clReleaseContext(clu->context));
 
-#ifdef VKFFT
-    deleteVkFFT(&clu->vkfft_app);
-#endif
+
 
     free(clu);
     return;
@@ -1643,6 +1740,7 @@ size_t clu_next_fft_size(size_t N)
 }
 
 
+#ifndef VKFFT
 const char * get_clfft_error_string(clfftStatus error)
 {
     switch (error) {
@@ -1668,7 +1766,9 @@ const char * get_clfft_error_string(clfftStatus error)
         return "UNKNOWN";
     }
 }
+#endif
 
+#ifndef VKFFT
 clfftPlanHandle  gen_r2h_plan(clu_env_t * clu,
                               size_t M, size_t N, size_t P)
 {
@@ -1710,6 +1810,7 @@ clfftPlanHandle  gen_r2h_plan(clu_env_t * clu,
                               NULL, NULL));
     check_CL(clFinish(clu->command_queue));
 
+#ifndef VKFFT
     size_t clfft_buffersize = 0;
     check_clFFT(clfftGetTmpBufSize(planHandle, &clfft_buffersize));
     if(clu->verbose > 2)
@@ -1720,10 +1821,14 @@ clfftPlanHandle  gen_r2h_plan(clu_env_t * clu,
         }
     }
     clu_increase_clfft_buffer(clu, clfft_buffersize);
+#endif
 
     return planHandle;
 }
+#endif
 
+
+#ifndef VKFFT
 /* TEST: Will inplace be much faster when the first dimension is padded? */
 clfftPlanHandle  gen_r2h_inplace_plan(clu_env_t * clu,
                                       size_t M, size_t N, size_t P)
@@ -1785,7 +1890,9 @@ clfftPlanHandle  gen_r2h_inplace_plan(clu_env_t * clu,
 
     return planHandle;
 }
+#endif
 
+#ifndef VKFFT
 cl_int clu_increase_clfft_buffer(clu_env_t * clu, size_t req_size)
 {
     cl_int ret = CL_SUCCESS;
@@ -1810,7 +1917,9 @@ cl_int clu_increase_clfft_buffer(clu_env_t * clu, size_t req_size)
 
     return ret;
 }
+#endif
 
+#ifndef VKFFT
 clfftPlanHandle  gen_h2r_plan(clu_env_t * clu,
                               size_t M, size_t N, size_t P)
 {
@@ -1836,11 +1945,11 @@ clfftPlanHandle  gen_h2r_plan(clu_env_t * clu,
                                        CLFFT_OUTOFPLACE));
 
     size_t inStride[3] = {1, cM, cM*cN};
-    #if PAD_FIRST_DIM
+#if PAD_FIRST_DIM
     size_t outStride[3] = {1, padsize(M), padsize(M)*N};
-    #else
+#else
     size_t outStride[3] = {1, M, M*N};
-    #endif
+#endif
 
     check_clFFT(clfftSetPlanInStride(planHandle,  CLFFT_3D, inStride));
     check_clFFT(clfftSetPlanOutStride(planHandle, CLFFT_3D, outStride));
@@ -1860,7 +1969,9 @@ clfftPlanHandle  gen_h2r_plan(clu_env_t * clu,
     clu_increase_clfft_buffer(clu, clfft_buffersize);
     return planHandle;
 }
+#endif
 
+#ifndef VKFFT
 clfftPlanHandle  gen_h2r_inplace_plan(clu_env_t * clu,
                                       size_t M, size_t N, size_t P)
 {
@@ -1886,12 +1997,12 @@ clfftPlanHandle  gen_h2r_inplace_plan(clu_env_t * clu,
                                        CLFFT_INPLACE));
 
     size_t inStride[3] = {1, cM, cM*cN};
-    #if PAD_FIRST_DIM
+#if PAD_FIRST_DIM
     size_t outStride[3] = {1, padsize(M), padsize(M)*N};
-    #else
+#else
     printf("gen_h2r_inplace_plan got bad values\n");
     size_t outStride[3] = {1, M, M*N};
-    #endif
+#endif
 
     check_clFFT(clfftSetPlanInStride(planHandle,  CLFFT_3D, inStride));
     check_clFFT(clfftSetPlanOutStride(planHandle, CLFFT_3D, outStride));
@@ -1917,6 +2028,8 @@ clfftPlanHandle  gen_h2r_inplace_plan(clu_env_t * clu,
     clu_increase_clfft_buffer(clu, clfft_buffersize);
     return planHandle;
 }
+#endif
+
 
 void clu_benchmark_transfer(clu_env_t * clu)
 {
@@ -1992,11 +2105,11 @@ void fimcl_update_y(fimcl_t * gy, fimcl_t * image)
     /* This takes no time, probably just a look-up so no need to
      * cache it */
     check_CL(
-        clGetKernelWorkGroupInfo(kernel,
-                                 gy->clu->device_id,
-                                 CL_KERNEL_WORK_GROUP_SIZE,
-                                 sizeof(size_t), &localWorkSize, NULL)
-        );
+             clGetKernelWorkGroupInfo(kernel,
+                                      gy->clu->device_id,
+                                      CL_KERNEL_WORK_GROUP_SIZE,
+                                      sizeof(size_t), &localWorkSize, NULL)
+             );
 
     /* The global size needs to be a multiple of the localWorkSize
      * i.e. it will be larger than the number of elements */
@@ -2050,7 +2163,7 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
     cl_int status = CL_SUCCESS;
 
     /* Configure sizes */
-    size_t nel = forward->M*forward->N*forward->P;
+    size_t nel = padsize(forward->M)*forward->N*forward->P;
     size_t localWorkSize; /* Use largest possible */
     // TOOD: does this take time?
     cl_kernel kernel = forward->clu->idiv_kernel->kernel;
@@ -2068,7 +2181,6 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
         printf("   localWorkSize: %zu\n", localWorkSize);
         printf("   numWorkGroups: %zu\n", numWorkGroups);
     }
-    assert(globalWorkSize >= image->M*image->N*image->P);
 
     fimcl_sync(forward);
     fimcl_sync(image);
@@ -2126,6 +2238,7 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
                                  NULL,
                                  NULL);
     clFinish(forward->clu->command_queue);
+    clReleaseMemObject(partial_sums_gpu);
 
     float sum_gpu = 0;
 #pragma omp parallel for reduction(+ : sum_gpu)
@@ -2134,7 +2247,7 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
         sum_gpu += partial_sums[kk];
     }
     free(partial_sums);
-    clReleaseMemObject(partial_sums_gpu);
+
 
     return sum_gpu / (float) (image->M*image->N*image->P);
 }

@@ -38,12 +38,14 @@ static fimcl_t  * fft_block_of_ones(clu_env_t * clu,
     }
 
     fimcl_t * gOne = fimcl_new(clu, fimcl_real, one, wM, wN, wP);
-    here();
-    fimcl_sync(gOne);
-    here();
-    free(one);
+#if use_inplace_clfft
+    fimcl_fft_inplace(gOne);
+    fimcl_t * gfOne = gOne;
+    gOne = NULL;
+#else
     fimcl_t * gfOne = fimcl_fft(gOne);
     fimcl_free(gOne);
+#endif
     return gfOne;
 }
 
@@ -100,27 +102,19 @@ float iter_shb_cl2(fimcl_t ** _xp_gpu, // Output, f_(t+1)
     fimcl_free(xp_gpu);
 
     fimcl_t * fft_pk_gpu = fimcl_fft(pk_gpu); // Pk -> fft_pk_gpu
-    //assert(fft_pk_gpu->buf_size_nf > 0);
-    here();
-
-    putdot(s);
-
-    // could be done inplace
-    assert(fft_psf_gpu->buf_size_nf > 0);
-    assert(fft_pk_gpu->buf_size_nf > 0);
     fimcl_t * gy = fimcl_convolve(fft_pk_gpu, fft_psf_gpu, CLU_KEEP_2ND);
     fft_pk_gpu = NULL;
-    assert(gy->buf_size_nf > 0);
-
-
 
     putdot(s);
 
     here();
 
+    // Actually takes some time ...
     float error = fimcl_error_idiv(gy, im_gpu);
+
     putdot(s);
     here();
+    /* Y = I./Y */
     fimcl_update_y(gy, im_gpu);
     putdot(s);
     here();
@@ -264,7 +258,8 @@ float * deconvolve_shb_cl2(float * restrict im,
 
     if(0){
         printf("WARNING: Tests enabled\n");
-        printf("-> upload and download -- copy.tif\n");
+
+        printf("-- upload and download -> copy.tif\n");
         {
             fimcl_t * gi = fimcl_new(clu, fimcl_real, im, M, N, P);
             float * _gi = fimcl_download(gi);
@@ -272,7 +267,20 @@ float * deconvolve_shb_cl2(float * restrict im,
             fim_tiff_write_float("copy.tif", _gi, NULL, M, N, P);
             free(_gi);
         }
-        printf("-> upload fft ifft download -- copy_ifft_fft.tif \n");
+
+        printf("-> copy_ipFFT_ipIFFT.tif \n");
+        {
+            fimcl_t * gi = fimcl_new(clu, fimcl_real, im, M, N, P);
+            fimcl_fft_inplace(gi);
+            fimcl_ifft_inplace(gi);
+            float * _gi = fimcl_download(gi);
+            fimcl_free(gi);
+            fim_tiff_write_float("copy_ipFFT_ipIFFT.tif", _gi, NULL, M, N, P);
+            free(_gi);
+        }
+
+
+        printf("-- copy_FFT_IFFT.tif \n");
         {
             fimcl_t * gi = fimcl_new(clu, fimcl_real, im, M, N, P);
             fimcl_t * FFTgi = fimcl_fft(gi);
@@ -281,10 +289,11 @@ float * deconvolve_shb_cl2(float * restrict im,
             fimcl_free(FFTgi);
             float * _gi = fimcl_download(IFFT_FFT_gi);
             fimcl_free(IFFT_FFT_gi);
-            fim_tiff_write_float("copy_ifft_fft.tif", _gi, NULL, M, N, P);
+            fim_tiff_write_float("copy_FFT_IFFT.tif", _gi, NULL, M, N, P);
             free(_gi);
         }
-        printf("-> INPLACE upload fft ifft download -- copy_inplace_ifft_fft.tif \n");
+
+        printf("-> -- copy_ipFFT_IFFT.tif \n");
         {
             fimcl_t * gi = fimcl_new(clu, fimcl_real, im, M, N, P);
             fimcl_fft_inplace(gi);
@@ -293,21 +302,24 @@ float * deconvolve_shb_cl2(float * restrict im,
             fimcl_free(gi);
             float * _gi = fimcl_download(igi);
             fimcl_free(igi);
-            fim_tiff_write_float("copy_inplace_ifft_fft.tif", _gi, NULL, M, N, P);
+            fim_tiff_write_float("copy_ipFFT_IFFT.tif", _gi, NULL, M, N, P);
             free(_gi);
         }
 
-        printf("-> FULL INPLACE upload fft ifft download -- copy_full_inplace_ifft_fft.tif \n");
+        printf("-- copy_FFT_ipIFFT\n");
         {
             fimcl_t * gi = fimcl_new(clu, fimcl_real, im, M, N, P);
-            fimcl_fft_inplace(gi);
-            fimcl_ifft_inplace(gi);
-            float * _gi = fimcl_download(gi);
+            fimcl_t *Fgi = fimcl_fft(gi);
             fimcl_free(gi);
-            fim_tiff_write_float("copy_full_inplace_ifft_fft.tif", _gi, NULL, M, N, P);
+            fimcl_ifft_inplace(Fgi);
+            float * _gi = fimcl_download(Fgi);
+            fimcl_free(Fgi);
+            fim_tiff_write_float("copy_ipFFT_ipIFFT.tif", _gi, NULL, M, N, P);
             free(_gi);
         }
 
+
+        exit(EXIT_SUCCESS);
     }
 
 

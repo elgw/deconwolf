@@ -9,7 +9,7 @@ kernel void update_y_kernel( global float * y,
 
     const float mindiv = 1e-6;
     size_t imIdx = m + n*M + p*M*N;
-    if(m < M && n < N && p < P )
+    if(m < M0 && n < N && p < P )
     {
         if(y[gid] < mindiv)
         {

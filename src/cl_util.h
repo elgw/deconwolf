@@ -26,7 +26,7 @@
 #else
 #include <CL/cl.h>
 #endif
-#include <clFFT.h>
+
 
 #define CLU_KEEP_ALL 0
 #define CLU_DROP_ALL 1
@@ -38,6 +38,8 @@
 #ifndef VKFFT
 #define VKFFT
 #endif
+#else
+#include <clFFT.h>
 #endif
 
 /* Pad first dimension */
@@ -58,14 +60,8 @@ typedef struct{
     cl_device_id device_id;
     cl_command_queue command_queue;
 
-    int clFFT_loaded;
-    clfftSetupData fftSetup;
-    size_t clfft_buffer_size;
-    cl_mem clfft_buffer; // Only allocated if clfft_buffer_size > 0
-    clfftPlanHandle r2h_plan;
-    clfftPlanHandle r2h_inplace_plan;
-    clfftPlanHandle h2r_plan;
-    clfftPlanHandle h2r_inplace_plan;
+
+
     size_t M; size_t N; size_t P;
     /* For complex data */
     clu_kernel_t kern_mul;
@@ -86,8 +82,20 @@ typedef struct{
     size_t n_release;
     size_t n_alloc;
 
+    /* Prefer in-place transformations over out-of place?
+     * in-place should use less memory, but is it slower? */
+    int prefer_inplace;
 #ifdef VKFFT
     VkFFTApplication vkfft_app;
+#else
+    int clFFT_loaded;
+    clfftSetupData fftSetup;
+    size_t clfft_buffer_size;
+    cl_mem clfft_buffer; // Only allocated if clfft_buffer_size > 0
+    clfftPlanHandle r2h_plan;
+    clfftPlanHandle r2h_inplace_plan;
+    clfftPlanHandle h2r_plan;
+    clfftPlanHandle h2r_inplace_plan;
 #endif
 } clu_env_t;
 
@@ -223,7 +231,9 @@ float * clu_convolve(clu_env_t * clu,
                      float * X, float * Y,
                      size_t M, size_t N, size_t P);
 
+#ifndef VKFFT
 const char * get_clfft_error_string(clfftStatus error);
+#endif
 
 /* Load a program either from a file (if file_name != NULL)
  * or from a string (if program_code != NULL)
@@ -264,6 +274,7 @@ void clu_print_device_info(FILE *, cl_device_id dev_id);
  */
 size_t clu_next_fft_size(size_t N);
 
+#ifndef VKFFT
 /* Generate a plan from real to complex hermitian */
 clfftPlanHandle  gen_r2h_plan(clu_env_t * clu,
                               size_t M, size_t N, size_t P);
@@ -275,9 +286,11 @@ clfftPlanHandle  gen_h2r_plan(clu_env_t * clu,
 clfftPlanHandle  gen_h2r_inplace_plan(clu_env_t * clu,
                                       size_t M, size_t N, size_t P);
 
+
 /* increase the size of the clFFT buffer to size. Don't do anything if
  * the current buffer is already large enough */
 cl_int clu_increase_clfft_buffer(clu_env_t * clu, size_t size);
+#endif
 
 void clu_benchmark_transfer(clu_env_t * clu);
 

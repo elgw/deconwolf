@@ -540,6 +540,10 @@ void dw_fprint_info(FILE * f, dw_opts * s)
     fprintf(f, "OpenCL: No. (Rebuild with OPENCL=1 to enable)\n");
 #endif
 
+#ifdef VKFFT
+    fprintf(f, "VkFFT: YES\n");
+#endif
+
 #ifndef NDEBUG
     fprintf(f, "Warning: Built in debug mode (NDEBUG not defined)\n");
 #endif

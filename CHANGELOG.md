@@ -1,5 +1,25 @@
 # CHANGELOG
 
+## 0.3.6
+- Changed so that the GPU code uses in-place transformations as much
+  as possible.
+
+- Added the option to use [VkFFT](https://github.com/DTolm/VkFFT) for
+  the FFT calculations on the GPU (still under OpenCL).
+
+  To build, you will have to download VkFFT and place it in a folder
+  next to this one. Then build with:
+
+  ```
+  make kernels
+  make -B OPENCL=1 VKFFT=1
+  ```
+
+  Initial tests show a speed up of about 15%. As a bonus VkFFT will
+  process any sizes while clFFT simply refuse to process the tricky
+  ones.
+
+
 ## 0.3.5
 - **dw maxproj** There were problems reading the output in
   MATLAB. Updated so that the output image will be written as a single
