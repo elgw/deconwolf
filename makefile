@@ -146,7 +146,7 @@ dw_LIBRARIES+=-lclFFT
 endif
 
 
-CFLAGS+=-DVKFFT_BACKEND=3
+#CFLAGS+=-DVKFFT_BACKEND=3
 CFLAGS+=-I../../VkFFT/vkFFT/
 
 # Platform specific

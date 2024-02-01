@@ -15,7 +15,7 @@
 #include "kernels/cl_update_y_kernel.h"
 
 
-//#define here(x) printf("%s %s %d\n", __FILE__, __FUNCTION__, __LINE__);
+//#define here(x) printf("%s %s %d\n", __FILE__, __FUNCTION__, __LINE__); fflush(stdout);
 #define here(x) ;
 
 static char * read_program(const char * fname, size_t * size);
@@ -31,10 +31,15 @@ static size_t fimcl_hM(fimcl_t * X);
 static size_t fimcl_hN(fimcl_t * X);
 static size_t fimcl_hP(fimcl_t * X);
 
+/* Number of complex numbers along the first dimension after FFT with
+ * hermitian symmetry taken into considerations, based on the number
+ * of real numbers.
+ */
 static size_t M_r2h(size_t M);
-static size_t N_r2h(size_t N);
-static size_t P_r2h(size_t P);
 
+/* Number of floats in the first dimension required for in-place
+ * transformation
+ */
 static size_t padsize(size_t M)
 {
     if(M % 2 == 0)
@@ -86,15 +91,6 @@ static size_t M_r2h(size_t M)
 {
     return (1+M/2);
 }
-static size_t N_r2h(size_t N)
-{
-    return N;
-}
-static size_t P_r2h(size_t P)
-{
-    return P;
-}
-
 
 static size_t fimcl_hM(fimcl_t * X)
 {
@@ -102,12 +98,12 @@ static size_t fimcl_hM(fimcl_t * X)
 }
 static size_t fimcl_hN(fimcl_t * X)
 {
-    return N_r2h(X->N);
+    return X->N;
 }
 
 static size_t fimcl_hP(fimcl_t * X)
 {
-    return P_r2h(X->P);
+    return X->P;
 }
 
 
@@ -123,6 +119,7 @@ static size_t fimcl_nreal(fimcl_t * X)
 
 float * fimcl_download(fimcl_t * gX)
 {
+    here();
     assert(gX != NULL);
     fimcl_sync(gX);
     if(gX->type == fimcl_real)
@@ -134,8 +131,10 @@ float * fimcl_download(fimcl_t * gX)
                    gX->M, gX->N, gX->P, MNP);
         }
 
-        float * X = calloc(MNP, sizeof(float));
-        if(X == NULL)
+        size_t nfloat = padsize(gX->M)*gX->N*gX->P;
+        float * PX = calloc(nfloat, sizeof(float));
+
+        if(PX == NULL)
         {
             fprintf(stderr, "Failed to allocate memory in %s %s %d\n", __FILE__,
                     __FUNCTION__,
@@ -144,17 +143,19 @@ float * fimcl_download(fimcl_t * gX)
                     gX->M, gX->N, gX->P, MNP);
             exit(EXIT_FAILURE);
         }
-        assert(X != NULL);
+
         check_CL( clEnqueueReadBuffer( gX->clu->command_queue,
                                        gX->buf,
                                        CL_TRUE, // blocking
                                        0, // offset
-                                       MNP * sizeof( float ), // size
-                                       X,
+                                       nfloat * sizeof( float ), // size
+                                       PX,
                                        0,
                                        NULL,
                                        &gX->wait_ev ));
         fimcl_sync(gX);
+        float * X = unpad_from_inplace(PX, gX->M, gX->N, gX->P);
+        free(PX);
         return X;
     }
 
@@ -195,7 +196,7 @@ float * fimcl_download(fimcl_t * gX)
 fimcl_t * fimcl_new(clu_env_t * clu, fimcl_type type,
                     const float * X, size_t M, size_t N, size_t P)
 {
-    // Consider CL_MEM_COPY_HOST_PTR on creation
+
     if(clu->verbose > 2)
     {
         printf("fimcl_new, type=");
@@ -203,9 +204,6 @@ fimcl_t * fimcl_new(clu_env_t * clu, fimcl_type type,
         {
         case fimcl_real:
             printf("real\n");
-            break;
-        case fimcl_real_inplace:
-            printf("real_inplace\n");
             break;
         case fimcl_hermitian:
             printf("fimcl_hermitian\n");
@@ -229,18 +227,8 @@ fimcl_t * fimcl_new(clu_env_t * clu, fimcl_type type,
 
     if(type == fimcl_real)
     {
-        Y->buf = clCreateBuffer(clu->context,
-                                CL_MEM_READ_WRITE,
-                                M*N*P* sizeof(float),
-                                NULL, &ret );
-
-        Y->buf_size_nf = M*N*P;
-        clu->nb_allocated += M*N*P*sizeof(float);
-    }
-
-    if(type == fimcl_real_inplace)
-    {
         Y->buf_size_nf = fimcl_ncx(Y)*2;
+
         Y->buf = clCreateBuffer(clu->context,
                                 CL_MEM_READ_WRITE,
                                 Y->buf_size_nf*sizeof(float),
@@ -265,23 +253,10 @@ fimcl_t * fimcl_new(clu_env_t * clu, fimcl_type type,
         printf("Uploading data to GPU\n");
     }
 
+
     if(type == fimcl_real)
     {
-        check_CL( clEnqueueWriteBuffer( clu->command_queue,
-                                        Y->buf,
-                                        CL_TRUE, // blocking_write
-                                        0,
-                                        M*N*P* sizeof( float ),
-                                        X,
-                                        0, // num_events_in_wait_list
-                                        NULL,
-                                        &Y->wait_ev ) );
-        fimcl_sync(Y);
-    }
-
-    if(type == fimcl_real_inplace)
-    {
-        printf("fimcl_ncx(Y)*2: %zu\n", fimcl_ncx(Y)*2);
+        //printf("fimcl_ncx(Y)*2: %zu\n", fimcl_ncx(Y)*2);
         float * PX = pad_for_inplace(X, M, N, P);
         check_CL( clEnqueueWriteBuffer( clu->command_queue,
                                         Y->buf,
@@ -336,26 +311,13 @@ fimcl_t * fimcl_copy(fimcl_t * G)
                      H->buf, //cl_mem dst_buffer,
                      0, //size_t src_offset,
                      0, //size_t dst_offset,
-                     G->M*G->N*G->P*sizeof(float),//size_t size,
+                     padsize(G->M)*G->N*G->P*sizeof(float),//size_t size,
                      0, //cl_uint num_events_in_wait_list,
                      NULL, //const cl_event* event_wait_list,
                      &H->wait_ev)); //cl_event* event);
     }
-
-    if(G->type == fimcl_real_inplace)
-    {
-        check_CL(clEnqueueCopyBuffer(
-                     G->clu->command_queue,//cl_command_queue command_queue,
-                     G->buf, //cl_mem src_buffer,
-                     H->buf, //cl_mem dst_buffer,
-                     0, //size_t src_offset,
-                     0, //size_t dst_offset,
-                     2*fimcl_ncx(H)*sizeof(float),//size_t size,
-                     0, //cl_uint num_events_in_wait_list,
-                     NULL, //const cl_event* event_wait_list,
-                     &H->wait_ev)); //cl_event* event);
-    }
-
+    H->buf_size_nf = G->buf_size_nf;
+    assert(H->buf_size_nf == padsize(G->M)*G->N*G->P);
     return H;
 }
 
@@ -385,7 +347,8 @@ static fimcl_t * _fimcl_convolve(fimcl_t * X, fimcl_t * Y, int mode, int conj)
 
         if(mode == CLU_KEEP_ALL)
         {
-            fimcl_t * Z = fimcl_new(X->clu, fimcl_hermitian, NULL, X->M, X->N, X->P);
+            fimcl_t * Z = fimcl_new(X->clu, fimcl_hermitian,
+                                    NULL, X->M, X->N, X->P);
             fimcl_complex_mul(X, Y, Z, conj);
             fimcl_ifft(Z);
             return Z;
@@ -410,12 +373,16 @@ static fimcl_t * _fimcl_convolve(fimcl_t * X, fimcl_t * Y, int mode, int conj)
 
         if(mode == CLU_KEEP_2ND)
         {
+            here();
+            assert(Y->buf_size_nf > 0);
+            assert(X->buf_size_nf > 0);
             fimcl_complex_mul_inplace(Y, X, conj);
 
             fimcl_t * fX = NULL;
 
             fX = fimcl_ifft(X);
             fimcl_sync(fX);
+            assert(fX->buf_size_nf > 0);
             fimcl_free(X);
 
             return fX;
@@ -639,7 +606,7 @@ void fimcl_real_mul_inplace(fimcl_t * X, fimcl_t * Y)
                                         &localWorkSize,
                                         NULL) );
 
-    size_t nel = X->M * X->N * X->P;
+    size_t nel = padsize(X->M) * X->N * X->P;
     size_t numWorkGroups = (nel + (localWorkSize -1) ) / localWorkSize;
     size_t globalWorkSize = localWorkSize * numWorkGroups;
 
@@ -695,7 +662,7 @@ void fimcl_shb_update(fimcl_t * P, fimcl_t * X, fimcl_t * XP, float alpha)
                                         &localWorkSize,
                                         NULL) );
 
-    size_t nel = X->M * X->N * X->P;
+    size_t nel = padsize(X->M) * X->N * X->P;
     size_t numWorkGroups = (nel + (localWorkSize -1) ) / localWorkSize;
     size_t globalWorkSize = localWorkSize * numWorkGroups;
 
@@ -746,10 +713,6 @@ void fimcl_shb_update(fimcl_t * P, fimcl_t * X, fimcl_t * XP, float alpha)
 void fimcl_positivity(fimcl_t * X, float val)
 {
     assert(X != NULL);
-    if(X->type == fimcl_real)
-    {
-        fprintf(stderr, "Warning: fimcl_positivity should only be used for fimcl_real for the moment\n");
-    }
     cl_kernel kernel = X->clu->kern_real_positivity.kernel;
 
     /* Set sizes */
@@ -761,7 +724,7 @@ void fimcl_positivity(fimcl_t * X, float val)
                                         &localWorkSize,
                                         NULL) );
 
-    size_t nel = fimcl_nreal(X);
+    size_t nel = padsize(X->M)*X->N*X->P;
     size_t numWorkGroups = (nel + (localWorkSize -1) ) / localWorkSize;
     size_t globalWorkSize = localWorkSize * numWorkGroups;
 
@@ -795,6 +758,7 @@ void fimcl_positivity(fimcl_t * X, float val)
                                      &X->wait_ev) );
 
     fimcl_sync(X);
+    here();
     return;
 }
 
@@ -871,8 +835,9 @@ fimcl_t * fimcl_ifft(fimcl_t * fX)
     cl_int ret;
     X->buf = clCreateBuffer(fX->clu->context,
                             CL_MEM_READ_WRITE,
-                            fX->M*fX->N*fX->P *  sizeof(float),
+                            padsize(fX->M)*fX->N*fX->P *  sizeof(float),
                             NULL, &ret );
+    X->buf_size_nf = padsize(fX->M)*fX->N*fX->P;
     fX->clu->nb_allocated += fX->M*fX->N*fX->P *  sizeof(float);
     check_CL(ret);
 
@@ -890,7 +855,7 @@ fimcl_t * fimcl_ifft(fimcl_t * fX)
                                       fX->clu->clfft_buffer)); // temp buffer
     clFinish(X->clu->command_queue);
     fimcl_sync(X);
-
+    here();
     return X;
 }
 
@@ -916,8 +881,9 @@ void fimcl_ifft_inplace(fimcl_t * X)
                                       NULL, // output buffer
                                       NULL)); // temp buffer
     clFinish(X->clu->command_queue);
-    X->type = fimcl_real_inplace;
+
     fimcl_sync(X);
+    X->type = fimcl_real;
     return;
 }
 
@@ -973,7 +939,9 @@ fimcl_t * fimcl_fft(fimcl_t * X)
 
 void fimcl_fft_inplace(fimcl_t * X)
 {
-    assert(X->type == fimcl_real_inplace);
+    assert(X != NULL);
+    assert(X->type == fimcl_real);
+
     if(X->clu->verbose > 1)
     {
         printf("fimcl_fft_inplace\n");
@@ -984,6 +952,7 @@ void fimcl_fft_inplace(fimcl_t * X)
 
     if(X->buf_size_nf < cMNP * 2)
     {
+        // Set in fimcl_new and fimcl_copy
         fprintf(stderr,
                 "fimcl_fft_inplace: the object does not have a "
                 "large enough buffer for in-place fft\n"
@@ -1015,7 +984,7 @@ float * clu_convolve(clu_env_t * clu,
                      float * X, float * Y,
                      size_t M, size_t N, size_t P)
 {
-    size_t cMNP = M_r2h(M)*N_r2h(N)*P_r2h(P);
+    size_t cMNP = M_r2h(M)*N*P;
     if(clu->verbose > 1)
     {
         size_t buf_mem = 2*cMNP*2*sizeof(float)/1000000;
@@ -1150,6 +1119,9 @@ clu_env_t * clu_new(int verbose, int cl_device)
     /* Might be of use in future releases */
     setenv("CLFFT_REQUEST_LIB_NOMEMALLOC", "1", 1);
 
+    assert(2*M_r2h(128) == padsize(128));
+    assert(2*M_r2h(129) == padsize(129));
+
     char * clFFT_cache_path = malloc(1024);
     char * dir_home = getenv("HOME");
     sprintf(clFFT_cache_path, "%s/.config/deconwolf/clFFT/", dir_home);
@@ -1282,9 +1254,11 @@ void clu_prepare_kernels(clu_env_t * clu,
      *  Create the OpenCL kernels that we will use
      */
 
-    /* Kernels for complex floats */
+    /* Kernels for complex floats
+     * These kernels only know the number of complex values
+    */
     sprintf(argstring, "-D cMNP=%zu",
-            M_r2h(wM)*N_r2h(wN)*P_r2h(wP));
+            M_r2h(wM)*wN*wP);
     clu->kern_mul =
         *clu_kernel_newa(clu,
                          NULL, //"cl_complex_mul.c",
@@ -1323,7 +1297,7 @@ void clu_prepare_kernels(clu_env_t * clu,
                           argstring);
 
     /* Kernels for real float */
-    sprintf(argstring, "-D wMNP=%zu", wM*wN*wP);
+    sprintf(argstring, "-D wMNP=%zu", padsize(wM)*wN*wP);
     clu->kern_real_mul_inplace =
         * clu_kernel_newa(clu,
                           NULL,
@@ -1352,7 +1326,7 @@ void clu_prepare_kernels(clu_env_t * clu,
             "-DNELEMENTS=%zu "
             "-DM=%zu -DN=%zu -DP=%zu "
             "-DwM=%zu -DwN=%zu -DwP=%zu",
-            wM*wN*wP, M, N, P, wM, wN, wP);
+            padsize(wM)*wN*wP, padsize(M), N, P, padsize(wM), wN, wP);
 
     clu->idiv_kernel = clu_kernel_newa(clu,
                                        "kernels/cl_idiv_kernel.c",
@@ -1699,7 +1673,7 @@ clfftPlanHandle  gen_r2h_plan(clu_env_t * clu,
                               size_t M, size_t N, size_t P)
 {
     size_t cM = M_r2h(M);
-    size_t cN = N_r2h(N);
+    size_t cN = N;
 
     clfftPlanHandle planHandle;
     size_t real_size[3] = {M, N, P};
@@ -1720,8 +1694,11 @@ clfftPlanHandle  gen_r2h_plan(clu_env_t * clu,
     check_clFFT(clfftSetResultLocation(planHandle,
                                        CLFFT_OUTOFPLACE));
 
-
+#if PAD_FIRST_DIM
+    size_t inStride[3] =  {1, padsize(M), padsize(M)*N};
+#else
     size_t inStride[3] =  {1, M, M*N};
+#endif
     size_t outStride[3] = {1, cM, cM*cN};
 
     check_clFFT(clfftSetPlanInStride(planHandle,  CLFFT_3D, inStride));
@@ -1752,7 +1729,7 @@ clfftPlanHandle  gen_r2h_inplace_plan(clu_env_t * clu,
                                       size_t M, size_t N, size_t P)
 {
     size_t cM = M_r2h(M);
-    size_t cN = N_r2h(N);;
+    size_t cN = N;
 
     clfftPlanHandle planHandle;
     size_t real_size[3] = {M, N, P};
@@ -1771,7 +1748,13 @@ clfftPlanHandle  gen_r2h_inplace_plan(clu_env_t * clu,
     check_clFFT(clfftSetResultLocation(planHandle,
                                        CLFFT_INPLACE));
 
+#if PAD_FIRST_DIM
     size_t inStride[3] = {1, padsize(M), padsize(M)*N};
+#else
+    printf("gen_r2h_inplace_plan -- bad values\n");
+    size_t inStride[3] = {1, M, M*N};
+#endif
+
     //size_t inStride[3] = {1, M, M*N};
     size_t outStride[3] = {1, cM, cM*cN};
 
@@ -1832,7 +1815,7 @@ clfftPlanHandle  gen_h2r_plan(clu_env_t * clu,
                               size_t M, size_t N, size_t P)
 {
     size_t cM = M_r2h(M);
-    size_t cN = N_r2h(N);;
+    size_t cN = N;
 
     /* From Hermitian to Real of size MxNxP */
     clfftPlanHandle planHandle;
@@ -1853,7 +1836,11 @@ clfftPlanHandle  gen_h2r_plan(clu_env_t * clu,
                                        CLFFT_OUTOFPLACE));
 
     size_t inStride[3] = {1, cM, cM*cN};
+    #if PAD_FIRST_DIM
+    size_t outStride[3] = {1, padsize(M), padsize(M)*N};
+    #else
     size_t outStride[3] = {1, M, M*N};
+    #endif
 
     check_clFFT(clfftSetPlanInStride(planHandle,  CLFFT_3D, inStride));
     check_clFFT(clfftSetPlanOutStride(planHandle, CLFFT_3D, outStride));
@@ -1878,7 +1865,7 @@ clfftPlanHandle  gen_h2r_inplace_plan(clu_env_t * clu,
                                       size_t M, size_t N, size_t P)
 {
     size_t cM = M_r2h(M);
-    size_t cN = N_r2h(N);;
+    size_t cN = N;
 
     /* From Hermitian to Real of size MxNxP */
     clfftPlanHandle planHandle;
@@ -1899,8 +1886,12 @@ clfftPlanHandle  gen_h2r_inplace_plan(clu_env_t * clu,
                                        CLFFT_INPLACE));
 
     size_t inStride[3] = {1, cM, cM*cN};
+    #if PAD_FIRST_DIM
     size_t outStride[3] = {1, padsize(M), padsize(M)*N};
-    //size_t outStride[3] = {1, M, M*N};
+    #else
+    printf("gen_h2r_inplace_plan got bad values\n");
+    size_t outStride[3] = {1, M, M*N};
+    #endif
 
     check_clFFT(clfftSetPlanInStride(planHandle,  CLFFT_3D, inStride));
     check_clFFT(clfftSetPlanOutStride(planHandle, CLFFT_3D, outStride));
@@ -1994,7 +1985,7 @@ void fimcl_update_y(fimcl_t * gy, fimcl_t * image)
     here();
 
     /* Configure sizes */
-    size_t nel = gy->M*gy->N*gy->P;
+    size_t nel = padsize(gy->M)*gy->N*gy->P;
     size_t localWorkSize; /* Use largest possible */
     cl_kernel kernel = gy->clu->update_y_kernel->kernel;
 
@@ -2154,14 +2145,14 @@ float * pad_for_inplace(const float * X, size_t M, size_t N, size_t P)
     const size_t nchunk = N*P;
     const size_t chunk_size = M*sizeof(float);
     float * PX = calloc(padsize(M)*N*P, sizeof(float));
-    printf("padsize(M)*N*P = %zu\n", padsize(M)*N*P);
+
     assert(PX != NULL);
     /* P values at a time */
     for(size_t c = 0; c < nchunk; c++)
     {
         memcpy(PX+c*padsize(M), X + c*M, chunk_size);
     }
-    printf("5\n");
+
     return PX;
 }
 

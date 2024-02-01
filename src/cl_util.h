@@ -18,9 +18,6 @@
 #include <unistd.h>
 #include "dw_util.h"
 
-//#define CL_USE_DEPRECATED_OPENCL_1_2_APIS
-
-
 /* VkFFT targets version 1.20 */
 #define CL_TARGET_OPENCL_VERSION 120
 
@@ -43,6 +40,8 @@
 #endif
 #endif
 
+/* Pad first dimension */
+#define PAD_FIRST_DIM 1
 
 const char* clGetErrorString(int errorCode);
 
@@ -94,16 +93,17 @@ typedef struct{
 
 /* A fimcl object can be one of these types */
 typedef enum {
-    fimcl_real, /* Real without any padding */
-    fimcl_real_inplace, /* 1st dimension padded */
-    fimcl_hermitian /* I.e. interleaved complex */
+    fimcl_real, /* Real (padding on is applied internally) */
+    fimcl_hermitian /* complex */
 }
     fimcl_type ;
 
 typedef struct{
+    /* Size of real array before padding */
     size_t M;
     size_t N;
     size_t P;
+
     cl_mem buf;
     size_t buf_size_nf; // Number of floats, not bytes
 
@@ -114,17 +114,35 @@ typedef struct{
     cl_event wait_ev;
 } fimcl_t;
 
+/*******************************************************
+ *     Setup and teardown of environment
+ *******************************************************/
+
+/* Create an environment with OpenCL and clFFT */
+clu_env_t * clu_new(int verbose, int cl_device);
+
+/* Prepare to do FFTs of real arrays of size wM x wN x wP
+ * the size M x N x P is the size of the original image
+ * without padding for Berteros method
+ */
+void clu_prepare_kernels(clu_env_t * clu,
+                         size_t wM, size_t wN, size_t wP,
+                         size_t M, size_t N, size_t P);
+
+/* Tear down what is crated with clu_new */
+void clu_destroy(clu_env_t * );
+
+
+
 /* Allocate a new float image on the GPU.
  * Use data in X unless it is NULL
- * if fullsize is set to 1, this object can be used for
- * inplace transformations
- * non-blocking. call fimcl_sync on the new object to manually sync
- * if X != NULL
  */
 fimcl_t * fimcl_new(clu_env_t * clu, fimcl_type type,
                     const float * X, size_t M, size_t N, size_t P);
 
 void fimcl_free(fimcl_t * );
+
+
 
 /* Get back data from GPU.
  * Blocking (sync before and after) */
@@ -194,17 +212,6 @@ void clu_exit_error(cl_int err,
                     int clfft);
 
 
-/* Create an environment with OpenCL and clFFT */
-clu_env_t * clu_new(int verbose, int cl_device);
-
-/* Prepare to do FFTs at size wM x wN x wP
- * the size M x N x P is the size of the input image before it was possibly padded */
-void clu_prepare_kernels(clu_env_t * clu,
-                         size_t wM, size_t wN, size_t wP,
-                         size_t M, size_t N, size_t P);
-
-/* Tear down what is crated with clu_new */
-void clu_destroy(clu_env_t * );
 
 
 /* host to host deconvolution via OpenCl
