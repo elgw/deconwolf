@@ -2160,12 +2160,25 @@ void fimcl_update_y(fimcl_t * gy, fimcl_t * image)
 
 float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
 {
+    int timers = 0;
+    struct timespec tstart, tend, t0, t1;
+
+    if(timers){
+    printf("\n");
+    clock_gettime(CLOCK_REALTIME, &tstart);
+    }
+
+    /* Performance considerations:
+     * Re-use the partial-sums buffer? (avoid create and destroy at each iter)
+     * Further reduction so that we don't have to download that much data?
+     * Other reduction kernel?
+     * */
     cl_int status = CL_SUCCESS;
 
     /* Configure sizes */
     size_t nel = padsize(forward->M)*forward->N*forward->P;
     size_t localWorkSize; /* Use largest possible */
-    // TOOD: does this take time?
+
     cl_kernel kernel = forward->clu->idiv_kernel->kernel;
     status = clGetKernelWorkGroupInfo(kernel,
                                       forward->clu->device_id,
@@ -2178,8 +2191,8 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
     if(0)
     {
         printf("   globalWorkSize: %zu\n", globalWorkSize);
-        printf("   localWorkSize: %zu\n", localWorkSize);
-        printf("   numWorkGroups: %zu\n", numWorkGroups);
+        printf("   localWorkSize: %zu\n", localWorkSize); // Typically 256, hardware dependent
+        printf("   numWorkGroups: %zu\n", numWorkGroups); // global/local
     }
 
     fimcl_sync(forward);
@@ -2192,11 +2205,16 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
     assert(image->P <= forward->P);
 
     /* Create a buffer for the partial sums */
+    if(timers){clock_gettime(CLOCK_REALTIME, &t0);}
     cl_mem partial_sums_gpu = clCreateBuffer(forward->clu->context,
                                              CL_MEM_WRITE_ONLY,
                                              numWorkGroups * sizeof(float),
                                              NULL,
                                              &status );
+    if(timers){
+        clock_gettime(CLOCK_REALTIME, &t1);
+    printf("Create buffer: %f \n", timespec_diff(&t1, &t0));
+    }
 
     check_CL( clSetKernelArg(kernel,
                              0, // argument index
@@ -2213,7 +2231,7 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
 
     check_CL( clSetKernelArg(kernel,
                              3, sizeof(cl_mem), &partial_sums_gpu));
-
+    clock_gettime(CLOCK_REALTIME, &t0);
     check_CL( clEnqueueNDRangeKernel(forward->clu->command_queue,
                                      kernel,
                                      1,
@@ -2225,8 +2243,14 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
                                      &forward->wait_ev) );
 
     fimcl_sync(forward);
+    if(timers)
+    {
+    clock_gettime(CLOCK_REALTIME, &t1);
+    printf("Reduce: %f \n", timespec_diff(&t1, &t0));
+    }
 
     /* Download the result */
+    if(timers){clock_gettime(CLOCK_REALTIME, &t0);}
     float * partial_sums = malloc(numWorkGroups*sizeof(float));
     status = clEnqueueReadBuffer(forward->clu->command_queue,
                                  partial_sums_gpu,
@@ -2238,7 +2262,19 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
                                  NULL,
                                  NULL);
     clFinish(forward->clu->command_queue);
+    if(timers)
+    {
+    clock_gettime(CLOCK_REALTIME, &t1);
+    printf("Download: %f \n", timespec_diff(&t1, &t0));
+    }
+
+    if(timers){clock_gettime(CLOCK_REALTIME, &t0);}
     clReleaseMemObject(partial_sums_gpu);
+    if(timers)
+    {
+    clock_gettime(CLOCK_REALTIME, &t1);
+    printf("Release buffer: %f \n", timespec_diff(&t1, &t0));
+    }
 
     float sum_gpu = 0;
 #pragma omp parallel for reduction(+ : sum_gpu)
@@ -2248,6 +2284,11 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
     }
     free(partial_sums);
 
+    if(timers)
+    {
+    clock_gettime(CLOCK_REALTIME, &tend);
+    printf("Total: %f \n", timespec_diff(&tend, &tstart));
+    }
 
     return sum_gpu / (float) (image->M*image->N*image->P);
 }

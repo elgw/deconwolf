@@ -14,6 +14,8 @@ kernel void idiv_kernel( global const float * forward,
     int tnum = get_local_id( 0 ); // thread (i.e., work-item) number in this work-group
 // 0 .. numItems-1
     int wgNum = get_group_id( 0 ); // which work-group number this is in
+
+    // Initialize the local memory to 0
     wgBuff[ tnum ] = 0.0;
 
     size_t p = gid / (wM * wN);
@@ -21,9 +23,10 @@ kernel void idiv_kernel( global const float * forward,
     size_t n = rem / wM;
     size_t m = rem - n*wM;
 
-    size_t imIdx = m + n*M + p*M*N;
+    // Transfer from global to local memory
     if(m < M0 && n < N && p < P )
     {
+        size_t imIdx = m + n*M + p*M*N;
         float est = forward[gid];
         float obs = image[imIdx];
         if(est > 0 && obs > 0)
@@ -35,6 +38,9 @@ kernel void idiv_kernel( global const float * forward,
     }
 
 // all threads execute this code simultaneously:
+// This is Interleaved Addressing
+// Sequential Addressing might be faster!
+
     for( int offset = 1; offset < numItems; offset *= 2 )
     {
         int mask = 2*offset - 1;
