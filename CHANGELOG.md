@@ -19,6 +19,8 @@
   size. As a bonus VkFFT will process any sizes while clFFT simply
   refuse to process the tricky ones.
 
+- Identified that `cl_idiv_kernel.c` took a substantial amount of the
+  iteration time and rewrote it.
 
 ## 0.3.5
 - **dw maxproj** There were problems reading the output in

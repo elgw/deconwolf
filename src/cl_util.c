@@ -1401,6 +1401,30 @@ void clu_prepare_kernels(clu_env_t * clu,
 
     /* CL_DEVICE_MAX_CONSTANT_ARGS is at least 8 so 7 is safe
        without checking capabilities */
+
+    /* Number of voxels to process per work item
+       Please check so that it matches when the kernel is called */
+    int nPerItem = 16;
+
+    sprintf(argstring,
+            "-DNELEMENTS=%zu "
+            "-DM0=%zu "
+            "-DM=%zu -DN=%zu -DP=%zu "
+            "-DwM=%zu -DwN=%zu -DwP=%zu "
+            "-DnPerItem=%d",
+            padsize(wM)*wN*wP,
+            M,
+            padsize(M), N, P,
+            padsize(wM), wN, wP,
+            nPerItem);
+
+    clu->idiv_kernel = clu_kernel_newa(clu,
+                                       "kernels/cl_idiv_kernel.c",
+                                       (const char *) cl_idiv_kernel,
+                                       cl_idiv_kernel_len,
+                                       "idiv_kernel",
+                                       argstring);
+
     sprintf(argstring,
             "-DNELEMENTS=%zu "
             "-DM0=%zu "
@@ -1410,13 +1434,6 @@ void clu_prepare_kernels(clu_env_t * clu,
             M,
             padsize(M), N, P,
             padsize(wM), wN, wP);
-
-    clu->idiv_kernel = clu_kernel_newa(clu,
-                                       "kernels/cl_idiv_kernel.c",
-                                       (const char *) cl_idiv_kernel,
-                                       cl_idiv_kernel_len,
-                                       "idiv_kernel",
-                                       argstring);
 
     clu->update_y_kernel = clu_kernel_newa(clu,
                                            "kernels/cl_update_y_kernel.c",
@@ -2168,6 +2185,10 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
     clock_gettime(CLOCK_REALTIME, &tstart);
     }
 
+    /* Number of voxels to process per work item
+     */
+    size_t nPerItem = 16;
+
     /* Performance considerations:
      * Re-use the partial-sums buffer? (avoid create and destroy at each iter)
      * Further reduction so that we don't have to download that much data?
@@ -2184,9 +2205,12 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
                                       forward->clu->device_id,
                                       CL_KERNEL_WORK_GROUP_SIZE,
                                       sizeof(size_t), &localWorkSize, NULL);
+
     /* The global size needs to be a multiple of the localWorkSize
      * i.e. it will be larger than the number of elements */
-    size_t numWorkGroups = (nel + (localWorkSize -1) ) / localWorkSize;
+    size_t numWorkGroups = (nel/nPerItem + (localWorkSize -1) ) / localWorkSize;
+    numWorkGroups < 1 ? numWorkGroups = 1 : 0;
+
     size_t globalWorkSize = localWorkSize * numWorkGroups;
     if(0)
     {
