@@ -230,9 +230,11 @@ float * deconvolve_shb_cl2(float * restrict im,
         wP = int64_t_max(P, pP);
     }
 
+    #ifndef VKFFT
     wM = clu_next_fft_size(wM);
     wN = clu_next_fft_size(wN);
     wP = clu_next_fft_size(wP);
+#endif
 
     if(s->borderQuality == 0)
     {

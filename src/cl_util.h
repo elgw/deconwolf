@@ -32,9 +32,12 @@
 #define CLU_DROP_ALL 1
 #define CLU_KEEP_2ND 2
 
-/* Should be defined in the makefile */
-#ifdef VKFFT_BACKEND
-#include "vkFFT.h"
+
+#ifdef VKFFT_BACKEND /* Should be defined in the makefile */
+// Unfortunately this does not turn off all warnings
+
+#include <vkFFT.h>
+
 #ifndef VKFFT
 #define VKFFT
 #endif

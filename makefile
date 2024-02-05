@@ -18,7 +18,7 @@ $(info Host type: $(UNAME_S))
 dw = bin/dw
 dwbw = bin/dw_bw
 
-CFLAGS = -Wall -Wextra
+CFLAGS = -Wall # -Wextra
 
 CC_VERSION = "$(shell $(CC) --version | head -n 1)"
 GIT_VERSION = "$(shell git log --pretty=format:'%aD:%H' -n 1)"
