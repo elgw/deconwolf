@@ -149,8 +149,7 @@ endif
 VKFFT?=0
 ifeq ($(VKFFT), 1)
 CFLAGS+=-DVKFFT_BACKEND=3
-CFLAGS+=-I../VkFFT/vkFFT/
-CFLAGS+=-I../../VkFFT/vkFFT/
+CFLAGS+=-Isrc/VkFFT/vkFFT/
 endif
 
 # Platform specific

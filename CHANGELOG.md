@@ -4,11 +4,8 @@
 - The GPU code path uses in-place transformations as much as possible
   to save a little on the memory usage.
 
-- Switched to [VkFFT](https://github.com/DTolm/VkFFT) for the FFT
-  calculations on the GPU (still under OpenCL).
-
-  To build, you will have to download VkFFT and place it in a folder
-  next to this one. Then build with:
+- Switched to [VkFFT](https://github.com/DTolm/VkFFT) as the default
+  FFT backend on the GPU.
 
   ```
   make kernels
