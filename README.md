@@ -67,13 +67,8 @@ Deconwolf uses:
 If these libraries are available for your platform, chances are that
 that it can be built.
 
-To enable GPU acceleration, deconwolf also requires:
-
- * A computer/GPU with OpenCL.
- * [VkFFT](https://github.com/DTolm/VkFFT) for FFT transform on GPUs
-   (the OpenCL backend is used). Alternatively it is possible to use
-   [libclfft2](https://github.com/clMathLibraries/clFFT).
-
+To enable GPU acceleration, deconwolf also requires a GPU and OpenCL
+drivers installed.
 
 ### Ubuntu 22.04 (or Windows with WSL)
 For other platforms, see [INSTALL.md](INSTALL.md).
@@ -206,6 +201,11 @@ The PSF calculations in **dw_bw** use these:
    [doi](https://doi.org/10.1364/josaa.34001029)
 
    Enable by **\--li**.
+
+ * [VkFFT](https://github.com/DTolm/VkFFT) is used for FFT transform
+   on GPUs (via the OpenCL). Alternatively it is possible to use
+   [libclfft2](https://github.com/clMathLibraries/clFFT) although this
+   option might be dropped in future versions.
 
 
 ## Alternatives

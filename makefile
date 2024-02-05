@@ -1,14 +1,13 @@
-# Normal build:
-# make -B
-# To build with debug flags and no OpenMP
-# make DEBUG=1 OMP=0 -B
-# For normal build
+## Normal build:
 # make -B
 
-# To enable the methods shbcl1, shbcl2 use
-# make -B OPENCL=1
+## To build with debug flags and no OpenMP
+# make DEBUG=1 OMP=0 DEBUG=1
+
+## With GPU acceleration
+# make kernels
+# make -B VKFFT=1
 #
-# To build with clang, specify CC=clang
 
 CC=gcc -std=gnu11
 # CC=clang # also requires the package libomp-14-dev
@@ -58,18 +57,10 @@ endif
 ### FFT Backend
 FFTW3=1
 MKL?=0
-CUDA?=0
 
 ifeq ($(MKL), 1)
 dw=bin/dw-mkl
 FFTW3=0
-CUDA=0
-endif
-
-ifeq ($(CUDA), 1)
-dw=bin/dw-cuda
-FFTW3=0
-MKL=0
 endif
 
 ifeq ($(MKL),1)
@@ -98,15 +89,6 @@ dwbw_LIBRARIES += -lfftw3f_omp
 endif
 endif
 
-ifeq ($(CUDA),1)
-$(info FFTW backend: CUDA)
-$(info FFT BACKEND: CUDA)
-CUDA_DIR=/usr/local/cuda/
-CFLAGS += -I$(CUDA_DIR)/include/ -L$(CUDA_DIR)/lib64/ -DCUDA
-dw_LIBRARIES +=  -lcufftw
-dwbw_LIBRARIES += -lcufftw
-endif
-
 ## OpenMP
 OMP?=1
 ifeq ($(OMP), 1)
@@ -125,6 +107,26 @@ CFLAGS += -fno-openmp
 $(info OMP disabled)
 endif
 
+
+###################
+# GPU clFFT or VKFFT + OpenCL
+####################
+
+# clFFT
+clFFT?=0
+ifeq ($(clFFT), 1)
+dw_LIBRARIES+=-lclFFT
+OPENCL=1
+endif
+
+
+VKFFT?=0
+ifeq ($(VKFFT), 1)
+CFLAGS+=-DVKFFT_BACKEND=3
+CFLAGS+=-Isrc/VkFFT/vkFFT/
+OPENCL=1
+endif
+
 ## OpenCL
 OPENCL?=0
 ifeq ($(OPENCL), 1)
@@ -140,19 +142,11 @@ endif
 dw_OBJECTS+=method_shb_cl.o method_shb_cl2.o cl_util.o
 endif
 
-# clFFT
-ifeq ($(OPENCL), 1)
-dw_LIBRARIES+=-lclFFT
-endif
 
+###########################
+# Platform specific extras
+###########################
 
-VKFFT?=0
-ifeq ($(VKFFT), 1)
-CFLAGS+=-DVKFFT_BACKEND=3
-CFLAGS+=-Isrc/VkFFT/vkFFT/
-endif
-
-# Platform specific
 ifneq ($(UNAME_S),Darwin)
     CFLAGS+=
 endif

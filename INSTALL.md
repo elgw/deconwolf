@@ -12,12 +12,15 @@
 
 ## OpenCL support
 Requires a working OpenCL installation.
+
 ``` shell
 make kernels
-make OPENCL=1 -B
+make -B VKFFT=1
 ```
 
 ## Meson
+WARNING: The configuration files might not be up to date.
+
 deconwolf can also be installed using [meson](https://mesonbuild.com/),
 tested only Ubuntu and MacOS
 
@@ -46,7 +49,6 @@ brew install libomp
 brew install libtiff
 brew install fftw
 brew install gsl
-# brew install clfft # see note below.
 ```
 
 Build and install deconwolf
@@ -54,8 +56,6 @@ Build and install deconwolf
 make -B
 sudo make install
 ```
-
-clFFT does unfortunately not work on MacOS according to [this issue](https://github.com/clMathLibraries/clFFT/issues/183)
 
 ## Windows 10
 Although it might be possible to build native windows executables, it
@@ -100,7 +100,6 @@ libwebp-7.dll  libwinpthread-1.dll libzstd.dll        zlib1.dll
 At least one person has build deconwolf using Windows Subsystem for Linux but
 beware, there might be a
 [performance penalty](https://www.phoronix.com/scan.php?page=article&item=wsl-wsl2-tr3970x&num=1).
-
 
 
 ### FreeBSD
@@ -164,7 +163,6 @@ For the OpenCL headers, required to build:
 
 ``` shell
 apt-get install opencl-headers
-apt-get install libclfft-dev libclfft2
 ```
 
 ## FreeBSD

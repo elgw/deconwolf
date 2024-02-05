@@ -1,7 +1,8 @@
-// Each kernel will read two values from the input data
-// directly, hence it should only be enqueued for half of the
-// pixels
+// Each work item will read nPerItem elements from the input data
+// directly. Hence the number of work items should be N/nPerItem
 
+
+// Sync free tail reduction.
 void warpReduce(volatile local float* wgBuff, int tnum)
 {
     wgBuff[tnum] += wgBuff[tnum + 32];
@@ -30,17 +31,17 @@ kernel void idiv_kernel( global const float * forward,
     // Initialize the local memory to 0
     wgBuff[ tnum ] = 0.0;
 
-    // Transfer from global to local memory
+    // Part I : Transfer from global to local memory in an attempt to read
+    // as sequential as possible.
     for(int kk = 0; kk<nPerItem; kk++)
     {
-        size_t idx = nPerItem*wgNum*numItems + tnum + kk*numItems; // Advance by the work group size each iter
+        // Advance by the work group size each iter
+        size_t idx = nPerItem*wgNum*numItems + tnum + kk*numItems;
 
         size_t p = idx / (wM * wN);
         size_t rem = idx - p*wM*wN;
         size_t n = rem / wM;
         size_t m = rem - n*wM;
-
-        // Transfer from global to local memory
 
         if(m < M0 && n < N && p < P )
         {
@@ -54,6 +55,7 @@ kernel void idiv_kernel( global const float * forward,
         }
     }
 
+    // Part II : reduce the work group buffer
 
     // Sequential Addressing
     // read s items, write to s/2 items
@@ -74,6 +76,7 @@ kernel void idiv_kernel( global const float * forward,
         warpReduce(wgBuff, tnum);
     }
 
+    // Part II : Write the sum for this work group to the output
     if( tnum == 0 )
         partialSums[ wgNum ] = wgBuff[ 0 ];
 

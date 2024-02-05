@@ -21,9 +21,6 @@
 static char * read_program(const char * fname, size_t * size);
 static double clockdiff(struct timespec* start, struct timespec * finish);
 
-/* Number of floats */
-static size_t fimcl_nreal(fimcl_t * X);
-
 /* Number of complex values required for Hermitian representation */
 static size_t fimcl_ncx(fimcl_t * X);
 
@@ -110,11 +107,6 @@ static size_t fimcl_hP(fimcl_t * X)
 static size_t fimcl_ncx(fimcl_t * X)
 {
     return fimcl_hM(X)*fimcl_hN(X)*fimcl_hP(X);
-}
-
-static size_t fimcl_nreal(fimcl_t * X)
-{
-    return X->M * X->N * X->P;
 }
 
 float * fimcl_download(fimcl_t * gX)

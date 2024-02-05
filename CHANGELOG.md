@@ -5,11 +5,12 @@
   to save a little on the memory usage.
 
 - Switched to [VkFFT](https://github.com/DTolm/VkFFT) as the default
-  FFT backend on the GPU.
+  FFT backend on the GPU. The clFFT code path will most likely not be
+  maintained in future versions.
 
   ```
   make kernels
-  make -B OPENCL=1 VKFFT=1
+  make -B VKFFT=1
   ```
 
   Initial tests show a speed up of about 10-30% depending on the image
@@ -18,6 +19,8 @@
 
 - Identified that `cl_idiv_kernel.c` took a substantial amount of the
   iteration time and rewrote it.
+
+- Removed the "CUDA" backend since it does not make sense any more.
 
 ## 0.3.5
 - **dw maxproj** There were problems reading the output in
