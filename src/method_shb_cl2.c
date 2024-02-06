@@ -231,6 +231,8 @@ float * deconvolve_shb_cl2(float * restrict im,
     }
 
     #ifndef VKFFT
+    /* However, this only works for bg > 0, i.e. if dimensions change
+     * under bq==0 the program needs to exit with a large boom!  */
     wM = clu_next_fft_size(wM);
     wN = clu_next_fft_size(wN);
     wP = clu_next_fft_size(wP);

@@ -153,36 +153,38 @@ The deconvolution algorithm is based on the following papers:
    [doi](https://doi.org/10.1086%2F111605)
 
    These together are referred to as Richardson-Lucy
-   (RL). Enable with **\--method rl**.
+   (RL).
+
+* Wang H, et al. Scaled Heavy-Ball Acceleration of the
+   Richardson-Lucy Algorithm for 3D Microscopy Image Restoration. IEEE
+   Trans Image Process. 2014 [doi](https://doi.org/10.1109/TIP.2013.2291324).
+
+   This is the default acceleration method as it use less memory than
+   the other alternatives below, and seems to generate less shot noise.
 
  * Biggs, D.S.C. and Andrews, M. “Acceleration of Iterative Image
    Restoration Algorithms.”  Applied Optics. Vol. 36. Number 8, 1997,
    pp. 1766–1775.  [doi](https://doi.org/10.1364/AO.36.001766)
 
-   The Additive Vector Extrapolation Method, enable with **\--method ave**
+   The Additive Vector Extrapolation Method, enable with **\--method
+   ave**
 
  * Biggs, D.S.C “Accelerated iterative blind deconvolution”. PhD thesis.
    University of Auckland, New Zealand, 1998.
 
-   The Exponential Vector Extrapolation Method is described, enable
-   with **\--method eve**
-
- * Wang H, et al. Scaled Heavy-Ball Acceleration of the
-   Richardson-Lucy Algorithm for 3D Microscopy Image Restoration. IEEE
-   Trans Image Process. 2014 [doi](https://doi.org/10.1109/TIP.2013.2291324).
-
-   The default method, i.e., **\--method shb** does nothing.
+   The Exponential Vector Extrapolation Method (EVE), enable with
+   **\--method eve**
 
  * M. Bertero and P. Boccacci, A simple method for the reduction of boundary
    effects in the Richardson-Lucy approach to image deconvolution,
    A&A 437, 369-374 (2005).
    [doi](https://doi.org/10.1051/0004-6361:20052717)
 
-   When **\--bq 2** (default) is used, this is the way that boundaries
-   are handled (although it is extended to 3D in **dw**). **\--bq 0**
-   turns this completely off (i.e., image is treated as circular in
-   all dimensions). **\--bq 1** is a compromise of speed and memory vs
-   quality.
+   The default boundary handling method (corresponds to **\--bq 2**),
+   although extended to 3D. To disable boundary handling or to use
+   already padded data, set **\--bq 0** which turns off this feature
+   completely, i.e., lets dw use periodic boundary handling. The
+   option **\--bq 1** is a compromise of speed and memory vs quality.
 
 The PSF calculations in **dw_bw** use these:
 
@@ -203,17 +205,22 @@ The PSF calculations in **dw_bw** use these:
    Enable by **\--li**.
 
  * [VkFFT](https://github.com/DTolm/VkFFT) is used for FFT transform
-   on GPUs (via the OpenCL). Alternatively it is possible to use
-   [libclfft2](https://github.com/clMathLibraries/clFFT) although this
-   option might be dropped in future versions.
+   on GPUs (via OpenCL). Until version 0.3.6
+   [libclfft2](https://github.com/clMathLibraries/clFFT) was used for
+   this purpose.
 
 
 ## Alternatives
 This is a non-complete list of alternative deconvolution software:
 
+### Deconvolution
 Free and open source:
  - [Deconvolution Lab2](http://bigwww.epfl.ch/deconvolution/deconvolutionlab2/)
 
 Commercial:
  - [Huygens](https://svi.nl/HomePage)
  - [Microvolution](https://www.microvolution.com/)
+
+### Point spread functions
+
+- [PSF Generator](http://bigwww.epfl.ch/algorithms/psfgenerator/)
