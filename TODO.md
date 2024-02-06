@@ -7,7 +7,7 @@ github](https://github.com/elgw/deconwolf/issues).
 - [ ] Complete switch to Vulkan from OpenCL. Doing this will ensure
       better portability, for example on new macs with
       [MoltenVK](https://github.com/KhronosGroup/MoltenVK). The switch
-      to VkFFT in v 0.3.6 was a first step. towards this goal.
+      from clFFT to VkFFT in v 0.3.6 was a first step towards this goal.
 
 - [ ] Crash-safe writing of output images. I.e, follow the standard
   procedure and first, write to temporary file and move to final
