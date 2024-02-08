@@ -1,6 +1,7 @@
 #include "method_shb_cl2.h"
 
-#define use_inplace_clfft 0
+/* Still work to do before this can be enabled */
+#define use_inplace_clfft 1
 
 
 //#define here(x) printf("%s %s %d\n", __FILE__, __FUNCTION__, __LINE__);
@@ -37,12 +38,14 @@ static fimcl_t  * fft_block_of_ones(clu_env_t * clu,
     }
 
     fimcl_t * gOne = fimcl_new(clu, fimcl_real, one, wM, wN, wP);
-    here();
-    fimcl_sync(gOne);
-    here();
-    free(one);
+#if use_inplace_clfft
+    fimcl_fft_inplace(gOne);
+    fimcl_t * gfOne = gOne;
+    gOne = NULL;
+#else
     fimcl_t * gfOne = fimcl_fft(gOne);
     fimcl_free(gOne);
+#endif
     return gfOne;
 }
 
@@ -99,12 +102,6 @@ float iter_shb_cl2(fimcl_t ** _xp_gpu, // Output, f_(t+1)
     fimcl_free(xp_gpu);
 
     fimcl_t * fft_pk_gpu = fimcl_fft(pk_gpu); // Pk -> fft_pk_gpu
-
-    here();
-
-    putdot(s);
-
-    // could be done inplace
     fimcl_t * gy = fimcl_convolve(fft_pk_gpu, fft_psf_gpu, CLU_KEEP_2ND);
     fft_pk_gpu = NULL;
 
@@ -112,12 +109,19 @@ float iter_shb_cl2(fimcl_t ** _xp_gpu, // Output, f_(t+1)
 
     here();
 
+    /* We spend 30% of the time here!  Bad enough to be called a
+     * BUG. At least it needs to be improved. In worst case we can
+     * skip calculating it at ever step!
+     */
     float error = fimcl_error_idiv(gy, im_gpu);
-    putdot(s);
+    //float error = 0;
 
+    putdot(s);
+    here();
+    /* Y = I./Y */
     fimcl_update_y(gy, im_gpu);
     putdot(s);
-
+    here();
     fimcl_t * _Y = gy;
 
 #if use_inplace_clfft
@@ -127,7 +131,7 @@ float iter_shb_cl2(fimcl_t ** _xp_gpu, // Output, f_(t+1)
     fimcl_t * Y = fimcl_fft(_Y);
     fimcl_free(_Y);
 #endif
-
+    here();
     // gx = Y * cK, Y is freed
     // could be done inplace
     fimcl_t * gx = fimcl_convolve_conj(Y, fft_psf_gpu, CLU_KEEP_2ND);
@@ -151,12 +155,14 @@ float iter_shb_cl2(fimcl_t ** _xp_gpu, // Output, f_(t+1)
 }
 
 
+
 float * deconvolve_shb_cl2(float * restrict im,
                            const int64_t M, const int64_t N, const int64_t P,
                            float * restrict psf,
                            const int64_t pM, const int64_t pN, const int64_t pP,
                            dw_opts * s)
 {
+
 
     if(s->verbosity > 0)
     {
@@ -224,9 +230,13 @@ float * deconvolve_shb_cl2(float * restrict im,
         wP = int64_t_max(P, pP);
     }
 
+    #ifndef VKFFT
+    /* However, this only works for bg > 0, i.e. if dimensions change
+     * under bq==0 the program needs to exit with a large boom!  */
     wM = clu_next_fft_size(wM);
     wN = clu_next_fft_size(wN);
     wP = clu_next_fft_size(wP);
+#endif
 
     if(s->borderQuality == 0)
     {
@@ -253,6 +263,73 @@ float * deconvolve_shb_cl2(float * restrict im,
     clu_env_t * clu = clu_new(s->verbosity, s->cl_device);
     /* Set up the kernels defined in this function */
     clu_prepare_kernels(clu, M, N, P, wM, wN, wP);
+
+    if(0){
+        printf("WARNING: Tests enabled\n");
+
+        printf("-- upload and download -> copy.tif\n");
+        {
+            fimcl_t * gi = fimcl_new(clu, fimcl_real, im, M, N, P);
+            float * _gi = fimcl_download(gi);
+            fimcl_free(gi);
+            fim_tiff_write_float("copy.tif", _gi, NULL, M, N, P);
+            free(_gi);
+        }
+
+        printf("-> copy_ipFFT_ipIFFT.tif \n");
+        {
+            fimcl_t * gi = fimcl_new(clu, fimcl_real, im, M, N, P);
+            fimcl_fft_inplace(gi);
+            fimcl_ifft_inplace(gi);
+            float * _gi = fimcl_download(gi);
+            fimcl_free(gi);
+            fim_tiff_write_float("copy_ipFFT_ipIFFT.tif", _gi, NULL, M, N, P);
+            free(_gi);
+        }
+
+
+        printf("-- copy_FFT_IFFT.tif \n");
+        {
+            fimcl_t * gi = fimcl_new(clu, fimcl_real, im, M, N, P);
+            fimcl_t * FFTgi = fimcl_fft(gi);
+            fimcl_free(gi);
+            fimcl_t * IFFT_FFT_gi = fimcl_ifft(FFTgi);
+            fimcl_free(FFTgi);
+            float * _gi = fimcl_download(IFFT_FFT_gi);
+            fimcl_free(IFFT_FFT_gi);
+            fim_tiff_write_float("copy_FFT_IFFT.tif", _gi, NULL, M, N, P);
+            free(_gi);
+        }
+
+        printf("-> -- copy_ipFFT_IFFT.tif \n");
+        {
+            fimcl_t * gi = fimcl_new(clu, fimcl_real, im, M, N, P);
+            fimcl_fft_inplace(gi);
+            //fimcl_ifft_inplace(gi);
+            fimcl_t * igi = fimcl_ifft(gi);
+            fimcl_free(gi);
+            float * _gi = fimcl_download(igi);
+            fimcl_free(igi);
+            fim_tiff_write_float("copy_ipFFT_IFFT.tif", _gi, NULL, M, N, P);
+            free(_gi);
+        }
+
+        printf("-- copy_FFT_ipIFFT\n");
+        {
+            fimcl_t * gi = fimcl_new(clu, fimcl_real, im, M, N, P);
+            fimcl_t *Fgi = fimcl_fft(gi);
+            fimcl_free(gi);
+            fimcl_ifft_inplace(Fgi);
+            float * _gi = fimcl_download(Fgi);
+            fimcl_free(Fgi);
+            fim_tiff_write_float("copy_ipFFT_ipIFFT.tif", _gi, NULL, M, N, P);
+            free(_gi);
+        }
+
+
+        exit(EXIT_SUCCESS);
+    }
+
 
     if(s->verbosity > 1)
     {
@@ -295,20 +372,16 @@ float * deconvolve_shb_cl2(float * restrict im,
         fim_tiff_write_float("fullPSF.tif", Z, NULL, wM, wN, wP);
     }
 
-#if use_inplace_clfft
-    fimcl_t * PSF_gpu = fimcl_new(clu, fimcl_real_inplace,
+    fimcl_t * PSF_gpu = fimcl_new(clu, fimcl_real,
                                   Z, wM, wN, wP);
+    free(Z);
+#if use_inplace_clfft
     fimcl_fft_inplace(PSF_gpu);
     fimcl_t * fft_PSF_gpu = PSF_gpu;
     PSF_gpu = NULL;
-    free(Z);
 #else
-    fimcl_t * PSF_gpu = fimcl_new(clu, fimcl_real,
-                                  Z, wM, wN, wP);
-
     fimcl_t * fft_PSF_gpu = fimcl_fft(PSF_gpu);
     fimcl_free(PSF_gpu);
-    free(Z);
 #endif
 
     /* Prepare the image */
@@ -368,13 +441,8 @@ float * deconvolve_shb_cl2(float * restrict im,
         float sumg = fim_sum(im, M*N*P);
         float * x = fim_constant(wMNP, sumg / (float) wMNP);
 
-#if use_inplace_clfft
-        x_gpu = fimcl_new(clu, fimcl_real_inplace, x, wM, wN, wP);
-#else
         x_gpu = fimcl_new(clu, fimcl_real, x, wM, wN, wP);
-#endif
         xp_gpu = fimcl_copy(x_gpu);
-
 
         free(x);
     }
@@ -397,12 +465,8 @@ float * deconvolve_shb_cl2(float * restrict im,
         here();
         /* To be interpreted as p^k in Eq. 7 of SHB
          *  p[kk] = x[kk] + alpha*(x[kk]-xp[kk]); */
-#if use_inplace_clfft
-        p_gpu = fimcl_new(clu, fimcl_real_inplace, NULL, wM, wN, wP);
-#else
-        p_gpu = fimcl_new(clu, fimcl_real, NULL, wM, wN, wP);
-#endif
 
+        p_gpu = fimcl_new(clu, fimcl_real, NULL, wM, wN, wP);
 
         fimcl_shb_update(p_gpu, x_gpu, xp_gpu, alpha);
         fimcl_positivity(p_gpu, s->bg);

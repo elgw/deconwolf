@@ -1,31 +1,49 @@
 # To do
 
 This document is complementary to the [issues page on
-github](https://github.com/elgw/deconwolf/issues). And focuses more on
-changes to the internal machinery.
+github](https://github.com/elgw/deconwolf/issues).
 
-## Top priority
+## Planned
+- [ ] Complete switch to Vulkan from OpenCL. Doing this will ensure
+      better portability, for example on new macs with
+      [MoltenVK](https://github.com/KhronosGroup/MoltenVK). The switch
+      from clFFT to VkFFT in v 0.3.6 was a first step towards this goal.
 
-- [ ] Crash-safe writing of output images, write to temporary file and
-move when write is complete to avoid bad luck.
-- [ ] Get documentation up to date.
+- [ ] Crash-safe writing of output images. I.e, follow the standard
+  procedure and first, write to temporary file and move to final
+  destination when the write has finished. Avoids some bad luck.
+
+- [ ] Get documentation up to date and write a general introduction.
+
 - [ ] Set default PSF size in `dw_bw` based on the geometry of the PSF
 and expected sample thickness.
-- [ ] Can deconwolf be built on the M1 mac models without modification?
 
-Related to OpenCL/GPU
-- [ ] When using clFFT that does not support all sizes, crop the image
-if needed when using **--bq 0**
-- [ ] Possibly replace `clCreateCommandQueue` by
-      `clCreateCommandQueueWithProperties`. First decide what
-      `CL_TARGET_OPENCL_VERSION` to define.
+- [ ] Prepare binary packages, should include Windows 10/11, MacOS and
+      linux.
+
+- [ ] Crop the PSF also in the axial direction when it vanishes, this
+      should be good for confocal, STED etc.
+
+- [ ] For the next major release, give the command line arguments a makeover:
+
+  - Place the image(s) last among the positional arguments so that dw
+    can be invoked by command like:
+
+    ```
+    $ dw --iter n psf_dapi.tif dapi*.tiff
+    ```
+
+  - `--shbcl2` is not particularly mnemonic. Use `--gpu` or have
+    separate binaries.
+
+  - `--xyfactor` is also a quite awkward name.
+
+- [ ] Still one kernel to write in order to speedup the initialization
+      in `method_shbcl2`.
 
 ## Nice to have
 - [ ] Skip libtiff, especially for writing.
-- [ ] Switch to/add vkFFT over clFFT
 - [ ] See if Pinned memory allocations can improve the performance for shbcl (don't expect anything drastic from shbcl2).
-- [ ] Adjust the PSF cropping so that the working image size has at
-least one power of two. Or even better use **nextfastfft** from
 [LFAT](https://ltfat.github.io/notes/ltfatnote017.pdf),
 [code](https://github.com/ltfat/ltfat/blob/master/fourier/nextfastfft.m)
 - [ ] Wrap malloc to catch allocation errors to the log file?
@@ -39,8 +57,16 @@ detect saturated pixels.
 - [ ] Make sure that something that makes sense happens when a
 Pyramidal tif is supplied.
 - [ ] Wrap image pointers in some abstraction.
+- [ ] Include CCD corrections.
+- [ ] Make the background correction work also in tiled mode.
+- [ ] Automatic image cropping in the axial direction based on
+      gradient magnitude or similar.
+- [ ] Do the padding/unpadding for in-place transformations on the GPU
+      side. This should not affect the memory usage since it is only
+      performed at the beginning and at the end.
 
 ## Done
+- [x] Switch to/add vkFFT over clFFT. -- since 0.3.6
 - [x] Transfer pixel size to output when doing max projections.
 - [x] Transfer metadata (pixel size) to output images when tiling is used.
 - [x] Clean up the **merge** sub command and test it.

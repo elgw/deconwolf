@@ -1,9 +1,13 @@
 #pragma once
 
-/* This is tailored for a single FFT size. Doing it that way we can
- * do much initialization in bulk at the beginning.
- * Notes:
- * -
+/* Only a single clu should be used at a time.
+ * One clu is only set up for a specific fft size.
+ *
+ * For vkFFT:
+ * - Todo: Forward and backward FFT (inplace and/or out of place)
+ *
+ * For clFFT:
+ * - Fix so that the inplace transforms work! (default is out-of-place, right?)
  */
 
 #include <assert.h>
@@ -14,24 +18,35 @@
 #include <unistd.h>
 #include "dw_util.h"
 
-//#define CL_USE_DEPRECATED_OPENCL_1_2_APIS
-//#define CL_TARGET_OPENCL_VERSION 120
-
-
-// TODO: see how to replace clCreateCommandQueue for more recent targets
-
+/* VkFFT targets version 1.20 */
 #define CL_TARGET_OPENCL_VERSION 120
+
 #ifdef __APPLE__
 #include <OpenCL/cl.h>
 #else
 #include <CL/cl.h>
 #endif
-#include <clFFT.h>
+
 
 #define CLU_KEEP_ALL 0
 #define CLU_DROP_ALL 1
 #define CLU_KEEP_2ND 2
 
+
+#ifdef VKFFT_BACKEND /* Should be defined in the makefile */
+// Unfortunately this does not turn off all warnings
+
+#include <vkFFT.h>
+
+#ifndef VKFFT
+#define VKFFT
+#endif
+#else
+#include <clFFT.h>
+#endif
+
+/* Pad first dimension */
+#define PAD_FIRST_DIM 1
 
 const char* clGetErrorString(int errorCode);
 
@@ -48,14 +63,8 @@ typedef struct{
     cl_device_id device_id;
     cl_command_queue command_queue;
 
-    int clFFT_loaded;
-    clfftSetupData fftSetup;
-    size_t clfft_buffer_size;
-    cl_mem clfft_buffer; // Only allocated if clfft_buffer_size > 0
-    clfftPlanHandle r2h_plan;
-    clfftPlanHandle r2h_inplace_plan;
-    clfftPlanHandle h2r_plan;
-    clfftPlanHandle h2r_inplace_plan;
+
+
     size_t M; size_t N; size_t P;
     /* For complex data */
     clu_kernel_t kern_mul;
@@ -72,22 +81,40 @@ typedef struct{
     clu_kernel_t * idiv_kernel;
     clu_kernel_t * update_y_kernel;
 
-
     size_t nb_allocated;
     size_t n_release;
     size_t n_alloc;
+
+    /* Prefer in-place transformations over out-of place?
+     * in-place should use less memory, but is it slower? */
+    int prefer_inplace;
+#ifdef VKFFT
+    VkFFTApplication vkfft_app;
+#else
+    int clFFT_loaded;
+    clfftSetupData fftSetup;
+    size_t clfft_buffer_size;
+    cl_mem clfft_buffer; // Only allocated if clfft_buffer_size > 0
+    clfftPlanHandle r2h_plan;
+    clfftPlanHandle r2h_inplace_plan;
+    clfftPlanHandle h2r_plan;
+    clfftPlanHandle h2r_inplace_plan;
+#endif
 } clu_env_t;
 
 /* A fimcl object can be one of these types */
 typedef enum {
-    fimcl_real,
-    fimcl_real_inplace,
-    fimcl_hermitian} fimcl_type ;
+    fimcl_real, /* Real (padding on is applied internally) */
+    fimcl_hermitian /* complex */
+}
+    fimcl_type ;
 
 typedef struct{
+    /* Size of real array before padding */
     size_t M;
     size_t N;
     size_t P;
+
     cl_mem buf;
     size_t buf_size_nf; // Number of floats, not bytes
 
@@ -98,17 +125,35 @@ typedef struct{
     cl_event wait_ev;
 } fimcl_t;
 
+/*******************************************************
+ *     Setup and teardown of environment
+ *******************************************************/
+
+/* Create an environment with OpenCL and clFFT */
+clu_env_t * clu_new(int verbose, int cl_device);
+
+/* Prepare to do FFTs of real arrays of size wM x wN x wP
+ * the size M x N x P is the size of the original image
+ * without padding for Berteros method
+ */
+void clu_prepare_kernels(clu_env_t * clu,
+                         size_t wM, size_t wN, size_t wP,
+                         size_t M, size_t N, size_t P);
+
+/* Tear down what is crated with clu_new */
+void clu_destroy(clu_env_t * );
+
+
+
 /* Allocate a new float image on the GPU.
  * Use data in X unless it is NULL
- * if fullsize is set to 1, this object can be used for
- * inplace transformations
- * non-blocking. call fimcl_sync on the new object to manually sync
- * if X != NULL
  */
 fimcl_t * fimcl_new(clu_env_t * clu, fimcl_type type,
                     const float * X, size_t M, size_t N, size_t P);
 
 void fimcl_free(fimcl_t * );
+
+
 
 /* Get back data from GPU.
  * Blocking (sync before and after) */
@@ -178,17 +223,6 @@ void clu_exit_error(cl_int err,
                     int clfft);
 
 
-/* Create an environment with OpenCL and clFFT */
-clu_env_t * clu_new(int verbose, int cl_device);
-
-/* Prepare to do FFTs at size wM x wN x wP
- * the size M x N x P is the size of the input image before it was possibly padded */
-void clu_prepare_kernels(clu_env_t * clu,
-                         size_t wM, size_t wN, size_t wP,
-                         size_t M, size_t N, size_t P);
-
-/* Tear down what is crated with clu_new */
-void clu_destroy(clu_env_t * );
 
 
 /* host to host deconvolution via OpenCl
@@ -200,7 +234,9 @@ float * clu_convolve(clu_env_t * clu,
                      float * X, float * Y,
                      size_t M, size_t N, size_t P);
 
+#ifndef VKFFT
 const char * get_clfft_error_string(clfftStatus error);
+#endif
 
 /* Load a program either from a file (if file_name != NULL)
  * or from a string (if program_code != NULL)
@@ -241,6 +277,7 @@ void clu_print_device_info(FILE *, cl_device_id dev_id);
  */
 size_t clu_next_fft_size(size_t N);
 
+#ifndef VKFFT
 /* Generate a plan from real to complex hermitian */
 clfftPlanHandle  gen_r2h_plan(clu_env_t * clu,
                               size_t M, size_t N, size_t P);
@@ -252,9 +289,11 @@ clfftPlanHandle  gen_h2r_plan(clu_env_t * clu,
 clfftPlanHandle  gen_h2r_inplace_plan(clu_env_t * clu,
                                       size_t M, size_t N, size_t P);
 
+
 /* increase the size of the clFFT buffer to size. Don't do anything if
  * the current buffer is already large enough */
 cl_int clu_increase_clfft_buffer(clu_env_t * clu, size_t size);
+#endif
 
 void clu_benchmark_transfer(clu_env_t * clu);
 

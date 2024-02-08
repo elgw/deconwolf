@@ -1,5 +1,37 @@
 # CHANGELOG
 
+## 0.3.6
+- The GPU code path uses in-place transformations as much as possible
+  to save a little on the memory usage.
+
+- Switched to [VkFFT](https://github.com/DTolm/VkFFT) (v1.3.3) as the
+  default FFT backend on the GPU. Unless a big regression is found,
+  the clFFT code path will most likely not be maintained in future
+  versions and be removed.
+
+  To build with GPU acceleration use:
+
+  ```
+  make kernels
+  make -B VKFFT=1
+  ```
+
+  As before, you need also to choose `--method shbcl2` to use it over
+  the CPU implementation.
+
+  Initial tests show a speed up of about 10-30% depending on the image
+  size. As a bonus VkFFT will process any sizes while clFFT simply
+  refuse to process the tricky ones.
+
+- Identified that `cl_idiv_kernel.c` took a substantial amount of the
+  iteration time and rewrote it.
+
+- Removed the "CUDA" backend since it does not make sense any more.
+
+- Checks that the min value of the image > 0. Aborts if not.
+
+- Checks that the max value of the image >= 1. Aborts if not.
+
 ## 0.3.5
 - **dw maxproj** There were problems reading the output in
   MATLAB. Updated so that the output image will be written as a single

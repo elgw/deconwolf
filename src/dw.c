@@ -540,6 +540,10 @@ void dw_fprint_info(FILE * f, dw_opts * s)
     fprintf(f, "OpenCL: No. (Rebuild with OPENCL=1 to enable)\n");
 #endif
 
+#ifdef VKFFT
+    fprintf(f, "VkFFT: YES\n");
+#endif
+
 #ifndef NDEBUG
     fprintf(f, "Warning: Built in debug mode (NDEBUG not defined)\n");
 #endif
@@ -1613,6 +1617,7 @@ float * psf_autocrop(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  // 
 {
     float * p = psf;
     assert(pM[0] > 0);
+
     /* Crop the PSF if it is larger than necessary */
     p = psf_autocrop_byImage(p, pM, pN, pP,
                              M, N, P,
@@ -1622,7 +1627,10 @@ float * psf_autocrop(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  // 
      * Only if the PSF is larger than the image in some dimension. */
     if((s->borderQuality > 0))
     {
-        p = psf_autocrop_XY(p, pM, pN, pP, M, N, P, s);
+        if(s->xycropfactor > 0)
+        {
+            p = psf_autocrop_XY(p, pM, pN, pP, M, N, P, s);
+        }
     }
     assert(pM[0] > 0);
     assert(p != NULL);
@@ -2091,6 +2099,12 @@ int dw_run(dw_opts * s)
         }
 
         im = fim_tiff_read(s->imFile, T, &M, &N, &P, s->verbosity);
+        if(im == NULL)
+        {
+            fprintf(stderr, "Failed to open %s\n", s->imFile);
+            exit(EXIT_FAILURE);
+        }
+
         if(s->verbosity > 4)
         {
             if(M > 9)
@@ -2107,18 +2121,36 @@ int dw_run(dw_opts * s)
 
         if(fim_min(im, M*N*P) < 0)
         {
-            printf("min value of the image is %f, shifting to 0\n", fim_min(im, M*N*P));
-            fim_set_min_to_zero(im, M*N*P);
-            if(fim_max(im, M*N*P) < 1000)
-            {
-                fim_mult_scalar(im, M*N*P, 1000/fim_max(im, M*N*P));
-            }
+            fprintf(stderr,
+                    "ERROR: The image contains negative values, can not continue!\n");
+            fprintf(s->log,
+                    "ERROR: The image contains negative values, can not continue!\n");
+            exit(EXIT_FAILURE);
         }
-        if(im == NULL)
+        float maxval = fim_max(im, M*N*P);
+        if(maxval < 1.0)
         {
-            fprintf(stderr, "Failed to open %s\n", s->imFile);
-            exit(1);
+            fprintf(stderr,
+                    "ERROR: The image has too low intensity, can not continue!\n");
+            fprintf(s->log,
+                    "ERROR: The image has too low intensity, can not continue!\n");
+            fprintf(s->log, "The largest value of the input image is %f\n",
+                    maxval);
+            exit(EXIT_FAILURE);
         }
+
+        if(maxval < 100)
+        {
+            if(s->verbosity > 0)
+            {
+                printf("WARNING: The largest value of the input image is %f\n",
+                       maxval);
+            }
+            fprintf(s->log,
+                    "WARNING: The largest value of the input image is %f\n",
+                    maxval);
+        }
+
 
         if(s->refFile != NULL)
         {
