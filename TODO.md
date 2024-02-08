@@ -21,6 +21,23 @@ and expected sample thickness.
 - [ ] Prepare binary packages, should include Windows 10/11, MacOS and
       linux.
 
+- [ ] Crop the PSF also in the axial direction when it vanishes, this
+      should be good for confocal, STED etc.
+
+- [ ] For the next major release, give the command line arguments a makeover:
+
+  - Place the image(s) last among the positional arguments so that dw
+    can be invoked by command like:
+
+    ```
+    $ dw --iter n psf_dapi.tif dapi*.tiff
+    ```
+
+  - `--shbcl2` is not particularly mnemonic. Use `--gpu` or have
+    separate binaries.
+
+  - `--xyfactor` is also a quite awkward name.
+
 
 ## Nice to have
 - [ ] Skip libtiff, especially for writing.
@@ -38,6 +55,10 @@ detect saturated pixels.
 - [ ] Make sure that something that makes sense happens when a
 Pyramidal tif is supplied.
 - [ ] Wrap image pointers in some abstraction.
+- [ ] Include CCD corrections.
+- [ ] Make the background correction work also in tiled mode.
+- [ ] Automatic image cropping in the axial direction based on
+      gradient magnitude or similar.
 
 ## Done
 - [x] Switch to/add vkFFT over clFFT. -- since 0.3.6

@@ -183,9 +183,9 @@ float * deconvolve_shb(float * restrict im,
 
     float sumg = fim_sum(im, M*N*P);
 
-    /* x is the initial guess, initially the previous iteration,
-     *  xp is
-     *  set to be the same */
+    /*  x -- the initial guess
+     *  xp -- the previous guess, initially set the same as x
+     */
 
     float * x = fim_constant(wMNP, sumg/wMNP);
     float * xp = fim_copy(x, wMNP);
