@@ -1465,7 +1465,6 @@ void clu_prepare_kernels(clu_env_t * clu,
         }
         vkfft_cache_file_name = malloc(1024);
         sprintf(vkfft_cache_file_name, "VkFFT_kernelCache_%zux%zux%zu.binary",
-                dir_home,
                 wM, wN, wP);
     } else {
         vkfft_cache_file_name = malloc(strlen(dir_home) + 1024);
