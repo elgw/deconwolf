@@ -1454,6 +1454,41 @@ void clu_prepare_kernels(clu_env_t * clu,
 
 
 #ifdef VKFFT
+
+    char * vkfft_cache_file_name = NULL;
+    char * dir_home = getenv("HOME");
+    if(dir_home == NULL)
+    {
+        if(clu->verbose > 0)
+        {
+            printf("Warning: could not determine your home directory\n");
+        }
+        vkfft_cache_file_name = malloc(1024);
+        sprintf(vkfft_cache_file_name, "VkFFT_kernelCache_%zux%zux%zu.binary",
+                dir_home,
+                wM, wN, wP);
+    } else {
+        vkfft_cache_file_name = malloc(strlen(dir_home) + 1024);
+        sprintf(vkfft_cache_file_name, "%s/.config/deconwolf/VkFFT_kernelCache_%zux%zux%zu.binary",
+                dir_home,
+                wM, wN, wP);
+    }
+
+    if(clu->verbose > 1)
+    {
+        printf("vkFFT cache file: %s\n", vkfft_cache_file_name);
+    }
+
+    int load_vkfft_from_file = 0;
+    if(dw_file_exist(vkfft_cache_file_name))
+    {
+        load_vkfft_from_file = 1;
+    }
+
+    struct timespec t0, t1;
+
+
+    clock_gettime(CLOCK_MONOTONIC, &t0);
     VkFFTConfiguration configuration = {};
 
     //Device management + code submission
@@ -1469,6 +1504,12 @@ void clu_prepare_kernels(clu_env_t * clu,
     //configuration.isOutputFormatted = 1; // padded for output size
     configuration.normalize = 1; // Normalize inverse transform (0 - off, 1- on
     // printf("sizeof(VkFFTApplication))=%zu\n", sizeof(VkFFTApplication));;
+    if( load_vkfft_from_file )
+    {
+        configuration.loadApplicationFromString = 1;
+    } else {
+        configuration.saveApplicationToString = 1;
+    }
 
     if(clu->verbose > 1)
     {
@@ -1477,12 +1518,42 @@ void clu_prepare_kernels(clu_env_t * clu,
                configuration.size[1],
                configuration.size[2]);
     }
+    if(configuration.loadApplicationFromString)
+    {
+        FILE* kernelCache;
+        uint64_t str_len;
+        kernelCache = fopen(vkfft_cache_file_name, "rb");
+        fseek(kernelCache, 0, SEEK_END);
+        str_len = ftell(kernelCache);
+        fseek(kernelCache, 0, SEEK_SET);
+        configuration.loadApplicationString = malloc(str_len);
+        fread(configuration.loadApplicationString, str_len, 1, kernelCache);
+        fclose(kernelCache);
+    }
     VkFFTResult resFFT = initializeVkFFT(&clu->vkfft_app, configuration);
     if(resFFT != 0)
     {
         fprintf(stderr, "VkFFT failed with error %d\n", resFFT);
         exit(EXIT_FAILURE);
     }
+    if (configuration.loadApplicationFromString) {
+        free(configuration.loadApplicationString);
+    }
+    if (configuration.saveApplicationToString) {
+        FILE* kernelCache;
+        kernelCache = fopen(vkfft_cache_file_name, "wb");
+        fwrite(clu->vkfft_app.saveApplicationString,
+               clu->vkfft_app.applicationStringSize, 1, kernelCache);
+        fclose(kernelCache);
+    }
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    if(clu->verbose > 2)
+    {
+        // 0.6 s for 512x256x128
+        printf("VkFFT intialization took %f s\n", timespec_diff(&t1, &t0));
+    }
+
+    free(vkfft_cache_file_name);
 #endif
 
     return;
