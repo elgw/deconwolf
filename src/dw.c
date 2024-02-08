@@ -2128,7 +2128,7 @@ int dw_run(dw_opts * s)
             exit(EXIT_FAILURE);
         }
         float maxval = fim_max(im, M*N*P);
-        if(maxval < 1)
+        if(maxval < 1.0)
         {
             fprintf(stderr,
                     "ERROR: The image has too low intensity, can not continue!\n");

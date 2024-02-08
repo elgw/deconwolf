@@ -38,6 +38,8 @@ and expected sample thickness.
 
   - `--xyfactor` is also a quite awkward name.
 
+- [ ] Still one kernel to write in order to speedup the initialization
+      in `method_shbcl2`.
 
 ## Nice to have
 - [ ] Skip libtiff, especially for writing.
@@ -59,6 +61,9 @@ Pyramidal tif is supplied.
 - [ ] Make the background correction work also in tiled mode.
 - [ ] Automatic image cropping in the axial direction based on
       gradient magnitude or similar.
+- [ ] Do the padding/unpadding for in-place transformations on the GPU
+      side. This should not affect the memory usage since it is only
+      performed at the beginning and at the end.
 
 ## Done
 - [x] Switch to/add vkFFT over clFFT. -- since 0.3.6

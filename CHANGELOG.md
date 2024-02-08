@@ -22,6 +22,10 @@
 
 - Removed the "CUDA" backend since it does not make sense any more.
 
+- Checks that the min value of the image > 0. Aborts if not.
+
+- Checks that the max value of the image >= 1. Aborts if not.
+
 ## 0.3.5
 - **dw maxproj** There were problems reading the output in
   MATLAB. Updated so that the output image will be written as a single
