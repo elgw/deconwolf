@@ -16,6 +16,8 @@ github](https://github.com/elgw/deconwolf/issues).
   procedure and first, write to temporary file and move to final
   destination when the write has finished. Avoids some bad luck.
 
+- [ ] Add OpenCL-RL method (as a low mem option).
+
 - [ ] Get documentation up to date and write a general introduction.
 
 - [ ] Set default PSF size in `dw_bw` based on the geometry of the PSF
