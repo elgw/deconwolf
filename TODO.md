@@ -4,6 +4,9 @@ This document is complementary to the [issues page on
 github](https://github.com/elgw/deconwolf/issues).
 
 ## Planned
+
+- [ ] dynamic loading of openCL, for examples using [https://github.com/yugr/Implib.so]
+
 - [ ] Complete switch to Vulkan from OpenCL. Doing this will ensure
       better portability, for example on new macs with
       [MoltenVK](https://github.com/KhronosGroup/MoltenVK). The switch
