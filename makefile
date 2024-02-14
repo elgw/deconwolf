@@ -32,8 +32,9 @@ DEBUG?=0
 ifeq ($(DEBUG),1)
     CFLAGS += -O0 -Wno-unknown-pragmas -fanalyzer -g3
 else
-    CFLAGS += -O3 -flto=auto -DNDEBUG
+    CFLAGS += -O3 -flto -DNDEBUG
     # Notes:
+    # -flto=auto is not supported by all compilers
     # -O2 -ftree-vectorize and -O3 give about the same performance
     # -DNDEBUG turns off some self-tests
     # -fno-math-errno gives no relevant performance gain
