@@ -8,7 +8,10 @@
 # Inspired by
 # https://gitlab.surrey.ac.uk/ri0005/binary_c/-/blob/455a3598c506cc157b45b90016ce896645d6ca0d/meson.build
 #
-# TODO: Add OpenCL support to the meson.build file
+# TODO:
+# - OpenCL
+# - -DNDEBUG -DVKFFT -DOpenCL
+# 
 
 project('deconwolf', 'c',
                  default_options : ['c_std=gnu11'])
@@ -61,6 +64,7 @@ gsl_dep = dependency(
     required : true)
 
 dw_bw_deps += gsl_dep
+dw_deps += gsl_dep
 
 # pkg-config --list-all | grep tiff
 tiff_dep = dependency(

@@ -14,7 +14,10 @@ dw_src = files('deconwolf.c',
 'method_shb.c',
 'dw_util.c',
 'ftab.c',
-'dw_psf.c')
+'dw_psf.c',
+'dw_dots.c',
+'dw_psf_sted.c',
+'fwhm.c')
 
 dw_bw_src = files('dw_bwpsf.c',
 'fim.c',
