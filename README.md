@@ -1,4 +1,4 @@
-# deconwolf
+# deconwolf v0.3.6
 
 **deconwolf** is a software for 3-D deconvolution of fluorescent wide-field
 images:
