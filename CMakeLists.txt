@@ -23,13 +23,11 @@ endif()
 # UNIX, WIN32, WINRT, CYGWIN, APPLE are environment variables as flags set by default system
 if(UNIX)
   message("This is a ${CMAKE_SYSTEM_NAME} system")
+  add_definitions(-DUNIX)
 elseif(WIN32)
   message("This is a Windows System")
+  add_definitions(-DWINDOWS)
 endif()
-
-add_definitions(-DMyDefine="Windows PC")
-
-
 
 
 
@@ -57,23 +55,70 @@ add_executable(dw
   src/tiling.c
   src/fft.c)
 
+add_executable(dw_bw
+  src/bw_gsl.c
+  src/dw_bwpsf.c
+  src/dw_util.c
+  src/fft.c
+  src/fim.c
+  src/fim_tiff.c
+  src/li.c
+  src/ftab.c
+  src/lanczos.c)
+
+#
+# FFTW3
+#
 
 target_link_libraries(dw fftw3 fftw3f fftw3f_omp)
+target_link_libraries(dw_bw fftw3 fftw3f fftw3f_omp)
+
+#
+# Math library, if needed
+#
 
 find_library(MATH_LIBRARY m)
 if(MATH_LIBRARY)
   target_link_libraries(dw ${MATH_LIBRARY})
+  target_link_libraries(dw_bw ${MATH_LIBRARY})
 endif()
 
-target_link_libraries(dw tiff)
-target_link_libraries(dw gsl)
+#
+# TIFF
+#
 
-# https://cmake.org/cmake/help/v3.9/module/FindOpenMP.html
+target_link_libraries(dw tiff)
+target_link_libraries(dw_bw tiff)
+
+#
+# Gnu Scientific Library
+#
+
+target_link_libraries(dw gsl)
+target_link_libraries(dw_bw gsl)
+
+#
+# OpenCL
+#
+# https://cmake.org/cmake/help/latest/module/FindOpenCL.html
+
+find_package(OpenCL)
+if(OpenCL_C_FOUND)
+  target_link_libraries(dw OpenCL::OpenCL_C)
+  add_definitions(dw, -DOPENCL=1)
+  add_definitions(dw, -DVKFFT_BACKEND=3)
+endif()
+
+
+
+#
+# OpenMP
+#
+#  https://cmake.org/cmake/help/v3.9/module/FindOpenMP.html
+
 find_package(OpenMP)
 if(OpenMP_C_FOUND)
   message("Found OpenMP")
-  message(${OpenMP_C_FLAGS}) # how to set these flags later on?
-  message(${OpenMP_C_LIB_NAMES}) #
-
-  target_link_libraries(dw ${OpenMP_C_LIB_NAMES})
+  target_link_libraries(dw OpenMP::OpenMP_C)
+  target_link_libraries(dw_bw OpenMP::OpenMP_C)
 endif()
