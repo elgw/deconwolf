@@ -13,7 +13,7 @@ static void fimcl_to_tiff(fimcl_t * I_gpu, char * filename)
     float * I = fimcl_download(I_gpu);
     printf("Writing to %s\n", filename);
     fim_tiff_write_float(filename, I, NULL, I_gpu->M, I_gpu->N, I_gpu->P);
-    free(I);
+    fim_free(I);
 }
 
 static fimcl_t  * fft_block_of_ones(clu_env_t * clu,
@@ -87,7 +87,7 @@ fimcl_t * create_initial_W(clu_env_t * clu,
 
     fimcl_t * W_gpu = fimcl_new(clu, fimcl_real, W_pre, wM, wN, wP);
 
-    free(W_pre);
+    fim_free(W_pre);
     return W_gpu;
 }
 
@@ -180,7 +180,7 @@ float * deconvolve_shb_cl2(float * restrict im,
 
     if(s->nIter == 0)
     {
-        free(psf);
+        fim_free(psf);
         return fim_copy(im, M*N*P);
     }
 
@@ -273,7 +273,7 @@ float * deconvolve_shb_cl2(float * restrict im,
             float * _gi = fimcl_download(gi);
             fimcl_free(gi);
             fim_tiff_write_float("copy.tif", _gi, NULL, M, N, P);
-            free(_gi);
+            fim_free(_gi);
         }
 
         printf("-> copy_ipFFT_ipIFFT.tif \n");
@@ -284,7 +284,7 @@ float * deconvolve_shb_cl2(float * restrict im,
             float * _gi = fimcl_download(gi);
             fimcl_free(gi);
             fim_tiff_write_float("copy_ipFFT_ipIFFT.tif", _gi, NULL, M, N, P);
-            free(_gi);
+            fim_free(_gi);
         }
 
 
@@ -298,7 +298,7 @@ float * deconvolve_shb_cl2(float * restrict im,
             float * _gi = fimcl_download(IFFT_FFT_gi);
             fimcl_free(IFFT_FFT_gi);
             fim_tiff_write_float("copy_FFT_IFFT.tif", _gi, NULL, M, N, P);
-            free(_gi);
+            fim_free(_gi);
         }
 
         printf("-> -- copy_ipFFT_IFFT.tif \n");
@@ -311,7 +311,7 @@ float * deconvolve_shb_cl2(float * restrict im,
             float * _gi = fimcl_download(igi);
             fimcl_free(igi);
             fim_tiff_write_float("copy_ipFFT_IFFT.tif", _gi, NULL, M, N, P);
-            free(_gi);
+            fim_free(_gi);
         }
 
         printf("-- copy_FFT_ipIFFT\n");
@@ -351,7 +351,7 @@ float * deconvolve_shb_cl2(float * restrict im,
     fim_insert(Z, wM, wN, wP,
                psf, pM, pN, pP);
 
-    free(psf);
+    fim_free(psf);
     psf = NULL;
 
     /* Shift the PSF so that the mid is at (0,0,0) */
@@ -374,7 +374,7 @@ float * deconvolve_shb_cl2(float * restrict im,
 
     fimcl_t * PSF_gpu = fimcl_new(clu, fimcl_real,
                                   Z, wM, wN, wP);
-    free(Z);
+    fim_free(Z);
 #if use_inplace_clfft
     fimcl_fft_inplace(PSF_gpu);
     fimcl_t * fft_PSF_gpu = PSF_gpu;
@@ -408,10 +408,10 @@ float * deconvolve_shb_cl2(float * restrict im,
         im_full_gpu = fimcl_ifft(fft_im_full_gpu);
         float * im_filt = fimcl_download(im_full_gpu);
         float * im_filt_cropped = fim_subregion(im_filt, wM, wN, wP, M, N, P);
-        free(im_filt);
+        fim_free(im_filt);
         im_gpu = fimcl_new(clu, fimcl_real, im_filt_cropped, M, N, P);
         fimcl_to_tiff(im_gpu, "ifft_fft_input.tif");
-        free(im_filt_cropped);
+        fim_free(im_filt_cropped);
     }
 
     putdot(s);
@@ -444,7 +444,7 @@ float * deconvolve_shb_cl2(float * restrict im,
         x_gpu = fimcl_new(clu, fimcl_real, x, wM, wN, wP);
         xp_gpu = fimcl_copy(x_gpu);
 
-        free(x);
+        fim_free(x);
     }
 
     if(s->verbosity > 0)
@@ -526,7 +526,7 @@ float * deconvolve_shb_cl2(float * restrict im,
     here();
 
     float * out = fim_subregion(out_full, wM, wN, wP, M, N, P);
-    free(out_full);
+    fim_free(out_full);
 
     here();
 

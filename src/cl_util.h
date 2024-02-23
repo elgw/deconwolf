@@ -45,6 +45,8 @@
 #include <clFFT.h>
 #endif
 
+#include "fim.h"
+
 /* Pad first dimension */
 #define PAD_FIRST_DIM 1
 
