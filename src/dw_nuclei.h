@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
-#include <libgen.h>
+
 
 #include <png.h>
 #include <zlib.h>

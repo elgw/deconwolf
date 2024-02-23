@@ -27,16 +27,17 @@
 
 
 #include <assert.h>
+#include <fftw3.h>
+#include <inttypes.h>
+#define _USE_MATH_DEFINES
+#include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
-#include <math.h>
-#include <tiffio.h>
-#include <unistd.h>
-#include <fftw3.h>
 #include <string.h>
 #include <stdint.h>
-#include <inttypes.h>
+#include <tiffio.h>
+
 #include "fim.h"
 #include "ftab.h"
 #include "dw_version.h"
@@ -146,6 +147,7 @@ fim_tiff_to_raw(const char *tif_file_name,
  * @param verbosity how verbose the function should be
  * @param[out] M0, N0, P0, the image size in pixels
  * @param[out] T tiff tags will be written to T
+ * @return The returned image is allocate with fim_malloc
  */
 float * fim_tiff_read(const char * fName,
                       ttags * T,
@@ -155,6 +157,7 @@ float * fim_tiff_read(const char * fName,
 /** @breif Read a sub region of a 3D stack as float array
  * set sub to 1
  * reads sM:sM+wM-1, sN:sN+wN-1, sP:sP+wP-1
+ * @return The returned image is allocate with fim_malloc
  */
 float * fim_tiff_read_sub(const char * fName,
                           ttags *,

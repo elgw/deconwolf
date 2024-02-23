@@ -171,10 +171,8 @@ fim_tiff.o \
 dw.o deconwolf.o \
 dw_maxproj.o \
 dw_util.o \
-method_eve.o \
 method_identity.o \
 method_rl.o \
-method_ave.o \
 method_shb.o \
 dw_imshift.o \
 fft.o \

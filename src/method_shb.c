@@ -27,7 +27,7 @@ float * deconvolve_shb(float * restrict im,
 
     if(s->nIter == 0)
     {
-        free(psf);
+        fim_free(psf);
         return fim_copy(im, M*N*P);
     }
 
@@ -117,7 +117,7 @@ float * deconvolve_shb(float * restrict im,
     fim_insert(Z, wM, wN, wP,
                psf, pM, pN, pP);
 
-    free(psf);
+    fim_free(psf);
 
     /* Shift the PSF so that the mid is at (0,0,0) */
     int64_t midM, midN, midP = -1;
@@ -207,7 +207,7 @@ float * deconvolve_shb(float * restrict im,
                     fim_tiff_write(outname, temp, NULL, M, N, P);
                 }
                 free(outname);
-                free(temp);
+                fim_free(temp);
             }
         }
 
@@ -286,7 +286,7 @@ float * deconvolve_shb(float * restrict im,
 
     if(xp != NULL)
     {
-        free(xp);
+        fim_free(xp);
     }
 
     if(s->verbosity > 0) {
@@ -295,9 +295,9 @@ float * deconvolve_shb(float * restrict im,
 
     if(W != NULL)
     {
-        free(W); /* Allocated as P1 */
+        fim_free(W); /* Allocated as P1 */
     }
-    free(cK);
+    fim_free(cK);
 
     if(s->fulldump)
     {
@@ -309,7 +309,7 @@ float * deconvolve_shb(float * restrict im,
 
     if(x != NULL)
     {
-        free(x);
+        fim_free(x);
     }
 
 
@@ -378,7 +378,7 @@ float iter_shb(
             x[cc] *= pk[cc];
         }
     }
-    free(pk);
+    fim_free(pk);
     here();
     xp[0] = x;
     return error;

@@ -16,7 +16,7 @@ static opts * opts_new();
 static void opts_free(opts * s);
 static void usage(__attribute__((unused)) int argc, char ** argv);
 static void argparsing(int argc, char ** argv, opts * s);
-static int file_exist(char * fname);
+
 int dw_imshift(int argc, char ** argv);
 
 static opts * opts_new()
@@ -109,16 +109,6 @@ static void argparsing(int argc, char ** argv, opts * s)
 }
 
 
-static int file_exist(char * fname)
-{
-    if( access( fname, F_OK ) != -1 ) {
-        return 1; // File exist
-    } else {
-        return 0;
-    }
-}
-
-
 #ifdef STANDALONE
 int main(int argc, char ** argv)
 {
@@ -142,7 +132,9 @@ int dw_imshift(int argc, char ** argv)
     }
 
     myfftw_start(s->nthreads, s->verbose, stdout);
+    #ifdef _OPENMP
     omp_set_num_threads(s->nthreads);
+#endif
 
     char * inFile = s->image;
     char * outFile = NULL;
@@ -151,7 +143,7 @@ int dw_imshift(int argc, char ** argv)
     double dy = s->dy;
     double dz = s->dz;
 
-    if(!file_exist(inFile))
+    if(!dw_file_exist(inFile))
     {
         printf("Can't open %s!\n", inFile);
         exit(1);
@@ -159,10 +151,8 @@ int dw_imshift(int argc, char ** argv)
 
     outFile = malloc(strlen(inFile) + 20);
 
-    char * _dname = strdup(inFile);
-    char * dname = dirname(_dname);
-    char * _fname = strdup(inFile);
-    char * fname = basename(_fname);
+    char * dname = dw_dirname(inFile);
+    char * fname = dw_basename(inFile);
 
     if(s->verbose > 1)
     {
@@ -171,14 +161,14 @@ int dw_imshift(int argc, char ** argv)
     }
 
     sprintf(outFile, "%s/sh_%s", dname, fname);
-    free(_dname);
-    free(_fname);
+    free(dname);
+    free(fname);
     if(s->verbose > 1)
     {
         fprintf(stdout, "Ouput file: %s\n", outFile);
     }
 
-    if(s->overwrite == 0 && file_exist(outFile))
+    if(s->overwrite == 0 && dw_file_exist(outFile))
     {
         printf("%s exists, skipping.\n", outFile);
         exit(EXIT_SUCCESS);

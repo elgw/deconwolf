@@ -15,7 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <unistd.h>
+
 #include "dw_util.h"
 
 /* VkFFT targets version 1.20 */

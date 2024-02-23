@@ -37,7 +37,7 @@ static opts * opts_new();
 static void opts_free(opts * s);
 static void usage(__attribute__((unused)) int argc, char ** argv);
 static void argparsing(int argc, char ** argv, opts * s);
-static int file_exist(char * fname);
+
 
 
 static double gauss1(double x, double s)
@@ -249,7 +249,7 @@ static void argparsing(int argc, char ** argv, opts * s)
 
     if(s->overwrite == 0)
     {
-        if(file_exist(s->outfile))
+        if(dw_file_exist(s->outfile))
         {
             printf("%s exists, leaving\n", s->outfile);
             printf("if you don't care, use --overwrite\n");
@@ -286,14 +286,6 @@ static void argparsing(int argc, char ** argv, opts * s)
 }
 
 
-static int file_exist(char * fname)
-{
-    if( access( fname, F_OK ) != -1 ) {
-        return 1; // File exist
-    } else {
-        return 0;
-    }
-}
 
 
 
@@ -385,7 +377,7 @@ static void dw_psf_sted(opts * s)
                          T,
                          PSF->M, PSF->N, PSF->P);
     ttags_free(&T);
-    fim_free(PSF);
+    fim_delete(PSF);
 }
 
 int dw_psf_sted_cli(int argc, char ** argv)

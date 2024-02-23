@@ -20,11 +20,11 @@
 #include <time.h>
 #include <fftw3.h>
 #include <string.h>
-#include <dirent.h>
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include "fim.h"
+#include "dw_util.h"
 
 /* This provides some utility functions for using fftw3.
  *
@@ -148,20 +148,6 @@ static size_t nch(size_t M, size_t N, size_t P)
     return (1+M/2)*N*P;
 }
 
-
-#ifdef WINDOWS
-#include <direct.h>
-#include <sysinfoapi.h>
-/* Not tested but it compiles */
-int clock_gettime(int a , struct timespec *spec)      //C-file part
-{  __int64 wintime; GetSystemTimeAsFileTime((FILETIME*)&wintime);
-    wintime      -=116444736000000000;  //1jan1601 to 1jan1970
-    spec->tv_sec  =wintime / 10000000;           //seconds
-    spec->tv_nsec =wintime % 10000000 *100;      //nano-seconds
-    return 0;
-}
-#endif
-
 static char * get_swf_file_name(int nThreads)
 {
     char * dir_home = getenv("HOME");
@@ -250,7 +236,9 @@ void myfftw_start(const int nThreads, int verbose, FILE * log)
     if(verbose > 1)
     {
 #ifndef CUDA
+        #ifndef WINDOWS
         printf("\t using %s with %d threads\n", fftwf_version, nThreads);
+        #endif
 #else
         printf("\t using cuFFT\n");
 #endif
@@ -258,7 +246,9 @@ void myfftw_start(const int nThreads, int verbose, FILE * log)
     if(log != NULL)
     {
 #ifndef CUDA
+        #ifndef WINDOWS
         fprintf(log, "Using %s with %d threads\n", fftwf_version, nThreads);
+        #endif
 #else
         printf(log, "\t using cuFFT\n");
 #endif
@@ -449,7 +439,7 @@ float * fft_convolve_cc(fftwf_complex * A, fftwf_complex * B,
     assert(out != NULL);
 
     fftwf_execute_dft_c2r(plan_r2c, C, out);
-    free(C);
+    fim_free(C);
 
     const size_t MNP = M*N*P;
 #pragma omp parallel for shared(out)
@@ -473,7 +463,7 @@ float * fft_convolve_cc_conj(fftwf_complex * A, fftwf_complex * B,
     assert(plan_c2r != NULL);
 
     fftwf_execute_dft_c2r(plan_c2r, C, out);
-    free(C);
+    fim_free(C);
 
     const size_t MNP = M*N*P;
 #pragma omp parallel for shared(out)
@@ -585,12 +575,13 @@ void fft_train(const size_t M, const size_t N, const size_t P,
         updatedWisdom = 1;
     }
 
-    free(C);
-    free(R);
+    fim_free(C);
+    fim_free(R);
 
     if(updatedWisdom)
     {
         char * swf = get_swf_file_name(nThreads);
+
         assert(swf != NULL);
 
         fprintf(log, "Exporting fftw wisdom to %s\n", swf);
@@ -646,9 +637,9 @@ void fft_ut_flipall_conj()
 
 
     fftwf_complex * FA = fft(A, M, N, P);
-    free(A);
+    fim_free(A);
     fftwf_complex * FB = fft(B, M, N, P);
-    free(B);
+    fim_free(B);
 
     fftwf_complex * FB_flipall = fft(B_flipall, M, N, P);
 
@@ -656,10 +647,10 @@ void fft_ut_flipall_conj()
 
     float * Y2 = fft_convolve_cc_conj(FA, FB, M, N, P);
     assert(FA != FB);
-    free(FA);
+    fim_free(FA);
     FA = NULL;
 
-    free(FB);
+    fim_free(FB);
     FB = NULL;
 
     float mse = fim_mse(Y1, Y2, M*N*P);
@@ -669,11 +660,11 @@ void fft_ut_flipall_conj()
     { printf("BAD :(\n"); }
 
 
-    free(B_flipall);
-    free(FB_flipall);
+    fim_free(B_flipall);
+    fim_free(FB_flipall);
 
-    free(Y1);
-    free(Y2);
+    fim_free(Y1);
+    fim_free(Y2);
 
     myfftw_stop();
 }
@@ -706,9 +697,9 @@ double * fft_bench_1d(int64_t from, int64_t to, int niter)
                                                     fft_in, fft_out,
                                                     FFTW_ESTIMATE);
 
-            clock_gettime(CLOCK_REALTIME, &tictoc_start);
+            dw_gettime(&tictoc_start);
             fftwf_execute(plan);
-            clock_gettime(CLOCK_REALTIME, &tictoc_end);
+            dw_gettime(&tictoc_end);
 
             double took = timespec_diff(&tictoc_end, &tictoc_start);
 
@@ -719,8 +710,8 @@ double * fft_bench_1d(int64_t from, int64_t to, int niter)
 
 
             fftwf_destroy_plan(plan);
-            free(fft_out);
-            free(fft_in);
+            fim_free(fft_out);
+            fim_free(fft_in);
         }
     }
     return t;
@@ -776,18 +767,18 @@ void test_inplace(void)
         printf("ifft\n");
         float * ffX = ifft(fX, M, N, P);
         float relerr_oo = fim_compare(X, ffX, M, N, P);
-        free(ffX);
+        fim_free(ffX);
         printf("fft:out-of-place ifft:out-of-place max_rel_err: %e\n", relerr_oo);
 
         /* Only forward inplace */
         float * X2 = fim_malloc(M*N*P*sizeof(float));
         assert(X2 != NULL);
         memcpy(X2, X, M*N*P*sizeof(float));
-        float * dummy1 = malloc(MNP);
+        float * dummy1 = fim_malloc(MNP);
         assert(dummy1 != NULL);
         printf("fft_inplace\n");
         fftwf_complex * fX2 = fft_inplace(X2, M, N, P);
-        float * dummy2 = malloc(MNP);
+        float * dummy2 = fim_malloc(MNP);
         assert(dummy2 != NULL);
         printf("ifft\n");
         float * ffX2 = ifft(fX2, M , N, P);
@@ -797,12 +788,12 @@ void test_inplace(void)
         /* Forward inplace and backward inplace */
         float * X3 = fim_malloc(M*N*P*sizeof(float));
         assert(X3 != NULL);
-        float * dummy3 = malloc(MNP);
+        float * dummy3 = fim_malloc(MNP);
         assert(dummy3 != NULL);
         memcpy(X3, X, M*N*P*sizeof(float));
         printf("fft_inplace\n");
         fftwf_complex * fX3 = fft_inplace(X3, M, N, P);
-        float * dummy4 = malloc(MNP);
+        float * dummy4 = fim_malloc(MNP);
         assert(dummy4 != NULL);
         printf("ifft_inplace\n");
         float * ffX3 = ifft_inplace(fX3, M , N, P);
@@ -813,15 +804,15 @@ void test_inplace(void)
         assert(relerr_io < 1e-5);
         assert(relerr_ii < 1e-5);
 
-        free(dummy1);
-        free(dummy2);
-        free(dummy3);
-        free(dummy4);
-        free(X);
-        free(ffX3);
-        free(fX2);
-        free(ffX2);
-        free(fX);
+        fim_free(dummy1);
+        fim_free(dummy2);
+        fim_free(dummy3);
+        fim_free(dummy4);
+        fim_free(X);
+        fim_free(ffX3);
+        fim_free(fX2);
+        fim_free(ffX2);
+        fim_free(fX);
     }
     exit(EXIT_SUCCESS);
     return;
@@ -848,7 +839,7 @@ void fft_ut(void)
     {
         printf("Size: %" PRId64 ", time %e\n", kk+from, t[kk]);
     }
-    free(t);
+    fim_free(t);
 
     // Typical z-sizes:
     from = 80;
@@ -858,7 +849,7 @@ void fft_ut(void)
     {
         printf("Size: %" PRId64 ", time %e\n", kk+from, t[kk]);
     }
-    free(t);
+    fim_free(t);
 
 
 
@@ -876,7 +867,7 @@ fftwf_complex * fft_and_free(float * restrict in,
         return F;
     } else {
         fftwf_complex * F = fft(in, n1, n2, n3);
-        free(in);
+        fim_free(in);
         return F;
     }
 }
@@ -890,7 +881,7 @@ float * ifft_and_free(fftwf_complex * F,
         return f;
     } else {
         float * f = ifft(F, n1, n2, n3);
-        free(F);
+        fim_free(F);
         return f;
     }
 }

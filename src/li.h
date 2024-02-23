@@ -38,6 +38,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#define _USE_MATH_DEFINES
 #include <math.h>
 #include <assert.h>
 #include <string.h>
@@ -46,6 +47,14 @@
 #include <gsl/gsl_permutation.h>
 #include <gsl/gsl_linalg.h>
 #include <gsl/gsl_blas.h>
+
+#ifndef dcomplex
+#ifdef WINDOWS
+typedef _Dcomplex dcomplex;
+#else
+typedef double complex dcomplex;
+#endif
+#endif
 
 typedef struct
 {
@@ -71,6 +80,6 @@ li_conf * li_new(double z);
 
 li_conf * li_free(li_conf ** LP);
 
-double complex li_calc(li_conf * L, const double r);
+dcomplex li_calc(li_conf * L, const double r);
 
 void li_show(li_conf * L);

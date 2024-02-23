@@ -24,7 +24,7 @@ static opts * opts_new();
 static void opts_free(opts * s);
 static void usage(__attribute__((unused)) int argc, char ** argv);
 static void argparsing(int argc, char ** argv, opts * s);
-static int file_exist(char * fname);
+
 
 static opts * opts_new()
 {
@@ -210,17 +210,6 @@ static void argparsing(int argc, char ** argv, opts * s)
     s->optpos = optind;
     return;
 }
-
-
-static int file_exist(char * fname)
-{
-    if( access( fname, F_OK ) != -1 ) {
-        return 1; // File exist
-    } else {
-        return 0;
-    }
-}
-
 
 
 cairo_surface_t * fim_to_cairo_surface(fim_t * I,
@@ -437,7 +426,11 @@ int dw_render(int argc, char ** argv)
     opts * s = opts_new();
 
     argparsing(argc, argv, s);
+
+    #ifdef _OPENMP
     omp_set_num_threads(s->nthreads);
+    #endif
+
     if(s->verbose > 1)
     {
         opts_print(stdout, s);
@@ -447,7 +440,7 @@ int dw_render(int argc, char ** argv)
     char * inFile = s->image;
     char * outFile = s->outfile;
 
-    if(!file_exist(inFile))
+    if(!dw_file_exist(inFile))
     {
         fprintf(stderr, "Can't open %s!\n", inFile);
         exit(1);
@@ -463,7 +456,7 @@ int dw_render(int argc, char ** argv)
         fprintf(stdout, "Ouput file: %s\n", outFile);
     }
 
-    if(s->overwrite == 0 && file_exist(outFile))
+    if(s->overwrite == 0 && dw_file_exist(outFile))
     {
         printf("%s exists, skipping.\n", outFile);
         exit(EXIT_SUCCESS);

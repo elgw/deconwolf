@@ -5,7 +5,7 @@ github](https://github.com/elgw/deconwolf/issues).
 
 ## Planned
 
-- [ ] dynamic loading of openCL, for examples using [https://github.com/yugr/Implib.so]
+- [ ] dynamic loading of OpenCL, for examples using [https://github.com/yugr/Implib.so]
 
 - [ ] Complete switch to Vulkan from OpenCL. Doing this will ensure
       better portability, for example on new macs with
@@ -31,20 +31,15 @@ and expected sample thickness.
 
 - [ ] For the next major release, give the command line arguments a makeover:
 
-  - Place the image(s) last among the positional arguments so that dw
-    can be invoked by command like:
-
-    ```
-    $ dw --iter n psf_dapi.tif dapi*.tiff
-    ```
-
   - `--shbcl2` is not particularly mnemonic. Use `--gpu` or have
     separate binaries.
 
   - `--xyfactor` is also a quite awkward name.
 
+  - `--bq 0` should have an alias like `--periodic`.
+
 - [ ] Still one kernel to write in order to speedup the initialization
-      in `method_shbcl2`.
+      in `method_shbcl2` when bq > 0.
 
 ## Nice to have
 - [ ] Skip libtiff, especially for writing.

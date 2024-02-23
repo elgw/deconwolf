@@ -22,14 +22,17 @@
 
 #include <assert.h>
 #include <inttypes.h>
+#define _USE_MATH_DEFINES
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 #include <time.h>
+#ifndef WINDOWS
 #include <unistd.h>
-
+#endif
+#include "dw_util.h"
 
 /* row-major table */
 typedef struct {

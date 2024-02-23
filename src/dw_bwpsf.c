@@ -14,15 +14,8 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * TODO:
- * - tidy up!
-*/
 
 #include "dw_bwpsf.h"
-
-pthread_mutex_t stdout_mutex;
-pthread_mutex_t logfile_mutex;
 
 int GLOB_N_GSL_EROUND = 0; /* Counter for GSL_EROUND */
 
@@ -194,7 +187,11 @@ void fprint_time(FILE * f)
 
 void bw_version(FILE* f)
 {
+    #ifdef WINDOWS
+    fprintf(f, "deconwolf: '%s'\n", deconwolf_version);
+    #else
     fprintf(f, "deconwolf: '%s' PID: %d\n", deconwolf_version, (int) getpid());
+    #endif
 }
 
 void usage(__attribute__((unused)) int argc, char ** argv, bw_conf * s)
@@ -463,46 +460,12 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
     return;
 }
 
-double cabs2(double complex v)
+double cabs2(dcomplex v)
 {
     return pow(creal(v), 2) + pow(cimag(v), 2);
 }
 
-void * BW_thread(void * data)
-{
-    // Entry point for pthread_create
-    bw_conf * conf = (bw_conf *) data;
 
-
-    if(conf->verbose > 3)
-    {
-        pthread_mutex_lock(&stdout_mutex);
-        printf("-> From thread %d\n", conf->thread);
-        bw_conf_printf(stdout, conf);
-        pthread_mutex_unlock(&stdout_mutex);
-    }
-
-
-    float * V = conf->V;
-    int M = conf->M;
-    int N = conf->N;
-    int P = conf->P;
-    size_t MN = M*N;
-
-    conf->wspx = gsl_integration_workspace_alloc(conf->limit);
-    conf->wspy = gsl_integration_workspace_alloc(conf->limit);
-
-
-    for (int z = conf->thread; z <= (P-1)/2; z+=conf->nThreads) {
-
-        float defocus = conf->resAxial * (z - (P - 1.0) / 2.0);
-        BW_slice(V + z*MN, defocus, conf);
-    }
-
-    gsl_integration_workspace_free(conf->wspx);
-    gsl_integration_workspace_free(conf->wspy);
-    return NULL;
-}
 
 void BW(bw_conf * conf)
 {
@@ -511,43 +474,21 @@ void BW(bw_conf * conf)
     conf->V = malloc(conf->M*conf->N*conf->P*sizeof(float));
     assert(conf->V != NULL);
 
-    float * V = conf->V;
-    int M = conf->M;
-    int N = conf->N;
-    int P = conf->P;
-    size_t MN = M*N;
-
-    int nThreads = conf->nThreads;
-    pthread_t * threads = malloc(nThreads*sizeof(pthread_t));
-    assert(threads != NULL);
-    bw_conf ** confs = malloc(nThreads*sizeof(bw_conf*));
-    assert(confs != NULL);
-
-    for(int kk = 0; kk<nThreads; kk++)
+    #pragma omp parallel for
+    for(int z = 0; z < (conf->P+1)/2; z++)
     {
-        confs[kk] = (bw_conf*) malloc(sizeof(bw_conf));
-        assert(confs[kk] != NULL);
-        memcpy(confs[kk], conf, sizeof(bw_conf));
-        confs[kk]->thread = kk;
-        // printf("Creating thread %d\n", kk);
-        pthread_create(&threads[kk], NULL, BW_thread, (void *) confs[kk]);
+        float defocus = conf->resAxial * (z - (conf->P - 1.0) / 2.0);
+        BW_slice(conf->V + z*conf->M*conf->N, defocus, conf);
     }
-
-    for(int kk = 0; kk<nThreads; kk++)
-    {
-        pthread_join(threads[kk], NULL);
-        free(confs[kk]);
-    }
-
-
-    free(confs);
-    free(threads);
 
     /* symmetry in Z */
-    for(int z = 0; z<(P-1)/2; z++)
+    for(int z = 0; z< (conf->P-1)/2; z++)
     {
-        memcpy(V+(P-z-1)*MN, V+z*MN, MN*sizeof(float));
+        memcpy(conf->V+(conf->P-z-1)*conf->M*conf->N,
+               conf->V+z*conf->M*conf->N,
+               conf->M*conf->N*sizeof(float));
     }
+    return;
 }
 
 double pixelpointfun(double y, void * _conf)
@@ -581,13 +522,15 @@ double pixelyfun(double x, void *_conf)
     //printf("y0=%f, y1=%f\n", iconf->y0, iconf->y1);
     gsl_integration_qag(&fun, iconf->y0, iconf->y1,
                         iconf->conf->epsabs, iconf->conf->epsrel,
-                        iconf->conf->limit, iconf->conf->key, iconf->conf->wspy,
+                        iconf->conf->limit, iconf->conf->key, iconf->wspy,
                         &result, &abserr);
 
     return result;
 }
 
 double integrate_pixel(bw_conf * conf,
+                       gsl_integration_workspace * wspx,
+                       gsl_integration_workspace * wspy,
                        double * radprofile, size_t nr, int radsample,
                              double x0, double x1,
                        double y0, double y1)
@@ -605,6 +548,8 @@ double integrate_pixel(bw_conf * conf,
     iconf.y0 = y0;
     iconf.y1 = y1;
     iconf.conf = conf;
+    iconf.wspx = wspx;
+    iconf.wspy = wspy;
     //printf("intgrate_pixel: iconf->nr = %zu, iconf->radsample=%d\n", iconf.nr, iconf.radsample);
 
     fun.params = &iconf;
@@ -616,7 +561,7 @@ double integrate_pixel(bw_conf * conf,
 
     gsl_integration_qag(&fun, x0, x1,
                         conf->epsabs, conf->epsrel,
-                        conf->limit, conf->key, conf->wspx,
+                        conf->limit, conf->key, wspx,
                         &result, &abserr);
 
     return result/((x1-x0)*(y1-y0));
@@ -629,6 +574,12 @@ void BW_slice(float * V, float z, bw_conf * conf)
      * This function is called from different threads with
      * a copy of the initial conf
      */
+
+    gsl_integration_workspace * wspx =
+        gsl_integration_workspace_alloc(conf->limit);
+    gsl_integration_workspace * wspy =
+        gsl_integration_workspace_alloc(conf->limit);
+
 
     /* The center of the image in units of [pixels] */
     double x0 = ((double) conf->M - 1.0) / 2.0;
@@ -665,7 +616,7 @@ void BW_slice(float * V, float z, bw_conf * conf)
         L->ni = conf->ni;
         for(size_t n = 0; n < nr; n++) // over r
         {
-            complex double v = li_calc(L, r[n]*conf->resLateral);
+            dcomplex v = li_calc(L, r[n]*conf->resLateral);
             radprofile[n] = cabs2(v);
         }
         li_free(&L);
@@ -685,10 +636,8 @@ void BW_slice(float * V, float z, bw_conf * conf)
 
         if(z == 0) /* Only write from the thread that processes z==0 */
         {
-            pthread_mutex_lock(&logfile_mutex);
             fprintf(conf->log, "Settings for BW integration over Z:\n");
             bw_gsl_fprint(conf->log, bw_gsl_conf);
-            pthread_mutex_unlock(&logfile_mutex);
         }
 
 
@@ -725,7 +674,9 @@ void BW_slice(float * V, float z, bw_conf * conf)
                 //       (double) x - 0.5 - x0, (double) x + 0.5 - x0,
                 //       (double) y - 0.5 - y0, (double) y + 0.5 - y0,z );
 
-                pIntensity = integrate_pixel(conf, radprofile, nr, radnsamples,
+                pIntensity = integrate_pixel(conf,
+                                             wspx, wspy,
+                                             radprofile, nr, radnsamples,
                                              (double) x - 0.5 - x0, (double) x + 0.5 - x0,
                                              (double) y - 0.5 - y0, (double) y + 0.5 - y0);
             }
@@ -747,6 +698,8 @@ void BW_slice(float * V, float z, bw_conf * conf)
         }
     }
 
+    gsl_integration_workspace_free(wspx);
+    gsl_integration_workspace_free(wspy);
     free(r);
     free(radprofile);
     return;
@@ -762,7 +715,7 @@ void unit_tests(bw_conf * conf)
 int main(int argc, char ** argv)
 {
     struct timespec tstart, tend;
-    clock_gettime(CLOCK_REALTIME, &tstart);
+    dw_gettime(&tstart);
 
     bw_conf * conf = bw_conf_new();
     bw_argparsing(argc, argv, conf);
@@ -804,7 +757,6 @@ int main(int argc, char ** argv)
 
     gsl_error_handler_t * old_handler =
         gsl_set_error_handler(dw_bw_gsl_err_handler); /* ignore GSL_EROUND */
-
     /* Do the calculations */
     BW(conf);
 
@@ -834,7 +786,7 @@ int main(int argc, char ** argv)
     ttags_free(&T);
 
     fprint_time(conf->log);
-    clock_gettime(CLOCK_REALTIME, &tend);
+    dw_gettime(&tend);
     fprintf(conf->log, "Took: %f s\n", timespec_diff(&tend, &tstart));
     fprintf(conf->log, "done!\n");
 

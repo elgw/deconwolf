@@ -16,6 +16,15 @@
 
 #include "li.h"
 
+static dcomplex build_complex(double vreal, double vcomp)
+{
+#ifdef WINDOWS
+    return _Cbuild(vreal, vcomp);
+#else
+    return vreal + I*vcomp;
+#endif
+}
+
 void li_show(li_conf * L)
 {
     printf("lambda = %f\n", L->lambda);
@@ -68,7 +77,7 @@ li_conf * li_free(li_conf ** LP)
     return NULL;
 }
 
-double complex li_calc(li_conf * L, const double r)
+dcomplex li_calc(li_conf * L, const double r)
 {
 
     /* Updated 2021-11-18 */
@@ -204,7 +213,7 @@ double complex li_calc(li_conf * L, const double r)
         vcomp += k*L->Cimag[kk];
     }
 
-    return vreal + I*vcomp;
+    return build_complex(vreal, vcomp);
 }
 
 #ifdef LI_TEST

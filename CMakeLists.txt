@@ -1,18 +1,40 @@
-# Usage:
+# This is a file to be interpreted by cmake (https://cmake.org/)
+#
+# Typically it is run to generate a makefile (for make) like this:
+#
 # mkdir build
 # cd build
 # cmake ..
-# or
-# CC=clang cmake ..
-# make dw
-
-# See https://medium.com/@onur.dundar1/cmake-tutorial-585dd180109b
+# make
+#
+# Variations:
+# - To Specify the compiler:
+#   CC=clang cmake ..
+# - To see command lines:
+#   make VERBOSE=1
+#
+# Useful references:
+# Good tutorial:
 # https://cliutils.gitlab.io/modern-cmake/
+# Complex example:
+# https://github.com/fluent/fluent-bit/blob/master/CMakeLists.txt
+
 
 cmake_minimum_required(VERSION 3.9)
+
+
+if(WIN32)
+    # Set MSVC runtime to MultiThreaded (/MT)
+    cmake_policy(SET CMP0091 NEW)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
 project(deconwolf VERSION 0.3.6
   DESCRIPTION "Deconvolution of wide field images"
   LANGUAGES C)
+set (CMAKE_C_STANDARD 99)
+
+include(CheckIPOSupported)
 
 if(${CMAKE_SYSTEM_NAME} MATCHES Darwin)
   message("This is a ${CMAKE_SYSTEM_NAME} system")
@@ -30,6 +52,10 @@ elseif(WIN32)
 endif()
 
 
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 # here is where we set the language(deconwolf C)
 add_executable(dw
@@ -46,11 +72,8 @@ add_executable(dw
   src/fim_tiff.c
   src/ftab.c
   src/fwhm.c
-  src/method_eve.c
   src/method_identity.c
   src/method_rl.c
-  src/method_ave.c
-  src/method_eve.c
   src/method_shb.c
   src/tiling.c
   src/fft.c)
@@ -103,10 +126,17 @@ target_link_libraries(dw_bw gsl)
 # https://cmake.org/cmake/help/latest/module/FindOpenCL.html
 
 find_package(OpenCL)
-if(OpenCL_C_FOUND)
-  target_link_libraries(dw OpenCL::OpenCL_C)
-  add_definitions(dw, -DOPENCL=1)
-  add_definitions(dw, -DVKFFT_BACKEND=3)
+if(OpenCL_FOUND)
+  message("Will use OpenCL")
+  target_link_libraries(dw OpenCL)
+  add_definitions(-DOPENCL)
+  add_definitions(-DVKFFT_BACKEND=3)
+  target_include_directories(dw PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/VkFFT/vkFFT/)
+  target_sources(dw PRIVATE src/cl_util.c)
+  target_sources(dw PRIVATE src/method_shb_cl.c)
+  target_sources(dw PRIVATE src/method_shb_cl2.c)
+else()
+  message("No OpenCL :(")
 endif()
 
 
@@ -115,10 +145,26 @@ endif()
 # OpenMP
 #
 #  https://cmake.org/cmake/help/v3.9/module/FindOpenMP.html
-
+if(WIN32)
+  message("Enabling OpenMP since it should be available")
+  add_definitions(-D_OPENMP)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fopenmp=libomp")
+else()
 find_package(OpenMP)
 if(OpenMP_C_FOUND)
   message("Found OpenMP")
   target_link_libraries(dw OpenMP::OpenMP_C)
   target_link_libraries(dw_bw OpenMP::OpenMP_C)
+endif()
+endif()
+
+
+#include(CheckCCompilerFlag)
+#check_c_compiler_flag(-flto=auto CP_ACCEPT_FLTOAUTO)
+
+# Enable -flto (GCC) and similar if available, see
+# https://cmake.org/cmake/help/latest/policy/CMP0069.html
+check_ipo_supported(RESULT result)
+if(result)
+  set_property(DIRECTORY PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif()

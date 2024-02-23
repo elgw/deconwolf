@@ -82,10 +82,8 @@ format, see the log files for scaling factor used.
   i/ **id** identity transform, i.e. nothing. Useful to see if images
    loads, scales and saves correctly.
   ii/ **rl** classical Richardson-Lucy.
-  iii/ **ave** Additive Vector Extrapolation by Biggs and Andrews.
-  iv/ **eve** Exponential Vector Extrapolation by Biggs.
-  v/ **shb** Scaled Heavy Ball.
-  vi/ **shbcl** Scaled Heavy Ball using OpenCl (not compiled by default)
+  iii/ **shb** Scaled Heavy Ball.
+  iv/ **shbcl** Scaled Heavy Ball using OpenCl (not compiled by default)
 
 **\--mse**
 : Show the Mean Square Error between the input image and the current

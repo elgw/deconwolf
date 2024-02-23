@@ -1,21 +1,22 @@
-# deconwolf v0.3.6
+# deconwolf v0.3.7
 
 **deconwolf** is a software for 3-D deconvolution of fluorescent wide-field
 images:
- - The deconvolved images shows very mild boundary effects which means that you
-   can crop and deconvolve small regions of interest.
+ - The deconvolved images shows very mild boundary effects which means
+   that relatively small regions of interest can be used.
  - RAM usage can be reduced at the cost of slightly longer computation times by
    tiling. That makes it possible to deconvolve large images on small machines.
  - Critical parts run on separate threads (as many as you would
    like). However, for maximal throughput (and if you have enough
    RAM), run several instances of dw in parallel.
- - Deconwolf is tiny! The binaries could even fit on a floppy drive
-   (if you are fortunate enough to own one of those antiquities).
  - It is shipped with program to generate Point Spread Functions (PSFs)
    according to the Born and Wolf model. Our program is the only one we
    know of that actually integrate the PSF over each pixel.
+ - The programs are developed under Linux but can be compiled on Mac
+   and Windows as well.
  - Fully open source. And we embrace [contributions and
    suggestions](CONTRIBUTING.md).
+
 
 Deconwolf does not:
  - Have a full-featured Graphical User Interface (GUI), however, if you
@@ -48,8 +49,8 @@ Deconwolf runs on 64-bit machines with, both aarch64 and x86_64, and
 require no special hardware. To compile and install deconwolf should
 take less than a minute on a Linux machine but might be more
 cumbersome on MacOS and Windows. For platform specific build
-instructions, see [INSTALL.md].  We hope to provide pre-compiled
-version in the future.
+instructions, see [INSTALL.md](INSTALL.MD).  We hope to provide
+pre-compiled binaries in the future.
 
 ### Dependencies
 Deconwolf uses:
@@ -61,8 +62,6 @@ Deconwolf uses:
    integration and special functions.
  * [OpenMP](https://www.openmp.org/) for _automatic_ parallelization
    of code, used in **dw**.
- * [POSIX Threads](https://en.wikipedia.org/wiki/Pthreads) for
-   explicit paralellization (in **dw_bw**)
 
 If these libraries are available for your platform, chances are that
 that it can be built.
@@ -70,7 +69,7 @@ that it can be built.
 To enable GPU acceleration, deconwolf also requires a GPU and OpenCL
 drivers installed.
 
-### Ubuntu 22.04 (or Windows with WSL)
+### Installation on Ubuntu 22.04 (or Windows via WSL)
 For other platforms, see [INSTALL.md](INSTALL.md).
 
 First install the required packages:
@@ -105,9 +104,13 @@ something like this:
 
 ``` shell
 # generate PSF.tif
-dw_bw --resxy 130 --resz 250 --NA 1.46 --ni 1.518 --lambda 460 PSF.tiff
+dw_bw --resxy 130 \
+--resz 250 \
+--NA 1.46 \
+--ni 1.518 \
+--lambda 460 PSF.tiff
 # Deconvolve image.tiff -> dw_image.tiff
-dw image.tiff PSF.tiff
+dw --iter 50 image.tiff PSF.tiff
 ```
 For available options, please see
 
@@ -116,7 +119,7 @@ dw --help
 dw_bw --help
 ```
 
-To validate that dw does not create random garbage, run it on
+To validate that **dw** does not create random garbage, run it on
 `/demo/dapi_001.tif`
 
 
@@ -161,19 +164,6 @@ The deconvolution algorithm is based on the following papers:
 
    This is the default acceleration method as it use less memory than
    the other alternatives below, and seems to generate less shot noise.
-
- * Biggs, D.S.C. and Andrews, M. “Acceleration of Iterative Image
-   Restoration Algorithms.”  Applied Optics. Vol. 36. Number 8, 1997,
-   pp. 1766–1775.  [doi](https://doi.org/10.1364/AO.36.001766)
-
-   The Additive Vector Extrapolation Method, enable with **\--method
-   ave**
-
- * Biggs, D.S.C “Accelerated iterative blind deconvolution”. PhD thesis.
-   University of Auckland, New Zealand, 1998.
-
-   The Exponential Vector Extrapolation Method (EVE), enable with
-   **\--method eve**
 
  * M. Bertero and P. Boccacci, A simple method for the reduction of boundary
    effects in the Richardson-Lucy approach to image deconvolution,

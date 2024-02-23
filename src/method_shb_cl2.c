@@ -175,7 +175,7 @@ float * deconvolve_shb_cl2(float * restrict im,
 
     fprintf(s->log, "Deconvolving with shbcl2\n");
     struct timespec t_deconvolution_start, t_deconvolution_end;
-    clock_gettime(CLOCK_REALTIME, &t_deconvolution_start);
+    dw_gettime(&t_deconvolution_start);
 
 
     if(s->nIter == 0)
@@ -532,7 +532,7 @@ float * deconvolve_shb_cl2(float * restrict im,
 
     clu_destroy(clu);
 
-    clock_gettime(CLOCK_REALTIME, &t_deconvolution_end);
+    dw_gettime(&t_deconvolution_end);
     float dt_deconvolution = clockdiff(&t_deconvolution_end,
                                        &t_deconvolution_start);
     fprintf(s->log, "Deconvolution took %.2f s\n", dt_deconvolution);

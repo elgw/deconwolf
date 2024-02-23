@@ -20,8 +20,8 @@
 #include <inttypes.h>
 #include <fftw3.h>
 #include <getopt.h>
-#include <libgen.h>
 #include <locale.h>
+#define _USE_MATH_DEFINES
 #include <math.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -31,7 +31,6 @@
 #include <string.h>
 #include <sys/types.h>
 #include <time.h>
-#include <unistd.h>
 #include <wchar.h>
 
 
@@ -51,9 +50,11 @@
  * can be build separately by the makefile in the src folder
  */
 // #include "dw_otsu.h"
+#ifndef WINDOWS
 #include "dw_dots.h"
 #include "dw_psf.h"
 #include "dw_psf_sted.h"
+#endif
 
 #include "fim.h"
 #include "fim_tiff.h"
@@ -69,10 +70,8 @@
  */
 
 typedef enum {
-    DW_METHOD_EVE, /* Biggs Exponential Vector Extrapolation */
     DW_METHOD_RL, /* Richardson Lucy */
     DW_METHOD_ID, /* Identity/nothing. For checking image loading/saving. */
-    DW_METHOD_AVE, /* Biggs-Andrews Additive Vector Extrapolation */
     DW_METHOD_SHB, /* Wang and Miller, Scaled Heavy Ball */
     #ifdef OPENCL
     DW_METHOD_SHBCL, /* GPU used only for FFT */
@@ -303,8 +302,6 @@ void dw_iterator_free(dw_iterator_t * );
 #include "method_shb_cl2.h"
 #endif
 
-#include "method_eve.h"
 #include "method_identity.h"
 #include "method_rl.h"
-#include "method_ave.h"
 #include "method_shb.h"

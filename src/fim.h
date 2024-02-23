@@ -20,6 +20,7 @@
 #include <assert.h>
 #include <inttypes.h>
 #include <fftw3.h>
+#define _USE_MATH_DEFINES
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,6 +31,7 @@
 #include "fft.h"
 #include "fim_tiff.h"
 #include "ftab.h"
+#include "dw_util.h"
 
 #ifdef _OPENMP // turned on with -fopenmp
 #include <omp.h>
@@ -66,7 +68,9 @@ typedef struct{
 
 /** @brief Aligned allocations
  *
- * Does more or less what fftw_malloc but can be freed with free.
+ * Use for images only, not for fim_t etc.
+ * make sure to deallocate with fim_free.
+ *
  * Calls exit if the allocation fails.
  * The memory is initialized to 0 and aligned according to FIM_ALIGNMENT
  */
@@ -79,9 +83,19 @@ void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_malloc(size_t n);
  */
 void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_realloc(void * p, size_t n);
 
+/** @brief Free an object allocated with fim_malloc (or fim_realloc)
+ *
+ * Note: This really has to be used, otherwhise the program will not work
+ *       under windows.
+*/
+void fim_free(void * p);
 
-/** @brief Free a fim_t object. */
-void fim_free(fim_t *);
+/** @brief Delete a fim_t object.
+ *
+* Frees all resources associated with the fim_t object.
+* as well as the fim_t object itself.
+*/
+void fim_delete(fim_t *);
 
 fim_t * fimt_zeros(size_t M, size_t N, size_t P);
 

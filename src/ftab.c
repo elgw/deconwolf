@@ -429,9 +429,16 @@ int ftab_ut()
     /* Save and read */
     char * fname = malloc(1024);
     assert(fname != NULL);
+
+
+#ifdef WINDOWS
+    printf("TODO: Windows functionality\n");
+    sprintf(fname, "ftab-random");
+#else
     sprintf(fname, "/tmp/ftab-XXXXXX");
     int filedes = mkstemp(fname);
     close(filedes);
+#endif
 
     printf("Temporary file: %s\n", fname);
     ftab_write_tsv(T, fname);
@@ -448,8 +455,9 @@ int ftab_ut()
         assert(strcmp(T->colnames[kk], T2->colnames[kk]) == 0);
     }
 
-
+#ifndef WINDOWS
     unlink(fname);
+#endif
     free(fname);
     ftab_print(stdout, T);
     ftab_free(T);
