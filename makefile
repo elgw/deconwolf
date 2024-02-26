@@ -1,33 +1,43 @@
-## Normal build:
+# -- Normal build:
 # make -B
-
-## To build with debug flags and no OpenMP
-# make DEBUG=1 OMP=0 DEBUG=1
-
-## With GPU acceleration
+#
+# -- With GPU acceleration
 # make kernels
 # make -B VKFFT=1
 #
+# To build with debug flags and no OpenMP
+# make DEBUG=1 OMP=0 DEBUG=1
+
 
 CC=gcc -std=gnu11
-# CC=clang # also requires the package libomp-14-dev
+DESTDIR?=/usr/local/bin
+DEBUG?=0
 
 UNAME_S := $(shell uname -s)
 $(info Host type: $(UNAME_S))
 
 dw = bin/dw
 dwbw = bin/dw_bw
-
 CFLAGS = -Wall -Wextra
 
+#
+# Bake some information
+#
+
 CC_VERSION = "$(shell $(CC) --version | head -n 1)"
+
+$(info -- Checking git commit version)
+ifneq ($(wildcard .git/.*),)
 GIT_VERSION = "$(shell git log --pretty=format:'%aD:%H' -n 1)"
+else
+$(info Building otside of the git repository)
+GIT_VERSION= "unknown (.git not available)"
+endif
+$(info found $(GIT_VERSION))
 
 CFLAGS += -DCC_VERSION=\"$(CC_VERSION)\"
 CFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
 
-DESTDIR?=/usr/local/bin
-DEBUG?=0
 
 #
 # Optimization flags
