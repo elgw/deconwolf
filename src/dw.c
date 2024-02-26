@@ -617,6 +617,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         { "flatfield", required_argument, NULL,  'C' },
         { "fulldump",  no_argument,       NULL,  'D' },
         { "float",     no_argument,       NULL,  'F' },
+        { "gpu",       no_argument,       NULL,  'G' },
         { "niterdump", required_argument, NULL,  'I' },
         { "lookahead", required_argument, NULL,  'L' },
         { "mse",       no_argument,       NULL,  'M' },
@@ -634,8 +635,9 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     int known_method = 1;
     int ch;
     int prefix_set = 0;
+    int use_gpu = 0;
     while((ch = getopt_long(argc, argv,
-                            "12349ab:c:f:ghil:m:n:o:p:r:s:tvwx:B:C:DFI:L:MR:S:TPQ:X:",
+                            "12349ab:c:f:Gghil:m:n:o:p:r:s:tvwx:B:C:DFI:L:MR:S:TPQ:X:",
                             longopts, NULL)) != -1)
     {
         switch(ch) {
@@ -673,6 +675,9 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             break;
         case 'g':
             s->showTime = 1;
+            break;
+        case 'G':
+            use_gpu = 1;
             break;
         case 'j': /* --relerror */
             s->err_rel = atof(optarg);
@@ -846,6 +851,19 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         }
     }
 
+    if(use_gpu)
+    {
+        #ifdef OPENCL
+        if(s->method == DW_METHOD_SHB)
+        {
+            s->method = DW_METHOD_SHBCL2;
+            s->fun = &deconvolve_shb_cl2;
+        }
+        #else
+        printf("WARNING: dw was not compiled with GPU support\n");
+        #endif
+    }
+
     /* Take care of the positional arguments */
     if(optind + 2 != argc)
     {
@@ -905,7 +923,8 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     {
         if( s->overwrite == 0 && dw_file_exist(s->outFile))
         {
-            printf("%s already exist. Doing nothing\n", s->outFile);
+            printf("%s already exist. Use --overwrite to overwrite existing files.\n",
+                   s->outFile);
             exit(0);
         }
     }

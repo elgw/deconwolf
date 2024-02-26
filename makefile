@@ -8,8 +8,6 @@
 # To build with debug flags and no OpenMP
 # make DEBUG=1 OMP=0 DEBUG=1
 
-
-CC=gcc -std=gnu11
 DESTDIR?=/usr/local/bin
 DEBUG?=0
 
@@ -18,7 +16,22 @@ $(info Host type: $(UNAME_S))
 
 dw = bin/dw
 dwbw = bin/dw_bw
-CFLAGS = -Wall -Wextra
+CFLAGS = -std=gnu11 -Wall -Wextra
+
+# FFT Backend, pick __one__
+FFTW3=1
+MKL?=0
+
+# GPU acceleration with OpenCL/VkFFT
+VKFFT?=1
+
+## MANPATH
+MANPATH=/usr/share/man/man1/
+ifeq ($(UNAME_S),Darwin)
+MANPATH=/usr/local/share/man/man1
+endif
+
+PKGCONF=pkg-config
 
 #
 # Bake some information
@@ -38,6 +51,28 @@ $(info found $(GIT_VERSION))
 CFLAGS += -DCC_VERSION=\"$(CC_VERSION)\"
 CFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
 
+#
+# Tools available?
+#
+
+$(info -- Looking for compiler ($(CC)))
+ifeq (, $(shell which $(CC)))
+	$(error Can not find $(CC))
+endif
+
+$(info -- Looking pkg-config)
+ifeq (, $(shell which pkg-config))
+ifeq (, $(shell which pkgconf))
+$(error Can not find pkg-config or pkgconf)
+else
+PKGCONF=pkgconf
+endif
+endif
+
+$(info -- Looking for xxd)
+ifeq (, $(shell which xxd))
+	$(warn xxd not found, kernels can''t be converted to .h files)
+endif
 
 #
 # Optimization flags
@@ -62,7 +97,7 @@ define check_ld_flag
 $(shell $(LD) $(1) -e 0 /dev/null 2>/dev/null && echo $(1))
 endef
 
-$(info --testing -flto and -flto=auto)
+$(info -- testing -flto and -flto=auto)
 LD_HAS_FLTO=$(call check_ld_flag,-flto)
 LD_HAS_FLTO_AUTO=$(call check_ld_flag,-flto=auto)
 
@@ -92,10 +127,10 @@ dwbw_LIBRARIES=
 $(info -- Math (-lm) library?)
 LD_HAS_LM=$(call check_ld_flag,-lm)
 ifneq ($(LD_HAS_LM),)
-$(info found. Will use -lm)
+$(info will use -lm)
 dw_libraries+=-lm
 else
-$(info NOT FOUND)
+$(info Not available, might be built in)
 endif
 
 #
@@ -106,7 +141,7 @@ $(info -- Looking for libtiff)
 TIFFLIB=
 
 ifeq ($(TIFFLIB),)
-LIBTIFF6 = $(shell pkg-config libtiff-6 --exists ; echo $$?)
+LIBTIFF6 = $(shell $(PKGCONF) libtiff-6 --exists ; echo $$?)
 ifeq ($(LIBTIFF6),0)
 TIFFLIB=libtiff-6
 endif
@@ -114,21 +149,21 @@ endif
 
 
 ifeq ($(TIFFLIB),)
-LIBTIFF5 = $(shell pkg-config libtiff-5 --exists ; echo $$?)
+LIBTIFF5 = $(shell $(PKGCONF) libtiff-5 --exists ; echo $$?)
 ifeq ($(LIBTIFF4),0)
 TIFFLIB=libtiff-5
 endif
 endif
 
 ifeq ($(TIFFLIB),)
-LIBTIFF4 = $(shell pkg-config libtiff-4 --exists ; echo $$?)
+LIBTIFF4 = $(shell $(PKGCONF) libtiff-4 --exists ; echo $$?)
 ifeq ($(LIBTIFF4),0)
 	TIFFLIB=libtiff-4
 endif
 endif
 
 ifeq ($(TIFFLIB),)
-LIBTIFF = $(shell pkg-config libtiff --exists ; echo $$?)
+LIBTIFF = $(shell $(PKGCONF) libtiff --exists ; echo $$?)
 ifeq ($(LIBTIFF4),0)
 TIFFLIB=libtiff
 endif
@@ -137,9 +172,9 @@ endif
 
 ifneq ($(TIFFLIB),)
 $(info found $(TIFFLIB))
-CFLAGS+=$(shell pkg-config ${TIFFLIB} --cflags)
-dw_LIBRARIES+=$(shell pkg-config ${TIFFLIB} --libs)
-dwbw_LIBRARIES+=$(shell pkg-config ${TIFFLIB} --libs)
+CFLAGS+=$(shell $(PKGCONF) ${TIFFLIB} --cflags)
+dw_LIBRARIES+=$(shell $(PKGCONF) ${TIFFLIB} --libs)
+dwbw_LIBRARIES+=$(shell $(PKGCONF) ${TIFFLIB} --libs)
 endif
 
 ifeq ($(TIFFLIB),)
@@ -173,34 +208,37 @@ endif
 ##
 ## FFT Backend
 ##
-FFTW3=1
-MKL?=0
+
+# There can be only one
+ifeq ($(FFTW3), 1)
+MKL=0
+endif
 
 ifeq ($(MKL), 1)
-dw=bin/dw-mkl
 FFTW3=0
 endif
 
-ifeq ($(MKL),1)
+
+ifeq ($(MKL), 1)
 $(info FFTW backend: MKL)
-CFLAGS += -DMKL `pkg-config mkl-static-lp64-iomp --cflags`
-dw_LIBRARIES += `pkg-config mkl-static-lp64-iomp --cflags --libs`
-dwbw_LIBRARIES += `pkg-config mkl-static-lp64-iomp --cflags --libs`
+CFLAGS += -DMKL $(shell $(PKGCONF) mkl-static-lp64-iomp --cflags )
+dw_LIBRARIES += $(shell $(PKGCONF) mkl-static-lp64-iomp --cflags --libs)
+dwbw_LIBRARIES += $(shell $(PKGCONF) mkl-static-lp64-iomp --cflags --libs)
 endif
 
 ifeq ($(FFTW3), 1)
 $(info -- Looking for FFTW3)
-FFTW_EXISTS = $(shell pkg-config libtiff-4 --exists ; echo $$?)
+FFTW_EXISTS = $(shell $(PKGCONF) libtiff-4 --exists ; echo $$?)
 ifeq ($(FFTW_EXISTS), 0)
-$(info found)
+
 else
 $(error Could not find FFTW3)
 endif
 
-CFLAGS += `pkg-config fftw3 fftw3f --cflags`
+CFLAGS += $(shell $(PKGCONF)fftw3 fftw3f --cflags)
 ifeq ($(MOSTLYSTATIC), 0)
-dw_LIBRARIES += `pkg-config fftw3 fftw3f --libs`
-dwbw_LIBRARIES += `pkg-config fftw3 fftw3f --libs`
+dw_LIBRARIES += $(shell $(PKGCONF) fftw3 fftw3f --libs)
+dwbw_LIBRARIES += $(shell $(PKGCONF) fftw3 fftw3f --libs)
 else
 dw_LIBRARIES += -l:libfftw3.a -l:libfftw3f.a
 dwbw_LIBRARIES += -l:libfftw3.a -l:libfftw3f.a
@@ -220,7 +258,7 @@ endif
 
 OMP?=1
 ifeq ($(OMP), 1)
-$(info --Enabling OpenMP (OMP))
+$(info -- Enabling OpenMP (OMP))
 ifeq ($(UNAME_S), Darwin)
 CFLAGS+=-Xpreprocessor -fopenmp
 dw_LIBRARIES += -lomp
@@ -242,7 +280,7 @@ endif
 ##
 
 
-VKFFT?=0
+
 ifeq ($(VKFFT), 1)
 $(info -- Including VkFFT)
 CFLAGS+=-DVKFFT_BACKEND=3
@@ -262,11 +300,11 @@ ifeq ($(UNAME_S), Darwin)
 dw_LIBRARIES+=-framework OpenCL
 else
 $(info -- Looking for OpenCL)
-OPENCL_EXISTS = $(shell pkg-config OpenCL --exists ; echo $$?)
+OPENCL_EXISTS = $(shell $(PKGCONF) OpenCL --exists ; echo $$?)
 ifeq ($(OPENCL_EXISTS),0)
-$(info found)
-CFLAGS+=`pkg-config OpenCL --cflags`
-dw_LIBRARIES+=`pkg-config OpenCL --libs`
+
+CFLAGS+=$(shell $(PKGCONF) OpenCL --cflags)
+dw_LIBRARIES+=$(shell $(PKGCONF) OpenCL --libs)
 else
 $(error ERROR: Could not find OpenCL)
 endif
@@ -275,9 +313,10 @@ dw_OBJECTS+=method_shb_cl.o method_shb_cl2.o cl_util.o
 endif
 
 
-###########################
-# Platform specific extras
-###########################
+##
+## Platform specific extras
+##
+
 
 ifneq ($(UNAME_S),Darwin)
     CFLAGS+=
@@ -287,11 +326,6 @@ ifeq ($(WINDOWS),1)
 	CFLAGS += -DWINDOWS
 endif
 
-## MANPATH
-MANPATH=/usr/share/man/man1/
-ifeq ($(UNAME_S),Darwin)
-	MANPATH=/usr/local/share/man/man1
-endif
 
 SRCDIR = src/
 

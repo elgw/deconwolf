@@ -64,7 +64,7 @@ Deconwolf uses:
    of code, used in **dw**.
 
 If these libraries are available for your platform, chances are that
-that it can be built.
+deconwolf can be built as well.
 
 To enable GPU acceleration, deconwolf also requires a GPU and OpenCL
 drivers installed.
@@ -76,8 +76,6 @@ First install the required packages:
 
 ``` shell
 sudo apt-get update
-# find out actual names with command like
-# sudo apt-cache search fftw
 sudo apt-get install \
  gcc                 \
  libfftw3-single3    \
@@ -97,6 +95,9 @@ sudo apt-install ./deconwolf_*.deb
 # to remove
 # sudo apt remove deconwolf
 ```
+
+If OpenCL is not installed, use `make -B VKFFT=0` to build without GPU
+acceleration.
 
 ## Minimal usage example
 To generate a parametric PSF and deconvolve an image, all you need is
@@ -129,7 +130,12 @@ make
 imagej dapi_001.tif dw_dapi_001.tif
 ```
 
-The run time on an AMD 3700x was 8s.
+The run time on an AMD 3700x was 8s. To use GPU acceleration. To use
+GPU accelerated deconvolution, test
+
+``` shell
+dw --iter 20 dapi_001.tif PSF_dapi.tif --gpu
+```
 
 For more documentation see the short [usage guide](USAGE.md), and the manual
 pages for both binaries, [man dw](doc/dw.txt) [man dw_bw](doc/dw_bw.txt).

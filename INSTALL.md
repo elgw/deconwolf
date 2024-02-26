@@ -98,12 +98,11 @@ cmake .. -G "Visual Studio 17 2022" -T ClangCL -A x64
 ```
 
 ### FreeBSD
-Differences to building on Linux.
- - `pkgconf` replaces `pkg-config`
- - `gmake` replaces `make`
- - clang is the default compiler.
+- Use `gmake`, not `make`.
+- Default compiler: `clang`
+- `pkgconf` not `pkg-config`.
 
-The following packages were required:
+Packages:
 ``` shell
 pkg install git
 pkg install gmake

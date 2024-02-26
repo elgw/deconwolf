@@ -43,6 +43,8 @@
 # https://cmake.org/cmake/help/latest/cpack_gen/bundle.html
 #
 
+# TODO:
+# Check https://learn.microsoft.com/en-us/cpp/error-messages/compiler-warnings/compiler-warning-level-3-c4996?view=msvc-170
 
 cmake_minimum_required(VERSION 3.9)
 
