@@ -1,8 +1,8 @@
 # CHANGELOG
 
 ## 0.3.7
-- Deconwolf compiles as a native windows program. The binaries are
-  only smoke tested since the main target is linux.
+- Deconwolf compiles as a native windows program using clang. So far
+  the binaries are only smoke tested since the main target is linux.
 
 - **dw_bw** use OpenMP and does not rely on pthreads any more (for
   portability reasons).
@@ -11,6 +11,11 @@
 
 - Added a `CMakeList.txt` for building with cmake.
 
+- Added `--gpu` which at the moment is equivalent to `--method shbcl2`
+  but a little more mnemonic.
+
+- Added the `--periodic` option which turns on periodic boundary conditions,
+  i.e. is equivalent to `--bq 0`.
 
 ## 0.3.6
 - The GPU code path uses in-place transformations as much as possible

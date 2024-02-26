@@ -622,6 +622,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         { "lookahead", required_argument, NULL,  'L' },
         { "mse",       no_argument,       NULL,  'M' },
         { "maxiter",   required_argument, NULL,  'N' },
+        { "periodic",  no_argument,       NULL,  'O' },
         { "ref",       required_argument, NULL,  'R' },
         { "scaling",   required_argument, NULL,  'S' },
         { "onetile",   no_argument,       NULL,  'T' },
@@ -637,7 +638,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     int prefix_set = 0;
     int use_gpu = 0;
     while((ch = getopt_long(argc, argv,
-                            "12349ab:c:f:Gghil:m:n:o:p:r:s:tvwx:B:C:DFI:L:MR:S:TPQ:X:",
+                            "12349ab:c:f:Gghil:m:n:o:p:r:s:tvwx:B:C:DFI:L:MOR:S:TPQ:X:",
                             longopts, NULL)) != -1)
     {
         switch(ch) {
@@ -691,6 +692,9 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             break;
         case 'N':
             s->maxiter = atoi(optarg);
+            break;
+        case 'O':
+            s->borderQuality = 0;
             break;
         case 'P':
             s->positivity = 0;
@@ -1249,9 +1253,11 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
     printf(" Options:\n");
     printf(" --version\n\t Show version info\n");
     printf(" --help\n\t Show this message\n");
-    printf(" --out file\n\t Specify output image name\n");
-    printf(" --iter N\n\t Specify the number of iterations to use (default: %d)\n", s->nIter);
-    printf(" --threads N\n\t Specify the number of threads to use\n");
+    printf(" --out file\n\t Specify output image name. If not set the input image "
+           "will be prefixed with dw_\n.");
+    printf(" --iter N\n\t "
+           "Specify the number of iterations to use (default: %d)\n", s->nIter);
+    printf(" --threads N\n\t Specify the number of CPU threads to use\n");
     printf(" --verbose N\n\t Set verbosity level (default: %d)\n", s->verbosity);
     printf(" --test\n\t Run unit tests\n");
     printf(" --tilesize N\n\t Enables tiling mode and sets the largest tile size to N voxels in x and y.\n");
@@ -1260,7 +1266,11 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
     printf(" --overwrite\n\t Allows deconwolf to overwrite already existing output files\n");
     printf(" --relax F\n\t Multiply the central pixel of the PSF by F. (F>1 relaxation)\n");
     printf(" --xyfactor F\n\t Discard outer planes of the PSF with sum < F of the central. Use 0 for no cropping.\n");
-    printf(" --bq Q\n\t Set border handling to 0 'none', 1 'compromise', or 2 'normal' which is default\n");
+    printf(" --bq Q\n\t Set border handling to \n\t"
+           "0 'none' i.e. periodic\n\t"
+           "1 'compromise', or\n\t"
+           "2 'normal' which is default\n");
+    printf("--periodic\n\t Equivalent to --bq 0\n");
     printf(" --scale s\n\t"
            "Set the scaling factor for the output image manually to s.\n\t"
            "Warning: Might cause clipping or discretization artifacts\n\t"
