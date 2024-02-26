@@ -153,6 +153,9 @@ endif()
 
 target_link_libraries(dw fftw3 fftw3f)
 
+# There is no _threads version or _omp version
+# on windows, multicore support should be baked
+# into the basic library.
 if(NOT WIN32)
   target_link_libraries(dw fftw3f_omp)
 endif()
