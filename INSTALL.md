@@ -35,7 +35,8 @@ To build:
 ``` shell
 mkdir builddir
 cd builddir
-cmake -DCMAKE_BUILD_TYPE=Release ..
+cmake ..
+cmake --build .
 ```
 
 ## Platform specific notes
@@ -95,10 +96,6 @@ mkdir winbuild
 cd winbuild
 cmake .. -G "Visual Studio 17 2022" -T ClangCL -A x64
 ```
-
-Finally, since the CMakeList isn't polished for the job, some settings
-have to be tuned inside of Visual Studio. If you are windows developer
-and have some good ideas, please reach out.
 
 ### FreeBSD
 Differences to building on Linux.

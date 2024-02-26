@@ -1,63 +1,79 @@
-# This is a file to be interpreted by cmake (https://cmake.org/)
 #
-# Typically it is run to generate a makefile (for make) like this:
+#  This is a file to be interpreted by cmake (https://cmake.org/)
+#  Please note that all dependencies have to be available first.
+#  See also INSTALL.md
 #
-# mkdir build
-# cd build
-# cmake ..
-# make
+# Typical Usage
 #
-# Variations:
+#   mkdir build
+#   cd build
+#   cmake ..
+#   cmake --build .
+#
+#  On Windows, use:
+#
+#   mkdir build
+#   cd build
+#   cmake `-T ClangCL -A x64` ..
+#   cmake --build .
+#
+# Variations/Options
+# - On Windows, use
 # - To Specify the compiler:
 #   CC=clang cmake ..
 # - To see command lines:
-#   make VERBOSE=1
+#   cmake -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON ..
+# - See what is defined with
+#   cmake -L . or cmake --LAH .
 #
-# Useful references:
-# Good tutorial:
+#
+# Documentation and tutorials:
+# https://cmake.org/cmake/help/latest/
 # https://cliutils.gitlab.io/modern-cmake/
-# Complex example:
-# https://github.com/fluent/fluent-bit/blob/master/CMakeLists.txt
+#
+#
+# Install generators
+# Debian
+# https://cmake.org/cmake/help/latest/cpack_gen/deb.html
+# RPM
+# https://cmake.org/cmake/help/latest/cpack_gen/rpm.html
+# Windows
+# https://cmake.org/cmake/help/latest/cpack_gen/nsis.html
+# Macos
+# https://cmake.org/cmake/help/latest/cpack_gen/bundle.html
+#
 
 
 cmake_minimum_required(VERSION 3.9)
 
-
-if(WIN32)
-    # Set MSVC runtime to MultiThreaded (/MT)
-    cmake_policy(SET CMP0091 NEW)
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-endif()
-
-project(deconwolf VERSION 0.3.6
+project(deconwolf VERSION 0.3.7
   DESCRIPTION "Deconvolution of wide field images"
   LANGUAGES C)
-set (CMAKE_C_STANDARD 99)
 
-include(CheckIPOSupported)
+set (CMAKE_C_STANDARD 11)
 
-if(${CMAKE_SYSTEM_NAME} MATCHES Darwin)
-  message("This is a ${CMAKE_SYSTEM_NAME} system")
-elseif(${CMAKE_SYSTEM_NAME} MATCHES Windows)
-  message("This is a Windows System")
-endif()
+option (ENABLE_GPU "Enable GPU/OpenCL" ON)
+option (ENABLE_NATIVE_OPTIMIZATION "Enable non-portable optimizations" OFF)
 
-# UNIX, WIN32, WINRT, CYGWIN, APPLE are environment variables as flags set by default system
+# UNIX, WIN32, WINRT, CYGWIN, APPLE are environment variables
+# as flags set by default system
 if(UNIX)
-  message("This is a ${CMAKE_SYSTEM_NAME} system")
   add_definitions(-DUNIX)
 elseif(WIN32)
-  message("This is a Windows System")
   add_definitions(-DWINDOWS)
 endif()
 
-
+#
+# Default build type is RELEASE
+#
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
-# here is where we set the language(deconwolf C)
+#
+# Add source files
+#
 add_executable(dw
   src/deconwolf.c
   src/dw.c
@@ -90,11 +106,54 @@ add_executable(dw_bw
   src/lanczos.c)
 
 #
+# Set MSVC runtime to MultiThreaded (/MT)
+#
+
+if(WIN32)
+  cmake_policy(SET CMP0091 NEW)
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
+#
+# Link time optimization
+#
+
+# https://cmake.org/cmake/help/latest/module/CheckIPOSupported.html
+include(CheckIPOSupported)
+check_ipo_supported(RESULT result OUTPUT output)
+if(result)
+  message("Enabling IPO")
+  set_property(TARGET dw PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+  set_property(TARGET dw_bw PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+  set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_JOBS 8)
+else()
+  message(WARNING "IPO is not supported: ${output}")
+endif()
+
+#
+# Architecture optimizations
+#
+if(ENABLE_NATIVE_OPTIMIZATION)
+include(CheckCCompilerFlag)
+CHECK_C_COMPILER_FLAG("-march=native" COMPILER_SUPPORTS_MARCH_NATIVE)
+if(COMPILER_SUPPORTS_MARCH_NATIVE)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native")
+endif()
+CHECK_C_COMPILER_FLAG("-mtune=native" COMPILER_SUPPORTS_MTUNE_NATIVE)
+if(COMPILER_SUPPORTS_MTUNE_NATIVE)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mtune=native")
+endif()
+endif()
+
+#
 # FFTW3
 #
 
-target_link_libraries(dw fftw3 fftw3f fftw3f_omp)
-target_link_libraries(dw_bw fftw3 fftw3f fftw3f_omp)
+target_link_libraries(dw fftw3 fftw3f)
+
+if(NOT WIN32)
+  target_link_libraries(dw fftw3f_omp)
+endif()
 
 #
 # Math library, if needed
@@ -125,6 +184,7 @@ target_link_libraries(dw_bw gsl)
 #
 # https://cmake.org/cmake/help/latest/module/FindOpenCL.html
 
+if (ENABLE_GPU)
 find_package(OpenCL)
 if(OpenCL_FOUND)
   message("Will use OpenCL")
@@ -138,33 +198,25 @@ if(OpenCL_FOUND)
 else()
   message("No OpenCL :(")
 endif()
-
+endif()
 
 
 #
 # OpenMP
 #
 #  https://cmake.org/cmake/help/v3.9/module/FindOpenMP.html
-if(WIN32)
-  message("Enabling OpenMP since it should be available")
-  add_definitions(-D_OPENMP)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fopenmp=libomp")
-else()
 find_package(OpenMP)
 if(OpenMP_C_FOUND)
   message("Found OpenMP")
   target_link_libraries(dw OpenMP::OpenMP_C)
   target_link_libraries(dw_bw OpenMP::OpenMP_C)
 endif()
-endif()
 
-
-#include(CheckCCompilerFlag)
-#check_c_compiler_flag(-flto=auto CP_ACCEPT_FLTOAUTO)
 
 # Enable -flto (GCC) and similar if available, see
 # https://cmake.org/cmake/help/latest/policy/CMP0069.html
 check_ipo_supported(RESULT result)
 if(result)
+  message("Enabling IPO")
   set_property(DIRECTORY PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif()

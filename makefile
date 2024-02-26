@@ -40,12 +40,113 @@ else
     # -fno-math-errno gives no relevant performance gain
 endif
 
-dw_LIBRARIES =  -lm -ltiff
-dwtm_LIBRARIES =  -lm -ltiff
-dwbw_LIBRARIES = -lm -ltiff -lpthread
+#
+# Check if the linker can perform link time optimizations
+#
 
-### GSL
-CFLAGS += `gsl-config --cflags`
+define check_ld_flag
+$(shell $(LD) $(1) -e 0 /dev/null 2>/dev/null && echo $(1))
+endef
+
+$(info --testing -flto and -flto=auto)
+LD_HAS_FLTO=$(call check_ld_flag,-flto)
+LD_HAS_FLTO_AUTO=$(call check_ld_flag,-flto=auto)
+
+ifneq ($(LD_HAS_FLTO_AUTO),)
+$(info Enabling -flto=auto)
+CFLAGS+=-flto=auto
+else
+ifneq ($(LD_HAS_FLTO),)
+$(info Enabling -flto)
+CFLAGS+=-flto
+else
+$(info Neither -flto nor -flto=auto available)
+endif
+endif
+
+#
+# Set up for linking
+#
+
+dw_LIBRARIES=
+dwbw_LIBRARIES=
+
+#
+# Math library
+#
+
+$(info -- Math (-lm) library?)
+LD_HAS_LM=$(call check_ld_flag,-lm)
+ifneq ($(LD_HAS_LM),)
+$(info found. Will use -lm)
+dw_libraries+=-lm
+else
+$(info NOT FOUND)
+endif
+
+#
+# Tiff library
+#
+
+$(info -- Looking for libtiff)
+TIFFLIB=
+
+ifeq ($(TIFFLIB),)
+LIBTIFF6 = $(shell pkg-config libtiff-6 --exists ; echo $$?)
+ifeq ($(LIBTIFF6),0)
+TIFFLIB=libtiff-6
+endif
+endif
+
+
+ifeq ($(TIFFLIB),)
+LIBTIFF5 = $(shell pkg-config libtiff-5 --exists ; echo $$?)
+ifeq ($(LIBTIFF4),0)
+TIFFLIB=libtiff-5
+endif
+endif
+
+ifeq ($(TIFFLIB),)
+LIBTIFF4 = $(shell pkg-config libtiff-4 --exists ; echo $$?)
+ifeq ($(LIBTIFF4),0)
+	TIFFLIB=libtiff-4
+endif
+endif
+
+ifeq ($(TIFFLIB),)
+LIBTIFF = $(shell pkg-config libtiff --exists ; echo $$?)
+ifeq ($(LIBTIFF4),0)
+TIFFLIB=libtiff
+endif
+endif
+
+
+ifneq ($(TIFFLIB),)
+$(info found $(TIFFLIB))
+CFLAGS+=$(shell pkg-config ${TIFFLIB} --cflags)
+dw_LIBRARIES+=$(shell pkg-config ${TIFFLIB} --libs)
+dwbw_LIBRARIES+=$(shell pkg-config ${TIFFLIB} --libs)
+endif
+
+ifeq ($(TIFFLIB),)
+$(error tiff library not found)
+endif
+
+##
+## GSL
+##
+
+$(info -- Looking for GSL)
+HAS_GSL= $(shell gsl-config --version)
+ifneq ($(HAS_GSL),)
+GSL_VERSION = $(shell gsl-config --version )
+$(info found GSL ${GSL_VERSION})
+else
+$(error Could not find GSL)
+endif
+
+GSLFLAGS=`gsl-config --cflags`
+CFLAGS += $(GSLFLAGS)
 MOSTLYSTATIC?=0
 ifeq ($(MOSTLYSTATIC), 0)
     dwbw_LIBRARIES += `gsl-config --libs`
@@ -55,7 +156,9 @@ else
    dw_LIBRARIES += -l:libgsl.a -l:libgslcblas.a
 endif
 
-### FFT Backend
+##
+## FFT Backend
+##
 FFTW3=1
 MKL?=0
 
@@ -72,7 +175,14 @@ dwbw_LIBRARIES += `pkg-config mkl-static-lp64-iomp --cflags --libs`
 endif
 
 ifeq ($(FFTW3), 1)
-$(info FFTW backend: FFTW3)
+$(info -- Looking for FFTW3)
+FFTW_EXISTS = $(shell pkg-config libtiff-4 --exists ; echo $$?)
+ifeq ($(FFTW_EXISTS), 0)
+$(info found)
+else
+$(error Could not find FFTW3)
+endif
+
 CFLAGS += `pkg-config fftw3 fftw3f --cflags`
 ifeq ($(MOSTLYSTATIC), 0)
 dw_LIBRARIES += `pkg-config fftw3 fftw3f --libs`
@@ -90,13 +200,17 @@ dwbw_LIBRARIES += -lfftw3f_omp
 endif
 endif
 
+##
 ## OpenMP
+##
+
 OMP?=1
 ifeq ($(OMP), 1)
-$(info OMP enabled)
+$(info --Enabling OpenMP (OMP))
 ifeq ($(UNAME_S), Darwin)
 CFLAGS+=-Xpreprocessor -fopenmp
 dw_LIBRARIES += -lomp
+dwbw_LIBRARIES += -lomp
 else
 CFLAGS += -fopenmp
 ifeq ($(CC),clang)
@@ -109,36 +223,39 @@ $(info OMP disabled)
 endif
 
 
-###################
-# GPU clFFT or VKFFT + OpenCL
-####################
-
-# clFFT
-clFFT?=0
-ifeq ($(clFFT), 1)
-dw_LIBRARIES+=-lclFFT
-OPENCL=1
-endif
+##
+## GPU VKFFT + OpenCL
+##
 
 
 VKFFT?=0
 ifeq ($(VKFFT), 1)
+$(info -- Including VkFFT)
 CFLAGS+=-DVKFFT_BACKEND=3
 CFLAGS+=-Isrc/VkFFT/vkFFT/
 OPENCL=1
 endif
 
-## OpenCL
+#
+# OpenCL
+#
+
 OPENCL?=0
 ifeq ($(OPENCL), 1)
-$(info OpenCL enabled)
+$(info -- OpenCL enabled)
 CFLAGS+=-DOPENCL
 ifeq ($(UNAME_S), Darwin)
 dw_LIBRARIES+=-framework OpenCL
 else
-# CFLAGS+=-I/opt/nvidia/hpc_sdk/Linux_x86_64/21.3/cuda/11.2/targets/x86_64-linux/include/
-# LDFLAGS=-L/opt/nvidia/hpc_sdk/Linux_x86_64/21.3/cuda/11.2/targets/x86_64-linux/lib/
+$(info -- Looking for OpenCL)
+OPENCL_EXISTS = $(shell pkg-config OpenCL --exists ; echo $$?)
+ifeq ($(OPENCL_EXISTS),0)
+$(info found)
+CFLAGS+=`pkg-config OpenCL --cflags`
 dw_LIBRARIES+=`pkg-config OpenCL --libs`
+else
+$(error ERROR: Could not find OpenCL)
+endif
 endif
 dw_OBJECTS+=method_shb_cl.o method_shb_cl2.o cl_util.o
 endif
@@ -193,10 +310,9 @@ li.o fft.o \
 dw_util.o \
 ftab.o
 
-# dwtm = bin/dw_tiffmax
-# dwtm_OBJECTS = fim.o fim_tiff.o deconwolf_tif_max.o
+$(info Everything looks ok)
 
-all: $(dw) $(dwtm) $(dwbw)
+all: $(dw) $(dwbw)
 
 $(dw): $(dw_OBJECTS)
 	$(CC) $(CFLAGS) -o $@ $^ $(dw_LIBRARIES)
