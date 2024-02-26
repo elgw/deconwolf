@@ -18,7 +18,7 @@ $(info Host type: $(UNAME_S))
 dw = bin/dw
 dwbw = bin/dw_bw
 
-CFLAGS = -Wall # -Wextra
+CFLAGS = -Wall -Wextra
 
 CC_VERSION = "$(shell $(CC) --version | head -n 1)"
 GIT_VERSION = "$(shell git log --pretty=format:'%aD:%H' -n 1)"
@@ -29,15 +29,19 @@ CFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
 DESTDIR?=/usr/local/bin
 DEBUG?=0
 
+#
+# Optimization flags
+#
+
+# Notes:
+# -O2 -ftree-vectorize and -O3 give about the same performance
+# -DNDEBUG turns off some self-tests
+# -fno-math-errno gives no relevant performance gain
+
 ifeq ($(DEBUG),1)
     CFLAGS += -O0 -Wno-unknown-pragmas -fanalyzer -g3
 else
     CFLAGS += -O3 -flto -DNDEBUG
-    # Notes:
-    # -flto=auto is not supported by all compilers
-    # -O2 -ftree-vectorize and -O3 give about the same performance
-    # -DNDEBUG turns off some self-tests
-    # -fno-math-errno gives no relevant performance gain
 endif
 
 #
