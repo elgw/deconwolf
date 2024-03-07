@@ -198,9 +198,8 @@ dw_opts * dw_opts_new(void)
     s->lookahead = 0;
     s->psigma = 0;
     s->biggs = 1;
-    s->eve = 1;
     s->metric = DW_METRIC_IDIV;
-    clock_gettime(CLOCK_REALTIME, &s->tstart);
+    dw_gettime(&s->tstart);
     s->fftw3_planning = FFTW_MEASURE;
     s->alphamax = 1;
 
@@ -309,12 +308,6 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
 
     switch(s->method)
     {
-    case DW_METHOD_EVE:
-        fprintf(f, "method: Biggs (EVE)\n");
-        break;
-    case DW_METHOD_AVE:
-        fprintf(f, "method: Biggs and Andrews (AVE)\n");
-        break;
     case DW_METHOD_RL:
         fprintf(f, "method: Richardson-Lucy (RL)\n");
         break;
@@ -476,13 +469,15 @@ void dw_fprint_info(FILE * f, dw_opts * s)
 
     if(f != stdout)
     {
+        #ifndef WINDOWS
         fprintf(f, "PID: %d\n",  (int) getpid());
+        #endif
     }
 
     if(f != stdout)
     {
         char cwd[1024];
-        if (getcwd(cwd, sizeof(cwd)) != NULL) {
+        if (dw_getcwd(cwd, sizeof(cwd)) != NULL) {
             fprintf(f, "PWD: %s\n", cwd);
         }
     }
@@ -507,7 +502,9 @@ void dw_fprint_info(FILE * f, dw_opts * s)
 #ifdef CUDA
     fprintf(f, "FFT Backend: 'cuFFT\n");
 #else
+#ifndef WINDOWS
     fprintf(f, "FFT Backend: '%s'\n", fftwf_version);
+#endif
 #endif
     fprintf(f, "TIFF Backend: '%s'\n", TIFFGetVersion());
 
@@ -620,10 +617,12 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         { "flatfield", required_argument, NULL,  'C' },
         { "fulldump",  no_argument,       NULL,  'D' },
         { "float",     no_argument,       NULL,  'F' },
+        { "gpu",       no_argument,       NULL,  'G' },
         { "niterdump", required_argument, NULL,  'I' },
         { "lookahead", required_argument, NULL,  'L' },
         { "mse",       no_argument,       NULL,  'M' },
         { "maxiter",   required_argument, NULL,  'N' },
+        { "periodic",  no_argument,       NULL,  'O' },
         { "ref",       required_argument, NULL,  'R' },
         { "scaling",   required_argument, NULL,  'S' },
         { "onetile",   no_argument,       NULL,  'T' },
@@ -637,8 +636,9 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     int known_method = 1;
     int ch;
     int prefix_set = 0;
+    int use_gpu = 0;
     while((ch = getopt_long(argc, argv,
-                            "12349ab:c:f:ghil:m:n:o:p:r:s:tvwx:B:C:DFI:L:MR:S:TPQ:X:",
+                            "12349ab:c:f:Gghil:m:n:o:p:r:s:tvwx:B:C:DFI:L:MOR:S:TPQ:X:",
                             longopts, NULL)) != -1)
     {
         switch(ch) {
@@ -677,6 +677,9 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         case 'g':
             s->showTime = 1;
             break;
+        case 'G':
+            use_gpu = 1;
+            break;
         case 'j': /* --relerror */
             s->err_rel = atof(optarg);
             s->iter_type = DW_ITER_REL;
@@ -689,6 +692,9 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             break;
         case 'N':
             s->maxiter = atoi(optarg);
+            break;
+        case 'O':
+            s->borderQuality = 0;
             break;
         case 'P':
             s->positivity = 0;
@@ -762,26 +768,6 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             break;
         case 'm':
             known_method = 0;
-            if(strcmp(optarg, "eve") == 0)
-            {
-                s->method = DW_METHOD_EVE;
-                if(prefix_set == 0)
-                {
-                    sprintf(s->prefix, "eve");
-                }
-                s->fun = &deconvolve_eve;
-                known_method = 1;
-            }
-            if(strcmp(optarg, "ave") == 0)
-            {
-                s->method = DW_METHOD_AVE;
-                if(prefix_set == 0)
-                {
-                    sprintf(s->prefix, "ave");
-                }
-                s->fun = &deconvolve_ave;
-                known_method = 1;
-            }
             if(strcmp(optarg, "rl") == 0)
             {
                 s->method = DW_METHOD_RL;
@@ -840,7 +826,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
 #ifdef OPENCL
                 fprintf(stderr, "shbcl, shbcl2, ");
 #endif
-                fprintf(stderr, "ave, eve, shb (default), rl or id\n");
+                fprintf(stderr, "shb (default), rl or id\n");
                 exit(EXIT_FAILURE);
             }
             break;
@@ -869,10 +855,17 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         }
     }
 
-    if((s->biggs < 0) | (s->biggs > 3))
+    if(use_gpu)
     {
-        printf("Invalid settings to --biggs, please specify 0, 1, 2 or 3\n");
-        exit(1);
+        #ifdef OPENCL
+        if(s->method == DW_METHOD_SHB)
+        {
+            s->method = DW_METHOD_SHBCL2;
+            s->fun = &deconvolve_shb_cl2;
+        }
+        #else
+        printf("WARNING: dw was not compiled with GPU support\n");
+        #endif
     }
 
     /* Take care of the positional arguments */
@@ -908,35 +901,34 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         exit(1);
     }
 
+
     if(s->outFile == NULL)
     {
-        char * dirc = strdup(s->imFile);
-        char * basec = strdup(s->imFile);
-        char * dname = dirname(dirc);
-        char * bname = basename(basec);
+        /* Set s->outFile and s->outFolder based on s->imFile */
+        char * dname = dw_dirname(s->imFile);
+        char * bname = dw_basename(s->imFile);
         s->outFile = malloc(strlen(dname) + strlen(bname) + strlen(s->prefix) + 10);
         assert(s->outFile != NULL);
-        sprintf(s->outFile, "%s/%s_%s", dname, s->prefix, bname);
+        sprintf(s->outFile, "%s%c%s_%s", dname, FILESEP, s->prefix, bname);
         s->outFolder = malloc(strlen(dname) + 16);
         assert(s->outFolder != NULL);
-        sprintf(s->outFolder, "%s/", dname);
-        free(dirc);
-        free(basec);
+        sprintf(s->outFolder, "%s%c", dname, FILESEP);
+        free(dname);
     } else {
-        char * dirc = strdup(s->outFile);
-        char * dname = dirname(dirc);
+        char * dname = dw_dirname(s->outFile);
         free(s->outFolder);
         s->outFolder = malloc(strlen(dname) + 16);
         assert(s->outFolder != NULL);
-        sprintf(s->outFolder, "%s/", dname);
-        free(dirc);
+        sprintf(s->outFolder, "%s%c", dname, FILESEP);
+        free(dname);
     }
 
     if(! s->iterdump)
     {
         if( s->overwrite == 0 && dw_file_exist(s->outFile))
         {
-            printf("%s already exist. Doing nothing\n", s->outFile);
+            printf("%s already exist. Use --overwrite to overwrite existing files.\n",
+                   s->outFile);
             exit(0);
         }
     }
@@ -1040,7 +1032,7 @@ void benchmark_write(dw_opts * s, int iter, double fMSE,
     }
     free(x);
     struct timespec tnow;
-    clock_gettime(CLOCK_REALTIME, &tnow);
+    dw_gettime(&tnow);
     double time = clockdiff(&tnow, &s->tstart);
     fprintf(s->tsv, "%d\t%f\t%f\t%f\n", iter, time, fMSE, KL);
 
@@ -1261,9 +1253,11 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
     printf(" Options:\n");
     printf(" --version\n\t Show version info\n");
     printf(" --help\n\t Show this message\n");
-    printf(" --out file\n\t Specify output image name\n");
-    printf(" --iter N\n\t Specify the number of iterations to use (default: %d)\n", s->nIter);
-    printf(" --threads N\n\t Specify the number of threads to use\n");
+    printf(" --out file\n\t Specify output image name. If not set the input image "
+           "will be prefixed with dw_\n.");
+    printf(" --iter N\n\t "
+           "Specify the number of iterations to use (default: %d)\n", s->nIter);
+    printf(" --threads N\n\t Specify the number of CPU threads to use\n");
     printf(" --verbose N\n\t Set verbosity level (default: %d)\n", s->verbosity);
     printf(" --test\n\t Run unit tests\n");
     printf(" --tilesize N\n\t Enables tiling mode and sets the largest tile size to N voxels in x and y.\n");
@@ -1272,15 +1266,17 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
     printf(" --overwrite\n\t Allows deconwolf to overwrite already existing output files\n");
     printf(" --relax F\n\t Multiply the central pixel of the PSF by F. (F>1 relaxation)\n");
     printf(" --xyfactor F\n\t Discard outer planes of the PSF with sum < F of the central. Use 0 for no cropping.\n");
-    printf(" --bq Q\n\t Set border handling to 0 'none', 1 'compromise', or 2 'normal' which is default\n");
+    printf(" --bq Q\n\t Set border handling to \n\t"
+           "0 'none' i.e. periodic\n\t"
+           "1 'compromise', or\n\t"
+           "2 'normal' which is default\n");
+    printf("--periodic\n\t Equivalent to --bq 0\n");
     printf(" --scale s\n\t"
            "Set the scaling factor for the output image manually to s.\n\t"
            "Warning: Might cause clipping or discretization artifacts\n\t"
            "This option is only used for 16-bit images\n");
     printf(" --float\n\t Set output format to 32-bit float (default is 16-bit int) and disable scaling\n");
     printf(" --bg l\n\t Set background level, l\n");
-    printf(" --biggs N\n\t Set how agressive the Biggs acceleration should be. 0=off, 1=low/default, 2=intermediate, 3=max\n");
-    printf(" --eve\n\t Use Biggs Exponential Vector Extrapolation (EVE)\n");
     printf(" --flatfield image.tif\n\t"
            " Use a flat field correction image. Deconwolf will divide each plane of the\n\t"
            " input image, pixel by pixel, by this correction image.\n");
@@ -1480,7 +1476,7 @@ float * psf_autocrop_byImage(float * psf,/* psf and size */
         }
         float * psf_cropped = fim_get_cuboid(psf, m, n, p,
                                              m0, m1, n0, n1, p0, p1);
-        free(psf);
+        fim_free(psf);
 
         pM[0] = m1-m0+1;
         pN[0] = n1-n0+1;
@@ -1607,7 +1603,7 @@ float * psf_autocrop_XY(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  
     fprintf(s->log, "PSF XY-crop [%" PRId64 " x %" PRId64 " x %" PRId64 "] -> [%" PRId64 " x %" PRId64 " x %" PRId64 "]\n",
             m, n, p, pM[0], pN[0], pP[0]);
 
-    free(psf);
+    fim_free(psf);
     return crop;
 }
 
@@ -1782,12 +1778,12 @@ void timings()
     printf("-> Timings\n");
     tictoc
         int64_t M = 1024, N = 1024, P = 50;
-    float temp = 0;
 
+    #ifndef WINDOWS
     tic
         usleep(1000);
     toc(usleep_1000)
-
+#endif
         tic
         float * V = fim_malloc(M*N*P*sizeof(float));
     toc(malloc)
@@ -1820,12 +1816,6 @@ void timings()
         tic
         fim_flipall(V, A, M, N, P);
     toc(fim_flipall)
-
-        // ---
-        tic
-        temp = alpha_ave(V, A, M*N*P, 1);
-    toc(biggs_alpha)
-        V[0]+= temp;
 
     // ---
     tic
@@ -2017,7 +2007,7 @@ fftwf_complex * initial_guess(const int64_t M, const int64_t N, const int64_t P,
 
     fftwf_complex * Fone = fft(one, wM, wN, wP);
 
-    free(one);
+    fim_free(one);
     return Fone;
 }
 
@@ -2044,7 +2034,7 @@ static void dw_set_omp_threads(const dw_opts *s)
 int dw_run(dw_opts * s)
 {
     struct timespec tstart, tend;
-    clock_gettime(CLOCK_REALTIME, &tstart);
+    dw_gettime(&tstart);
     dcw_init_log(s);
 
     if(s->verbosity > 1)
@@ -2288,7 +2278,7 @@ int dw_run(dw_opts * s)
 
     if(tiling == 0)
     {
-        free(im);
+        fim_free(im);
 
 
         if(out == NULL)
@@ -2338,11 +2328,11 @@ int dw_run(dw_opts * s)
         printf("Finalizing "); fflush(stdout);
     }
 
-    free(out);
+    fim_free(out);
     myfftw_stop();
 
 
-    clock_gettime(CLOCK_REALTIME, &tend);
+    dw_gettime(&tend);
     fprintf(s->log, "Took: %f s\n", timespec_diff(&tend, &tstart));
     dcw_close_log(s);
 

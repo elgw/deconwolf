@@ -208,7 +208,7 @@ float * deconvolve_rl(float * restrict im, const int64_t M, const int64_t N, con
     /* Insert the psf into the bigger Z */
     fim_insert(Z, wM, wN, wP,
                psf, pM, pN, pP);
-    free(psf);
+    fim_free(psf);
 
     /* Shift the PSF so that the mid is at (0,0,0) */
     int64_t midM, midN, midP = -1;
@@ -294,7 +294,7 @@ float * deconvolve_rl(float * restrict im, const int64_t M, const int64_t N, con
                     fim_tiff_write(outname, temp, NULL, M, N, P);
                 }
                 free(outname);
-                free(temp);
+                fim_free(temp);
             }
         }
 
@@ -310,7 +310,7 @@ float * deconvolve_rl(float * restrict im, const int64_t M, const int64_t N, con
                              wM, wN, wP, // Expanded size
                              M, N, P, // Original size
                              s);
-        free(xp);
+        fim_free(xp);
 
         dw_iterator_set_error(it, err);
         xp = x;
@@ -343,15 +343,15 @@ float * deconvolve_rl(float * restrict im, const int64_t M, const int64_t N, con
 
     if(W != NULL)
     {
-        free(W);
+        fim_free(W);
     }
 
     fulldump(s, x, wM, wN, wP, "fulldump_x.tif");
-    free(fftPSF);
+    fim_free(fftPSF);
 
     /* Extract the observed region from the last iteration */
     float * out = fim_subregion(x, wM, wN, wP, M, N, P);
-    free(x);
+    fim_free(x);
 
     return out;
 }

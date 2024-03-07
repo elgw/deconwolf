@@ -16,8 +16,24 @@
 
 #include "dw_util.h"
 
-int isdir(char * dir)
+#ifdef WINDOWS
+
+
+
+#endif
+
+int isdir(const char * dir)
 {
+#ifdef WINDOWS
+    if( _taccess_s( dir, 0 ) == 0 )
+    {
+        struct _stat status;
+        _tstat( dir, &status );
+        return (status.st_mode & _S_IFDIR) != 0;
+    }
+
+    return 0;
+#else
 
     DIR* odir = opendir(dir);
     if (odir) {
@@ -31,11 +47,12 @@ int isdir(char * dir)
         /* opendir() failed for some other reason. */
         return 0;
     }
+#endif
 }
 
 
 
-int ensuredir(char * dir)
+int ensuredir(const char * dir)
 
 {
     if(isdir(dir) == 1)
@@ -58,7 +75,67 @@ int ensuredir(char * dir)
     return 1;
 }
 
+void dw_gettime(struct timespec * t)
+{
+#ifdef WINDOWS
+    timespec_get(t, TIME_UTC); // since C11
+#else
+    clock_gettime(CLOCK_REALTIME, t);
+#endif
+    return;
+}
 
+char * dw_dirname(const char * path)
+{
+    #ifdef WINDOWS
+    size_t maxlen = strlen(path)+1;
+    char * drive = malloc(maxlen);
+    char * dir = malloc(maxlen);
+
+    _splitpath(path, drive, dir, NULL, NULL);
+    char * outpath = malloc(maxlen);
+    _makepath(outpath, drive, dir, NULL, NULL);
+    free(drive);
+    free(dir);
+    return outpath;
+    #else
+    char * t = strdup(path);
+    char * _dir = dirname(t); // should not be freed
+    char * dir = strdup(_dir);
+    free(t);
+    return dir;
+    #endif
+}
+
+char * dw_basename(const char * path)
+{
+#ifdef WINDOWS
+    size_t maxlen = strlen(path)+1;
+    char * fname = malloc(maxlen);
+    char * ext = malloc(maxlen);
+    char * outname = malloc(maxlen);
+    _splitpath(path, NULL, NULL, fname, ext);
+    _makepath(outname, NULL, NULL, fname, ext);
+    free(fname);
+    free(ext);
+    return outname;
+#else
+    char * t = strdup(path);
+    char * _fname = basename(t); // should not be freed
+    char * fname = strdup(_fname);
+    free(t);
+    return fname;
+#endif
+}
+
+char * dw_getcwd(char * buf, size_t size)
+{
+    #ifdef WINDOWS
+    return _getcwd(buf, size);
+    #else
+    return getcwd(buf, size);
+    #endif
+}
 
 int ptr_alignment_B(const void * p)
 {
@@ -79,23 +156,36 @@ int dw_get_threads(void)
 {
     int nThreads = 4;
 #ifndef WINDOWS
-/* Reports #threads, typically 2x#cores */
+    /* Reports #threads, typically 2x#cores */
     nThreads = sysconf(_SC_NPROCESSORS_ONLN)/2;
+#else
+    nThreads = atoi(getenv("NUMBER_OF_PROCESSORS"))/2;
 #endif
 #ifdef OMP
-/* Reports number of cores */
+    /* Reports number of cores */
     nThreads = omp_get_num_procs();
 #endif
+    nThreads < 1 ? nThreads = 1 : 0;
     return nThreads;
 }
 
 int dw_file_exist(char * fname)
 {
+#ifndef WINDOWS
     if( access( fname, F_OK ) != -1 ) {
         return 1; // File exist
     } else {
         return 0;
     }
+#else
+    FILE * fid = fopen(fname, "r");
+    if(fid == NULL)
+    {
+        return 0;
+    }
+    fclose(fid);
+    return 1;
+#endif
 }
 
 
@@ -214,7 +304,49 @@ float dw_read_scaling(char * file)
 
     free(line);
     fclose(fid);
-leave:
+ leave:
     free(logfile);
     return scaling;
 }
+
+
+#ifdef WINDOWS
+int getline(char **lineptr, size_t *n, FILE *stream)
+{
+    static char line[256];
+    char *ptr;
+    unsigned int len;
+
+    if (lineptr == NULL || n == NULL)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+
+    if (ferror (stream))
+        return -1;
+
+    if (feof(stream))
+        return -1;
+
+    fgets(line,256,stream);
+
+    ptr = strchr(line,'\n');
+    if (ptr)
+        *ptr = '\0';
+
+    len = strlen(line);
+
+    if ((len+1) < 256)
+    {
+        ptr = realloc(*lineptr, 256);
+        if (ptr == NULL)
+            return(-1);
+        *lineptr = ptr;
+        *n = 256;
+    }
+
+    strcpy(*lineptr,line);
+    return(len);
+}
+#endif

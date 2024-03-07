@@ -349,7 +349,7 @@ fim_t * get_reduction(opts * s, char * file)
         result->V = malloc(M*N*sizeof(float));
         assert(result->V != NULL);
         memcpy(result->V, II->V+slice*M*N, M*N*sizeof(float));
-        fim_free(II);
+        fim_delete(II);
         if(s->verbose > 0)
         {
             printf("Returning slice %d\n", slice); fflush(stdout);
@@ -453,7 +453,7 @@ void segment_image_rf(opts * s, PrfForest * F, char * file)
 
     fim_tiff_write_noscale(outfile, result, NULL,
                            redu->M, redu->N, 1);
-    fim_free(redu);
+    fim_delete(redu);
     return;
 }
 
@@ -551,7 +551,7 @@ PrfForest * loop_training_data(opts * s, float * features_cm,
         }
         free(features_cma);
         free(features_cma_train);
-        fim_free(anno);
+        fim_delete(anno);
         free(result);
     }
 
@@ -602,7 +602,9 @@ int dw_nuclei(int argc, char ** argv)
 
     argparsing(argc, argv, s);
 
+    #ifdef _OPENMP
     omp_set_num_threads(s->nthreads);
+#endif
 
     if(s->anno_image == NULL)
     {

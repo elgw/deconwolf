@@ -77,16 +77,6 @@ static void argparsing(int argc, char ** argv, opts * s)
 }
 
 
-static int file_exist(char * fname)
-{
-    if( access( fname, F_OK ) != -1 ) {
-        return 1; // File exist
-    } else {
-        return 0;
-    }
-}
-
-
 #ifdef STANDALONE
 int main(int argc, char ** argv)
 {
@@ -96,15 +86,21 @@ int main(int argc, char ** argv)
 
 static char * get_outfile_name_for_max(const char * inFile)
 {
-    char * _dname = strdup(inFile);
-    char * dname = dirname(_dname);
-    char * _fname = strdup(inFile);
-    char * fname = basename(_fname);
+
+    char * dname = dw_dirname(inFile);
+    char * fname = dw_basename(inFile);
     char * outFile = malloc(strlen(inFile) + 20);
     assert(outFile != NULL);
-    sprintf(outFile, "%s/max_%s", dname, fname);
-    free(_dname);
-    free(_fname);
+    if(strlen(dname) > 0)
+    {
+        sprintf(outFile, "%s%cmax_%s", dname, FILESEP, fname);
+    } else {
+        sprintf(outFile, "max_%s", fname);
+    }
+
+    free(dname);
+    free(fname);
+
     return outFile;
 }
 
@@ -130,7 +126,7 @@ int dw_tiff_max(int argc, char ** argv)
     {
         inFile = argv[ff];
 
-        if(!file_exist(inFile))
+        if(!dw_file_exist(inFile))
         {
             printf("Can't open %s!\n", inFile);
             exit(EXIT_FAILURE);
@@ -143,10 +139,10 @@ int dw_tiff_max(int argc, char ** argv)
             if(s->verbose > 1)
             {
                 fprintf(stdout, "Input file: %s\n", inFile);
-                fprintf(stdout, "Ouput file: %s\n", outFile);
+                fprintf(stdout, "Output file: %s\n", outFile);
             }
 
-            if(s->overwrite == 0 && file_exist(outFile))
+            if(s->overwrite == 0 && dw_file_exist(outFile))
             {
                 printf("%s exists, skipping.\n", outFile);
             } else {
@@ -176,7 +172,7 @@ int dw_tiff_max(int argc, char ** argv)
         {
             char * outFile = malloc(strlen(inFile) + 20);
             sprintf(outFile, "s%04d_%s", s->slice, inFile);
-            if(file_exist(outFile) && s->overwrite == 0)
+            if(dw_file_exist(outFile) && s->overwrite == 0)
             {
                 printf("%s exists, skipping.\n", outFile);
             } else {

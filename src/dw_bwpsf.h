@@ -24,17 +24,18 @@
  */
 
 #include <stdio.h>
+#define _USE_MATH_DEFINES
 #include <math.h>
 #include <assert.h>
 #include <complex.h>
 #include <stdlib.h>
 #include <string.h>
-#include <pthread.h>
 #include <getopt.h>
 #include <time.h>
 #include <wchar.h>
 #include <locale.h>
 #include <gsl/gsl_integration.h>
+#include <omp.h>
 
 #include "dw_util.h"
 #include "fim_tiff.h"
@@ -42,6 +43,15 @@
 #include "lanczos.h"
 #include "li.h"
 #include "bw_gsl.h"
+
+/* Windows does not agree on the definition of complex numbers,
+ * we will call them dcomplex regardless of the underlying library
+ */
+#ifdef WINDOWS
+typedef _Dcomplex dcomplex;
+#else
+typedef double complex dcomplex;
+#endif
 
 /* Mode for calculating the 1D integral */
 #define MODE_BW_GSL 0
@@ -70,8 +80,6 @@ typedef struct {
     double epsrel;
     size_t limit;
     int key;
-    gsl_integration_workspace *wspx;
-    gsl_integration_workspace *wspy;
 
     float * V; // output image
     // shape of output image
@@ -111,6 +119,8 @@ typedef struct {
     double y0;
     double y1;
     double x;
+    gsl_integration_workspace * wspx;
+    gsl_integration_workspace * wspy;
 } pixely_t;
 
 

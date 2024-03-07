@@ -1,29 +1,20 @@
 # Installation notes
 
- - [Meson](#Meson)
- - [Windows 10](#Windows10)
- - [macOS Big Sur](#macOS-Big-Sur)
- - [Free BSD](#freebsd)
- - [CentOS](#CentOS)
- - [Ubuntu 16.04](#ubuntu-1604)
- - [FreeBSD](#FreeBSD)
- - [MKL FFT Backend](#MKL)
-
-
 ## OpenCL support
-Requires a working OpenCL installation.
+To use GPU acceleration **dw** needs to be compiled with that option
+enabled. Using the makefile that corresponds to:
 
 ``` shell
 make kernels
 make -B VKFFT=1
 ```
 
-## Meson
-WARNING: The configuration files might not be up to date.
+## Build systems
+Under linux the makefile should work on most distributions. For those
+that prefer something else there is also configuration files for Meson
+and CMake.
 
-deconwolf can also be installed using [meson](https://mesonbuild.com/),
-tested only Ubuntu and MacOS
-
+### Meson
 To build and install:
 ``` shell
 meson setup builddir --buildtype release
@@ -37,7 +28,19 @@ To uninstall:
 ``` shell
 sudo ninja -C builddir uninstall
 ```
-## macOS Big Sur
+
+### CMake
+To build:
+
+``` shell
+mkdir builddir
+cd builddir
+cmake ..
+cmake --build .
+```
+
+## Platform specific notes
+### macOS Big Sur
 
 For building you will need XCode from the App Store and [brew](https://brew.sh/).
 
@@ -57,54 +60,49 @@ make -B
 sudo make install
 ```
 
-## Windows 10
-Although it might be possible to build native windows executables, it
-is suggested that WSL is used.
+## Windows 11
+Deconwolf can be built and run using WSL. Most likely there will be a [performance
+penalty](https://www.phoronix.com/scan.php?page=article&item=wsl-wsl2-tr3970x&num=1), and it will not be possible to enable GPU acceleration.
 
-With the following instructions it was possible to build deconwolf
-0.1.0 on Windows 10 (the --inplace option might not work on the
-current version).
+It can also be built using [msys2](https://www.msys2.org/) or
+[cygwin](https://www.cygwin.com/), however those options will be
+slower since OpenMP will be using an pthreads emulation on top of
+windows threads. It might be possible to get OpenCL working.
 
-The simplest way to build native windows binaries seems to be using msys2.
-Follow all steps of the [msys2](https://www.msys2.org/) installation guide,
-then install the dependencies in the 'MSYS2 MinGW 64-bit` terminal:
+To build native windows programs, at least the following software is
+needed:
 
+- [git](https://git-scm.com/download)
+- [cmake](https://cmake.org/download/)
+- Visual studio with clang.
+- [vcpkg](https://github.com/microsoft/vcpkg?tab=readme-ov-file#quick-start-windows)
+
+The dependencies can get retrieved by vcpkg:
 ``` shell
-pacman -S mingw-w64-x86_64-fftw
-pacman -S mingw-w64-x86_64-libtiff
-pacman -S mingw-w64-x86_64-msmpi
-pacman -S mingw-w64-cross-winpthreads-git
-pacman -S git
+git clone https://github.com/microsoft/vcpkg
+.\vcpkg\bootstrap-vcpkg.bat
+.\vcpkg integrate install
+.\vcpkg\vcpkg.exe install fftw3
+.\vcpkg\vcpkg.exe install tiff
+.\vcpkg\vcpkg.exe install gsl
+.\vcpkg\vcpkg.exe install opencl
 ```
 
-Then get deconwolf and build:
+A visual studio project can be created by
 
 ``` shell
-git clone https://www.github.com/elgw/deconwolf
 cd deconwolf
-make WINDOWS=1 -B
+mkdir winbuild
+cd winbuild
+cmake .. -G "Visual Studio 17 2022" -T ClangCL -A x64
 ```
-
-binaries will end up in the `bin` sub folder. All dependencies (DLLs) can be
-found in `/mingw64/bin/` under the directory where msys64 is installed. To use
-deconwolf outside of msys2 you will need to copy the binaries and the following
-DLL files to the same folder.
-
-```
-libdeflate.dll libfftw3f-3.dll     libgcc_s_seh-1.dll libgomp-1.dll
-libgsl-25.dll  libgslcblas-0.dll   libjbig-0.dll      libjpeg-8.dll
-libLerc.dll    liblzma-5.dll       libstdc++-6.dll    libtiff-5.dll
-libwebp-7.dll  libwinpthread-1.dll libzstd.dll        zlib1.dll
-```
-
-At least one person has build deconwolf using Windows Subsystem for Linux but
-beware, there might be a
-[performance penalty](https://www.phoronix.com/scan.php?page=article&item=wsl-wsl2-tr3970x&num=1).
-
 
 ### FreeBSD
+- Use `gmake`, not `make`.
+- Default compiler: `clang`
+- `pkgconf` not `pkg-config`.
 
-The following packages were required:
+Packages:
 ``` shell
 pkg install git
 pkg install gmake
@@ -114,13 +112,7 @@ pkg install gsl
 pkg install sudo
 ```
 
-To build and install deconwolf:
-``` shell
-gmake -f makefile-freebsd
-sudo gmake install
-```
-
-## CentOS
+### CentOS
 Tested on CentOS Linux Release 7.8.2009 (Core).
 
 ``` shell
@@ -128,20 +120,7 @@ Tested on CentOS Linux Release 7.8.2009 (Core).
 sudo yum install gcc gsl-devel libtiff-devel fftw-devel
 ```
 
-Should work with the
-``` shell
-make
-sudo make install
-```
-
-``` shell
-# To build with meson
-sudo yum install python3
-sudo python3 -m pip install meson ninja
-# Then follow the general meson instructions in README.md
-```
-
-## Ubuntu 16.04
+### Ubuntu 16.04
 ``` shell
 sudo apt-get update
 sudo apt-get install gcc
@@ -153,71 +132,49 @@ sudo apt-get install libtiff-dev # only difference to 20.04
 sudo apt-get install libgsl-dev
 sudo apt-get install libomp-dev
 sudo apt-get install libpng-dev
-
 ```
 
-## Ubuntu 23.04
+### Ubuntu 23.04
 Same as Ubuntu 22.04.
-
-For the OpenCL headers, required to build:
 
 ``` shell
 apt-get install opencl-headers
 ```
 
-## FreeBSD
-Differences to building on Linux.
- - `pkgconf` replaces `pkg-config`
- - `gmake` replaces `make`
- - clang is the default compiler.
-
-## MKL
-FFTW3 is the default FFT backend for deconwolf but it is also possible to use
-Intel MKL. This option is only tested on Ubuntu so far.
-
-### Installation
-Install the required package(s):
-
-``` shel
-sudo apt install intel-mkl
-```
-
-Build using
-
-``` shell
-make MKL=1 -B
-```
-
-Make will find the MKL libraries using
-`pkg-config mkl-static-lp64-seq --cflags --libs`, the procedure
-might be different on other platforms.
-
-### Usage
-To set the number of threads, set the environmental variable
-`MKL_NUM_THREADS`, for example:
-``` shell
-export MKL_NUM_THREADS=8
-dw ...
-```
-
-## Arch/ Manjaro
+### Arch/ Manjaro
 
 ``` shell
 # remember to update system
 sudo pacman -Suuyy
 # install dependencies
-sudo pacman -S fftw, gsl, openmp, libtiff
+sudo pacman -S fftw gsl openmp libtiff
 make
 sudo make install
-
 ```
 
-## Rapsberry PI (64-bit Debian bookworm)
-### Dependencies for build
+### Rapsberry PI (64-bit Debian bookworm)
 ``` shell
 sudo apt-get update
 sudo apt-get upgrade
 sudo apt-get install libfftw3-dev \
 libtiff-dev \
 libgsl-dev
+```
+
+## Library options
+
+### MKL
+FFTW3 is the default FFT backend for deconwolf but it is also possible to use
+Intel MKL. This option is only tested on Ubuntu so far.
+
+``` shel
+sudo apt install intel-mkl
+make MKL=1 -B
+```
+
+To set the number of threads, set the environmental variable
+`MKL_NUM_THREADS`, for example:
+``` shell
+export MKL_NUM_THREADS=8
+dw ...
 ```

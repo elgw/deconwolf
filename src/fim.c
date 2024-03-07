@@ -60,6 +60,9 @@ void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_malloc(size_t nbytes)
 #else
 void * fim_malloc(size_t nbytes)
 {
+    #ifdef WINDOWS
+    return _aligned_malloc(nbytes, FIM_ALIGNMENT);
+    #else
     void * p;
     if(posix_memalign(&p, FIM_ALIGNMENT, nbytes))
     {
@@ -69,9 +72,17 @@ void * fim_malloc(size_t nbytes)
     }
     assert(p != NULL);
     return p;
+    #endif
 }
 #endif
 
+#ifdef WINDOWS
+void * fim_realloc(void * p, size_t nbytes)
+{
+    void * ret = _aligned_realloc(p, nbytes, FIM_ALIGNMENT);
+    return ret;
+}
+#else
 void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_realloc(void * p, size_t nbytes)
 {
     void * out = realloc(p, nbytes);
@@ -85,13 +96,22 @@ void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_realloc(void * p, size_t 
     {
         void * out2 = fim_malloc(nbytes);
         memcpy(out2, out, nbytes);
-        free(out);
+        fim_free(out);
         return out2;
     }
 
     return out;
 }
+#endif
 
+void fim_free(void * p)
+{
+    #ifdef WINDOWS
+    _aligned_free(p);
+    #else
+    free(p);
+    #endif
+}
 
 void fim_set_verbose(int v)
 {
@@ -106,11 +126,11 @@ static double clockdiff(struct timespec* end, struct timespec * start)
 }
 
 
-void fim_free(fim_t * F)
+void fim_delete(fim_t * F)
 {
     if(F != NULL)
     {
-        free(F->V);
+        fim_free(F->V);
         F->V = NULL;
         free(F);
     }
@@ -692,7 +712,7 @@ void fim_circshift(float * restrict A,
     }
 
     const size_t bsize = fmax(fmax(M, N), P);
-    float * restrict buf = malloc(bsize*sizeof(float)*nThreads);
+    float * restrict buf = fim_malloc(bsize*sizeof(float)*nThreads);
     assert(buf != NULL);
 
 
@@ -737,7 +757,7 @@ void fim_circshift(float * restrict A,
         }
     }
 
-    free(buf);
+    fim_free(buf);
 
 #if 0
     char name[100];
@@ -760,7 +780,7 @@ static float * kernel_linear_shift(float delta, int * _N)
         return NULL;
     }
     *_N = 3; /* Always three elements */
-    float * K = malloc(3*sizeof(float));
+    float * K = fim_malloc(3*sizeof(float));
     assert(K != NULL);
     K[2] = delta;
     K[2] < 0 ? K[2] = 0 : 0;
@@ -806,7 +826,7 @@ void fim_shift(float * restrict A,
     }
 
     const size_t bsize = fmax(fmax(M, N), P);
-    float * restrict buf = malloc(bsize*sizeof(float)*nThreads);
+    float * restrict buf = fim_malloc(bsize*sizeof(float)*nThreads);
     assert(buf != NULL);
 
 
@@ -859,11 +879,11 @@ void fim_shift(float * restrict A,
         }
     }
 
-    free(buf);
+    fim_free(buf);
 
-    free(kernelx);
-    free(kernely);
-    free(kernelz);
+    fim_free(kernelx);
+    fim_free(kernely);
+    fim_free(kernelz);
 
 #if 0
     char name[100];
@@ -954,10 +974,10 @@ void shift_vector(float * restrict V,
 /* Circular shift of a vector of length N with stride S by step k */
 {
 
-    float * buffer = malloc(N*sizeof(float));
+    float * buffer = fim_malloc(N*sizeof(float));
     assert(buffer != NULL);
     shift_vector_buf(V, S, N, k, buffer);
-    free(buffer);
+    fim_free(buffer);
     return;
 }
 
@@ -986,11 +1006,11 @@ float * fim_expand(const float * restrict in,
 void fim_flipall_ut()
 {
 
-    float * a = malloc(3*3*3*sizeof(float));
+    float * a = fim_malloc(3*3*3*sizeof(float));
     assert(a != NULL);
-    float * b = malloc(3*3*3*sizeof(float));
+    float * b = fim_malloc(3*3*3*sizeof(float));
     assert(b != NULL);
-    float * c = malloc(3*3*3*sizeof(float));
+    float * c = fim_malloc(3*3*3*sizeof(float));
     assert(c != NULL);
 
     for(int64_t kk = 0; kk<27; kk++)
@@ -1024,7 +1044,7 @@ void fim_flipall_ut()
     for(int64_t kk = 0; kk<24; kk++)
         assert(a[kk] == c[kk]);
 
-    free(a); free(b); free(c);
+    fim_free(a); fim_free(b); fim_free(c);
     return;
 }
 
@@ -1032,7 +1052,7 @@ void shift_vector_ut()
 {
     int64_t N = 5;
     int64_t S = 1; // stride
-    float * V = malloc(N*sizeof(float));
+    float * V = fim_malloc(N*sizeof(float));
     assert(V != NULL);
 
     for(int64_t k = -7; k<7; k++)
@@ -1045,7 +1065,7 @@ void shift_vector_ut()
         { printf("%.0f ", V[kk]);}
         printf("\n");
     }
-    free(V);
+    fim_free(V);
 }
 
 void fim_invert(float * restrict A, size_t N)
@@ -1078,8 +1098,8 @@ void fim_local_sum_ut()
     size_t lM = M + filtM-1;
     size_t lN = N + filtN-1;
     fim_show(L, lM, lN, 1);
-    free(A);
-    free(L);
+    fim_free(A);
+    fim_free(L);
 
 }
 
@@ -1105,7 +1125,7 @@ void fim_cumsum_ut()
     printf("After cumsum along dim 1\n");
     fim_cumsum(A, M, N, 1);
     fim_show(A, M, N, 1);
-    free(A);
+    fim_free(A);
 }
 
 void fim_xcorr2_ut()
@@ -1132,9 +1152,9 @@ void fim_xcorr2_ut()
     fim_show(A, M, N, 1);
     printf("xcorr2(T,A)=\n");
     fim_show(X, 2*M-1, 2*N-1, 1);
-    free(A);
-    free(T);
-    free(X);
+    fim_free(A);
+    fim_free(T);
+    fim_free(X);
 }
 
 void fim_otsu_ut()
@@ -1156,8 +1176,8 @@ void fim_otsu_ut()
     fim_show(Im, M, N, P);
     float * B = fim_otsu(Im, M, N);
     fim_show(B, M, N, P);
-    free(Im);
-    free(B);
+    fim_free(Im);
+    fim_free(B);
 }
 
 void fim_conncomp6_ut()
@@ -1177,8 +1197,8 @@ void fim_conncomp6_ut()
     int * L = fim_conncomp6(Im, M, N);
     printf("Labelled array\n");
     fim_show_int(L, M, N, 1);
-    free(L);
-    free(Im);
+    fim_free(L);
+    fim_free(Im);
 }
 
 void fim_conv1_vector_ut()
@@ -1213,9 +1233,9 @@ void fim_conv1_vector_ut()
         fim_conv1_vector(V, stride, W, nV, K, nK, normalized);
         printf("V*K=");
         fim_show(V, 1, nV, 1);
-        free(K);
+        fim_free(K);
     }
-    free(V);
+    fim_free(V);
 }
 
 void fim_LoG_ut()
@@ -1248,14 +1268,14 @@ void fim_LoG_ut()
             exit(EXIT_FAILURE);
         }
     }
-    fim_free(T);
+    fim_delete(T);
     T = NULL;
     assert(S1->V != S2->V);
-    fim_free(S1);
+    fim_delete(S1);
     S1 = NULL;
-    fim_free(S2);
+    fim_delete(S2);
     S2 = NULL;
-    fim_free(S3);
+    fim_delete(S3);
 
 
     for(size_t kk = 0; kk<M*N*P; kk++)
@@ -1267,9 +1287,9 @@ void fim_LoG_ut()
 
     float * Vpre = fim_copy(V, M*N*P);
 
-    clock_gettime(CLOCK_REALTIME, &tstart);
+    dw_gettime(&tstart);
     float * LoG2 = fim_LoG_S(V, M, N, P, sigma_l, sigma_a);
-    clock_gettime(CLOCK_REALTIME, &tend);
+    dw_gettime(&tend);
     for(size_t kk = 0; kk<M*N*P; kk++)
     {
         if(V[kk] != Vpre[kk])
@@ -1281,9 +1301,9 @@ void fim_LoG_ut()
     }
     float tLoG_S = clockdiff(&tend, &tstart);
 
-    clock_gettime(CLOCK_REALTIME, &tstart);
+    dw_gettime(&tstart);
     float * LoG = fim_LoG(V, M, N, P, sigma_l, sigma_a);
-    clock_gettime(CLOCK_REALTIME, &tend);
+    dw_gettime(&tend);
     for(size_t kk = 0; kk<M*N*P; kk++)
     {
         if(V[kk] != Vpre[kk])
@@ -1292,7 +1312,7 @@ void fim_LoG_ut()
             exit(EXIT_FAILURE);
         }
     }
-    free(Vpre);
+    fim_free(Vpre);
 
     float tLoG = clockdiff(&tend, &tstart);
 
@@ -1322,7 +1342,7 @@ void fim_LoG_ut()
         printf("Writing to LoG_S.tif\n");
         fim_tiff_write_float("LoG_S.tif", LoG2, NULL, N, M, P);
     }
-    free(Delta);
+    fim_free(Delta);
 
     if(M*N*P < 200)
     {
@@ -1332,9 +1352,9 @@ void fim_LoG_ut()
         fim_show(LoG2, M, N, P);
     }
 
-    free(V);
-    free(LoG);
-    free(LoG2);
+    fim_free(V);
+    fim_free(LoG);
+    fim_free(LoG2);
 }
 
 
@@ -1464,7 +1484,7 @@ void fim_conv1_vector(float * restrict V, const int stride, float * restrict W,
 
     if(Walloc)
     {
-        free(W);
+        fim_free(W);
     }
     return;
 }
@@ -1621,7 +1641,7 @@ void fim_gsmooth_old(float * restrict V, size_t M, size_t N, size_t P, float sig
         }
     }
 
-    free(W);
+    fim_free(W);
     return;
 }
 
@@ -1637,14 +1657,14 @@ void fim_gsmooth_aniso(float * restrict V,
         float * Kl = gaussian_kernel(lsigma, &nKl);
         fim_convn1(V, M, N, P, Kl, nKl, 0, 1);
         fim_convn1(V, M, N, P, Kl, nKl, 1, 1);
-        free(Kl);
+        fim_free(Kl);
     }
     if(asigma > 0 && P > 1)
     {
         size_t nKa = 0;
         float * Ka = gaussian_kernel(asigma, &nKa);
         fim_convn1(V, M, N, P, Ka, nKa, 2, 1);
-        free(Ka);
+        fim_free(Ka);
     }
 
     return;
@@ -1733,7 +1753,7 @@ float * fim_local_sum(const float * A,
     }
     //printf("C=\n");
     //fim_show(C, cM, cN, 1);
-    free(B);
+    fim_free(B);
     /* Second dimension */
     size_t dM = (wM-pM-1);
     size_t dN = (wN-pN-1);
@@ -1752,7 +1772,7 @@ float * fim_local_sum(const float * A,
     }
     //printf("D=\n");
     //fim_show(D, dM, dN, 1);
-    free(C);
+    fim_free(C);
     return D;
 }
 
@@ -1826,18 +1846,18 @@ float * fim_xcorr2(const float * T, const float * A,
     float * xT = fim_zeros(wM*wN);
     fim_insert(xT, wM, wN, 1,
                temp, M, N, 1);
-    free(temp);
+    fim_free(temp);
     temp = NULL;
 
     fftwf_complex * fxT = fft(xA, wM, wN, 1);
-    free(xA);
+    fim_free(xA);
     fftwf_complex * fxA = fft(xT, wM, wN, 1);
-    free(xT);
+    fim_free(xT);
     float * C = fft_convolve_cc(fxT, fxA, wM, wN, 1);
     // TODO fft_convolve_cc_conj instead?
     //fim_tiff_write_float("C.tif", C, NULL, wM, wN, 1);
-    free(fxT);
-    free(fxA);
+    fim_free(fxT);
+    fim_free(fxA);
 
     //printf("C=\n");
     //fim_show(C, 2*M-1, 2*N-1, 1);
@@ -1866,7 +1886,7 @@ float * fim_xcorr2(const float * T, const float * A,
 
     float * LS2 = fim_local_sum(A2, M, N,
                                 M, N);
-    free(A2);
+    fim_free(A2);
     float * denom_I = fim_zeros(wM*wN);
 
 #pragma omp parallel for shared(LS2, denom_I)
@@ -1877,8 +1897,8 @@ float * fim_xcorr2(const float * T, const float * A,
         v < 0 ? v = 0 : 0;
         denom_I[kk] = v;
     }
-    free(LS);
-    free(LS2);
+    fim_free(LS);
+    fim_free(LS2);
     //printf("denom_I=\n");
     //fim_show(denom_I, wM, wN, 1);
 
@@ -1894,8 +1914,8 @@ float * fim_xcorr2(const float * T, const float * A,
             C[kk] = numerator[kk] / d;
         }
     }
-    free(numerator);
-    free(denom_I);
+    fim_free(numerator);
+    fim_free(denom_I);
     return C;
 }
 
@@ -2047,7 +2067,7 @@ ftab_t * fim_lmax(const float * I, size_t M, size_t N, size_t P)
         }
     }
 
-    free(strel);
+    fim_free(strel);
     return T;
 }
 
@@ -2105,7 +2125,7 @@ void fim_histogram_free(fim_histogram_t * H)
     }
     if(H->C != NULL)
     {
-        free(H->C);
+        fim_free(H->C);
     }
     free(H);
     return;
@@ -2212,7 +2232,7 @@ float * fim_remove_small(const float * im,
     printf("%d objects\n", ncomp);
 
     /* Histogram on the number of pixels per label */
-    uint32_t * H = calloc((ncomp+1), sizeof(uint32_t));
+    uint32_t * H = fim_malloc( (ncomp+1)*sizeof(uint32_t));
     assert(H != NULL);
     for(size_t kk = 0; kk<M*N; kk++)
     {
@@ -2221,7 +2241,7 @@ float * fim_remove_small(const float * im,
 
     /* Set  */
     size_t npix = 0;
-    float * out = malloc(M*N*sizeof(float));
+    float * out = fim_malloc(M*N*sizeof(float));
     assert(out != NULL);
     for(size_t kk = 0; kk<M*N; kk++)
     {
@@ -2236,8 +2256,8 @@ float * fim_remove_small(const float * im,
         }
     }
     printf("Cleared %zu pixels\n", npix);
-    free(H);
-    free(L);
+    fim_free(H);
+    fim_free(L);
     return out;
 }
 
@@ -2246,7 +2266,7 @@ float * fim_fill_holes(const float * im, size_t M, size_t N, float max_size)
     /* Any region in !im that is not connected to the boundary
      * is a hole
      */
-    float * nim = malloc(sizeof(float)*M*N);
+    float * nim = fim_malloc(sizeof(float)*M*N);
     if(nim == NULL)
     {
         exit(EXIT_FAILURE);
@@ -2256,7 +2276,7 @@ float * fim_fill_holes(const float * im, size_t M, size_t N, float max_size)
         nim[kk] = (im[kk] == 0);
     }
     int * L = fim_conncomp6(nim, M, N);
-    free(nim);
+    fim_free(nim);
 
     /* Count the number of components
      * or actually the largest label used
@@ -2291,10 +2311,10 @@ float * fim_fill_holes(const float * im, size_t M, size_t N, float max_size)
             L[kk] = 0;
         }
     }
-    free(boundary);
+    fim_free(boundary);
 
     /* Histogram on the number of pixels per label */
-    uint32_t * H = calloc((ncomp+1), sizeof(uint32_t));
+    uint32_t * H = fim_malloc((ncomp+1)*sizeof(uint32_t));
     assert(H != NULL);
     for(size_t kk = 0; kk<M*N; kk++)
     {
@@ -2306,7 +2326,7 @@ float * fim_fill_holes(const float * im, size_t M, size_t N, float max_size)
      * in the inverted image that are not connected to the
      * boundary are set to zero. */
     size_t nfilled = 0;
-    float * out = malloc(M*N*sizeof(float));
+    float * out = fim_malloc(M*N*sizeof(float));
     assert(out != NULL);
     for(size_t kk = 0; kk<M*N; kk++)
     {
@@ -2321,14 +2341,14 @@ float * fim_fill_holes(const float * im, size_t M, size_t N, float max_size)
         }
     }
     printf("Filled %zu pixels\n", nfilled);
-    free(H);
-    free(L);
+    fim_free(H);
+    fim_free(L);
     return out;
 }
 
 int * fim_conncomp6(const float * im, size_t M, size_t N)
 {
-    int * lab = calloc(M*N, sizeof(float));
+    int * lab = fim_malloc(M*N*sizeof(float));
     assert(lab != NULL);
     int label = 0;
 
@@ -2362,7 +2382,7 @@ int * fim_conncomp6(const float * im, size_t M, size_t N)
     //    fim_show_int(lab, M, N, 1);
     label++;
     //    printf("Second pass, set up equivalences\n");
-    int * E = malloc(label*sizeof(int));
+    int * E = fim_malloc(label*sizeof(int));
     assert(E != NULL);
     for(size_t kk = 0; kk< (size_t) label; kk++)
     {
@@ -2410,7 +2430,7 @@ int * fim_conncomp6(const float * im, size_t M, size_t N)
 
 
     //    printf("Third pass, set pixel values\n");
-    int * E2 = calloc(label, sizeof(int));
+    int * E2 = fim_malloc(label*sizeof(int));
     assert(E2 != NULL);
     int newlabel = 1;
     for(size_t kk = 0; kk<M*N; kk++)
@@ -2427,9 +2447,9 @@ int * fim_conncomp6(const float * im, size_t M, size_t N)
             lab[kk] = e2;
         }
     }
-    free(E2);
+    fim_free(E2);
 
-    free(E);
+    fim_free(E);
     return lab;
 }
 
@@ -2453,7 +2473,7 @@ int fim_convn1(float * restrict V, size_t M, size_t N, size_t P,
     }
 
 
-    float * W = malloc(nThreads*nW*sizeof(float));
+    float * W = fim_malloc(nThreads*nW*sizeof(float));
     assert(W != NULL);
 
     if(dim == 0)
@@ -2495,9 +2515,7 @@ int fim_convn1(float * restrict V, size_t M, size_t N, size_t P,
         }
     }
 
-    free(W);
-
-
+    fim_free(W);
     return EXIT_SUCCESS;
 }
 
@@ -2514,18 +2532,18 @@ float * conv1_3(const float * V, size_t M, size_t N, size_t P,
 
     fim_convn1(F->V, F->M, F->N, F->P, K1, nK1, dim, norm);
     fim_t * F2 = fim_shiftdim(F);
-    free(F->V);
-    free(F);
+    fim_free(F->V);
+    fim_free(F);
     fim_convn1(F2->V, F2->M, F2->N, F2->P, K2, nK2, dim, norm);
     fim_t * F3 = fim_shiftdim(F2);
-    free(F2->V);
-    free(F2);
+    fim_free(F2->V);
+    fim_free(F2);
     fim_convn1(F3->V, F3->M, F3->N, F3->P, K3, nK3, dim, norm);
     fim_t * F4 = fim_shiftdim(F3);
-    free(F3->V);
-    free(F3);
+    fim_free(F3->V);
+    fim_free(F3);
     float * out = F4->V;
-    free(F4);
+    fim_free(F4);
 
     return out;
 }
@@ -2574,14 +2592,14 @@ float * fim_LoG_S(const float * V0, const size_t M, const size_t N, const size_t
                           lG, nlG, l2, nl2, aG, naG);
     float * LGG = conv1_3(V, M, N, P,
                           l2, nl2, lG, nlG, aG, naG);
-    free(V);
+    fim_free(V);
     float * LoG = GGL;
     for(size_t kk = 0; kk<M*N*P; kk++)
     {
         LoG[kk] += GLG[kk] + LGG[kk];
     }
-    free(GLG);
-    free(LGG);
+    fim_free(GLG);
+    fim_free(LGG);
 
     /* Set border to 0 */
     size_t pos = 0;
@@ -2614,16 +2632,16 @@ float * fim_LoG_S(const float * V0, const size_t M, const size_t N, const size_t
             }
         }
     }
-    free(aG);
-    free(lG);
-    free(a2);
-    free(l2);
+    fim_free(aG);
+    fim_free(lG);
+    fim_free(a2);
+    fim_free(l2);
 
     /* Unpad in the axial direction */
     float * uLoG = fim_malloc(M*N*P0*sizeof(float));
 
     memcpy(uLoG, LoG+M*N*apad, M*N*P0*sizeof(float));
-    free(LoG);
+    fim_free(LoG);
     return uLoG;
 }
 
@@ -2649,16 +2667,16 @@ fim_t * fimt_partial(const fim_t * F, const int dim, const float sigma)
     {
         fim_convn1(D->V, D->M, D->N, D->P, D1, nD1, 0, 0);
         fim_convn1(D->V, D->M, D->N, D->P, G, nG, 1, 0);
-        free(D1);
-        free(G);
+        fim_free(D1);
+        fim_free(G);
         return D;
     }
     if(dim == 1)
     {
         fim_convn1(D->V, D->M, D->N, D->P, G, nG, 0, 0);
         fim_convn1(D->V, D->M, D->N, D->P, D1, nD1, 1, 0);
-        free(D1);
-        free(G);
+        fim_free(D1);
+        fim_free(G);
         return D;
     }
 
@@ -2701,7 +2719,7 @@ float * fim_LoG(const float * V, const size_t M, const size_t N, const size_t P,
         fim_convn1(GLG, M, N, P, l2, nl2, 1, 0);
         fim_convn1(GLG, M, N, P, aG, naG, 2, 0);
         fim_add(LoG, GLG, M*N*P);
-        free(GLG);
+        fim_free(GLG);
     }
 
     /* 3rd dimension */
@@ -2711,14 +2729,14 @@ float * fim_LoG(const float * V, const size_t M, const size_t N, const size_t P,
         fim_convn1(LGG, M, N, P, lG, nlG, 1, 0);
         fim_convn1(LGG, M, N, P, aG, naG, 2, 0);
         fim_add(LoG, LGG, M*N*P);
-        free(LGG);
+        fim_free(LGG);
     }
 
     /* Free the kernels */
-    free(lG);
-    free(l2);
-    free(aG);
-    free(a2);
+    fim_free(lG);
+    fim_free(l2);
+    fim_free(aG);
+    fim_free(a2);
 
 
     /* Set border to 0 */
@@ -2767,7 +2785,7 @@ double * fim_get_line_double(fim_t * I,
     int N = I->N;
     int P = I->P;
     int pos = z*M*N + y*M + x;
-    double * L = calloc(nPix, sizeof(double));
+    double * L = fim_malloc(nPix*sizeof(double));
     assert(L != NULL);
     if(dim == 0)
     {
@@ -2872,7 +2890,7 @@ static float total_gm(const float * I0, size_t M, size_t N, float sigma)
     fim_t * I = fim_image_from_array(I0, M, N, 1);
     fim_t * dx = fimt_partial(I, 0, sigma);
     fim_t * dy = fimt_partial(I, 1, sigma);
-    fim_free(I);
+    fim_delete(I);
 
     double gm = 0;
     for(size_t kk = 0; kk<M*N; kk++)
@@ -2880,8 +2898,8 @@ static float total_gm(const float * I0, size_t M, size_t N, float sigma)
         gm += sqrt( pow(dx->V[kk], 2) + pow(dy->V[kk], 2));
     }
 
-    fim_free(dx);
-    fim_free(dy);
+    fim_delete(dx);
+    fim_delete(dy);
     return (float) gm;
 }
 
@@ -3034,12 +3052,12 @@ ftab_t * fim_features_2d(const fim_t * fI)
         debug == 1 ? memcpy(debug_image + M*N*col, value, M*N*sizeof(float)) : 0;
         sprintf(sbuff, "s%.1f_HE_EV_2", sigma);
         ftab_set_colname(T, col++, sbuff);
-        fim_free(dx);
-        fim_free(dy);
-        fim_free(ddx);
-        fim_free(ddy);
-        fim_free(dxdy);
-        fim_free(G);
+        fim_delete(dx);
+        fim_delete(dy);
+        fim_delete(ddx);
+        fim_delete(ddy);
+        fim_delete(dxdy);
+        fim_delete(G);
     }
     free(sbuff); /* Free string buffer */
     printf("\n");
@@ -3048,7 +3066,7 @@ ftab_t * fim_features_2d(const fim_t * fI)
         fim_tiff_write_float(debug_image_name,
                              debug_image, NULL,
                              M, N, nfeatures);
-        free(debug_image);
+        fim_free(debug_image);
     }
     return T;
 }
@@ -3081,7 +3099,7 @@ void fim_features_2d_ut()
     T->nrow = 10;
     ftab_print(stdout, T);
     ftab_free(T);
-    fim_free(I);
+    fim_delete(I);
 }
 
 
@@ -3092,14 +3110,14 @@ void fim_argmax_max_ut()
     size_t N = 2048;
     size_t P = 60;
     size_t MNP = M*N*P;
-    float * A = calloc(MNP, sizeof(float));
+    float * A = fim_malloc(MNP*sizeof(float));
     assert(A != NULL);
 
     for(size_t kk = 0 ; kk < MNP; kk ++)
     {
         A[kk] = (float) rand()/ (float) RAND_MAX;
     }
-    clock_gettime(CLOCK_REALTIME, &tstart);
+    dw_gettime(&tstart);
 
     float ref_max = A[0];
     size_t ref_argmax = 0;
@@ -3114,15 +3132,17 @@ void fim_argmax_max_ut()
     int64_t ref_amP = ref_argmax / (M*N);
     int64_t ref_amN = (ref_argmax - (ref_amP*M*N)) / M;
     int64_t ref_amM = ref_argmax - ref_amP*M*N - ref_amN*M;
-    clock_gettime(CLOCK_REALTIME, &tend);
+    dw_gettime(&tend);
 
     double t_ref_amax = clockdiff(&tend, &tstart);
 
-    clock_gettime(CLOCK_REALTIME, &tstart);
+
+    dw_gettime(&tstart);
     int64_t amM, amN, amP;
     float lib_max;
     fim_argmax_max(A, M, N, P, &amM, &amN, &amP, &lib_max);
-    clock_gettime(CLOCK_REALTIME, &tend);
+
+    dw_gettime(&tend);
     double t_lib_amax = clockdiff(&tend, &tstart);
 
     if( (lib_max == ref_max) &&
@@ -3140,7 +3160,7 @@ void fim_argmax_max_ut()
                ref_amM, ref_amN, ref_amP, ref_max);
         exit(EXIT_FAILURE);
     }
-    free(A);
+    fim_free(A);
     return;
 }
 
@@ -3149,14 +3169,15 @@ void fim_max_ut()
 {
     struct timespec tstart, tend;
     size_t N = 2024*1024*60;
-    float * A = calloc(N, sizeof(float));
+    float * A = fim_malloc(N*sizeof(float));
     assert(A != NULL);
 
     for(size_t kk = 0 ; kk < N; kk ++)
     {
         A[kk] = (float) rand()/ (float) RAND_MAX;
     }
-    clock_gettime(CLOCK_REALTIME, &tstart);
+
+    dw_gettime(&tstart);
     float ref_max = A[0];
     for(size_t kk = 0 ; kk < N; kk++)
     {
@@ -3165,12 +3186,13 @@ void fim_max_ut()
             ref_max = A[kk];
         }
     }
-    clock_gettime(CLOCK_REALTIME, &tend);
+
+    dw_gettime(&tend);
     double t_ref_max = clockdiff(&tend, &tstart);
 
-    clock_gettime(CLOCK_REALTIME, &tstart);
+    dw_gettime(&tstart);
     float lib_max = fim_max(A, N);
-    clock_gettime(CLOCK_REALTIME, &tend);
+    dw_gettime(&tend);
     double t_lib_max = clockdiff(&tend, &tstart);
 
     if(lib_max == ref_max)
@@ -3180,7 +3202,7 @@ void fim_max_ut()
         fprintf(stderr, "fim_max_ut failed\n");
         exit(EXIT_FAILURE);
     }
-    free(A);
+    fim_free(A);
     return;
 }
 
@@ -3188,14 +3210,14 @@ void fim_min_ut()
 {
     struct timespec tstart, tend;
     size_t N = 2024*1024*60;
-    float * A = calloc(N, sizeof(float));
+    float * A = fim_malloc(N*sizeof(float));
     assert(A != NULL);
 
     for(size_t kk = 0 ; kk < N; kk ++)
     {
         A[kk] = (float) rand()/ (float) RAND_MAX;
     }
-    clock_gettime(CLOCK_REALTIME, &tstart);
+    dw_gettime(&tstart);
     float ref_min = A[0];
     for(size_t kk = 0 ; kk < N; kk++)
     {
@@ -3204,12 +3226,12 @@ void fim_min_ut()
             ref_min = A[kk];
         }
     }
-    clock_gettime(CLOCK_REALTIME, &tend);
+    dw_gettime(&tend);
     double t_ref_min = clockdiff(&tend, &tstart);
 
-    clock_gettime(CLOCK_REALTIME, &tstart);
+    dw_gettime(&tstart);
     float lib_min = fim_min(A, N);
-    clock_gettime(CLOCK_REALTIME, &tend);
+    dw_gettime(&tend);
     double t_lib_min = clockdiff(&tend, &tstart);
 
     if(lib_min == ref_min)
@@ -3220,7 +3242,7 @@ void fim_min_ut()
         fprintf(stderr, "fim_min_ut failed\n");
         exit(EXIT_FAILURE);
     }
-    free(A);
+    fim_free(A);
     return;
 }
 
@@ -3245,14 +3267,14 @@ void fim_ut()
     assert(N>0);
     printf("gaussian_kernel, sigma=%f\n", sigma);
     show_vec(K, N);
-    free(K);
+    fim_free(K);
     sigma = 0.5;
     K = gaussian_kernel(sigma, &N);
     printf("gaussian_kernel, sigma=%f\n", sigma);
     show_vec(K, N);
 
     int nV = 10;
-    float * V = malloc(nV*sizeof(float));
+    float * V = fim_malloc(nV*sizeof(float));
     assert(V != NULL);
     for(int kk = 0; kk<nV; kk++)
     {
@@ -3264,8 +3286,8 @@ void fim_ut()
     printf("V*K = ");
     show_vec(V, nV);
 
-    free(V);
-    free(K);
+    fim_free(V);
+    fim_free(K);
 
     fim_cumsum_ut();
     fim_local_sum_ut();

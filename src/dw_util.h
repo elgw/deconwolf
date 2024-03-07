@@ -17,9 +17,12 @@
  */
 
 #include <assert.h>
+#ifndef WINDOWS
 #include <dirent.h>
+#endif
 #include <errno.h>
 #include <fcntl.h>
+#define _USE_MATH_DEFINES
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -28,24 +31,39 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <time.h>
+#ifdef WINDOWS
+#include <io.h>
+#include <tchar.h>
+#include <direct.h>
+#else
+#include <libgen.h>
 #include <unistd.h>
+#endif
 
 #define tictoc struct timespec tictoc_start, tictoc_end;
-#define tic clock_gettime(CLOCK_REALTIME, &tictoc_start);
-#define toc(X) clock_gettime(CLOCK_REALTIME, &tictoc_end); printf(#X); printf(" %f s\n", timespec_diff(&tictoc_end, &tictoc_start)); fflush(stdout);
+#define tic dw_gettime(&tictoc_start);
+#define toc(X) dw_gettime(&tictoc_end); printf(#X); printf(" %f s\n", timespec_diff(&tictoc_end, &tictoc_start)); fflush(stdout);
 
+#ifdef WINDOWS
+#define FILESEP '\\'
+#else
+#define FILESEP '/'
+#endif
+
+/* Get the current time  */
+void dw_gettime(struct timespec *);
 
 /* Create dir if it does not exist.
  * Returns 0 if the dir already existed or could be created
  * returns non-zeros if the dir can't be created
  */
-int ensuredir(char * dir);
+int ensuredir(const char * dir);
 
 /* Check if directory exist, do not create if missing
  * returns 1 if it exist
  * */
 
-int isdir(char * dir);
+int isdir(const char * dir);
 
 /* Return a suggestion for how many threads to use
  * ideally this should be the same as the number of cores
@@ -64,3 +82,24 @@ size_t get_peakMemoryKB(void);
 
 /* Read the scaling of file from the .log.txt file if exists */
 float dw_read_scaling(char * file);
+
+/* Linux : returns dirname() of path.
+ * path is not altered and the returned strings has to be freed.
+ * WINDOWS: returns drive and path
+ * Example: "C:\home\dir\file.ext"" -> "C:\home\dir\"
+ */
+char * dw_dirname(const char * path);
+
+/*
+ * Linux: basename, compare to dw_dirname
+* Windows: file name without extension.
+* Should only be called for files, not for folders */
+char * dw_basename(const char * path);
+
+/* POSIX getcwd or _getcwd on windows */
+char * dw_getcwd(char * buf, size_t size);
+
+
+#ifdef WINDOWS
+int getline(char **lineptr, size_t *n, FILE *stream);
+#endif

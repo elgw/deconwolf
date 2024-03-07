@@ -223,7 +223,7 @@ static ftab_t * append_fwhm(opts * s, ftab_t * T, fim_t * V,
     {
         printf("Calculating fwhm..."); fflush(stdout);
     }
-    clock_gettime(CLOCK_REALTIME, &tstart);
+    dw_gettime(&tstart);
     float * fwhm_vals_lateral = malloc(T->nrow*sizeof(float));
     assert(fwhm_vals_lateral != NULL);
     float * fwhm_vals_axial = malloc(T->nrow*sizeof(float));
@@ -236,7 +236,7 @@ static ftab_t * append_fwhm(opts * s, ftab_t * T, fim_t * V,
         fwhm_vals_lateral[kk] = fwhm_lateral(V, row[xcol], row[ycol], row[zcol], s->verbose);
         fwhm_vals_axial[kk] = fwhm_axial(V, row[xcol], row[ycol], row[zcol], s->verbose);
     }
-    clock_gettime(CLOCK_REALTIME, &tend);
+    dw_gettime(&tend);
     double t = timespec_diff(&tend, &tstart);
     if(s->verbose > 1)
     {
@@ -456,7 +456,9 @@ int dw_dots(int argc, char ** argv)
 
 
     argparsing(argc, argv, s);
+    #ifdef _OPENMP
     omp_set_num_threads(s->nthreads);
+    #endif
     if(s->verbose > 0)
     {
         opts_print(stdout, s);
