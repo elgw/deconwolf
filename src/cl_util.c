@@ -1559,7 +1559,20 @@ void clu_prepare_kernels(clu_env_t * clu,
     VkFFTResult resFFT = initializeVkFFT(&clu->vkfft_app, configuration);
     if(resFFT != 0)
     {
-        fprintf(stderr, "VkFFT failed with error %d\n", resFFT);
+        fprintf(stderr, "\n"
+                "initializeVkFFT failed with error code %d\n", resFFT);
+        fprintf(stderr,
+                "%s\n", getVkFFTErrorString(resFFT));
+        fprintf(stderr,
+                "\n"
+                "Unfortunately deconwolf can not continue from this point.\n"
+                "Please see the documentation about possible solutions or open\n"
+                "an issue on https://github.com/elgw/deconwolf/issues if you\n"
+                "think that this is a bug.\n");
+        fprintf(stderr,
+                "\n"
+                "In most cases errors at this point indicate that there\n"
+                "was not enough memory on the GPU\n");
         exit(EXIT_FAILURE);
     }
     if (configuration.loadApplicationFromString) {
