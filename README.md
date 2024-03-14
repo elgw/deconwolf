@@ -70,7 +70,7 @@ improvements, especially when the pixel size to resolution limit is
 low. **dw psf** also contains a few other PSF models which eventually
 will be documented as well.
 
-For GPU calculations dw use [VkFFT](https://github.com/DTolm/VkFFT)
+For GPU calculations dw use [VkFFT](https://github.com/DTolm/VkFFT) [^8]
 via OpenCL. Until version 0.3.6
 [libclfft2](https://github.com/clMathLibraries/clFFT) was used for
 this purpose. Since OpenCL is vendor neutral, this option should work
@@ -306,3 +306,8 @@ Commercial:
    point spread function computation for fluorescence microscopy”. In: Journal
    of the Optical Society of America A 34.6 (May 2017), p. 1029.
    [doi](https://doi.org/10.1364/josaa.34001029)
+
+[^8:] D. Tolmachev, "VkFFT-A Performant, Cross-Platform and
+Open-Source GPU FFT Library," in IEEE Access, vol. 11,
+pp. 12039-12058, 2023,
+[doi](https://doi.org/10.1109/ACCESS.2023.3242240)
