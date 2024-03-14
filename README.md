@@ -253,11 +253,11 @@ Commercial:
    Restoration". JOSA. 62 (1): 55–59.
    [doi](https://doi.org/10.1364/JOSA.62.000055)
 
-[^3] Lucy, L. B. (1974). "An iterative technique for the rectification of observed
+[^3]: Lucy, L. B. (1974). "An iterative technique for the rectification of observed
    distributions". Astronomical Journal. 79 (6): 745–754.
    [doi](https://doi.org/10.1086%2F111605)
 
-[^4] Wang H, et al. Scaled Heavy-Ball Acceleration of the
+[^4]: Wang H, et al. Scaled Heavy-Ball Acceleration of the
    Richardson-Lucy Algorithm for 3D Microscopy Image Restoration. IEEE
    Trans Image Process. 2014 [doi](https://doi.org/10.1109/TIP.2013.2291324).
 
