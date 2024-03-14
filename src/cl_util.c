@@ -14,6 +14,16 @@
 #include "kernels/cl_idiv_kernel.h"
 #include "kernels/cl_update_y_kernel.h"
 
+#define check_CL(x) if(x != CL_SUCCESS)                         \
+    {                                                           \
+        clu_exit_error(x, __FILE__, __FUNCTION__, __LINE__, 0); \
+    }                                                           \
+
+#define check_clFFT(x) if(x != CL_SUCCESS)                      \
+    {                                                           \
+        clu_exit_error(x, __FILE__, __FUNCTION__, __LINE__, 1); \
+    }                                                           \
+
 
 //#define here(x) printf("%s %s %d\n", __FILE__, __FUNCTION__, __LINE__); fflush(stdout);
 #define here(x) ;
@@ -1268,7 +1278,6 @@ clu_env_t * clu_new(int verbose, int cl_device)
             clu_print_device_info(stdout, devices[kk]);
 	}
     }
-    check_CL(ret);
 
     cl_int ret = CL_SUCCESS;
     env->context = clCreateContext( NULL,

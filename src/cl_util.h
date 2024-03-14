@@ -205,18 +205,6 @@ void fimcl_positivity(fimcl_t * X, float val);
  * To be used after fft, ifft, complex_mul etc ...*/
 void fimcl_sync(fimcl_t * X);
 
-
-#define check_CL(x) if(x != CL_SUCCESS)                         \
-    {                                                           \
-        clu_exit_error(x, __FILE__, __FUNCTION__, __LINE__, 0); \
-    }                                                           \
-
-#define check_clFFT(x) if(x != CL_SUCCESS)                      \
-    {                                                           \
-        clu_exit_error(x, __FILE__, __FUNCTION__, __LINE__, 1); \
-    }                                                           \
-
-
 /* Try to resolve the error code and then exit */
 void clu_exit_error(cl_int err,
                     const char * file,
