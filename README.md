@@ -195,7 +195,7 @@ Running only on the CPU the throughput drops drastically on this
 machine, having only 4 cores:
 
 | software |   image size |      job size | time (s) | sys-mem (Mb) |
-| -------- | ------------ | ------------- | -------- | ------------ |
+| :------- | :----------: | :-----------: | -------: | -----------: |
 | dw 1.3.7 | 2048x2048x35 | 2228x2228x103 |    1,079 |       10,802 |
 | dw 1.3.7 | 1024x1024x35 | 1204x1204x103 |      222 |        3,300 |
 | dw 1.3.7 | 512x512x35   |   692x692x103 |       78 |        1,238 |
@@ -218,7 +218,7 @@ System: Ubuntu 22.04.4 LTS, AMD Ryzen 7 3700X 8-Core Processor, 64 GB
 RAM, 12 GB RX 6700 XT GPU. Iterations: 115.
 
 | software                  | time (s) | self-mem (Mb) | sys-mem (Mb) |
-| ------------------------- | -------- | ------------- | ------------ |
+| :------------------------ | -------: | ------------: | -----------: |
 | DeconvolutionLab2         | 1,025    | 1,582         | 48,511       |
 | DeconvolutionLab2 + FFTW2 |   862    | 1,353         | 47,387       |
 | MATLAB/deconvlucy         |   104    |               |  5,270       |
@@ -226,7 +226,7 @@ RAM, 12 GB RX 6700 XT GPU. Iterations: 115.
 | dw 1.3.7 --threads 2      |    32    |               |    419       |
 | dw 1.3.7 --threads 4      |    21    |               |    566       |
 | dw 1.3.7 --threads 8      |    18    |               |  1,124       |
-| dw 1.3.7 --gpu            |     2.6  |               |  5,085       |
+| dw 1.3.7 --gpu            |     3    |               |  5,085       |
 
 Notes:
 
