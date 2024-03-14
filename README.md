@@ -44,6 +44,41 @@ After building and installing you will find two binaries:
 At the moment we don't provide pre-built packages. You will have to build
 deconwolf from the source code, instructions follows below.
 
+## Method
+
+The deconvolution algorithm is based on the Richardson-Lucy (RL)
+method [^2][^3]. The scaled heavy ball (SHB) [^4] is used for
+acceleration, i.e. to do more work per iteration. Compared to the
+"Biggs" acceleration, it use less memory, it also has a proven
+convergence without any modifications to the algorithm.
+
+The default boundary handling method is based on [^1] , although
+extended to 3D. In our experiments it cause the least artifacts close
+to the image borders, especially important in the axial direction. To
+disable boundary handling, i.e. use periodic deconvolution, the option
+**--periodic** can be used.
+
+The PSF calculations in **dw_bw** implements the "Born and Wolf" model
+[^5] which is also decribed well in [^6]. It is possible to speed up
+the calculations using the method from [^7] using the **--li**
+argument. At some point (after some more testing) it might become the
+default method. An important difference to the
+[PSFGenerator](https://bigwww.epfl.ch/algorithms/psfgenerator/) is
+that each pixel in the PSF is integrated full, rather than just using
+one sample at the pixel centre. This modification gives measureable
+improvements, especially when the pixel size to resolution limit is
+low. **dw psf** also contains a few other PSF models which eventually
+will be documented as well.
+
+For GPU calculations dw use [VkFFT](https://github.com/DTolm/VkFFT)
+via OpenCL. Until version 0.3.6
+[libclfft2](https://github.com/clMathLibraries/clFFT) was used for
+this purpose. Since OpenCL is vendor neutral, this option should work
+for all major GPU brands. On the CPU side
+[FFTW](http://www.fftw.org/fftw3_doc/) is used, although it can of
+course be swapped with API compatible alternatives like MKL.
+
+
 ## Build and install
 Deconwolf runs on 64-bit machines with, both aarch64 and x86_64, and
 require no special hardware. To compile and install deconwolf should
@@ -196,64 +231,6 @@ Please open a [new ticket](https://github.com/elgw/deconwolf/issues) if you
 have any issues with the program.
 
 
-## References
-
-There is a [pseudo code](PSEUDOCODE.md) description of what the binaries does.
-
-The deconvolution algorithm is based on the following papers:
-
- * Richardson, William Hadley (1972). "Bayesian-Based Iterative Method of Image
-   Restoration". JOSA. 62 (1): 55–59.
-   [doi](https://doi.org/10.1364/JOSA.62.000055)
- * Lucy, L. B. (1974). "An iterative technique for the rectification of observed
-   distributions". Astronomical Journal. 79 (6): 745–754.
-   [doi](https://doi.org/10.1086%2F111605)
-
-   These together are referred to as Richardson-Lucy
-   (RL).
-
-* Wang H, et al. Scaled Heavy-Ball Acceleration of the
-   Richardson-Lucy Algorithm for 3D Microscopy Image Restoration. IEEE
-   Trans Image Process. 2014 [doi](https://doi.org/10.1109/TIP.2013.2291324).
-
-   This is the default acceleration method as it use less memory than
-   the other alternatives below, and seems to generate less shot noise.
-
-[^1]: M. Bertero and P. Boccacci, A simple method for the reduction of boundary
-   effects in the Richardson-Lucy approach to image deconvolution,
-   A&A 437, 369-374 (2005).
-   [doi](https://doi.org/10.1051/0004-6361:20052717)
-
-   The default boundary handling method (corresponds to **\--bq 2**),
-   although extended to 3D. To disable boundary handling or to use
-   already padded data, set **\--bq 0** which turns off this feature
-   completely, i.e., lets dw use periodic boundary handling. The
-   option **\--bq 1** is a compromise of speed and memory vs quality.
-
-The PSF calculations in **dw_bw** use these:
-
- * Max Born. Principles of optics : electromagnetic theory of propagation, interference,
-   and diffraction of light. Cambridge: Cambridge University Press, 2019.
-   ISBN: 978-1-108-47743-7.
-
- * F. Aguet. “Super-Resolution Fluorescence Microscopy Based on Physical
-   Models”. EPFL Thesis no. 4418 (2009), 209 p. Swiss Federal Institute of
-   Technology Lausanne (EPFL), May 2009
-   [url](http://bigwww.epfl.ch/publications/aguet0903.html)
-
- * Jizhou Li, Feng Xue, and Thierry Blu. “Fast and accurate three-dimensional
-   point spread function computation for fluorescence microscopy”. In: Journal
-   of the Optical Society of America A 34.6 (May 2017), p. 1029.
-   [doi](https://doi.org/10.1364/josaa.34001029)
-
-   Enable by **\--li**.
-
- * [VkFFT](https://github.com/DTolm/VkFFT) is used for FFT transform
-   on GPUs (via OpenCL). Until version 0.3.6
-   [libclfft2](https://github.com/clMathLibraries/clFFT) was used for
-   this purpose.
-
-
 ## Alternatives
 This is a non-complete list of alternative deconvolution software:
 
@@ -268,3 +245,38 @@ Commercial:
 ### Point spread functions
 
 - [PSF Generator](http://bigwww.epfl.ch/algorithms/psfgenerator/)
+
+
+## References
+
+[^2]: Richardson, William Hadley (1972). "Bayesian-Based Iterative Method of Image
+   Restoration". JOSA. 62 (1): 55–59.
+   [doi](https://doi.org/10.1364/JOSA.62.000055)
+
+[^3] Lucy, L. B. (1974). "An iterative technique for the rectification of observed
+   distributions". Astronomical Journal. 79 (6): 745–754.
+   [doi](https://doi.org/10.1086%2F111605)
+
+[^4] Wang H, et al. Scaled Heavy-Ball Acceleration of the
+   Richardson-Lucy Algorithm for 3D Microscopy Image Restoration. IEEE
+   Trans Image Process. 2014 [doi](https://doi.org/10.1109/TIP.2013.2291324).
+
+[^1]: M. Bertero and P. Boccacci, A simple method for the reduction of boundary
+   effects in the Richardson-Lucy approach to image deconvolution,
+   A&A 437, 369-374 (2005).
+   [doi](https://doi.org/10.1051/0004-6361:20052717)
+
+
+[^5]: Max Born. Principles of optics : electromagnetic theory of propagation, interference,
+   and diffraction of light. Cambridge: Cambridge University Press, 2019.
+   ISBN: 978-1-108-47743-7.
+
+[^6]: F. Aguet. “Super-Resolution Fluorescence Microscopy Based on Physical
+   Models”. EPFL Thesis no. 4418 (2009), 209 p. Swiss Federal Institute of
+   Technology Lausanne (EPFL), May 2009
+   [url](http://bigwww.epfl.ch/publications/aguet0903.html)
+
+[^7]: Jizhou Li, Feng Xue, and Thierry Blu. “Fast and accurate three-dimensional
+   point spread function computation for fluorescence microscopy”. In: Journal
+   of the Optical Society of America A 34.6 (May 2017), p. 1029.
+   [doi](https://doi.org/10.1364/josaa.34001029)
