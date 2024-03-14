@@ -184,9 +184,9 @@ target_link_libraries(dw_bw ${TIFF_LIBRARIES})
 #
 # Gnu Scientific Library
 #
-
-target_link_libraries(dw gsl)
-target_link_libraries(dw_bw gsl)
+find_package(GSL)
+target_link_libraries(dw ${GSL_LIBRARIES})
+target_link_libraries(dw_bw ${GSL_LIBRARIES})
 
 #
 # OpenCL
