@@ -307,7 +307,7 @@ Commercial:
    of the Optical Society of America A 34.6 (May 2017), p. 1029.
    [doi](https://doi.org/10.1364/josaa.34001029)
 
-[^8:] D. Tolmachev, "VkFFT-A Performant, Cross-Platform and
+[^8]: D. Tolmachev, "VkFFT-A Performant, Cross-Platform and
 Open-Source GPU FFT Library," in IEEE Access, vol. 11,
 pp. 12039-12058, 2023,
 [doi](https://doi.org/10.1109/ACCESS.2023.3242240)
