@@ -140,6 +140,54 @@ dw --iter 20 dapi_001.tif PSF_dapi.tif --gpu
 For more documentation see the short [usage guide](USAGE.md), and the manual
 pages for both binaries, [man dw](doc/dw.txt) [man dw_bw](doc/dw_bw.txt).
 
+### Performance hints
+By default deconwolf use a method to avoid the creation of boundary
+artifacts [^1] which isn't available in other software. To be able to
+test raw numerical performance we turn that option of for this section.
+
+Benchmarking is performed on the [microtubules
+image](https://bigwww.epfl.ch/deconvolution/data/microtubules/) using
+the accompanying PSF.
+
+Please note that it does not simulate "real" wide
+field data very well since it is created by periodic convolution. In
+this case it is necessary to use the options **--periodic** to
+indicate that periodic deconvolution should be used, and also
+**--xyfactor 0** do disable any cropping of the PSF.
+
+System: Ubuntu 22.04.4 LTS, AMD Ryzen 7 3700X 8-Core Processor, 64 GB
+RAM, 12 GB RX 6700 XT GPU.
+
+| software                  | time (s) | self-mem (Mb) | sys-mem (Mb) |
+| ------------------------  | -------- | --------      | -------      |
+| DeconvolutionLab2         | 1025     | 1582          | 48511        |
+| DeconvolutionLab2 + FFTW2 | 862      | 1353          | 47387        |
+| MATLAB/deconvlucy         | 104      |               | 5270         |
+| dw 1.3.7 --threads 1      | 52       |               |  344         |
+| dw 1.3.7 --threads 2      | 32       |               |  419         |
+| dw 1.3.7 --threads 4      | 21       |               |  566         |
+| dw 1.3.7 --threads 8      | 18       |               | 1124         |
+| dw 1.3.7 --gpu            |  2.6     |               | 5085         |
+
+Notes:
+
+- sys-mem is measured by parsing the **VmPeak** value from
+  `/proc/pid/status`. In the case of DeconvolutionLab2 the values does
+  not necessarily reflect the required memory since it is written in
+  Java which is garbage collected. For MATLAB/deconvlucy the memory
+  includes the full MATLAB environment.
+
+- self-mem is the memory usage reported by the software if available.
+
+- DeconlutionLab2 use vanilla RL, i.e. without any acceleration which
+means that more iterations will be needed before convergence.
+
+- MATLAB/deconvlucy use "Biggs" acceleration. Matlab version R2020b
+  was used in this case.
+
+- For "real" data, when **--periodic** is not used, the input image is
+  padded automagically during processing and the relevant part is
+  cropped out at the end.
 
 ### Bugs
 
@@ -171,7 +219,7 @@ The deconvolution algorithm is based on the following papers:
    This is the default acceleration method as it use less memory than
    the other alternatives below, and seems to generate less shot noise.
 
- * M. Bertero and P. Boccacci, A simple method for the reduction of boundary
+[^1]: M. Bertero and P. Boccacci, A simple method for the reduction of boundary
    effects in the Richardson-Lucy approach to image deconvolution,
    A&A 437, 369-374 (2005).
    [doi](https://doi.org/10.1051/0004-6361:20052717)
