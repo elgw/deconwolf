@@ -186,7 +186,7 @@ a system with: a 4-core Intel i7-6700K CPU, 64 GB RAM, NVIDIA GeForce RTX 3090,
 using the **--gpu** flag and 50 iterations (**--iter 50**).
 
 | software |   image size |      job size | time (s) | sys-mem (Mb)  |
-| -------- | ------------ | ------------- | -------- | ------------- |
+| :------- | :----------: | :-----------: | -------: | ------------: |
 | dw 1.3.7 | 2048x2048x35 | 2228x2228x103 |       37 |        28,748 |
 | dw 1.3.7 | 1024x1024x35 | 1204x1204x103 |       11 |         9,686 |
 | dw 1.3.7 | 512x512x35   |   692x692x103 |        4 |         7,564 |
