@@ -177,9 +177,9 @@ endif()
 #
 # TIFF
 #
-
-target_link_libraries(dw tiff)
-target_link_libraries(dw_bw tiff)
+find_package(TIFF)
+target_link_libraries(dw ${TIFF_LIBRARIES})
+target_link_libraries(dw_bw ${TIFF_LIBRARIES})
 
 #
 # Gnu Scientific Library
