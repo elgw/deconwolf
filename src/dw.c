@@ -268,6 +268,7 @@ void dw_opts_free(dw_opts ** sp)
     free(s->imFile);
     free(s->psfFile);
     free(s->outFile);
+    free(s->outFolder);
     free(s->logFile);
     free(s->flatfieldFile);
     free(s->prefix);
@@ -913,6 +914,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         s->outFolder = malloc(strlen(dname) + 16);
         assert(s->outFolder != NULL);
         sprintf(s->outFolder, "%s%c", dname, FILESEP);
+        free(bname);
         free(dname);
     } else {
         char * dname = dw_dirname(s->outFile);
