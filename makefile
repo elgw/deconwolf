@@ -86,15 +86,18 @@ endif
 # -fno-math-errno gives no relevant performance gain
 
 ifeq ($(DEBUG),1)
-    CFLAGS += -O0 -Wno-unknown-pragmas -fanalyzer -g3
+    CFLAGS += -O0 -Wno-unknown-pragmas -g3
 else
-    CFLAGS += -O3 -flto -DNDEBUG
+    CFLAGS += -O3 -DNDEBUG
 endif
+
+# possibly good to compile with -fanalyzer now and then,
+# however without VkFFT ...
 
 #
 # Check if the linker can perform link time optimizations
 #
-
+ifeq ($(DEBUG),0)
 define check_ld_flag
 $(shell $(LD) $(1) -e 0 /dev/null 2>/dev/null && echo $(1))
 endef
@@ -112,6 +115,7 @@ $(info Enabling -flto)
 CFLAGS+=-flto
 else
 $(info Neither -flto nor -flto=auto available)
+endif
 endif
 endif
 
