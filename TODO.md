@@ -39,6 +39,9 @@ and expected sample thickness.
 - [ ] Wrap image pointers in some abstraction, would be especially
       useful for Windows where there are multiple **free**-functions.
 
+- [ ] Make the **--lookahead** option work again, and possibly enable
+      it by default, at least on the CPU side.
+
 ## Nice to have
 - [ ] Skip libtiff, especially for writing.
 - [ ] See if Pinned memory allocations can improve the performance for shbcl (don't expect anything drastic from shbcl2).
