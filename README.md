@@ -183,21 +183,31 @@ the output, the time is linear with the number of iterations.
 
 Here is a table with performance figures for some real images. Run on
 a system with: a 4-core Intel i7-6700K CPU, 64 GB RAM, NVIDIA GeForce RTX 3090,
-using the **--gpu** flag:
+using the **--gpu** flag and 50 iterations (**--iter 50**).
 
-|   image size |      job size | time (s) | sys-mem (Mb) |
-|------------- | ------------- | -------- | ------------ |
-| 2048x2048x35 | 2228x2228x103 |       37 |        28748 |
-| 1024x1024x35 | 1204x1204x103 |       11 |         9686 |
-| 512x512x35   |   692x692x103 |        4 |         7564 |
+| software |   image size |      job size | time (s) | sys-mem (Mb)  |
+| -------- | ------------ | ------------- | -------- | ------------- |
+| dw 1.3.7 | 2048x2048x35 | 2228x2228x103 |       37 |        28,748 |
+| dw 1.3.7 | 1024x1024x35 | 1204x1204x103 |       11 |         9,686 |
+| dw 1.3.7 | 512x512x35   |   692x692x103 |        4 |         7,564 |
 
+Running only on the CPU the throughput drops drastically on this
+machine, having only 4 cores:
 
-To give a hint on the performance relative to other software, we use
-synthetic data where we can turn off the default boundary handling in
-deconwolf and use periodic boundary conditions (**--periodic**). We
-also tell deconwolf to not crop the PSF (which is usually done
-automatically to save some memory/gain some speed) by supplying
-**--xyfactor 0**.
+| software |   image size |      job size | time (s) | sys-mem (Mb) |
+| -------- | ------------ | ------------- | -------- | ------------ |
+| dw 1.3.7 | 2048x2048x35 | 2228x2228x103 |    1,079 |       10,802 |
+| dw 1.3.7 | 1024x1024x35 | 1204x1204x103 |      222 |        3,300 |
+| dw 1.3.7 | 512x512x35   |   692x692x103 |       78 |        1,238 |
+
+Yes, deconvolution is time consuming without a GPU :(
+
+Below there will be some hints on the performance relative to other
+software. For that purpose synthetic data will be used where periodic
+boundary conditions (**--periodic**) can be used. dw should not try to
+crop the PSF (which is usually done automatically to save some
+memory/gain some speed) in this case, hence the flag **--xyfactor 0** is
+added as well.
 
 Benchmarking is performed on the [microtubules
 image](https://bigwww.epfl.ch/deconvolution/data/microtubules/) using
@@ -205,18 +215,18 @@ the accompanying PSF. Please note that it does not simulate "real"
 wide field data very well since it is created by periodic convolution.
 
 System: Ubuntu 22.04.4 LTS, AMD Ryzen 7 3700X 8-Core Processor, 64 GB
-RAM, 12 GB RX 6700 XT GPU.
+RAM, 12 GB RX 6700 XT GPU. Iterations: 115.
 
 | software                  | time (s) | self-mem (Mb) | sys-mem (Mb) |
-| ------------------------  | -------- | --------      | -------      |
-| DeconvolutionLab2         | 1025     | 1582          | 48511        |
-| DeconvolutionLab2 + FFTW2 | 862      | 1353          | 47387        |
-| MATLAB/deconvlucy         | 104      |               | 5270         |
-| dw 1.3.7 --threads 1      | 52       |               |  344         |
-| dw 1.3.7 --threads 2      | 32       |               |  419         |
-| dw 1.3.7 --threads 4      | 21       |               |  566         |
-| dw 1.3.7 --threads 8      | 18       |               | 1124         |
-| dw 1.3.7 --gpu            |  2.6     |               | 5085         |
+| ------------------------- | -------- | ------------- | ------------ |
+| DeconvolutionLab2         | 1,025    | 1,582         | 48,511       |
+| DeconvolutionLab2 + FFTW2 |   862    | 1,353         | 47,387       |
+| MATLAB/deconvlucy         |   104    |               |  5,270       |
+| dw 1.3.7 --threads 1      |    52    |               |    344       |
+| dw 1.3.7 --threads 2      |    32    |               |    419       |
+| dw 1.3.7 --threads 4      |    21    |               |    566       |
+| dw 1.3.7 --threads 8      |    18    |               |  1,124       |
+| dw 1.3.7 --gpu            |     2.6  |               |  5,085       |
 
 Notes:
 

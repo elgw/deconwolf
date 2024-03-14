@@ -5,6 +5,8 @@ github](https://github.com/elgw/deconwolf/issues).
 
 ## Planned
 
+- [ ] c2r and c2r plans needed any more? Probably only the in-place versions.
+
 - [ ] dynamic loading of OpenCL, for examples using [https://github.com/yugr/Implib.so]
 
 - [ ] Complete switch to Vulkan from OpenCL. Doing this will ensure
