@@ -1281,7 +1281,7 @@ clu_env_t * clu_new(int verbose, int cl_device)
 
     cl_int ret = CL_SUCCESS;
     env->context = clCreateContext( NULL,
-                                    ret_num_devices,
+                                    1,
                                     &env->device_id,
                                     cl_crash_fun,
                                     NULL,
