@@ -150,14 +150,18 @@ endif()
 #
 # FFTW3
 #
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/util/findFFTW)
+find_package(FFTW REQUIRED FLOAT_LIB FLOAT_OPENMP_LIB)
+target_link_libraries(dw FFTW::Double)
+target_link_libraries(dw FFTW::Float)
+target_link_libraries(dw FFTW::FloatOpenMP)
 
-target_link_libraries(dw fftw3 fftw3f)
 
 # There is no _threads version or _omp version
 # on windows, multicore support should be baked
 # into the basic library.
 if(NOT WIN32)
-  target_link_libraries(dw fftw3f_omp)
+  target_link_libraries(dw FFTW::FloatOpenMP)
 endif()
 
 #
@@ -225,3 +229,11 @@ if(result)
   message("Enabling IPO")
   set_property(DIRECTORY PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif()
+
+include(GNUInstallDirs)
+install(TARGETS dw)
+install(TARGETS dw_bw)
+install(FILES "${CMAKE_SOURCE_DIR}/doc/dw.1"
+  DESTINATION "${CMAKE_INSTALL_MANDIR}/man1/" )
+install(FILES "${CMAKE_SOURCE_DIR}/doc/dw_bw.1"
+  DESTINATION "${CMAKE_INSTALL_MANDIR}/man1/" )

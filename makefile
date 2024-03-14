@@ -230,14 +230,14 @@ endif
 
 ifeq ($(FFTW3), 1)
 $(info -- Looking for FFTW3)
-FFTW_EXISTS = $(shell $(PKGCONF) libtiff-4 --exists ; echo $$?)
+FFTW_EXISTS = $(shell $(PKGCONF) fftw3 --exists ; echo $$?)
 ifeq ($(FFTW_EXISTS), 0)
 
 else
 $(error Could not find FFTW3)
 endif
 
-CFLAGS += $(shell $(PKGCONF)fftw3 fftw3f --cflags)
+CFLAGS += $(shell $(PKGCONF) fftw3 fftw3f --cflags)
 ifeq ($(MOSTLYSTATIC), 0)
 dw_LIBRARIES += $(shell $(PKGCONF) fftw3 fftw3f --libs)
 dwbw_LIBRARIES += $(shell $(PKGCONF) fftw3 fftw3f --libs)

@@ -104,35 +104,25 @@ deconwolf can be built as well.
 To enable GPU acceleration, deconwolf also requires a GPU and OpenCL
 drivers installed.
 
-### Installation on Ubuntu 22.04 (or Windows via WSL)
-For other platforms, see [INSTALL.md](INSTALL.md).
+### Installation
+These instructions should work under Linux, BSD, Windows (via WSL),
+and MacOS.
 
-First install the required packages:
+1. Get the dependencies. The required libraries should be found on
+   most platforms, however, the installation process differs
+   slightly. See [INSTALL.md](INSTALL.md) for per-platform advice.
+
+2. Compile and install
 
 ``` shell
-sudo apt-get update
-sudo apt-get install \
- gcc                 \
- libfftw3-single3    \
- libfftw3-dev        \
- libgsl-dev          \
- libomp-dev          \
- libpng-dev          \
- libtiff-dev         \
- pkg-config
+mkdir builddir
+cd builddir
+cmake ..
+cmake --build .
+make install
 ```
 
-Build, to build and install deconwolf:
-``` shell
-make -B
-./makedeb-ubuntu_2204
-sudo apt-install ./deconwolf_*.deb
-# to remove
-# sudo apt remove deconwolf
-```
-
-If OpenCL is not installed, use `make -B VKFFT=0` to build without GPU
-acceleration.
+What was installed can be found in the `install_manifest.txt`.
 
 ## Minimal usage example
 To generate a parametric PSF and deconvolve an image, all you need is
@@ -275,6 +265,11 @@ Commercial:
 
 ## References
 
+[^1]: M. Bertero and P. Boccacci, A simple method for the reduction of boundary
+   effects in the Richardson-Lucy approach to image deconvolution,
+   A&A 437, 369-374 (2005).
+   [doi](https://doi.org/10.1051/0004-6361:20052717)
+
 [^2]: Richardson, William Hadley (1972). "Bayesian-Based Iterative Method of Image
    Restoration". JOSA. 62 (1): 55–59.
    [doi](https://doi.org/10.1364/JOSA.62.000055)
@@ -286,12 +281,6 @@ Commercial:
 [^4]: Wang H, et al. Scaled Heavy-Ball Acceleration of the
    Richardson-Lucy Algorithm for 3D Microscopy Image Restoration. IEEE
    Trans Image Process. 2014 [doi](https://doi.org/10.1109/TIP.2013.2291324).
-
-[^1]: M. Bertero and P. Boccacci, A simple method for the reduction of boundary
-   effects in the Richardson-Lucy approach to image deconvolution,
-   A&A 437, 369-374 (2005).
-   [doi](https://doi.org/10.1051/0004-6361:20052717)
-
 
 [^5]: Max Born. Principles of optics : electromagnetic theory of propagation, interference,
    and diffraction of light. Cambridge: Cambridge University Press, 2019.
@@ -308,6 +297,6 @@ Commercial:
    [doi](https://doi.org/10.1364/josaa.34001029)
 
 [^8]: D. Tolmachev, "VkFFT-A Performant, Cross-Platform and
-Open-Source GPU FFT Library," in IEEE Access, vol. 11,
-pp. 12039-12058, 2023,
-[doi](https://doi.org/10.1109/ACCESS.2023.3242240)
+    Open-Source GPU FFT Library," in IEEE Access, vol. 11,
+    pp. 12039-12058, 2023,
+    [doi](https://doi.org/10.1109/ACCESS.2023.3242240)
