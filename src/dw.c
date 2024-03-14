@@ -1257,6 +1257,8 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
            "will be prefixed with dw_\n.");
     printf(" --iter N\n\t "
            "Specify the number of iterations to use (default: %d)\n", s->nIter);
+    printf(" --gpu\n\t Use GPU processing\n");
+    printf(" --cldevice n\n\t Use OpenCL device #n\n");
     printf(" --threads N\n\t Specify the number of CPU threads to use\n");
     printf(" --verbose N\n\t Set verbosity level (default: %d)\n", s->verbosity);
     printf(" --test\n\t Run unit tests\n");

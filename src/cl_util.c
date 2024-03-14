@@ -1181,7 +1181,7 @@ void cl_crash_fun (
     __attribute__((unused)) void *user_data
     )
 {
-    printf("On no... OpenCL have some bad news:\n");
+    printf("On no... bad new from OpenCL:\n");
     printf("errinfo: %s\n", errinfo);
     printf("\n");
     //printf("private_info: %s\n", private_info);
@@ -1268,6 +1268,7 @@ clu_env_t * clu_new(int verbose, int cl_device)
             clu_print_device_info(stdout, devices[kk]);
 	}
     }
+    check_CL(ret);
 
     cl_int ret = CL_SUCCESS;
     env->context = clCreateContext( NULL,
