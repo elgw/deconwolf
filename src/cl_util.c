@@ -1254,6 +1254,7 @@ clu_env_t * clu_new(int verbose, int cl_device)
     if(env->verbose > 1)
     {
         printf("Found %d CL devices\n", ret_num_devices);
+        printf("Will use device %d (first = 0)\n", cl_device);
     }
     fflush(stdout);
 
