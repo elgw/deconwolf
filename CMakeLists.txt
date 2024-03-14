@@ -156,6 +156,10 @@ target_link_libraries(dw FFTW::Double)
 target_link_libraries(dw FFTW::Float)
 target_link_libraries(dw FFTW::FloatOpenMP)
 
+target_link_libraries(dw_bw FFTW::Float)
+target_link_libraries(dw_bw FFTW::FloatOpenMP)
+
+
 
 # There is no _threads version or _omp version
 # on windows, multicore support should be baked
