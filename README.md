@@ -176,19 +176,33 @@ For more documentation see the short [usage guide](USAGE.md), and the manual
 pages for both binaries, [man dw](doc/dw.txt) [man dw_bw](doc/dw_bw.txt).
 
 ### Performance hints
-By default deconwolf use a method to avoid the creation of boundary
-artifacts [^1] which isn't available in other software. To be able to
-test raw numerical performance we turn that option of for this section.
+
+The performance depends on the system and the image size. Except for
+some initialization (read images, padding, cropping ... ) and writing
+the output, the time is linear with the number of iterations.
+
+Here is a table with performance figures for some real images. Run on
+a system with: a 4-core Intel i7-6700K CPU, 64 GB RAM, NVIDIA GeForce RTX 3090,
+using the **--gpu** flag:
+
+|   image size |      job size | time (s) | sys-mem (Mb) |
+|------------- | ------------- | -------- | ------------ |
+| 2048x2048x35 | 2228x2228x103 |       37 |        28748 |
+| 1024x1024x35 | 1204x1204x103 |       11 |         9686 |
+| 512x512x35   |   692x692x103 |        4 |         7564 |
+
+
+To give a hint on the performance relative to other software, we use
+synthetic data where we can turn off the default boundary handling in
+deconwolf and use periodic boundary conditions (**--periodic**). We
+also tell deconwolf to not crop the PSF (which is usually done
+automatically to save some memory/gain some speed) by supplying
+**--xyfactor 0**.
 
 Benchmarking is performed on the [microtubules
 image](https://bigwww.epfl.ch/deconvolution/data/microtubules/) using
-the accompanying PSF.
-
-Please note that it does not simulate "real" wide
-field data very well since it is created by periodic convolution. In
-this case it is necessary to use the options **--periodic** to
-indicate that periodic deconvolution should be used, and also
-**--xyfactor 0** do disable any cropping of the PSF.
+the accompanying PSF. Please note that it does not simulate "real"
+wide field data very well since it is created by periodic convolution.
 
 System: Ubuntu 22.04.4 LTS, AMD Ryzen 7 3700X 8-Core Processor, 64 GB
 RAM, 12 GB RX 6700 XT GPU.
@@ -223,6 +237,8 @@ means that more iterations will be needed before convergence.
 - For "real" data, when **--periodic** is not used, the input image is
   padded automagically during processing and the relevant part is
   cropped out at the end.
+
+- Also works on Raspberry PI5 :) In that case it took 146 s.
 
 ### Bugs
 
