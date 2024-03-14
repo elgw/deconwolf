@@ -69,10 +69,12 @@ PKGCONF=pkgconf
 endif
 endif
 
+# Only needed for developers that edit the kernels
 $(info -- Looking for xxd)
 ifeq (, $(shell which xxd))
-	$(warn xxd not found, kernels can''t be converted to .h files)
+$(info xxd not found)
 endif
+
 
 #
 # Optimization flags

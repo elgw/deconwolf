@@ -5,6 +5,8 @@ github](https://github.com/elgw/deconwolf/issues).
 
 ## Planned
 
+- [ ] c2r and c2r plans needed any more? Probably only the in-place versions.
+
 - [ ] dynamic loading of OpenCL, for examples using [https://github.com/yugr/Implib.so]
 
 - [ ] Complete switch to Vulkan from OpenCL. Doing this will ensure
@@ -36,6 +38,9 @@ and expected sample thickness.
 
 - [ ] Wrap image pointers in some abstraction, would be especially
       useful for Windows where there are multiple **free**-functions.
+
+- [ ] Make the **--lookahead** option work again, and possibly enable
+      it by default, at least on the CPU side.
 
 ## Nice to have
 - [ ] Skip libtiff, especially for writing.
