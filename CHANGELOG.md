@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## 0.3.8
+- For systems with multiple GPUs or OpenCL compatible devices it is
+  now possible to select which to use with **--cldevice**. To figure
+  out which that are available it is simplest to use
+  `clinfo`. Alternatively call dw with **--verbose 2** or above.
+
+- Removed depreciated makefile for freebsd as the general makefile or
+  the `CMakeLists.txt` should work also there.
+
+- Minor changes.
+
 ## 0.3.7
 - Deconwolf compiles as a native windows program using clang. So far
   the binaries are only smoke tested since the main target is linux.

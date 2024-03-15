@@ -3088,7 +3088,7 @@ void fim_features_2d_ut()
     int64_t P = 0;
 
     float * V = fim_tiff_read(file, NULL, &M, &N, &P, 0);
-    printf("%s is %ld %ld %ld image\n", file, M, N, P);
+    printf("%s is %" PRId64 " %" PRId64 " %" PRId64 " image\n", file, M, N, P);
     fim_t * I = malloc(sizeof(fim_t));
     assert(I != NULL);
     I->V = V;
@@ -3148,15 +3148,15 @@ void fim_argmax_max_ut()
     if( (lib_max == ref_max) &&
         (amM + amN*M + amP*M*N == ref_argmax))
     {
-        printf("lib: A(%ld, %ld, %ld) = %f\n", amM, amN, amP, lib_max);
-        printf("ref: A(%zu) = A(%ld, %ld, %ld) = %f\n", ref_argmax,
+        printf("lib: A(%" PRId64 ", %" PRId64 ", %" PRId64 ") = %f\n", amM, amN, amP, lib_max);
+        printf("ref: A(%zu) = A(%" PRId64 ", %" PRId64 ", %" PRId64 ") = %f\n", ref_argmax,
                ref_amM, ref_amN, ref_amP, ref_max);
         printf("fim_argmax_max_ut passed (%e s, ref-implementation: %e s)\n",
                t_lib_amax, t_ref_amax);
     } else {
         fprintf(stderr, "fim_argmax_max_ut failed\n");
-        printf("lib: A(%ld, %ld, %ld) = %f\n", amM, amN, amP, lib_max);
-        printf("ref: A(%zu) = A(%ld, %ld, %ld) = %f\n", ref_argmax,
+        printf("lib: A(%" PRId64 ", %" PRId64 ", %" PRId64 ") = %f\n", amM, amN, amP, lib_max);
+        printf("ref: A(%zu) = A(%" PRId64 ", %" PRId64 ", %" PRId64 ") = %f\n", ref_argmax,
                ref_amM, ref_amN, ref_amP, ref_max);
         exit(EXIT_FAILURE);
     }
