@@ -150,14 +150,22 @@ endif()
 #
 # FFTW3
 #
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/util/findFFTW)
+find_package(FFTW REQUIRED FLOAT_LIB FLOAT_OPENMP_LIB)
+target_link_libraries(dw FFTW::Double)
+target_link_libraries(dw FFTW::Float)
+target_link_libraries(dw FFTW::FloatOpenMP)
 
-target_link_libraries(dw fftw3 fftw3f)
+target_link_libraries(dw_bw FFTW::Float)
+target_link_libraries(dw_bw FFTW::FloatOpenMP)
+
+
 
 # There is no _threads version or _omp version
 # on windows, multicore support should be baked
 # into the basic library.
 if(NOT WIN32)
-  target_link_libraries(dw fftw3f_omp)
+  target_link_libraries(dw FFTW::FloatOpenMP)
 endif()
 
 #
@@ -173,16 +181,16 @@ endif()
 #
 # TIFF
 #
-
-target_link_libraries(dw tiff)
-target_link_libraries(dw_bw tiff)
+find_package(TIFF)
+target_link_libraries(dw ${TIFF_LIBRARIES})
+target_link_libraries(dw_bw ${TIFF_LIBRARIES})
 
 #
 # Gnu Scientific Library
 #
-
-target_link_libraries(dw gsl)
-target_link_libraries(dw_bw gsl)
+find_package(GSL)
+target_link_libraries(dw ${GSL_LIBRARIES})
+target_link_libraries(dw_bw ${GSL_LIBRARIES})
 
 #
 # OpenCL
@@ -193,7 +201,7 @@ if (ENABLE_GPU)
 find_package(OpenCL)
 if(OpenCL_FOUND)
   message("Will use OpenCL")
-  target_link_libraries(dw OpenCL)
+  target_link_libraries(dw ${OpenCL_LIBRARIES})
   add_definitions(-DOPENCL)
   add_definitions(-DVKFFT_BACKEND=3)
   target_include_directories(dw PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/VkFFT/vkFFT/)
@@ -225,3 +233,11 @@ if(result)
   message("Enabling IPO")
   set_property(DIRECTORY PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif()
+
+include(GNUInstallDirs)
+install(TARGETS dw)
+install(TARGETS dw_bw)
+install(FILES "${CMAKE_SOURCE_DIR}/doc/dw.1"
+  DESTINATION "${CMAKE_INSTALL_MANDIR}/man1/" )
+install(FILES "${CMAKE_SOURCE_DIR}/doc/dw_bw.1"
+  DESTINATION "${CMAKE_INSTALL_MANDIR}/man1/" )

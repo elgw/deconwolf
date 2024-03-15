@@ -24,7 +24,7 @@ FILE * logfile = NULL;
 
 dw_iterator_t * dw_iterator_new(const dw_opts * s)
 {
-    dw_iterator_t * it = malloc(sizeof(dw_iterator_t));
+    dw_iterator_t * it = calloc(1, sizeof(dw_iterator_t));
     it->error = 1;
     it->lasterror = 1;
     it->itertype = s->iter_type;
@@ -268,6 +268,7 @@ void dw_opts_free(dw_opts ** sp)
     free(s->imFile);
     free(s->psfFile);
     free(s->outFile);
+    free(s->outFolder);
     free(s->logFile);
     free(s->flatfieldFile);
     free(s->prefix);
@@ -913,6 +914,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         s->outFolder = malloc(strlen(dname) + 16);
         assert(s->outFolder != NULL);
         sprintf(s->outFolder, "%s%c", dname, FILESEP);
+        free(bname);
         free(dname);
     } else {
         char * dname = dw_dirname(s->outFile);
@@ -1257,6 +1259,8 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
            "will be prefixed with dw_\n.");
     printf(" --iter N\n\t "
            "Specify the number of iterations to use (default: %d)\n", s->nIter);
+    printf(" --gpu\n\t Use GPU processing\n");
+    printf(" --cldevice n\n\t Use OpenCL device #n\n");
     printf(" --threads N\n\t Specify the number of CPU threads to use\n");
     printf(" --verbose N\n\t Set verbosity level (default: %d)\n", s->verbosity);
     printf(" --test\n\t Run unit tests\n");
@@ -1945,7 +1949,8 @@ double get_nbg(float * I, size_t N, float bg)
 
 void flatfieldCorrection(dw_opts * s, float * im, int64_t M, int64_t N, int64_t P)
 {
-    printf("Experimental: applying flat field correction using %s\n", s->flatfieldFile);
+    printf("Experimental: applying flat field correction using %s\n",
+           s->flatfieldFile);
     ttags * T = ttags_new();
     int64_t m = 0, n = 0, p = 0;
     float * C = fim_tiff_read(s->flatfieldFile, T, &m, &n, &p, s->verbosity);
@@ -2069,7 +2074,8 @@ int dw_run(dw_opts * s)
 
     if(s->verbosity > 1)
     {
-        printf("Image dimensions: %" PRId64 " x %" PRId64 " x %" PRId64 "\n", M, N, P);
+        printf("Image dimensions: %" PRId64 " x %" PRId64 " x %" PRId64 "\n",
+               M, N, P);
     }
 
     int tiling = 0;

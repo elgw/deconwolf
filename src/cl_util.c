@@ -14,6 +14,16 @@
 #include "kernels/cl_idiv_kernel.h"
 #include "kernels/cl_update_y_kernel.h"
 
+#define check_CL(x) if(x != CL_SUCCESS)                         \
+    {                                                           \
+        clu_exit_error(x, __FILE__, __FUNCTION__, __LINE__, 0); \
+    }                                                           \
+
+#define check_clFFT(x) if(x != CL_SUCCESS)                      \
+    {                                                           \
+        clu_exit_error(x, __FILE__, __FUNCTION__, __LINE__, 1); \
+    }                                                           \
+
 
 //#define here(x) printf("%s %s %d\n", __FILE__, __FUNCTION__, __LINE__); fflush(stdout);
 #define here(x) ;
@@ -1133,7 +1143,7 @@ void clu_print_device_info(FILE * fid, cl_device_id dev_id)
                               &dev_memory,
                               NULL));
 
-    fprintf(fid, "CL_DEVICE_GLOBAL_MEM_SIZE = %lu (%lu MiB)\n",
+    fprintf(fid, "CL_DEVICE_GLOBAL_MEM_SIZE = %" PRIu64 " (%" PRIu64 " MiB)\n",
             dev_memory,
             dev_memory/1000000);
 
@@ -1181,7 +1191,7 @@ void cl_crash_fun (
     __attribute__((unused)) void *user_data
     )
 {
-    printf("On no... OpenCL have some bad news:\n");
+    printf("On no... bad new from OpenCL:\n");
     printf("errinfo: %s\n", errinfo);
     printf("\n");
     //printf("private_info: %s\n", private_info);
@@ -1254,6 +1264,7 @@ clu_env_t * clu_new(int verbose, int cl_device)
     if(env->verbose > 1)
     {
         printf("Found %d CL devices\n", ret_num_devices);
+        printf("Will use device %d (first = 0)\n", cl_device);
     }
     fflush(stdout);
 
@@ -1270,7 +1281,7 @@ clu_env_t * clu_new(int verbose, int cl_device)
 
     cl_int ret = CL_SUCCESS;
     env->context = clCreateContext( NULL,
-                                    ret_num_devices,
+                                    1,
                                     &env->device_id,
                                     cl_crash_fun,
                                     NULL,
@@ -1530,7 +1541,7 @@ void clu_prepare_kernels(clu_env_t * clu,
 
     if(clu->verbose > 1)
     {
-        printf("Initializing VkFFT for size %zu x %zu x %zu\n",
+        printf("Initializing VkFFT for size %" PRIu64 " x %" PRIu64 " x %" PRIu64 "\n",
                configuration.size[0],
                configuration.size[1],
                configuration.size[2]);

@@ -1,5 +1,18 @@
 # Installation notes
 
+## General requirements on Linux/Unix
+
+- A compiler, tested with [gcc](https://gcc.gnu.org/) and
+  [clang](https://clang.llvm.org/).
+- openmp, typically bundled with the compiler.
+- [cmake](https://cmake.org/)
+- [https://www.gnu.org/software/make/](make)
+- [fftw3](https://www.fftw.org/)
+- [libtiff](https://libtiff.gitlab.io/libtiff/)
+- [GSL - GNU Scientific Library](https://www.gnu.org/software/gsl/)
+- [libpng](http://libpng.org/pub/png/libpng.html)
+
+
 ## OpenCL support
 To use GPU acceleration **dw** needs to be compiled with that option
 enabled. Using the makefile that corresponds to:
@@ -9,27 +22,7 @@ make kernels
 make -B VKFFT=1
 ```
 
-## Build systems
-Under linux the makefile should work on most distributions. For those
-that prefer something else there is also configuration files for Meson
-and CMake.
-
-### Meson
-To build and install:
-``` shell
-meson setup builddir --buildtype release
-cd builddir
-meson compile
-meson install # Note: only works if meson was installed by sudo
-```
-
-To uninstall:
-
-``` shell
-sudo ninja -C builddir uninstall
-```
-
-### CMake
+## CMake
 To build:
 
 ``` shell
@@ -39,8 +32,7 @@ cmake ..
 cmake --build .
 ```
 
-## Platform specific notes
-### macOS Big Sur
+## macOS Big Sur
 
 For building you will need XCode from the App Store and [brew](https://brew.sh/).
 
@@ -60,7 +52,7 @@ make -B
 sudo make install
 ```
 
-## Windows 11
+## Windows 10/11
 Deconwolf can be built and run using WSL. Most likely there will be a [performance
 penalty](https://www.phoronix.com/scan.php?page=article&item=wsl-wsl2-tr3970x&num=1), and it will not be possible to enable GPU acceleration.
 
@@ -97,7 +89,7 @@ cd winbuild
 cmake .. -G "Visual Studio 17 2022" -T ClangCL -A x64
 ```
 
-### FreeBSD
+## FreeBSD
 - Use `gmake`, not `make`.
 - Default compiler: `clang`
 - `pkgconf` not `pkg-config`.
@@ -112,7 +104,7 @@ pkg install gsl
 pkg install sudo
 ```
 
-### CentOS
+## CentOS
 Tested on CentOS Linux Release 7.8.2009 (Core).
 
 ``` shell
@@ -120,7 +112,7 @@ Tested on CentOS Linux Release 7.8.2009 (Core).
 sudo yum install gcc gsl-devel libtiff-devel fftw-devel
 ```
 
-### Ubuntu 16.04
+## Ubuntu 16.04
 ``` shell
 sudo apt-get update
 sudo apt-get install gcc
@@ -134,14 +126,43 @@ sudo apt-get install libomp-dev
 sudo apt-get install libpng-dev
 ```
 
-### Ubuntu 23.04
+## Ubuntu 22.04
+
+First install the required packages:
+
+``` shell
+sudo apt-get update
+sudo apt-get install \
+ cmake               \
+ pkg-config          \
+ gcc                 \
+ libfftw3-single3    \
+ libfftw3-dev        \
+ libgsl-dev          \
+ libomp-dev          \
+ libpng-dev          \
+ libtiff-dev
+```
+
+It is possible to create a deb file:
+
+``` shell
+make -B
+./makedeb-ubuntu_2204
+sudo apt-install ./deconwolf_*.deb
+# to remove
+# sudo apt remove deconwolf
+```
+
+
+## Ubuntu 23.04
 Same as Ubuntu 22.04.
 
 ``` shell
 apt-get install opencl-headers
 ```
 
-### Arch/ Manjaro
+## Arch/ Manjaro
 
 ``` shell
 # remember to update system
@@ -152,7 +173,7 @@ make
 sudo make install
 ```
 
-### Rapsberry PI (64-bit Debian bookworm)
+## Rapsberry PI (64-bit Debian bookworm)
 ``` shell
 sudo apt-get update
 sudo apt-get upgrade
@@ -161,9 +182,7 @@ libtiff-dev \
 libgsl-dev
 ```
 
-## Library options
-
-### MKL
+## MKL
 FFTW3 is the default FFT backend for deconwolf but it is also possible to use
 Intel MKL. This option is only tested on Ubuntu so far.
 

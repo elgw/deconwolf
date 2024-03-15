@@ -43,6 +43,7 @@ and expected sample thickness.
       it by default, at least on the CPU side.
 
 ## Nice to have
+- [ ] Build deb files etc with cmake.
 - [ ] Skip libtiff, especially for writing.
 - [ ] See if Pinned memory allocations can improve the performance for shbcl (don't expect anything drastic from shbcl2).
 [LFAT](https://ltfat.github.io/notes/ltfatnote017.pdf),

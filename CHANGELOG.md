@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## 0.3.8
+- For systems with multiple GPUs or OpenCL compatible devices it is
+  now possible to select which to use with **--cldevice**. To figure
+  out which that are available it is simplest to use
+  `clinfo`. Alternatively call dw with **--verbose 2** or above.
+
+- Removed depreciated makefile for freebsd as it is no longer needed.
+
+- Removed anything related to meson as it is no longer needed.
+
+- Using the `PRI*` macros from `inttype.h`,
+  especially `PRIu64` for `uint64_t` and `PRId64` for `int64_t` to get
+  rid of some warnings under MacOS.
+
+- Minor changes.
+
 ## 0.3.7
 - Deconwolf compiles as a native windows program using clang. So far
   the binaries are only smoke tested since the main target is linux.

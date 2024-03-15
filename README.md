@@ -1,4 +1,4 @@
-# deconwolf v0.3.7
+# deconwolf v0.3.8
 
 **deconwolf** is a software for 3-D deconvolution of fluorescent wide-field
 images:
@@ -70,7 +70,7 @@ improvements, especially when the pixel size to resolution limit is
 low. **dw psf** also contains a few other PSF models which eventually
 will be documented as well.
 
-For GPU calculations dw use [VkFFT](https://github.com/DTolm/VkFFT)
+For GPU calculations dw use [VkFFT](https://github.com/DTolm/VkFFT) [^8]
 via OpenCL. Until version 0.3.6
 [libclfft2](https://github.com/clMathLibraries/clFFT) was used for
 this purpose. Since OpenCL is vendor neutral, this option should work
@@ -103,77 +103,6 @@ deconwolf can be built as well.
 
 To enable GPU acceleration, deconwolf also requires a GPU and OpenCL
 drivers installed.
-
-### Installation on Ubuntu 22.04 (or Windows via WSL)
-For other platforms, see [INSTALL.md](INSTALL.md).
-
-First install the required packages:
-
-``` shell
-sudo apt-get update
-sudo apt-get install \
- gcc                 \
- libfftw3-single3    \
- libfftw3-dev        \
- libgsl-dev          \
- libomp-dev          \
- libpng-dev          \
- libtiff-dev         \
- pkg-config
-```
-
-Build, to build and install deconwolf:
-``` shell
-make -B
-./makedeb-ubuntu_2204
-sudo apt-install ./deconwolf_*.deb
-# to remove
-# sudo apt remove deconwolf
-```
-
-If OpenCL is not installed, use `make -B VKFFT=0` to build without GPU
-acceleration.
-
-## Minimal usage example
-To generate a parametric PSF and deconvolve an image, all you need is
-something like this:
-
-``` shell
-# generate PSF.tif
-dw_bw --resxy 130 \
---resz 250 \
---NA 1.46 \
---ni 1.518 \
---lambda 460 PSF.tiff
-# Deconvolve image.tiff -> dw_image.tiff
-dw --iter 50 image.tiff PSF.tiff
-```
-For available options, please see
-
-``` shell
-dw --help
-dw_bw --help
-```
-
-To validate that **dw** does not create random garbage, run it on
-`/demo/dapi_001.tif`
-
-
-``` shell
-cd demo
-make
-imagej dapi_001.tif dw_dapi_001.tif
-```
-
-The run time on an AMD 3700x was 8s. To use GPU acceleration. To use
-GPU accelerated deconvolution, test
-
-``` shell
-dw --iter 20 dapi_001.tif PSF_dapi.tif --gpu
-```
-
-For more documentation see the short [usage guide](USAGE.md), and the manual
-pages for both binaries, [man dw](doc/dw.txt) [man dw_bw](doc/dw_bw.txt).
 
 ### Performance hints
 
@@ -250,6 +179,71 @@ means that more iterations will be needed before convergence.
 
 - Also works on Raspberry PI5 :) In that case it took 146 s.
 
+
+### Installation
+These instructions should work under Linux, BSD, Windows (via WSL),
+and MacOS.
+
+1. Get the dependencies. The required libraries should be found on
+   most platforms, however, the installation process differs
+   slightly. See [INSTALL.md](INSTALL.md) for per-platform advice.
+
+2. Compile and install
+
+``` shell
+mkdir builddir
+cd builddir
+cmake ..
+cmake --build .
+sudo make install
+```
+
+What was installed can be found in the `install_manifest.txt`.
+
+## Minimal usage example
+To generate a parametric PSF and deconvolve an image, all you need is
+something like this:
+
+``` shell
+# generate PSF.tif
+dw_bw --resxy 130 \
+--resz 250 \
+--NA 1.46 \
+--ni 1.518 \
+--lambda 460 PSF.tiff
+# Deconvolve image.tiff -> dw_image.tiff
+dw --iter 50 image.tiff PSF.tiff
+```
+For available options, please see
+
+``` shell
+dw --help
+dw_bw --help
+```
+
+To validate that **dw** does not create random garbage, run it on
+`/demo/dapi_001.tif`
+
+
+``` shell
+cd demo
+make
+imagej dapi_001.tif dw_dapi_001.tif
+```
+
+The run time on an AMD 3700x was 8s. To use
+GPU accelerated deconvolution, test
+
+``` shell
+dw --iter 20 dapi_001.tif PSF_dapi.tif --gpu --prefix dwgpu
+```
+
+The results should be visually identical.
+
+For more documentation see the short [usage guide](USAGE.md), and the manual
+pages for both binaries, [man dw](doc/dw.txt) [man dw_bw](doc/dw_bw.txt).
+
+
 ### Bugs
 
 Most likely there are bugs and they can only be fixed when they are known.
@@ -258,9 +252,11 @@ have any issues with the program.
 
 
 ## Alternatives
+
 This is a non-complete list of alternative deconvolution software:
 
 ### Deconvolution
+
 Free and open source:
  - [Deconvolution Lab2](http://bigwww.epfl.ch/deconvolution/deconvolutionlab2/)
 
@@ -272,8 +268,18 @@ Commercial:
 
 - [PSF Generator](http://bigwww.epfl.ch/algorithms/psfgenerator/)
 
+### Others
+
+- [nd2tool](https://www.github.com/elgw/nd2tool) Convert nd2 files
+  (Nikon) to tif files. Can also generate scripts for deconvolution
+  with dw.
 
 ## References
+
+[^1]: M. Bertero and P. Boccacci, A simple method for the reduction of boundary
+   effects in the Richardson-Lucy approach to image deconvolution,
+   A&A 437, 369-374 (2005).
+   [doi](https://doi.org/10.1051/0004-6361:20052717)
 
 [^2]: Richardson, William Hadley (1972). "Bayesian-Based Iterative Method of Image
    Restoration". JOSA. 62 (1): 55–59.
@@ -286,12 +292,6 @@ Commercial:
 [^4]: Wang H, et al. Scaled Heavy-Ball Acceleration of the
    Richardson-Lucy Algorithm for 3D Microscopy Image Restoration. IEEE
    Trans Image Process. 2014 [doi](https://doi.org/10.1109/TIP.2013.2291324).
-
-[^1]: M. Bertero and P. Boccacci, A simple method for the reduction of boundary
-   effects in the Richardson-Lucy approach to image deconvolution,
-   A&A 437, 369-374 (2005).
-   [doi](https://doi.org/10.1051/0004-6361:20052717)
-
 
 [^5]: Max Born. Principles of optics : electromagnetic theory of propagation, interference,
    and diffraction of light. Cambridge: Cambridge University Press, 2019.
@@ -306,3 +306,8 @@ Commercial:
    point spread function computation for fluorescence microscopy”. In: Journal
    of the Optical Society of America A 34.6 (May 2017), p. 1029.
    [doi](https://doi.org/10.1364/josaa.34001029)
+
+[^8]: D. Tolmachev, "VkFFT-A Performant, Cross-Platform and
+    Open-Source GPU FFT Library," in IEEE Access, vol. 11,
+    pp. 12039-12058, 2023,
+    [doi](https://doi.org/10.1109/ACCESS.2023.3242240)

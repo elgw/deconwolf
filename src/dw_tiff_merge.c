@@ -117,7 +117,7 @@ int dw_tiff_merge(int argc, char ** argv)
         if(kk > 1)
         {
             fim_tiff_get_size(argv[kk], &M, &N, &P);
-            //printf(" %ld x %ld x %ld", M, N, P);
+            //printf(" %" PRId64 " x %" PRId64 " x %" PRId64 "", M, N, P);
             if(kk == optind+1)
             {
                 M_out = M;
@@ -129,7 +129,7 @@ int dw_tiff_merge(int argc, char ** argv)
                 {
                     fprintf(stderr, "Error while reading %s\n", argv[kk]);
                     fprintf(stderr, "Image sizes does not match. A previous image had size "
-                            "%lu x %lu while %s has size %lu x %lu\n",
+                            "%" PRIu64 " x %" PRIu64 " while %s has size %" PRIu64 " x %" PRIu64 "\n",
                             M_out, N_out, argv[kk], M, N);
                     return EXIT_FAILURE;
                 }
@@ -138,7 +138,7 @@ int dw_tiff_merge(int argc, char ** argv)
         }
     }
 
-    printf("Output image size: %lu x %lu x %lu\n", M_out, N_out, P_out);
+    printf("Output image size: %" PRIu64 " x %" PRIu64 " x %" PRIu64 "\n", M_out, N_out, P_out);
 
     float * im_out = malloc(M_out*N_out*P_out*sizeof(float));
     if(im_out == NULL)

@@ -347,20 +347,20 @@ void readUint16(TIFF * tfile, float * V,
 
         for(int64_t ss=0; ss < TIFFNumberOfStrips(tfile); ss++)
         {
-            //printf("Reading strip %ld of size %ld B\n", ss, ssize); fflush(stdout);
+            //printf("Reading strip %" PRId64 " of size %" PRId64 " B\n", ss, ssize); fflush(stdout);
             // vs TIFFReadEncodedStrip vs TIFFReadRawStrip ?
             tsize_t read = TIFFReadEncodedStrip(tfile,
                                                 (tstrip_t) ss, // Strip number
                                                 (tdata_t) buf, // target
                                                 (tsize_t) -1); // The entire strip
-            //printf("Got %ld\n", read);
+            //printf("Got %" PRId64 "\n", read);
             if(read == -1)
             {
                 fprintf(stderr, "Failed to read from tif file and can't continue.\n");
                 fprintf(stderr, "ERROR at FILE: %s FUNCTION: %s LINE: %d\n",
                         __FILE__, __FUNCTION__, __LINE__);
                 tmsize_t ssize2 = TIFFStripSize(tfile);
-                printf("ssize2: %ld\n", ssize2);
+                printf("ssize2: %" PRId64 "\n", ssize2);
                 fflush(stdout);
                 exit(EXIT_FAILURE);
             }
@@ -1768,7 +1768,7 @@ int fim_tiff_maxproj(const char * in, const char * out)
 
     if(verbose > 1)
     {
-        printf("strip size: %ld\n", ssize);
+        printf("strip size: %" PRId64 "\n", ssize);
         printf("number of strips: %u\n", nstrips);
         switch(SF)
         {
@@ -1783,7 +1783,7 @@ int fim_tiff_maxproj(const char * in, const char * out)
             break;
         }
         printf("Bits per sample: %u\n", BPS);
-        printf("Number of directories (Z-planes): %ld\n", P);
+        printf("Number of directories (Z-planes): %" PRId64 "\n", P);
     }
 
     TIFFSetDirectory(output, 0);
