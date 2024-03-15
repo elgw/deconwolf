@@ -203,7 +203,7 @@ int dw_imshift(int argc, char ** argv)
 
         if(s->verbose > 1)
         {
-            printf("Image size: [%ld, %ld, %ld]\n", M, N, P);
+            printf("Image size: [%" PRId64 ", %" PRId64 ", %" PRId64 "]\n", M, N, P);
             printf("Creating max projections\n");
         }
         //float * mA = fim_maxproj(A, M, N, P);
@@ -233,7 +233,7 @@ int dw_imshift(int argc, char ** argv)
 
         if(s->verbose > 1)
         {
-            printf("Found max at (%ld, %ld, %ld)\n",
+            printf("Found max at (%" PRId64 ", %" PRId64 ", %" PRId64 ")\n",
                    aM, aN, aP);
         }
         s->dx = (float) M-aM-1.0;
