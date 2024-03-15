@@ -43,9 +43,7 @@ and expected sample thickness.
       it by default, at least on the CPU side.
 
 ## Nice to have
-- [ ] Use the `PRI*` macros from `inttype.h`, especially `PRIu64` for
-      `uint64_t` and `PRId64` for `int64_t`.  Should be used in a lot
-      of places to get rid of warnings when building on MacOS etc..
+- [ ] Build deb files etc with cmake.
 - [ ] Skip libtiff, especially for writing.
 - [ ] See if Pinned memory allocations can improve the performance for shbcl (don't expect anything drastic from shbcl2).
 [LFAT](https://ltfat.github.io/notes/ltfatnote017.pdf),

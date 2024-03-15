@@ -1143,7 +1143,7 @@ void clu_print_device_info(FILE * fid, cl_device_id dev_id)
                               &dev_memory,
                               NULL));
 
-    fprintf(fid, "CL_DEVICE_GLOBAL_MEM_SIZE = %lu (%lu MiB)\n",
+    fprintf(fid, "CL_DEVICE_GLOBAL_MEM_SIZE = %" PRIu64 " (%" PRIu64 " MiB)\n",
             dev_memory,
             dev_memory/1000000);
 
@@ -1541,7 +1541,7 @@ void clu_prepare_kernels(clu_env_t * clu,
 
     if(clu->verbose > 1)
     {
-        printf("Initializing VkFFT for size %zu x %zu x %zu\n",
+        printf("Initializing VkFFT for size %" PRIu64 " x %" PRIu64 " x %" PRIu64 "\n",
                configuration.size[0],
                configuration.size[1],
                configuration.size[2]);

@@ -1,4 +1,4 @@
-# deconwolf v0.3.7
+# deconwolf v0.3.8
 
 **deconwolf** is a software for 3-D deconvolution of fluorescent wide-field
 images:
@@ -104,67 +104,6 @@ deconwolf can be built as well.
 To enable GPU acceleration, deconwolf also requires a GPU and OpenCL
 drivers installed.
 
-### Installation
-These instructions should work under Linux, BSD, Windows (via WSL),
-and MacOS.
-
-1. Get the dependencies. The required libraries should be found on
-   most platforms, however, the installation process differs
-   slightly. See [INSTALL.md](INSTALL.md) for per-platform advice.
-
-2. Compile and install
-
-``` shell
-mkdir builddir
-cd builddir
-cmake ..
-cmake --build .
-make install
-```
-
-What was installed can be found in the `install_manifest.txt`.
-
-## Minimal usage example
-To generate a parametric PSF and deconvolve an image, all you need is
-something like this:
-
-``` shell
-# generate PSF.tif
-dw_bw --resxy 130 \
---resz 250 \
---NA 1.46 \
---ni 1.518 \
---lambda 460 PSF.tiff
-# Deconvolve image.tiff -> dw_image.tiff
-dw --iter 50 image.tiff PSF.tiff
-```
-For available options, please see
-
-``` shell
-dw --help
-dw_bw --help
-```
-
-To validate that **dw** does not create random garbage, run it on
-`/demo/dapi_001.tif`
-
-
-``` shell
-cd demo
-make
-imagej dapi_001.tif dw_dapi_001.tif
-```
-
-The run time on an AMD 3700x was 8s. To use GPU acceleration. To use
-GPU accelerated deconvolution, test
-
-``` shell
-dw --iter 20 dapi_001.tif PSF_dapi.tif --gpu
-```
-
-For more documentation see the short [usage guide](USAGE.md), and the manual
-pages for both binaries, [man dw](doc/dw.txt) [man dw_bw](doc/dw_bw.txt).
-
 ### Performance hints
 
 The performance depends on the system and the image size. Except for
@@ -240,6 +179,71 @@ means that more iterations will be needed before convergence.
 
 - Also works on Raspberry PI5 :) In that case it took 146 s.
 
+
+### Installation
+These instructions should work under Linux, BSD, Windows (via WSL),
+and MacOS.
+
+1. Get the dependencies. The required libraries should be found on
+   most platforms, however, the installation process differs
+   slightly. See [INSTALL.md](INSTALL.md) for per-platform advice.
+
+2. Compile and install
+
+``` shell
+mkdir builddir
+cd builddir
+cmake ..
+cmake --build .
+sudo make install
+```
+
+What was installed can be found in the `install_manifest.txt`.
+
+## Minimal usage example
+To generate a parametric PSF and deconvolve an image, all you need is
+something like this:
+
+``` shell
+# generate PSF.tif
+dw_bw --resxy 130 \
+--resz 250 \
+--NA 1.46 \
+--ni 1.518 \
+--lambda 460 PSF.tiff
+# Deconvolve image.tiff -> dw_image.tiff
+dw --iter 50 image.tiff PSF.tiff
+```
+For available options, please see
+
+``` shell
+dw --help
+dw_bw --help
+```
+
+To validate that **dw** does not create random garbage, run it on
+`/demo/dapi_001.tif`
+
+
+``` shell
+cd demo
+make
+imagej dapi_001.tif dw_dapi_001.tif
+```
+
+The run time on an AMD 3700x was 8s. To use
+GPU accelerated deconvolution, test
+
+``` shell
+dw --iter 20 dapi_001.tif PSF_dapi.tif --gpu --prefix dwgpu
+```
+
+The results should be visually identical.
+
+For more documentation see the short [usage guide](USAGE.md), and the manual
+pages for both binaries, [man dw](doc/dw.txt) [man dw_bw](doc/dw_bw.txt).
+
+
 ### Bugs
 
 Most likely there are bugs and they can only be fixed when they are known.
@@ -248,9 +252,11 @@ have any issues with the program.
 
 
 ## Alternatives
+
 This is a non-complete list of alternative deconvolution software:
 
 ### Deconvolution
+
 Free and open source:
  - [Deconvolution Lab2](http://bigwww.epfl.ch/deconvolution/deconvolutionlab2/)
 
@@ -262,6 +268,11 @@ Commercial:
 
 - [PSF Generator](http://bigwww.epfl.ch/algorithms/psfgenerator/)
 
+### Others
+
+- [nd2tool](https://www.github.com/elgw/nd2tool) Convert nd2 files
+  (Nikon) to tif files. Can also generate scripts for deconvolution
+  with dw.
 
 ## References
 
