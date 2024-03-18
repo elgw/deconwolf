@@ -1264,22 +1264,28 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
     printf(" --threads N\n\t Specify the number of CPU threads to use\n");
     printf(" --verbose N\n\t Set verbosity level (default: %d)\n", s->verbosity);
     printf(" --test\n\t Run unit tests\n");
-    printf(" --tilesize N\n\t Enables tiling mode and sets the largest tile size to N voxels in x and y.\n");
-    printf(" --tilepad N\n\t Sets the tiles to overlap by N voxels in tile mode (default: %d)\n", s->tiling_padding);
-    printf(" --prefix str\n\t Set the prefix of the output files (default: '%s')\n", s->prefix);
+    printf(" --tilesize N\n\t Enables tiling mode and sets the largest tile size\n\t"
+           "to N voxels in x and y.\n");
+    printf(" --tilepad N\n\t Sets the tiles to overlap by N voxels in tile mode \n\t"
+           "(default: %d)\n", s->tiling_padding);
+    printf(" --prefix str\n\t Set the prefix of the output files (default: '%s')\n",
+           s->prefix);
     printf(" --overwrite\n\t Allows deconwolf to overwrite already existing output files\n");
     printf(" --relax F\n\t Multiply the central pixel of the PSF by F. (F>1 relaxation)\n");
-    printf(" --xyfactor F\n\t Discard outer planes of the PSF with sum < F of the central. Use 0 for no cropping.\n");
+    printf(" --xyfactor F\n\t Discard outer planes of the PSF with sum < F of \n\t"
+           "the central. Use 0 for no cropping.\n");
     printf(" --bq Q\n\t Set border handling to \n\t"
            "0 'none' i.e. periodic\n\t"
            "1 'compromise', or\n\t"
            "2 'normal' which is default\n");
     printf("--periodic\n\t Equivalent to --bq 0\n");
-    printf(" --scale s\n\t"
+    printf(" --scaling s\n\t"
            "Set the scaling factor for the output image manually to s.\n\t"
            "Warning: Might cause clipping or discretization artifacts\n\t"
-           "This option is only used for 16-bit images\n");
-    printf(" --float\n\t Set output format to 32-bit float (default is 16-bit int) and disable scaling\n");
+           "This option is only used when the output format is 16-bit (i.e. \n\t"
+           "not with --float)\n");
+    printf(" --float\n\t Set output format to 32-bit float (default is 16-bit \n\t"
+           "int) and disable scaling\n");
     printf(" --bg l\n\t Set background level, l\n");
     printf(" --flatfield image.tif\n\t"
            " Use a flat field correction image. Deconwolf will divide each plane of the\n\t"
