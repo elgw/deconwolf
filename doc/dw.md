@@ -71,6 +71,15 @@ scaling. Please note that without this flag, images will be saved as
 16-bit unsigned integers and will be scaled to make most use of that
 format, see the log files for scaling factor used.
 
+**\--scaling s**
+: Disable automatic scaling of the output image. Instead use the value
+  **s**. This is only valid in the default, 16-bit output mode. This
+  option is useful when it is not an option to parse the log files and
+  re-scale the image intensities after opening them. Potential risks:
+  A too large scaling value which will cause the high values to be
+  clipped. A too low value will eventually cause discretization
+  artifacts.
+
 **\--version**, **-V**
 : Show version information and quit.
 
@@ -82,8 +91,7 @@ format, see the log files for scaling factor used.
   i/ **id** identity transform, i.e. nothing. Useful to see if images
    loads, scales and saves correctly.
   ii/ **rl** classical Richardson-Lucy.
-  iii/ **shb** Scaled Heavy Ball.
-  iv/ **shbcl** Scaled Heavy Ball using OpenCl (not compiled by default)
+  iii/ **shbcl2** Scaled Heavy Ball using OpenCl (not compiled by default)
 
 **\--mse**
 : Show the Mean Square Error between the input image and the current
@@ -131,6 +139,9 @@ to the log file that also will be created (as `dw_file.tif.log.txt`).
 Unless **\--float** was specified the output images will be scaled
 to use the full dynamic range of the 16 bit format. The scaling factor
 can be found in the log file.
+
+To use a consistent scaling with 16-bit output, use the **\--scaling**
+option.
 
 # PERFORMANCE
 Without specifying any arguments to **dw** it will use one thread per
