@@ -6,13 +6,12 @@
   [clang](https://clang.llvm.org/).
 - openmp, typically bundled with the compiler.
 - [cmake](https://cmake.org/)
+- A package manager to get the dependencies.
 - [https://www.gnu.org/software/make/](make)
 - [fftw3](https://www.fftw.org/)
 - [libtiff](https://libtiff.gitlab.io/libtiff/)
 - [GSL - GNU Scientific Library](https://www.gnu.org/software/gsl/)
 - [libpng](http://libpng.org/pub/png/libpng.html)
-
-
 
 ## Normal build procedure with CMake
 
@@ -29,6 +28,16 @@ To install:
 
 ``` shell
 sudo make install
+```
+
+To use the system package manager:
+
+``` shell
+mkdir builddir
+cd builddir
+cmake ..
+cpack -G DEB # see cpack --help for other types
+sudo apt-get install ./deconwolf-0.3.8-Linux.deb # on Ubuntu
 ```
 
 Build options:
@@ -56,12 +65,6 @@ brew install libomp
 brew install libtiff
 brew install fftw
 brew install gsl
-```
-
-Build and install deconwolf
-``` shell
-make -B
-sudo make install
 ```
 
 ## Windows 10/11
@@ -103,8 +106,6 @@ cmake .. -G "Visual Studio 17 2022" -T ClangCL -A x64
 
 ## FreeBSD
 - Use `gmake`, not `make`.
-- Default compiler: `clang`
-- `pkgconf` not `pkg-config`.
 
 Packages:
 ``` shell
@@ -119,8 +120,8 @@ pkg install sudo
 ## CentOS
 Tested on CentOS Linux Release 7.8.2009 (Core).
 
+Dependencies:
 ``` shell
-# Install dependencies
 sudo yum install gcc gsl-devel libtiff-devel fftw-devel
 ```
 
@@ -156,19 +157,9 @@ sudo apt-get install \
  libtiff-dev
 ```
 
-It is possible to create a deb file:
-
-``` shell
-make -B
-./makedeb-ubuntu_2204
-sudo apt-install ./deconwolf_*.deb
-# to remove
-# sudo apt remove deconwolf
-```
-
 
 ## Ubuntu 23.04
-Same as Ubuntu 22.04.
+Same as Ubuntu 22.04. Possibly also
 
 ``` shell
 apt-get install opencl-headers
@@ -181,8 +172,6 @@ apt-get install opencl-headers
 sudo pacman -Suuyy
 # install dependencies
 sudo pacman -S fftw gsl openmp libtiff
-make
-sudo make install
 ```
 
 ## Rapsberry PI (64-bit Debian bookworm)
@@ -196,7 +185,7 @@ libgsl-dev
 
 ## MKL
 FFTW3 is the default FFT backend for deconwolf but it is also possible to use
-Intel MKL. This option is only tested on Ubuntu so far.
+Intel MKL. At some point it was possible to choose MKL via
 
 ``` shel
 sudo apt install intel-mkl
@@ -209,3 +198,4 @@ To set the number of threads, set the environmental variable
 export MKL_NUM_THREADS=8
 dw ...
 ```
+If you are interested in using MKL please open a new issue.
