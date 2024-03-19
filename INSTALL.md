@@ -13,16 +13,9 @@
 - [libpng](http://libpng.org/pub/png/libpng.html)
 
 
-## OpenCL support
-To use GPU acceleration **dw** needs to be compiled with that option
-enabled. Using the makefile that corresponds to:
 
-``` shell
-make kernels
-make -B VKFFT=1
-```
+## Normal build procedure with CMake
 
-## CMake
 To build:
 
 ``` shell
@@ -31,6 +24,25 @@ cd builddir
 cmake ..
 cmake --build .
 ```
+
+To install:
+
+``` shell
+sudo make install
+```
+
+Build options:
+
+ - **OpenCL** By default **dw** will be compiled with OpenCL/GPU
+ support enabled. To explicitly turn that option off, pass
+ `-DENABLE_GPU=OFF` to cmake, i.e. use:
+
+ - **Machine specific optimizations** To enable optimizations for your
+ particular machine, pass the option
+ `-DENABLE_NATIVE_OPTIMIZATION=ON`. Doing that might create binaries
+ that run faster on your machine. However it might not be possible to
+ run the same binaries on another machine.
+
 
 ## macOS Big Sur
 

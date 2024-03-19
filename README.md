@@ -84,7 +84,7 @@ Deconwolf runs on 64-bit machines with, both aarch64 and x86_64, and
 require no special hardware. To compile and install deconwolf should
 take less than a minute on a Linux machine but might be more
 cumbersome on MacOS and Windows. For platform specific build
-instructions, see [INSTALL.md](INSTALL.MD).  We hope to provide
+instructions, see [INSTALL.md](INSTALL.md).  We hope to provide
 pre-compiled binaries in the future.
 
 ### Dependencies
