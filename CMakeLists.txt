@@ -10,6 +10,15 @@
 #   cmake ..
 #   cmake --build .
 #
+#   Either install directly with
+#   cmake install
+#
+#   Or produce a package that can be installed with the
+#   system package manager, for example
+#   cpack -G RPM
+#   cpack -G DEB
+#
+#
 #  On Windows, use:
 #
 #   mkdir build
@@ -27,20 +36,9 @@
 #   cmake -L . or cmake --LAH .
 #
 #
-# Documentation and tutorials:
+# cmake documentation and tutorials:
 # https://cmake.org/cmake/help/latest/
 # https://cliutils.gitlab.io/modern-cmake/
-#
-#
-# Install generators
-# Debian
-# https://cmake.org/cmake/help/latest/cpack_gen/deb.html
-# RPM
-# https://cmake.org/cmake/help/latest/cpack_gen/rpm.html
-# Windows
-# https://cmake.org/cmake/help/latest/cpack_gen/nsis.html
-# Macos
-# https://cmake.org/cmake/help/latest/cpack_gen/bundle.html
 #
 
 # TODO:
@@ -48,7 +46,7 @@
 
 cmake_minimum_required(VERSION 3.9)
 
-project(deconwolf VERSION 0.3.7
+project(deconwolf
   DESCRIPTION "Deconvolution of wide field images"
   LANGUAGES C)
 
@@ -106,6 +104,27 @@ add_executable(dw_bw
   src/li.c
   src/ftab.c
   src/lanczos.c)
+
+#
+# Parse version number from src/dw_version.h
+#
+
+file(STRINGS ${CMAKE_CURRENT_SOURCE_DIR}/src/dw_version.h DW_VERSION_MAJOR
+  REGEX "#define[ ]+DW_VERSION_MAJOR[ ]+\"[0-9]+\"")
+string(REGEX MATCH "\"([0-9]+)\"" _ ${DW_VERSION_MAJOR})
+set(DW_VERSION_MAJOR "${CMAKE_MATCH_1}")
+
+file(STRINGS ${CMAKE_CURRENT_SOURCE_DIR}/src/dw_version.h DW_VERSION_MINOR
+  REGEX "#define[ ]+DW_VERSION_MINOR[ ]+\"[0-9]+\"")
+string(REGEX MATCH "\"([0-9]+)\"" _ ${DW_VERSION_MINOR})
+set(DW_VERSION_MINOR "${CMAKE_MATCH_1}")
+
+file(STRINGS ${CMAKE_CURRENT_SOURCE_DIR}/src/dw_version.h DW_VERSION_PATCH
+  REGEX "#define[ ]+DW_VERSION_PATCH[ ]+\"[0-9]+\"")
+string(REGEX MATCH "\"([0-9]+)\"" _ ${DW_VERSION_PATCH})
+set(DW_VERSION_PATCH "${CMAKE_MATCH_1}")
+
+project(deconwolf VERSION "${DW_VERSION_MAJOR}.${DW_VERSION_MINOR}.${DW_VERSION_PATCH}")
 
 #
 # Set MSVC runtime to MultiThreaded (/MT)
@@ -241,3 +260,28 @@ install(FILES "${CMAKE_SOURCE_DIR}/doc/dw.1"
   DESTINATION "${CMAKE_INSTALL_MANDIR}/man1/" )
 install(FILES "${CMAKE_SOURCE_DIR}/doc/dw_bw.1"
   DESTINATION "${CMAKE_INSTALL_MANDIR}/man1/" )
+
+
+# Install generators
+# Debian
+# https://cmake.org/cmake/help/latest/cpack_gen/deb.html
+# RPM
+# https://cmake.org/cmake/help/latest/cpack_gen/rpm.html
+# Windows
+# https://cmake.org/cmake/help/latest/cpack_gen/nsis.html
+# Macos
+# https://cmake.org/cmake/help/latest/cpack_gen/bundle.html
+#
+
+# https://cmake.org/cmake/help/book/mastering-cmake/chapter/Packaging%20With%20CPack.html
+
+
+SET(CPACK_DEBIAN_PACKAGE_MAINTAINER "Erik Wernersson") #required
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON) # resolve dependencies automatically
+set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "https://www.github.com/elgw/deconwolf/")
+
+INCLUDE(CPack)
+
+# The produced deb files are not perfectly portable,
+# dpkg -I ./deconwolf-0.3.8-Linux.deb
+# reveals ocl-icd-libopencl1-amdgpu-pro
