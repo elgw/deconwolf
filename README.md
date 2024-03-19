@@ -197,8 +197,7 @@ cmake ..
 cmake --build .
 sudo make install
 ```
-
-What was installed can be found in the `install_manifest.txt`.
+Once again, see [INSTALL.md](INSTALL.md) for more options.
 
 ## Minimal usage example
 To generate a parametric PSF and deconvolve an image, all you need is
