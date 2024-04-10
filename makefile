@@ -352,7 +352,9 @@ fwhm.o \
 ftab.o \
 dw_psf.o \
 dw_tiff_merge.o \
-dw_psf_sted.o
+dw_psf_sted.o \
+sparse_preprocess.o \
+sparse_preprocess_cli.o \
 #dw_nuclei.o
 
 dwbw_OBJECTS = fim.o \

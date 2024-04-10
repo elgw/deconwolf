@@ -33,6 +33,10 @@ CFLAGS+=-fopenmp
 
 all: tiling_ut fft_ut fim_ut
 
+sparse_preprocess_files=sparse_preprocess_cli.c fim_tiff.o fim.o dw_util.o ftab.o fft.o sparse_preprocess.c
+sparse_preprocess_cli: $(sparse_preprocess_files)
+	$(CC) $(CFLAGS) -DSTANDALONE $(sparse_preprocess_files) $(LDFLAGS) -o sparse_preprocess_cli
+
 tiling_files=fft.o tiling_ut.o tiling.o fim_tiff.o fim.o ftab.o dw_util.o
 tiling_ut: $(tiling_files)
 	$(CC) $(CFLAGS) $(tiling_files) $(LDFLAGS) -o tiling_ut

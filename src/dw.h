@@ -60,6 +60,7 @@
 #include "fim_tiff.h"
 #include "fft.h"
 #include "tiling.h"
+#include "sparse_preprocess_cli.h"
 
 /* fftw3 wisdom data is stored and loaded from
  * $home/.config/

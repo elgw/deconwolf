@@ -350,3 +350,29 @@ int getline(char **lineptr, size_t *n, FILE *stream)
     return(len);
 }
 #endif
+
+
+
+char *
+dw_prefix_file(const char * inFile, const char * prefix)
+{
+
+    char * dname = dw_dirname(inFile);
+    assert(dname != NULL);
+    char * fname = dw_basename(inFile);
+    assert(fname != NULL);
+    char * outFile = calloc(strlen(inFile) + strlen(prefix)+16, 1);
+    assert(outFile != NULL);
+
+    if(strlen(dname) > 0)
+    {
+        sprintf(outFile, "%s%c%s_%s", dname, FILESEP, prefix, fname);
+    } else {
+        sprintf(outFile, "%s_%s", prefix, fname);
+    }
+
+    free(dname);
+    free(fname);
+
+    return outFile;
+}

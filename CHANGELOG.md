@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 0.3.9
+- Fixed crashes when trying to read a non tif file.
+- Added a highly experimental noise filtering algorithm available
+  as **dw noise1**
+
 ## 0.3.8
 - For systems with multiple GPUs or OpenCL compatible devices it is
   now possible to select which to use with **--cldevice**. To figure

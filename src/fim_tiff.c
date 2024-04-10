@@ -1281,13 +1281,13 @@ float * fim_tiff_read_sub(const char * fName,
 
     TIFF * tfile = TIFFOpen(fName, "r");
 
+    if(tfile == NULL) {
+        return NULL;
+    }
+
     if(T != NULL)
     {
         ttags_get(tfile, T);
-    }
-
-    if(tfile == NULL) {
-        return NULL;
     }
 
     // Tags: ImageWidth and ImageLength
