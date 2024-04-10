@@ -6,6 +6,7 @@
 typedef struct {
     const float * restrict image;
     float lambda;
+    float lambda_h;
     float lambda_s;
     u64 M;
     u64 N;
@@ -101,7 +102,7 @@ get_error(const sparse_conf_t * s, const float * restrict u)
 
     //printf("E_data=%e, E_smooth=%e, E_sparse=%e\n", E_data, E_smooth, E_sparse);
 
-    return (s->lambda*E_data + E_smooth + s->lambda_s*E_sparse) / (double) (M*N*P);
+    return (s->lambda*E_data + s->lambda_h*E_smooth + s->lambda_s*E_sparse) / (double) (M*N*P);
 }
 
 static float max(const float a, const float b)
@@ -188,20 +189,20 @@ static void get_gradient(const sparse_conf_t * restrict s,
 
             if(s->periodic)
             {
-                ldE[0] += -2*lbuff[0] + lbuff[1] + lbuff[M-1];
+                ldE[0] += s->lambda_h*(-2*lbuff[0] + lbuff[1] + lbuff[M-1]);
             } else {
-                ldE[0] = -lbuff[0] + lbuff[1];
+                ldE[0] = s->lambda_h*(-lbuff[0] + lbuff[1]);
             }
 
             for(size_t mm = 1; mm+1 < M ; mm++)
             {
-                ldE[mm] += (-2*lbuff[mm] + lbuff[mm-1] + lbuff[mm+1]);
+                ldE[mm] += s->lambda_h*(-2*lbuff[mm] + lbuff[mm-1] + lbuff[mm+1]);
             }
             if(s->periodic)
             {
-                ldE[M-1] = lbuff[0] - 2*lbuff[M-1] + lbuff[M-2];
+                ldE[M-1] = s->lambda_h*(lbuff[0] - 2*lbuff[M-1] + lbuff[M-2]);
             } else {
-                ldE[M-1] = -lbuff[M-1]+lbuff[M-2];
+                ldE[M-1] = s->lambda_h*(-lbuff[M-1]+lbuff[M-2]);
             }
         }
     }
@@ -271,12 +272,12 @@ static void get_gradient(const sparse_conf_t * restrict s,
             if(s->periodic){
                 for(size_t mm = 0; mm < M ; mm++)
                 {
-                    ldE[mm] += (-2*lbuff[mm] + lbuff[mm+M] + s->buff[pp*M*N+mm]);
+                    ldE[mm] += s->lambda_h*(-2*lbuff[mm] + lbuff[mm+M] + s->buff[pp*M*N+mm]);
                 }
             } else {
                 for(size_t mm = 0; mm < M ; mm++)
                 {
-                    ldE[mm] += (-lbuff[mm] + lbuff[mm+M]);
+                    ldE[mm] += s->lambda_h*(-lbuff[mm] + lbuff[mm+M]);
                 }
             }
         }
@@ -289,7 +290,7 @@ static void get_gradient(const sparse_conf_t * restrict s,
 
             for(size_t mm = 0; mm < M ; mm++)
             {
-                ldE[mm] += (-2*lbuff[mm] + lbuff[mm-M] + lbuff[mm+M]);
+                ldE[mm] += s->lambda_h*(-2*lbuff[mm] + lbuff[mm-M] + lbuff[mm+M]);
             }
         }
 
@@ -300,13 +301,13 @@ static void get_gradient(const sparse_conf_t * restrict s,
             if(s->periodic){
                 for(size_t mm = 0; mm < M ; mm++)
                 {
-                    ldE[mm] += (-2*lbuff[mm] + lbuff[mm-M] + s->buff[pp*M*N+M*(N-1) + mm]);
+                    ldE[mm] += s->lambda_h*(-2*lbuff[mm] + lbuff[mm-M] + s->buff[pp*M*N+M*(N-1) + mm]);
                 }
             } else {
 
                 for(size_t mm = 0; mm < M ; mm++)
                 {
-                    ldE[mm] += (-lbuff[mm] + lbuff[mm-M]);
+                    ldE[mm] += s->lambda_h*(-lbuff[mm] + lbuff[mm-M]);
                 }
             }
         }
@@ -398,12 +399,12 @@ static void get_gradient(const sparse_conf_t * restrict s,
                 {
                     for(size_t mm = 0; mm < M ; mm++)
                     {
-                        ldE[mm] += (-2*lbuff[mm] + lbuff[mm+MN] + s->buff[(P-1)*M*N + nn*M + mm]);
+                        ldE[mm] += s->lambda_h*(-2*lbuff[mm] + lbuff[mm+MN] + s->buff[(P-1)*M*N + nn*M + mm]);
                     }
                 } else {
                     for(size_t mm = 0; mm < M ; mm++)
                     {
-                        ldE[mm] += (-lbuff[mm] + lbuff[mm+MN]);
+                        ldE[mm] += s->lambda_h*(-lbuff[mm] + lbuff[mm+MN]);
                     }
                 }
             }
@@ -417,12 +418,12 @@ static void get_gradient(const sparse_conf_t * restrict s,
                 {
                     for(size_t mm = 0; mm < M ; mm++)
                     {
-                        ldE[mm] += (-2*lbuff[mm] + lbuff[mm-MN] + s->buff[nn*N+mm]);
+                        ldE[mm] += s->lambda_h*(-2*lbuff[mm] + lbuff[mm-MN] + s->buff[nn*N+mm]);
                     }
                 } else {
                     for(size_t mm = 0; mm < M ; mm++)
                     {
-                        ldE[mm] += (-lbuff[mm] + lbuff[mm-MN]);
+                        ldE[mm] += s->lambda_h*(-lbuff[mm] + lbuff[mm-MN]);
                     }
                 }
             }
@@ -434,7 +435,7 @@ static void get_gradient(const sparse_conf_t * restrict s,
 
                 for(size_t mm = 0; mm < M ; mm++)
                 {
-                    ldE[mm] += (-2*lbuff[mm] + lbuff[mm-MN] + lbuff[mm+MN]);
+                    ldE[mm] += s->lambda_h*(-2*lbuff[mm] + lbuff[mm-MN] + lbuff[mm+MN]);
                 }
             }
         }
@@ -463,22 +464,39 @@ add(float * restrict dtu,
 float *
 sparse_preprocess(const float * image, const u64 M, const u64 N, const u64 P,
                   const double lambda, const double lambda_s,
-                  const int periodic, const u64 iter)
+                  const int periodic, const u64 iter,
+                  int verbose, FILE * log)
 {
 
 #ifdef LL
-    printf("Using Log-Likelihood (I-divergence) for the data fidelity\n");
+    if(verbose > 0)
+    {
+        printf("Using Log-Likelihood (I-divergence) for the data fidelity\n");
+    }
 #else
-    printf("Using L2-norm for data fidelity\n");
+    if(verbose > 0)
+    {
+        printf("Using L2-norm for data fidelity\n");
+    }
 #endif
 
-    printf("lambda = %e, lambda_s = %e\n", lambda, lambda_s);
+    if(verbose > 1)
+    {
+        printf("lambda = %e, lambda_s = %e\n", lambda, lambda_s);
+    }
 
     sparse_conf_t * s = calloc(1, sizeof(sparse_conf_t));
     assert(s != NULL);
     s->image = image;
     s->lambda = lambda;
     s->lambda_s = lambda_s;
+    s->lambda_h = 1.0;
+
+    float lmax = max(max(s->lambda, s->lambda_s), s->lambda_h);
+    s->lambda /= lmax;
+    s->lambda_s /= lmax;
+    s->lambda_h /= lmax;
+
     s->M = M;
     s->N = N;
     s->P = P;
@@ -503,10 +521,20 @@ sparse_preprocess(const float * image, const u64 M, const u64 N, const u64 P,
     float E0 = get_error(s, u);
     float E = 0;
 
-    printf("processing ... \n");
+    if(verbose > 0)
+    {
+        printf("processing ... \n");
+    }
     for(u64 ii = 0; ii<iter; ii++)
     {
-        printf("\r%03lu/%03lu: E=%e, step=%f", ii+1, iter, E0, dt);
+        if(verbose > 0)
+        {
+            printf("\r%03lu/%03lu: E=%e, step=%f", ii+1, iter, E0, dt);
+        }
+        if(log != NULL)
+        {
+            fprintf(log, "%03lu/%03lu: E=%e, step=%f\n", ii+1, iter, E0, dt);
+        }
         fflush(stdout);
         get_gradient(s, u, dE);
 
@@ -537,15 +565,25 @@ sparse_preprocess(const float * image, const u64 M, const u64 N, const u64 P,
 
         if(dt < min_step)
         {
+            if(verbose > 0)
+            {
             printf("\n");
             printf("Stopping because dt < min_step (%e < %e)\n", dt, min_step);
             break;
+            }
+            if(log != NULL)
+            {
+                fprintf(log, "Stopping because dt < min_step (%e < %e)\n", dt, min_step);
+            }
         }
         E0 = E;
         //dt*=2;
         //dt > 1 ? dt = 1 : 0 ;
     }
-    printf("\n");
+    if(verbose > 0)
+    {
+        printf("\n");
+    }
 
 
     free(dE);

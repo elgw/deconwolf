@@ -8,35 +8,6 @@
 #include "sparse_preprocess.h"
 
 
-static void usage(int argc, char ** argv)
-{
-    printf("For noise removal in images (before deconvolution)\n");
-    printf("\n");
-    printf("Usage:\n");
-    if(argc > 0)
-    {
-        printf("%s [options] image.tif\n", argv[0]);
-    }
-    printf("\n");
-
-    printf("Options:\n");
-    printf("--lambda lambda\n\t"
-           "set the lambda parameter (data fidelity)\n");
-    printf("--lambda_s lambda_s\n\t"
-           "set the lambda_s parameter (sparsity)\n");
-    printf("--iter iter\n\t"
-           "Number of iterations\n");
-    printf("--overwrite\n\t"
-           "Over write existing output files\n");
-    printf("--prefix p\n\t"
-           "set the prefix of the output file\n");
-    printf("--threads t\n\t"
-           "Number of threads\n");
-    printf("--verbose v\n\t"
-           "Set the verbosity level (default=1)\n");
-    printf("--periodic\n\t"
-           "Treat the image as periodic\n");
-}
 
 typedef struct {
     float lambda;
@@ -64,12 +35,12 @@ static sparse_settings_t * sparse_settings_new()
     sparse_settings_t * conf = calloc(1, sizeof(sparse_settings_t));
     assert(conf != NULL);
     conf->threads = -1;
-    conf->iter = 100;
+    conf->iter = 60;
     conf->prefix = strdup("nf");
     conf->overwrite = 0;
-    conf->verbose = 0;
-    conf->lambda = 0.02;
-    conf->lambda_s = 0.04;
+    conf->verbose = 1;
+    conf->lambda = 0.002;
+    conf->lambda_s = 0.004;
     conf->periodic = 0;
     return conf;
 }
@@ -80,6 +51,42 @@ sparse_settings_free(sparse_settings_t * conf)
     free(conf->prefix);
     free(conf);
 }
+
+static void usage(int argc, char ** argv)
+{
+    printf("For noise removal in images (before deconvolution)\n");
+    printf("\n");
+    printf("Usage:\n");
+    sparse_settings_t * s = sparse_settings_new();
+
+    if(argc > 0)
+    {
+        printf("%s [options] image.tif\n", argv[0]);
+    }
+    printf("\n");
+
+    printf("Options:\n");
+    printf("--lambda lambda\n\t"
+           "set the lambda parameter (data fidelity, default=%e)\n", s->lambda);
+    printf("--lambda_s lambda_s\n\t"
+           "set the lambda_s parameter (sparsity, default=%e)\n", s->lambda_s);
+    printf("--iter iter\n\t"
+           "Number of iterations (default=%d)\n", s->iter);
+    printf("--overwrite\n\t"
+           "Overwrite existing output files\n");
+    printf("--prefix p\n\t"
+           "set the prefix of the output file (default=%s)\n", s->prefix);
+    printf("--threads t\n\t"
+           "Number of threads (default=auto)\n");
+    printf("--verbose v\n\t"
+           "Set the verbosity level (default=%d)\n", s->verbose);
+    printf("--periodic\n\t"
+           "Treat the image as periodic\n");
+
+    sparse_settings_free(s);
+    return;
+}
+
 
 static sparse_settings_t * get_cli_options(int argc, char ** argv)
 {
@@ -196,7 +203,10 @@ int sparse_preprocess_cli(int argc, char ** argv)
             free(outfile);
             continue;
         }
-        printf("Processing %s -> %s\n", inFile, outfile);
+        if(conf->verbose > 0)
+        {
+            printf("Processing %s -> %s(.log.txt)\n", inFile, outfile);
+        }
 
         if(conf->verbose > 1)
         {
@@ -223,7 +233,10 @@ int sparse_preprocess_cli(int argc, char ** argv)
         assert(logfile != NULL);
         sprintf(logfile, "%s.log.txt", outfile);
 
-        printf("logfile = %s\n", logfile);
+        if(conf->verbose > 1)
+        {
+            printf("logfile = %s\n", logfile);
+        }
         FILE * log = fopen(logfile, "w");
         if(log == NULL)
         {
@@ -231,8 +244,16 @@ int sparse_preprocess_cli(int argc, char ** argv)
             free(I);
             continue;
         }
+        fprintf(log, "deconwolf: '%s'\n", deconwolf_version);
+        fprintf(log, "CMD: ");
+        for(int kk = 0; kk<argc; kk++)
+        {
+            fprintf(log, "%s ", argv[kk]);
+        }
+        fprintf(log, "\n");
+
         sparse_settings_write(conf, log);
-        fclose(log);
+
         free(logfile);
 
 
@@ -245,16 +266,24 @@ int sparse_preprocess_cli(int argc, char ** argv)
                                       M, N, P,
                                       conf->lambda, conf->lambda_s,
                                       conf->periodic,
-                                      conf->iter);
+                                      conf->iter, conf->verbose, log);
+
         free(I);
         fim_tiff_write_float(outfile, J,
                        &T, M, N, P);
         free(J);
 
         free(outfile);
+        fclose(log);
+    }
+
+    if(conf->verbose > 1)
+    {
+        printf("Peak memory: %lu KB\n", get_peakMemoryKB());
     }
 
     sparse_settings_free(conf);
+
     return EXIT_SUCCESS;
 
  fail:
