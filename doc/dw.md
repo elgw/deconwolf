@@ -83,7 +83,10 @@ format, see the log files for scaling factor used.
    loads, scales and saves correctly.
   ii/ **rl** classical Richardson-Lucy.
   iii/ **shb** Scaled Heavy Ball.
-  iv/ **shbcl** Scaled Heavy Ball using OpenCl (not compiled by default)
+  iv/ **shbcl2** Scaled Heavy Ball using OpenCl (not compiled by default)
+
+**\--gpu**
+: same as **--method shbcl2*.
 
 **\--mse**
 : Show the Mean Square Error between the input image and the current
@@ -100,15 +103,18 @@ allows more iterations before.
 Example: For the microtubules image $s=0.7$ and 150 iterations was
 found to produce the lowest MSE compared to the ground truth image.
 
+**\--start_id**
+: Use the input image as the initial guess. Possibly good if only a
+  few iterations are to be used. Can cause adverse results when many
+  iterations are used.
+
+**\--start_flat**
+: Use the mean of the input image as the initial guess. This was
+  the result up to version 0.3.7.
+
 **\--noplan**
 : disable FFTW3 planning. This means that FFTW3 uses the default plan
   for the given problem size.
-
-**\--no-inplace**
-: disable the use of in-place FFT transformations with fftw3. This
-  will cause fftw3 to use more memory and is typically slower. This
-  option is mostly for debugging. On some platforms it is expected
-  that deconwolf will only work with this flag.
 
 **maxproj**
 : With *maxproj* as the first argument deconwolf will create max

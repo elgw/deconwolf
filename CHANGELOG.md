@@ -21,7 +21,9 @@
   achieved with **--psigma 0.7**. A value of 0 is the same as not
   using the filter.
 
-![alt text](doc/20240419.png)
+Results when testing on the microtubules image shown below.
+
+![iterations vs mse](doc/20240419.png)
 
 
 ## 0.3.7
