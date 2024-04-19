@@ -125,6 +125,25 @@ static double clockdiff(struct timespec* end, struct timespec * start)
     return elapsed;
 }
 
+/* https://en.wikipedia.org/wiki/Anscombe_transform  */
+void fim_anscombe(float * x, size_t n)
+{
+    #pragma omp parallel for
+    for(size_t kk = 0; kk<n; kk++)
+    {
+        x[kk] = 2.0*sqrt(x[kk] + 3.0/8.0);
+    }
+}
+
+void fim_ianscombe(float * x, size_t n)
+{
+#pragma omp parallel for
+    for(size_t kk = 0; kk<n; kk++)
+    {
+        x[kk] = pow(x[kk] / 2.0, 2) - 3.0/8.0;
+    }
+}
+
 
 void fim_delete(fim_t * F)
 {

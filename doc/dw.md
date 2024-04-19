@@ -91,9 +91,14 @@ format, see the log files for scaling factor used.
   I-divergence is shown.
 
 **\--psigma s**
-: Pre-process the image and the PSF by convolving it by a 3-D isotropic
-Gaussian with sigma=s. This acts as a low pass filter.
-Have been found useful for very noisy image.
+: Pre-process the image and the PSF by convolving it by a 3-D
+isotropic Gaussian with sigma=s. The Anscombe transform is applied
+before the filtering, and inverted afterwards. $s=0$ means that this
+feature is disabled which is the default. Note that that less noise
+allows more iterations before.
+
+Example: For the microtubules image $s=0.7$ and 150 iterations was
+found to produce the lowest MSE compared to the ground truth image.
 
 **\--noplan**
 : disable FFTW3 planning. This means that FFTW3 uses the default plan

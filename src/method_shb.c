@@ -187,8 +187,39 @@ float * deconvolve_shb(float * restrict im,
      *  xp -- the previous guess, initially set the same as x
      */
 
-    float * x = fim_constant(wMNP, sumg/wMNP);
-    float * xp = fim_copy(x, wMNP);
+    float * x = NULL;
+    float * xp = NULL;
+
+    if(s->start_condition == DW_START_FLAT)
+    {
+         x = fim_constant(wMNP, sumg/wMNP);
+         xp = fim_copy(x, wMNP);
+    }
+
+    if(s->start_condition == DW_START_IDENTITY)
+    {
+        x = fim_malloc(wMNP*sizeof(float));
+        fim_insert(x, wM, wN, wP,
+                   im, M, N, P);
+        xp = fim_copy(x, wMNP);
+    }
+
+    if(s->start_condition == DW_START_LP)
+    {
+        x = fim_malloc(wMNP*sizeof(float));
+        float * im_lp = fim_copy(im, M*N*P);
+        fim_gsmooth(im_lp, M, N, P, 8);
+        fim_insert(x, wM, wN, wP,
+                   im_lp, M, N, P);
+        xp = fim_copy(x, wMNP);
+        fim_free(im_lp);
+    }
+
+
+
+    assert(x != NULL);
+    assert(xp != NULL);
+
 
     dw_iterator_t * it = dw_iterator_new(s);
     while(dw_iterator_next(it) >= 0)
@@ -228,11 +259,6 @@ float * deconvolve_shb(float * restrict im,
                 p[kk] < s->bg ? p[kk] = s->bg : 0; // TODO
             }
 
-        if(s->psigma > 0)
-        {
-            printf("gsmoothing()\n");
-            fim_gsmooth(x, wM, wN, wP, s->psigma);
-        }
 
         putdot(s);
 

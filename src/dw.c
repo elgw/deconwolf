@@ -210,6 +210,8 @@ dw_opts * dw_opts_new(void)
         s->color = 0;
     }
 
+    s->start_condition = DW_START_LP;
+
     return s;
 }
 
@@ -434,6 +436,20 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
         fprintf(f, "UNKNOWN/Wrongly Set\n");
         break;
     }
+
+    fprintf(f, "Initial guess: ");
+    switch(s->start_condition)
+    {
+    case DW_START_FLAT:
+        fprintf(f, "Flat average\n");
+        break;
+    case DW_START_IDENTITY:
+        fprintf(f, "Identity\n");
+        break;
+    case DW_START_LP:
+        fprintf(f, "Low pass filtered\n");
+    }
+    return;
 }
 
 void warning(FILE * fid)
@@ -591,6 +607,8 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         { "ompthreads",required_argument, NULL, '2' },
         { "psf-pass",  required_argument, NULL, '3' },
 	{ "cldevice",  required_argument, NULL, '4' },
+        { "start_flat",no_argument,       NULL, '5' },
+        { "start_id",  no_argument,       NULL, '6' },
         { "temp",      required_argument, NULL, '9' },
         { "noplan",    no_argument,       NULL, 'a' },
         { "bg",        required_argument, NULL, 'b' },
@@ -638,7 +656,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     int prefix_set = 0;
     int use_gpu = 0;
     while((ch = getopt_long(argc, argv,
-                            "12349ab:c:f:Gghil:m:n:o:p:r:s:tvwx:B:C:DFI:L:MOR:S:TPQ:X:",
+                            "1234569ab:c:f:Gghil:m:n:o:p:r:s:tvwx:B:C:DFI:L:MOR:S:TPQ:X:",
                             longopts, NULL)) != -1)
     {
         switch(ch) {
@@ -653,6 +671,12 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             break;
 	case '4':
             s->cl_device = atoi(optarg);
+            break;
+        case '5':
+            s->start_condition = DW_START_FLAT;
+            break;
+        case '6':
+            s->start_condition = DW_START_IDENTITY;
             break;
         case '9':
             s->alphamax = atof(optarg);
@@ -1264,14 +1288,18 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
     printf(" --tilepad N\n\t Sets the tiles to overlap by N voxels in tile mode (default: %d)\n", s->tiling_padding);
     printf(" --prefix str\n\t Set the prefix of the output files (default: '%s')\n", s->prefix);
     printf(" --overwrite\n\t Allows deconwolf to overwrite already existing output files\n");
-    printf(" --relax F\n\t Multiply the central pixel of the PSF by F. (F>1 relaxation)\n");
-    printf(" --xyfactor F\n\t Discard outer planes of the PSF with sum < F of the central. Use 0 for no cropping.\n");
+    //printf(" --relax F\n\t Multiply the central pixel of the PSF by F. (F>1 relaxation)\n");
+    printf(" --xyfactor F\n\t Discard outer planes of the PSF with sum < F of "
+           "the central. Use 0 for no cropping.\n");
+    printf(" --psigma s\n\t"
+           "Pre filter the image with a Gaussian filter of sigma=s while Anscombe "
+           "transformed\n");
     printf(" --bq Q\n\t Set border handling to \n\t"
            "0 'none' i.e. periodic\n\t"
            "1 'compromise', or\n\t"
            "2 'normal' which is default\n");
     printf("--periodic\n\t Equivalent to --bq 0\n");
-    printf(" --scale s\n\t"
+    printf("--scale s\n\t"
            "Set the scaling factor for the output image manually to s.\n\t"
            "Warning: Might cause clipping or discretization artifacts\n\t"
            "This option is only used for 16-bit images\n");
@@ -1283,7 +1311,13 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
     printf(" --lookahead N"
            "\n\t Try to do a speed-for-memory trade off by using a N pixels larger"
            "\n\t job size that is better suited for FFT.\n");
-
+    printf("--method name\n\t"
+           "Select what method to use. Valid options: rl, shb, shbcl2\n");
+    printf("--start_id\n\t"
+           "Set the input image as the initial guess\n");
+    printf("--start_flat\n\t"
+           "Use the average of the input image as the initial guess. This was "
+           "the default up to version 1.3.8.\n");
     printf(" --noplan\n\t Don't use any planning optimization for fftw3\n");
     printf(" --no-inplace\n\t Disable in-place FFTs (for fftw3), uses more "
            "memory but could potentially be faster for some problem sizes.\n");
@@ -1969,7 +2003,7 @@ void flatfieldCorrection(dw_opts * s, float * im, int64_t M, int64_t N, int64_t 
 }
 
 
-void prefilter(dw_opts * s,
+static void prefilter(dw_opts * s,
                float * im, int64_t M, int64_t N, int64_t P,
                float * psf, int64_t pM, int64_t pN, int64_t pP)
 {
@@ -1978,8 +2012,11 @@ void prefilter(dw_opts * s,
     {
         return;
     }
+
+    fim_anscombe(im, M*N*P);
     fim_gsmooth(im, M, N, P, s->psigma);
-    fim_gsmooth(psf, pM, pN, pP, s->psigma);
+    fim_ianscombe(im, M*N*P);
+
     return;
 }
 

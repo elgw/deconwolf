@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## 0.3.8
+
+- Changed the initial guess for all methods. It is now set to be a low
+  pass filtered version of the input image. Experiments suggests that
+  this was better than the previous approach where a flat image was
+  used. To use the previous default, please use **--start_flat**.
+
+- Added the option to start from the input image with the flag
+  **--start_id**. This might be a good option when only a few
+  iterations are used since but can lead to more shot noise.
+
+- Added a noise filter for the input image which can be enabled with
+  **--psigma s**, where s controls the filter shape. This is
+  implemented as follows: 1) the Anscombe transform is applied 2) the
+  transformed image is filtered with a isotropic Gaussian kernel with
+  sigma=s. 3) The inverse transform is applied. Using this with
+  moderate values of s leads to better results on synthetic
+  images. For example on the microtubules image the best results were
+  achieved with **--psigma 0.7**. A value of 0 is the same as not
+  using the filter.
+
+![alt text](doc/20240419.png)
+
+
 ## 0.3.7
 - Deconwolf compiles as a native windows program using clang. So far
   the binaries are only smoke tested since the main target is linux.

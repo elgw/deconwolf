@@ -230,7 +230,7 @@ float * deconvolve_shb_cl2(float * restrict im,
         wP = int64_t_max(P, pP);
     }
 
-    #ifndef VKFFT
+#ifndef VKFFT
     /* However, this only works for bg > 0, i.e. if dimensions change
      * under bq==0 the program needs to exit with a large boom!  */
     wM = clu_next_fft_size(wM);
@@ -437,15 +437,45 @@ float * deconvolve_shb_cl2(float * restrict im,
     fimcl_t * x_gpu = NULL;
     fimcl_t * xp_gpu = NULL;
     fimcl_t * p_gpu = NULL;
+
+    if(s->start_condition == DW_START_FLAT)
     {
         float sumg = fim_sum(im, M*N*P);
         float * x = fim_constant(wMNP, sumg / (float) wMNP);
+        assert(x != NULL);
 
         x_gpu = fimcl_new(clu, fimcl_real, x, wM, wN, wP);
         xp_gpu = fimcl_copy(x_gpu);
-
         fim_free(x);
     }
+
+    if(s->start_condition == DW_START_IDENTITY)
+    {
+        float * im_full = fim_malloc(wMNP*sizeof(float));
+        memset(im_full, 0, wMNP*sizeof(float));
+        /* Insert the psf into the bigger Z */
+        fim_insert(im_full, wM, wN, wP,
+                   im, M, N, P);
+        x_gpu = fimcl_new(clu, fimcl_real, im_full, wM, wN, wP);
+        xp_gpu = fimcl_copy(x_gpu);
+        fim_free(im_full);
+    }
+
+    if(s->start_condition == DW_START_LP)
+    {
+        float * im_lp = fim_copy(im, M*N*P);
+        fim_gsmooth(im_lp, M, N, P, 8);
+
+        float * im_full = fim_malloc(wMNP*sizeof(float));
+        memset(im_full, 0, wMNP*sizeof(float));
+        /* Insert the psf into the bigger Z */
+        fim_insert(im_full, wM, wN, wP,
+                   im_lp, M, N, P);
+        x_gpu = fimcl_new(clu, fimcl_real, im_full, wM, wN, wP);
+        xp_gpu = fimcl_copy(x_gpu);
+        fim_free(im_full);
+    }
+
 
     if(s->verbosity > 0)
     {
