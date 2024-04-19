@@ -262,9 +262,36 @@ float * deconvolve_rl(float * restrict im, const int64_t M, const int64_t N, con
     putdot(s);
 
     /* Step 3. */
-    float sumg = fim_sum(im, M*N*P);
 
-    float * xp = fim_constant(wMNP, sumg/wMNP); /* Initial guess */
+
+    float * xp = NULL; /* Initial guess */
+
+    if(s->start_condition == DW_START_FLAT)
+    {
+        float sumg = fim_sum(im, M*N*P);
+        xp = fim_constant(wMNP, sumg/wMNP);
+    }
+
+    if(s->start_condition == DW_START_IDENTITY)
+    {
+        xp = fim_malloc(wMNP*sizeof(float));
+        fim_insert(xp, wM, wN, wP,
+                   im, M, N, P);
+    }
+
+    if(s->start_condition == DW_START_LP)
+    {
+        xp = fim_malloc(wMNP*sizeof(float));
+        float * im_lp = fim_copy(im, M*N*P);
+        fim_gsmooth(im_lp, M, N, P, 8);
+        fim_insert(xp, wM, wN, wP,
+                   im_lp, M, N, P);
+        fim_free(im_lp);
+    }
+
+
+
+    assert(xp != NULL);
     float * x = NULL;
     /* We enter the iterative loop,
      * Input arrays:

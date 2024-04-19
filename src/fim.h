@@ -436,3 +436,9 @@ int fimt_tiff_write(const fim_t * Im, const char * fName);
 
 /* Insert into B into A, with upper left corner at x0, y0 */
 void fimt_blit_2D(fim_t * A, const fim_t * B, size_t x0, size_t y0);
+
+/**  Anscombe transform and inverse.
+ *
+ * https://en.wikipedia.org/wiki/Anscombe_transform  */
+void fim_anscombe(float * x, size_t n);
+void fim_ianscombe(float * x, size_t n);

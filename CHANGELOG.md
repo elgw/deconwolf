@@ -1,11 +1,9 @@
 # CHANGELOG
 
-## 0.3.9
-- Fixed crashes when trying to read a non tif file.
-- Added a highly experimental noise filtering algorithm available
-  as **dw noise1**
-
+<<<<<<< HEAD
 ## 0.3.8
+- Fixed crashes when trying to read a non tif file.
+
 - For systems with multiple GPUs or OpenCL compatible devices it is
   now possible to select which to use with **--cldevice**. To figure
   out which that are available it is simplest to use
@@ -19,7 +17,29 @@
   especially `PRIu64` for `uint64_t` and `PRId64` for `int64_t` to get
   rid of some warnings under MacOS.
 
-- Minor changes.
+- Changed the initial guess for all methods. It is now set to be a low
+  pass filtered version of the input image. Experiments suggests that
+  this was better than the previous approach where a flat image was
+  used. To use the previous default, please use **--start_flat**.
+
+- Added the option to start from the input image with the flag
+  **--start_id**. This might be a good option when only a few
+  iterations are used since but can lead to more shot noise.
+
+- Added a noise filter for the input image which can be enabled with
+  **--psigma s**, where s controls the filter shape. This is
+  implemented as follows: 1) the Anscombe transform is applied 2) the
+  transformed image is filtered with a isotropic Gaussian kernel with
+  sigma=s. 3) The inverse transform is applied. Using this with
+  moderate values of s leads to better results on synthetic
+  images. For example on the microtubules image the best results were
+  achieved with **--psigma 0.7**. A value of 0 is the same as not
+  using the filter.
+
+Results when testing on the microtubules image shown below.
+
+![iterations vs mse](doc/20240419.png)
+
 
 ## 0.3.7
 - Deconwolf compiles as a native windows program using clang. So far
