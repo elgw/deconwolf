@@ -1,6 +1,6 @@
 # CHANGELOG
 
-<<<<<<< HEAD
+
 ## 0.3.8
 - Fixed crashes when trying to read a non tif file.
 
