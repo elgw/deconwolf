@@ -91,7 +91,14 @@ format, see the log files for scaling factor used.
   i/ **id** identity transform, i.e. nothing. Useful to see if images
    loads, scales and saves correctly.
   ii/ **rl** classical Richardson-Lucy.
+
   iii/ **shbcl2** Scaled Heavy Ball using OpenCl (not compiled by default)
+
+  iii/ **shb** Scaled Heavy Ball.
+  iv/ **shbcl2** Scaled Heavy Ball using OpenCl (not compiled by default)
+
+**\--gpu**
+: same as **--method shbcl2*.
 
 **\--mse**
 : Show the Mean Square Error between the input image and the current
@@ -99,19 +106,27 @@ format, see the log files for scaling factor used.
   I-divergence is shown.
 
 **\--psigma s**
-: Pre-process the image and the PSF by convolving it by a 3-D isotropic
-Gaussian with sigma=s. This acts as a low pass filter.
-Have been found useful for very noisy image.
+: Pre-process the image and the PSF by convolving it by a 3-D
+isotropic Gaussian with sigma=s. The Anscombe transform is applied
+before the filtering, and inverted afterwards. $s=0$ means that this
+feature is disabled which is the default. Note that that less noise
+allows more iterations before.
+
+Example: For the microtubules image $s=0.7$ and 150 iterations was
+found to produce the lowest MSE compared to the ground truth image.
+
+**\--start_id**
+: Use the input image as the initial guess. Possibly good if only a
+  few iterations are to be used. Can cause adverse results when many
+  iterations are used.
+
+**\--start_flat**
+: Use the mean of the input image as the initial guess. This was
+  the result up to version 0.3.7.
 
 **\--noplan**
 : disable FFTW3 planning. This means that FFTW3 uses the default plan
   for the given problem size.
-
-**\--no-inplace**
-: disable the use of in-place FFT transformations with fftw3. This
-  will cause fftw3 to use more memory and is typically slower. This
-  option is mostly for debugging. On some platforms it is expected
-  that deconwolf will only work with this flag.
 
 **maxproj**
 : With *maxproj* as the first argument deconwolf will create max

@@ -78,6 +78,10 @@ int main(int argc, char ** argv)
 #endif
         }
 
+        if(strcmp(argv[1], "noise1") == 0)
+        {
+            return sparse_preprocess_cli(argc-1, argv+1);
+        }
 
     }
 

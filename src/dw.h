@@ -60,6 +60,7 @@
 #include "fim_tiff.h"
 #include "fft.h"
 #include "tiling.h"
+#include "sparse_preprocess_cli.h"
 
 /* fftw3 wisdom data is stored and loaded from
  * $home/.config/
@@ -78,6 +79,18 @@ typedef enum {
     DW_METHOD_SHBCL2, /* GPU used as much as possible */
     #endif
 } dw_method;
+
+/* What should be the initial guess
+   for the iterations? */
+typedef enum {
+    /* The average of the input image. Was default up till version
+     * 0.3.7 */
+    DW_START_FLAT,
+    /* A low pass filtered version of the input image */
+    DW_START_LP,
+    /* The input image itself */
+    DW_START_IDENTITY,
+} dw_start_condition;
 
 typedef enum {
     DW_METRIC_MSE, /* Mean Square Error */
@@ -140,6 +153,8 @@ struct _dw_opts{
     dw_function fun; /* Function pointer */
     dw_metric metric;
 
+    /* Select what the initial guess should be */
+    dw_start_condition start_condition;
     /* How aggressive should the Biggs acceleration be.
      *  0 = off,
      *  1 = low/default, safe for most images
@@ -172,7 +187,9 @@ struct _dw_opts{
 
     float alphamax;
 
-  int cl_device; /* OpenCL device number, default 0 */
+
+    int cl_device; /* OpenCL device number, default 0 */
+
 
     fftwf_plan fft_plan;
     fftwf_plan ifft_plan;

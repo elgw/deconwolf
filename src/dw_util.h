@@ -99,6 +99,12 @@ char * dw_basename(const char * path);
 /* POSIX getcwd or _getcwd on windows */
 char * dw_getcwd(char * buf, size_t size);
 
+/** Add a prefix to a file
+ * Examples:
+ * ("file.tif", "dw") -> "dw_file.tif"
+ * ("/dir/file.tif", "dw" -> "/dir/dw_file.tif"
+ **/
+char * dw_prefix_file(const char * file, const char * prefix);
 
 #ifdef WINDOWS
 int getline(char **lineptr, size_t *n, FILE *stream);
