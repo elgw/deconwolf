@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## 0.3.9
+- Added the **--offset** option. This will add an offset to the image
+  before the deconvolution start, which will be removed before saving
+  the result to disk. Initial tests suggests that this can reduce the
+  effect of detector noise (non-Poisson) by decreasing the relative
+  weight of pixels with low values. See some numerical tests below:
+
+  ![iterations vs mse](doc/20240422.png)
+
+- Removed the **--relax** option since it made no sense.
+- Reverted the default start guess to flat, like it was before v
+  0.3.8. The **--start_lp** still seems to produce better images but
+  takes a little too long to initialize for being a default
+  method. Might still be the default in future version when there is a
+  GPU implementation.
+
 
 ## 0.3.8
 - Fixed crashes when trying to read a non tif file.

@@ -19,6 +19,7 @@ typedef struct {
     int overwrite;
     int verbose;
     int periodic;
+    int directions;
 } sparse_settings_t;
 
 static void sparse_settings_write(sparse_settings_t * s, FILE * fid)
@@ -28,6 +29,7 @@ static void sparse_settings_write(sparse_settings_t * s, FILE * fid)
     fprintf(fid, "iter=%d\n", s->iter);
     fprintf(fid, "threads=%d\n", s->threads);
     fprintf(fid, "periodic=%d\n", s->periodic);
+    fprintf(fid, "directions=%d\n", s->directions);
 }
 
 static sparse_settings_t * sparse_settings_new()
@@ -42,6 +44,7 @@ static sparse_settings_t * sparse_settings_new()
     conf->lambda = 0.002;
     conf->lambda_s = 0.004;
     conf->periodic = 0;
+    conf->directions = 3;
     return conf;
 }
 
@@ -82,7 +85,8 @@ static void usage(int argc, char ** argv)
            "Set the verbosity level (default=%d)\n", s->verbose);
     printf("--periodic\n\t"
            "Treat the image as periodic\n");
-
+    printf("--nine\n\t"
+           "use 9, not 3 directions for the Hessian\n");
     sparse_settings_free(s);
     return;
 }
@@ -99,6 +103,7 @@ static sparse_settings_t * get_cli_options(int argc, char ** argv)
         {"lambda_s", required_argument, NULL, '2'},
         {"help", no_argument, NULL, 'h'},
         {"iter", required_argument, NULL, 'I'},
+        {"nine", no_argument, NULL, 'n'},
         {"overwrite", no_argument, NULL, 'o'},
         {"periodic", no_argument, NULL, 'P'},
         {"prefix", required_argument, NULL, 'p'},
@@ -108,7 +113,7 @@ static sparse_settings_t * get_cli_options(int argc, char ** argv)
 
 
     int opt;
-    while( (opt = getopt_long(argc, argv, "1:2:hI:oPp:T:v:", longopts, NULL)) != -1)
+    while( (opt = getopt_long(argc, argv, "1:2:hI:noPp:T:v:", longopts, NULL)) != -1)
     {
         switch(opt)
         {
@@ -125,6 +130,9 @@ static sparse_settings_t * get_cli_options(int argc, char ** argv)
             break;
         case 'I':
             conf->iter = atoi(optarg);
+            break;
+        case 'n':
+            conf->directions = 9;
             break;
         case 'o':
             conf->overwrite = 1;
@@ -156,11 +164,12 @@ static sparse_settings_t * get_cli_options(int argc, char ** argv)
         goto fail;
     }
 
-    if(conf->threads > 0)
+    if(conf->threads < 1)
     {
-        omp_set_num_threads(conf->threads);
+        conf->threads = dw_get_threads();
     }
 
+    omp_set_num_threads(conf->threads);
     conf->optpos = optind;
 
     return conf;
@@ -265,7 +274,7 @@ int sparse_preprocess_cli(int argc, char ** argv)
         float * J = sparse_preprocess(I,
                                       M, N, P,
                                       conf->lambda, conf->lambda_s,
-                                      conf->periodic,
+                                      conf->periodic, conf->directions,
                                       conf->iter, conf->verbose, log);
 
         free(I);

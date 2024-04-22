@@ -65,6 +65,12 @@ will be deconvolved in tiles. See separate section on tiling below.
 : Border/edge handling. n=0: no padding. n=1: a compromise between memory/speed
 and quality. n=2 default.
 
+**\--offset v**
+: Add a positive number, $v$, to the image before processing, and then
+  remove it before saving to disk. This can make the RL algorithm less
+  sensitive to non-Poissonian noise (from the detector). A value close
+  the standard deviation of the detector noise seems reasonable.
+
 **\--float**
 : Save the output using 32-bit floats, also turns off any
 scaling. Please note that without this flag, images will be saved as
