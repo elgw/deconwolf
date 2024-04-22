@@ -312,6 +312,11 @@ float * deconvolve_rl(float * restrict im, const int64_t M, const int64_t N, con
             if(it->iter % s->iterdump == 0)
             {
                 float * temp = fim_subregion(xp, wM, wN, wP, M, N, P);
+                if(s->offset > 0)
+                {
+                    fim_add_scalar(temp, M*N*P, -s->offset);
+                    fim_project_positive(im, M*N*P);
+                }
                 char * outname = gen_iterdump_name(s, it->iter);
                 //fulldump(s, temp, M, N, P, outname);
                 if(s->outFormat == 32)

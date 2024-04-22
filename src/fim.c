@@ -633,6 +633,27 @@ void fim_mult_scalar(float * restrict I, size_t N, float x)
     return;
 }
 
+void fim_project_positive(float * I, size_t N)
+{
+#pragma omp parallel for shared(I)
+    for(size_t kk = 0; kk < N ; kk++)
+    {
+        I[kk] < 0 ? I[kk] = 0 : 0;
+    }
+    return;
+}
+
+void fim_add_scalar(float * restrict I, size_t N, float x)
+{
+#pragma omp parallel for shared(I)
+    for(size_t kk = 0; kk < N ; kk++)
+    {
+        I[kk]+=x;
+    }
+    return;
+}
+
+
 void fim_normalize_sum1(float * restrict psf, int64_t M, int64_t N, int64_t P)
 {
     const size_t pMNP = M*N*P;;

@@ -182,7 +182,6 @@ dw_opts * dw_opts_new(void)
     s->method = DW_METHOD_SHB;
     s->fun = deconvolve_shb;
     s->iterdump = 0;
-    s->relax = 0;
     s->xycropfactor = 0.001;
     s->commandline = NULL;
     s->onetile = 0;
@@ -194,6 +193,7 @@ dw_opts * dw_opts_new(void)
     s->positivity = 1;
     s->bg = 1e-2; /* Should be strictly positive or pixels will be freezed */
     s->bg_auto = 1;
+    s->offset = 5;
     s->flatfieldFile = NULL;
     s->lookahead = 0;
     s->psigma = 0;
@@ -210,7 +210,7 @@ dw_opts * dw_opts_new(void)
         s->color = 0;
     }
 
-    s->start_condition = DW_START_LP;
+    s->start_condition = DW_START_FLAT;
 
     return s;
 }
@@ -369,10 +369,7 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
         fprintf(f, "tiling: OFF\n");
     }
     fprintf(f, "XY crop factor: %f\n", s->xycropfactor);
-    if(s->relax > 0)
-    {
-        fprintf(f, "PSF relaxation: %f\n", s->relax);
-    }
+    fprintf(f, "Offset: %f\n", s->offset);
     fprintf(f, "Output Format: ");
     switch(s->outFormat){
     case 16:
@@ -610,6 +607,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
 	{ "cldevice",  required_argument, NULL, '4' },
         { "start_flat",no_argument,       NULL, '5' },
         { "start_id",  no_argument,       NULL, '6' },
+        { "start_lp",  no_argument,       NULL, '7' },
         { "temp",      required_argument, NULL, '9' },
         { "noplan",    no_argument,       NULL, 'a' },
         { "bg",        required_argument, NULL, 'b' },
@@ -626,7 +624,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         { "iter",      required_argument, NULL, 'n' },
         { "out",       required_argument, NULL, 'o' },
         { "tilepad",   required_argument, NULL, 'p' },
-        { "relax",     required_argument, NULL, 'r' },
+        { "offset",    required_argument, NULL, 'q' },
         { "tilesize",  required_argument, NULL, 's' },
         { "test",      no_argument,       NULL, 't' },
         { "version",   no_argument,       NULL, 'v' },
@@ -657,7 +655,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     int prefix_set = 0;
     int use_gpu = 0;
     while((ch = getopt_long(argc, argv,
-                            "1234569ab:c:f:Gghil:m:n:o:p:r:s:tvwx:B:C:DFI:L:MOR:S:TPQ:X:",
+                            "12345679ab:c:f:Gghil:m:n:o:p:q:s:tvwx:B:C:DFI:L:MOR:S:TPQ:X:",
                             longopts, NULL)) != -1)
     {
         switch(ch) {
@@ -678,6 +676,9 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             break;
         case '6':
             s->start_condition = DW_START_IDENTITY;
+            break;
+        case '7':
+            s->start_condition = DW_START_LP;
             break;
         case '9':
             s->alphamax = atof(optarg);
@@ -724,6 +725,9 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         case 'P':
             s->positivity = 0;
             printf("Turning off positivity constraint!\n");
+            break;
+        case 'q':
+            s->offset = atof(optarg);
             break;
         case 'Q':
             s->psigma = atof(optarg);
@@ -855,9 +859,6 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
                 exit(EXIT_FAILURE);
             }
             break;
-        case 'r':
-            s->relax = atof(optarg);
-            break;
         case 'x':
             s->xycropfactor = atof(optarg);
             if(s->xycropfactor > 1 || s->xycropfactor < 0)
@@ -878,6 +879,12 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         default:
             exit(EXIT_FAILURE);
         }
+    }
+
+    if(s->offset < 0)
+    {
+        printf("WARNING: A negative offset not allowed, setting it to 0\n");
+        s->offset = 0;
     }
 
     if(use_gpu)
@@ -1314,6 +1321,10 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
     printf(" --float\n\t Set output format to 32-bit float (default is 16-bit \n\t"
            "int) and disable scaling\n");
     printf(" --bg l\n\t Set background level, l\n");
+    printf(" --offset l\n\t"
+           "Set a positive offset that will be added to the image during\n"
+           "processing and remove before saving to disk. Can help to mitigate\n"
+           "some of the detector noise (non-Poissonian)\n");
     printf(" --flatfield image.tif\n\t"
            " Use a flat field correction image. Deconwolf will divide each plane of the\n\t"
            " input image, pixel by pixel, by this correction image.\n");
@@ -1325,8 +1336,9 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
     printf("--start_id\n\t"
            "Set the input image as the initial guess\n");
     printf("--start_flat\n\t"
-           "Use the average of the input image as the initial guess. This was "
-           "the default up to version 1.3.8.\n");
+           "Use the average of the input image as the initial guess. Default\n");
+    printf("--start_lp\n\t"
+           "Use a low passed version of the input image as the initial guess.n");
     printf(" --noplan\n\t Don't use any planning optimization for fftw3\n");
     printf(" --no-inplace\n\t Disable in-place FFTs (for fftw3), uses more "
            "memory but could potentially be faster for some problem sizes.\n");
@@ -1783,10 +1795,20 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
 
         fim_normalize_sum1(tpsf, tpM, tpN, tpP);
 
+        if(s->offset > 0)
+        {
+            fim_add_scalar(im_tile, tileM*tileN*tileP, s->offset);
+        }
+
         float * dw_im_tile = s->fun(im_tile, tileM, tileN, tileP, // input image and size
                                     tpsf, tpM, tpN, tpP, // psf and size
                                     s);
         free(im_tile);
+        if(s->offset > 0)
+        {
+            fim_add_scalar(dw_im_tile, tileM*tileN*tileP, -s->offset);
+            fim_project_positive(dw_im_tile, tileM*tileN*tileP);
+        }
         tiling_put_tile_raw(T, tt, tfile, dw_im_tile);
         free(dw_im_tile);
         // free(tpsf);
@@ -2263,29 +2285,6 @@ int dw_run(dw_opts * s)
                            M, N, P, s);
     }
 
-    if(s->relax > 0)
-    {
-        // Note: only works with odd sized PSF
-        fprintf(s->log, "Relaxing the PSF by %f\n", s->relax);
-        if(s->verbosity > 0)
-        {
-            printf("Relaxing the PSF\n");
-        }
-
-        size_t mid = (pM-1)/2 + (pN-1)/2*pM + (pP-1)/2*pM*pN;
-        //printf("mid: %f -> %f\n", psf[mid], psf[mid]+s->relax);
-        psf[mid] += s->relax;
-        fim_normalize_sum1(psf, pM, pN, pP);
-        if(s->verbosity > 2)
-        {
-            double spsf = 0;
-            for(int64_t kk = 0 ; kk<pM*pN*pP; kk++)
-            {
-                spsf+=psf[kk];
-            }
-            printf("Sum of PSF: %f\n", spsf);
-        }
-    }
 
     if(s->verbosity > 0)
     {
@@ -2317,10 +2316,22 @@ int dw_run(dw_opts * s)
         /* Pre filter by psigma */
         prefilter(s, im, M, N, P, psf, pM, pN, pP);
 
+        if(s->offset > 0)
+        {
+            fim_add_scalar(im, M*N*P, s->offset);
+        }
+
         /* Note: psf is freed bu the deconvolve_* functions*/
         out = s->fun(im, M, N, P, // input image and size
                      psf, pM, pN, pP, // psf and size
                      s);// settings
+
+        if(s->offset > 0)
+        {
+            fim_add_scalar(im, M*N*P, -s->offset);
+            fim_project_positive(im, M*N*P);
+        }
+
         psf = NULL;
     }
 
@@ -2378,7 +2389,6 @@ int dw_run(dw_opts * s)
 
     fim_free(out);
     myfftw_stop();
-
 
     dw_gettime(&tend);
     fprintf(s->log, "Took: %f s\n", timespec_diff(&tend, &tstart));

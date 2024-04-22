@@ -14,4 +14,5 @@ typedef uint64_t u64;
 
 float * sparse_preprocess(const float * image, u64 M, u64 N, u64 P,
                           double lambda, double lambda_s,
-                          int periodic, u64 iter, int verbose, FILE * log);
+                          int periodic, int directions, u64 iter,
+                          int verbose, FILE * log);

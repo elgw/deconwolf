@@ -184,7 +184,12 @@ void fim_add(float * restrict A,
 
 void fim_invert(float * restrict A, const size_t N);
 
+/* Shift the image so that the minimal value is 0 */
 void fim_set_min_to_zero(float * , size_t N);
+
+/* Project on the set of positive numbers, i.e.
+ * any pixel < 0 is set to 0 */
+void fim_project_positive(float *, size_t);
 
 int fim_maxAtOrigo(const float * restrict V, const int64_t M, const int64_t N, const int64_t P);
 /* Check that the MAX of the fim is in the middle
@@ -311,6 +316,9 @@ void shift_vector_float_buf(float * restrict V, // data
 
 /* Multiply a float array of size N by x */
 void fim_mult_scalar(float * restrict fim, size_t N, float x);
+
+/* Add a constant value to all pixels */
+void fim_add_scalar(float * restrict fim, size_t N, float x);
 
 void fim_ut(void);
 
