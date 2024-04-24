@@ -71,7 +71,7 @@ dw_psf_sted: $(spsf_files)
 # Test the float image module
 fim_ut_files=fim_ut.o fim.o dw_util.o ftab.o fft.o fim_tiff.o
 fim_ut: $(fim_ut_files)
-	$(CC)  $(CFLAGS) $(fim_ut_files) $(LDFLAGS)
+	$(CC)  $(CFLAGS) $(fim_ut_files) $(LDFLAGS) -o fim_ut
 
 ftab_ut: ftab.c
 	$(CC) ftab_ut.c ftab.c $(CFLAGS) -o ftab_ut
