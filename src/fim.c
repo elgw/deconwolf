@@ -1280,11 +1280,11 @@ void fim_conv1_vector_ut()
 
 void fim_LoG_ut()
 {
-    printf("-> fim_LoG_ut");
+    printf("-> fim_LoG_ut\n");
     struct timespec tstart, tend;
-    size_t M = 12;
-    size_t N = 12;
-    size_t P = 12;
+    size_t M = 256;
+    size_t N = 512;
+    size_t P = 128;
     float sigma_l = 3.1;
     float sigma_a = 1.1;
     float * V = fim_malloc(M*N*P*sizeof(float));
