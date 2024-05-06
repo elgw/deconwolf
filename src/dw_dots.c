@@ -389,7 +389,7 @@ void detect_dots(opts * s, char * inFile)
     float std = fim_std(values, T->nrow);
     if(s->verbose > 1)
     {
-        printf("Extrated %zu dots: Mean=%f, std=%f\n", T->nrow, mean, std);
+        printf("Extracted %zu dots: Mean=%f, std=%f\n", T->nrow, mean, std);
     }
     fprintf(s->log, "Extracted %zu dots: Mean=%f, std=%f\n", T->nrow, mean, std);
 
@@ -440,7 +440,6 @@ void detect_dots(opts * s, char * inFile)
     }
 
     fprintf(s->log, "Wrote %zu dots. Done!\n", T->nrow);
-    //fprintf(s->log, "Optimal detection when \sigma = 0.425*FWHM\n");
 
     ftab_free(T);
     fclose(s->log);
