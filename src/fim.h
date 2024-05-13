@@ -87,14 +87,14 @@ void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_realloc(void * p, size_t 
  *
  * Note: This really has to be used, otherwhise the program will not work
  *       under windows.
-*/
+ */
 void fim_free(void * p);
 
 /** @brief Delete a fim_t object.
  *
-* Frees all resources associated with the fim_t object.
-* as well as the fim_t object itself.
-*/
+ * Frees all resources associated with the fim_t object.
+ * as well as the fim_t object itself.
+ */
 void fim_delete(fim_t *);
 
 fim_t * fimt_zeros(size_t M, size_t N, size_t P);
@@ -248,15 +248,15 @@ float * fim_subregion(const float * restrict A,
                       const int64_t m, const int64_t n, const int64_t p);
 
 /** @brief  reference implementation of fim_subregion
-*/
+ */
 float * fim_subregion_ref(float * A,
                           int64_t M, int64_t N, int64_t P,
                           int64_t m, int64_t n, int64_t p);
 
 /** @brief Normalize an image to have the sum 1.0
-* MATLAB:
-* Y = X/max(X(:))
-*/
+ * MATLAB:
+ * Y = X/max(X(:))
+ */
 void fim_normalize_sum1(float * restrict psf, int64_t M, int64_t N, int64_t P);
 
 /* Return a newly allocated copy of V */
@@ -342,8 +342,6 @@ float * fim_local_sum(const float * A, size_t M, size_t N, size_t pM, size_t pN)
 /* Cumulative sum along dimension dim */
 void fim_cumsum(float * A, const size_t M, const size_t N, const int dim);
 
-
-
 /* Normalized cross correlation between T and A
  * See MATLAB's normxcorr2
  * This function requires that T and A have the same size
@@ -386,6 +384,7 @@ int * fim_conncomp6(const float * Im, size_t M, size_t N);
 
 /* 2D hole filling using fim_conncomp6 */
 float * fim_fill_holes(const float * im, size_t M, size_t N, float max_size);
+
 /* 2D remove small objects, only keep those that has at least
  * min_pixels  */
 float * fim_remove_small(const float * im, size_t M, size_t N,
@@ -399,12 +398,42 @@ void ftab_sort(ftab_t * T, int col);
 
 /* Spatial convolution */
 
+/* Boundary handling options. Not in use yet...
+ * Inspiration:
+ * https://diplib.org/diplib-docs/boundary.html#dip-BoundaryCondition
+ */
+typedef enum  {
+    /* I[-1] = 0, ... I[nV] = 0 ... */
+    FIM_BC_ZEROS = 0,
+    /* Just skip elements not completely covered by the kernel */
+    /* Weight the kernel by the number of elements inside the image */
+    FIM_BC_WEIGHTED = 1,
+    /* Only compute for the valid elements, completely covered by the kernel */
+    FIM_BC_VALID,
+    /* I[-1] = I[1], I[-2] = I[2] ... */
+    FIM_BC_SYMMETRIC_MIRROR,
+    /* Like for FFT , I[nV] = I[0], I[-1] = I[nV-1] etc */
+    FIM_BC_PERIODIC
+} fim_boundary_condition;
+
+/* 1D convolution between possibly strided data and a kernel.
+ *
+ */
+
+void
+fim_conv1(float * restrict V, const size_t nV, const int stride,
+          const float * restrict K, const size_t nK,
+          float * restrict buffer,
+          fim_boundary_condition bc);
+
 /* Convolution of a single vector
  * In MATLAB that would be
- * Y = convn(V, K, 'same') / convn(ones(size(V)), K, 'same')
+ * Y = convn(V, K, 'same')
  * With normalized == 1 it would be
  * Y = convn(V, K, 'same') / convn(ones(size(V)), K, 'same')
  * That is only useful for gaussians
+ *
+ * W is an optional temporary buffer of size nV.
  */
 void fim_conv1_vector(float * restrict V, int stride, float * restrict W,
                       const size_t nV,
@@ -423,13 +452,13 @@ int fim_convn1(float * restrict V, size_t M, size_t N, size_t P,
 /* Gaussian smoothing, normalized at edges */
 void fim_gsmooth(float * restrict V, size_t M, size_t N, size_t P, float sigma);
 
-/* Gaussian smoothing, normalized at edges, separate values for lateral and axial
- * filter */
+/** Gaussian smoothing, normalized at edges, separate values for
+ * lateral and axial filter */
 void fim_gsmooth_aniso(float * restrict V,
                        size_t M, size_t N, size_t P,
                        float lsigma, float asigma);
 
-/* Laplacian of Gaussian filter */
+/* Laplacian of Gaussian (LoG) filter */
 float * fim_LoG(const float * V, size_t M, size_t N, size_t P,
                 float sigmaxy, float sigmaz);
 
