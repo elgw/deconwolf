@@ -23,6 +23,23 @@ static void cumsum_array(float * A, size_t N, size_t stride);
 static void fim_show(float * A, size_t M, size_t N, size_t P);
 static void fim_show_int(int * A, size_t M, size_t N, size_t P);
 
+static const char * fim_boundary_condition_str(fim_boundary_condition bc)
+{
+    switch(bc)
+    {
+    case FIM_BC_VALID:
+        return "VALID";
+    case FIM_BC_SYMMETRIC_MIRROR:
+        return "SYMMETRIC MIRROR";
+    case FIM_BC_PERIODIC:
+        return "PERIODIC";
+    case FIM_BC_WEIGHTED:
+        return "WEIGHTED";
+    default:
+        return "UNKNOWN";
+    }
+}
+
 #ifdef __linux__
 void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_malloc(size_t nbytes)
 {
@@ -34,7 +51,7 @@ void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_malloc(size_t nbytes)
         exit(EXIT_FAILURE);
     }
 
-    #if 0
+#if 0
     const size_t HPAGE_SIZE  = (1 << 21); // 2 Mb
     if(FIM_ALIGNMENT == HPAGE_SIZE)
     {
@@ -51,7 +68,7 @@ void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_malloc(size_t nbytes)
             }
         }
     }
-    #endif
+#endif
 
     memset(p, 0, nbytes);
 
@@ -60,9 +77,9 @@ void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_malloc(size_t nbytes)
 #else
 void * fim_malloc(size_t nbytes)
 {
-    #ifdef WINDOWS
+#ifdef WINDOWS
     return _aligned_malloc(nbytes, FIM_ALIGNMENT);
-    #else
+#else
     void * p;
     if(posix_memalign(&p, FIM_ALIGNMENT, nbytes))
     {
@@ -72,7 +89,7 @@ void * fim_malloc(size_t nbytes)
     }
     assert(p != NULL);
     return p;
-    #endif
+#endif
 }
 #endif
 
@@ -106,11 +123,11 @@ void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_realloc(void * p, size_t 
 
 void fim_free(void * p)
 {
-    #ifdef WINDOWS
+#ifdef WINDOWS
     _aligned_free(p);
-    #else
+#else
     free(p);
-    #endif
+#endif
 }
 
 void fim_set_verbose(int v)
@@ -128,7 +145,7 @@ static double clockdiff(struct timespec* end, struct timespec * start)
 /* https://en.wikipedia.org/wiki/Anscombe_transform  */
 void fim_anscombe(float * x, size_t n)
 {
-    #pragma omp parallel for
+#pragma omp parallel for
     for(size_t kk = 0; kk<n; kk++)
     {
         x[kk] = 2.0*sqrt(x[kk] + 3.0/8.0);
@@ -1256,7 +1273,7 @@ void fim_conv1_vector_ut()
     float * W = NULL;
     printf("V=\n");
     fim_show(V, 1, nV, 1);
-    for(int nK = 3; nK<8; nK+=2)
+    for(int nK = 3; nK<= (int) nV; nK+=2)
     {
         for(size_t kk = 0; kk<nV; kk++)
         {
@@ -1414,12 +1431,241 @@ static size_t max_size_t(size_t a, size_t b)
     return b;
 }
 
+
+static float fim_interp_bc(float * V, int64_t nV,
+                           int64_t stride,
+                           int64_t idx, fim_boundary_condition bc)
+{
+    /* Neither VALID or WEIGHTED can be handled like this ...  */
+    switch(bc)
+    {
+    case FIM_BC_SYMMETRIC_MIRROR:
+        idx < 0 ? idx = -idx : 0;
+        idx >= nV ? idx = (nV-1)-(idx+1-nV) : 0;
+        assert(idx >= 0);
+        assert(idx < nV);
+        return V[stride*idx];
+        break;
+    case FIM_BC_PERIODIC:
+        return V[stride*(idx % nV)];
+        break;
+    default:
+        assert(0);
+        return 0;
+    }
+    assert(0);
+    return 0;
+}
+
+/* like here: https://diplib.org/diplib-docs/boundary.html#dip-BoundaryCondition */
+void fim_conv1(float * restrict V, const size_t nV, const int stride,
+               const float * restrict K, const size_t nK,
+               float * restrict buffer,
+               fim_boundary_condition bc)
+{
+    assert(V != NULL);
+
+    if(nK % 2 == 0)
+    {
+        fprintf(stderr,
+                "fim_conv1 error: will only work with kernels of odd size\n");
+        return;
+    }
+
+    const int64_t mid = (nK-1)/2;
+    if(nK > nV)
+    {
+        for(int64_t ii = 0 ; ii < (int64_t) nV; ii++)
+        {
+            for(int64_t kk = 0; kk < (int64_t )nK; kk++)
+            {
+                int64_t idx = ii + kk - mid;
+                buffer[ii] += K[kk]*fim_interp_bc(V, nV, stride, idx, bc);
+            }
+        }
+        return;
+    }
+
+    if(K == NULL) { return; }
+    int buffer_allocation = 0;
+    if(buffer == NULL)
+    {
+        buffer_allocation = 1;
+        buffer = calloc(nV, sizeof(float));
+    }
+
+    double Wtotal = 0;
+    if(bc == FIM_BC_WEIGHTED)
+    {
+        for(size_t kk = 0 ; kk<nK; kk++)
+        {
+            Wtotal += K[kk];
+        }
+    }
+
+    /* Part I: The kernel is overlapping the edge
+       if bc == FIM_BC_VALID, this part is skipped */
+
+
+    if(bc == FIM_BC_SYMMETRIC_MIRROR)
+    {
+        for(int64_t ii = 0 ; ii < mid; ii++)
+        {
+            for(int64_t kk = 0; kk < (int64_t) nK; kk++)
+            {
+                int64_t idx = ii + kk - mid;
+                idx < 0 ? idx = -idx : 0;
+                buffer[ii] += K[kk]*V[stride*idx];
+            }
+        }
+    }
+
+    if(bc == FIM_BC_ZEROS)
+    {
+        for(int64_t ii = 0 ; ii < mid; ii++)
+        {
+            for(int64_t kk = 0; kk < (int64_t) nK; kk++)
+            {
+                int64_t idx = ii + kk - mid;
+                if(idx >= 0)
+                {
+                    buffer[ii] += K[kk]*V[stride*idx];
+                }
+            }
+        }
+    }
+
+    if(bc == FIM_BC_PERIODIC)
+    {
+        for(int64_t ii = 0 ; ii < mid; ii++)
+        {
+            for(int64_t kk = 0; kk < (int64_t) nK; kk++)
+            {
+                int64_t idx = (ii + kk - mid);
+                idx < 0 ? idx = nV +idx : 0;
+                printf("%ld -> %ld\n", (ii+kk - mid), idx);
+                buffer[ii] += K[kk]*V[stride*idx];
+            }
+        }
+    }
+
+    if(bc == FIM_BC_WEIGHTED)
+    {
+        for(int64_t ii = 0 ; ii < mid; ii++)
+        {
+            float W = 0;
+            for(int64_t kk = 0; kk < (int64_t) nK; kk++)
+            {
+                int64_t idx = (ii + kk - mid);
+                if(idx >= 0)
+                {
+                    buffer[ii] += K[kk]*V[stride*idx];
+                    W+=K[kk];
+                }
+            }
+            buffer[ii]*=Wtotal/W;
+        }
+    }
+
+    /* Part II: Central, the kernels is inside the image */
+    for(int64_t ii = mid ; ii < (int64_t) nV-mid; ii++)
+    {
+        for(int64_t kk = 0; kk < (int64_t) nK; kk++)
+        {
+            int64_t idx = ii + kk - mid;
+            idx < 0 ? idx = -idx : 0;
+            buffer[ii] += K[kk]*V[stride*idx];
+        }
+    }
+
+    /* Part III: Last, where kernel is beyond the last pixel
+       if bc == FIM_BC_VALID, this part is skipped */
+    if(bc == FIM_BC_SYMMETRIC_MIRROR)
+    {
+        int64_t inV = nV;
+        for(int64_t ii = inV-mid ; ii < inV; ii++)
+        {
+            for(int64_t kk = 0; kk < (int64_t) nK; kk++)
+            {
+                int64_t idx = ii + kk - mid;
+                idx >= inV ? idx = (inV-1)-(idx+1-inV) : 0;
+                buffer[ii] += K[kk]*V[stride*idx];
+            }
+        }
+    }
+
+    if(bc == FIM_BC_ZEROS)
+    {
+        int64_t inV = nV;
+        for(int64_t ii = inV-mid ; ii < inV; ii++)
+        {
+            for(int64_t kk = 0; kk < (int64_t) nK; kk++)
+            {
+                int64_t idx = ii + kk - mid;
+                if(idx < inV)
+                { buffer[ii] += K[kk]*V[stride*idx]; }
+            }}}
+
+    if(bc == FIM_BC_PERIODIC)
+    {
+        int64_t inV = nV;
+        for(int64_t ii = inV-mid ; ii < inV; ii++)
+        {
+            for(int64_t kk = 0; kk < (int64_t) nK; kk++)
+            {
+                int64_t idx = (ii + kk - mid) % nV;
+                buffer[ii] += K[kk]*V[stride*idx];
+            }
+        }
+    }
+
+    if(bc == FIM_BC_WEIGHTED)
+    {
+        int64_t inV = nV;
+        for(int64_t ii = inV-mid ; ii < inV; ii++)
+        {
+            float W = 0;
+            assert(buffer[ii] == 0);
+            for(int64_t kk = 0; kk < (int64_t) nK; kk++)
+            {
+                int64_t idx = (ii + kk - mid);
+                if(idx < inV)
+                {
+                    buffer[ii] += K[kk]*V[stride*idx];
+                    W+=K[kk];
+                }
+            }
+            buffer[ii]*=Wtotal/W;
+        }
+    }
+
+
+    /* Write back the result to the input array */
+    for(size_t ii = 0; ii<nV; ii++)
+    {
+        V[ii*stride] = buffer[ii];
+    }
+
+    if(buffer_allocation)
+    {
+        free(buffer);
+    }
+    return;
+}
+
 void fim_conv1_vector(float * restrict V, const int stride, float * restrict W,
                       const size_t nV,
                       const float * restrict K, const size_t nKu, const int normalized)
 {
     if(V == NULL || K == NULL)
     {
+        return;
+    }
+
+    if(nKu > nV)
+    {
+        fprintf(stderr,
+                "fim_conv1_vector: error - kernel can't be longer than data\n");
         return;
     }
 
@@ -1474,7 +1720,9 @@ void fim_conv1_vector(float * restrict V, const int stride, float * restrict W,
             double kacc = 0;
             for(size_t kk = k2-vv; kk<nKu; kk++)
             {
+                assert((vv-k2+kk) < nV);
                 acc0 = acc0 + K[kk]*V[(vv-k2+kk)*stride];
+
                 kacc += K[kk];
             }
             if(normalized)
@@ -1492,6 +1740,7 @@ void fim_conv1_vector(float * restrict V, const int stride, float * restrict W,
             for(size_t kk = 0; kk < nKu; kk++)
             {
                 size_t vpos = ((vv-k2)+kk)*stride;
+                assert(vpos/stride < nV);
                 acc = acc + K[kk]*V[vpos];
             }
             W[bpos++] = acc;
@@ -1832,8 +2081,8 @@ static void fim_show(float * A, size_t M, size_t N, size_t P)
             }
             printf("\n");
         }
-        printf("\n");
     }
+    return;
 }
 
 static void fim_show_int(int * A, size_t M, size_t N, size_t P)
@@ -1852,8 +2101,8 @@ static void fim_show_int(int * A, size_t M, size_t N, size_t P)
             }
             printf("\n");
         }
-        printf("\n");
     }
+    return;
 }
 
 
@@ -2090,11 +2339,11 @@ ftab_t * fim_lmax(const float * I, size_t M, size_t N, size_t P)
     }
     strel[13] = 0;
 
-    for(size_t mm = 1; mm+1 < M; mm++)
+    for(size_t pp = 1; pp+1 < P; pp++)
     {
         for(size_t nn = 1; nn+1 < N; nn++)
         {
-            for(size_t pp = 1; pp+1 < P; pp++)
+            for(size_t mm = 1; mm+1 < M; mm++)
             {
                 size_t pos = mm + nn*M + pp*M*N;
                 if(I[pos] > strel333_max(I + pos, M, N, P, strel))
@@ -2503,59 +2752,53 @@ int fim_convn1(float * restrict V, size_t M, size_t N, size_t P,
     }
 
     /* Temporary storage/buffer for conv1_vector */
-    // TODO: one buffer per thread
-    size_t nW = max_size_t(M, max_size_t(N, P));
+    size_t nBuff = max_size_t(M, max_size_t(N, P));
 
-    int nThreads = 1;
 #pragma omp parallel
     {
-        nThreads = omp_get_num_threads();
-    }
 
+        float * buff = fim_malloc(nBuff*sizeof(float));
+        assert(buff != NULL);
 
-    float * W = fim_malloc(nThreads*nW*sizeof(float));
-    assert(W != NULL);
-
-    if(dim == 0)
-    {
-#pragma omp parallel for
-        for(size_t pp = 0; pp < P; pp++)
+        if(dim == 0)
         {
-            float * buff = W+omp_get_thread_num()*nW;
-            for(size_t nn = 0; nn < N; nn++)
+#pragma omp for
+            for(size_t pp = 0; pp < P; pp++)
             {
-                fim_conv1_vector(V+pp*(M*N)+nn*M, 1, buff, M, K, nK, normalized);
+                for(size_t nn = 0; nn < N; nn++)
+                {
+                    fim_conv1_vector(V+pp*(M*N)+nn*M, 1, buff, M, K, nK, normalized);
+                }
             }
         }
-    }
 
-    if(dim == 1)
-    {
-#pragma omp parallel for
-        for(size_t pp = 0; pp<P; pp++)
+        if(dim == 1)
         {
-            float * buff = W+omp_get_thread_num()*nW;
-            for(size_t mm = 0; mm<M; mm++)
+#pragma omp for
+            for(size_t pp = 0; pp<P; pp++)
             {
-                fim_conv1_vector(V + pp*(M*N) + mm, M, buff, N, K, nK, normalized);
+                for(size_t mm = 0; mm<M; mm++)
+                {
+                    fim_conv1_vector(V + pp*(M*N) + mm, M, buff, N, K, nK, normalized);
+                }
             }
         }
-    }
 
-    if(dim == 2)
-    {
-#pragma omp parallel for
-        for(size_t mm = 0; mm<M; mm++)
+        if(dim == 2)
         {
-            float * buff = W+omp_get_thread_num()*nW;
+#pragma omp for
             for(size_t nn = 0; nn<N; nn++)
             {
-                fim_conv1_vector(V+mm+M*nn, M*N, buff, P, K, nK, normalized);
+
+                for(size_t mm = 0; mm<M; mm++)
+                {
+                    fim_conv1_vector(V+mm+M*nn, M*N, buff, P, K, nK, normalized);
+                }
             }
         }
-    }
 
-    fim_free(W);
+        fim_free(buff);
+    }
     return EXIT_SUCCESS;
 }
 
@@ -3286,9 +3529,63 @@ void fim_min_ut()
     return;
 }
 
+void fim_conv1_ut(fim_boundary_condition bc)
+{
+    printf("fim_conv1_ut()\n");
+    printf("bc: %s\n", fim_boundary_condition_str(bc));
+    size_t nV = 7;
+    size_t nK = 3;
+    size_t stride = 1;
+    float * V = calloc(nV, sizeof(float));
+    for(size_t kk = 0; kk < nV; kk++)
+    { V[kk] = kk+1; }
+    printf("V=");fim_show(V, 1, nV, 1);
+    float * K = calloc(nK, sizeof(float));
+    K[0] = 1;
+    K[1] = 1;
+    K[2] = 1;
+    printf("K=");fim_show(K, 1, nK, 1);
+    fim_conv1(V, nV, stride,
+              K, nK,
+              NULL, bc);
+    printf("V*K=");fim_show(V, 1, nV, 1);
+    if(bc == FIM_BC_ZEROS)
+    {
+        assert(V[0] == 1+2);
+        assert(V[6] == 6+7);
+    }
+    if(bc == FIM_BC_SYMMETRIC_MIRROR)
+    {
+        assert(V[0] == 2+1+2);
+        assert(V[6] == 6+7+6);
+    }
+    if(bc == FIM_BC_VALID)
+    {
+        assert(V[0] == 0);
+        assert(V[6] == 0);
+    }
+    if(bc == FIM_BC_PERIODIC)
+    {
+        assert(V[0] == 1 + 2 + 7);
+        assert(V[6] == 6 + 7 + 1);
+    }
+    if(bc == FIM_BC_WEIGHTED)
+    {
+        assert(fabs(V[0] - (1.0+2.0)*3.0/2.0) < 1e-5);
+        assert(fabs(V[6] - (6.0+7.0)*3.0/2.0) < 1e-5);
+    }
+    free(V);
+    free(K);
+    return;
+}
+
 void fim_ut()
 {
-
+    fim_conv1_ut(FIM_BC_SYMMETRIC_MIRROR);
+    fim_conv1_ut(FIM_BC_ZEROS);
+    fim_conv1_ut(FIM_BC_VALID);
+    fim_conv1_ut(FIM_BC_PERIODIC);
+    fim_conv1_ut(FIM_BC_WEIGHTED);
     fim_argmax_max_ut();
     fim_min_ut();
     fim_max_ut();
