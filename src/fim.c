@@ -35,9 +35,11 @@ static const char * fim_boundary_condition_str(fim_boundary_condition bc)
         return "PERIODIC";
     case FIM_BC_WEIGHTED:
         return "WEIGHTED";
-    default:
-        return "UNKNOWN";
+    case FIM_BC_ZEROS:
+        return "ZEROS";
     }
+    assert(0);
+    return "UNKNOWN";
 }
 
 #ifdef __linux__
@@ -1252,7 +1254,7 @@ void fim_conncomp6_ut()
     printf("Input image\n");
     fim_show(Im, M, N, 1);
     int * L = fim_conncomp6(Im, M, N);
-    printf("Labelled array\n");
+    printf("Labeled array\n");
     fim_show_int(L, M, N, 1);
     fim_free(L);
     fim_free(Im);
@@ -1543,7 +1545,6 @@ void fim_conv1(float * restrict V, const size_t nV, const int stride,
             {
                 int64_t idx = (ii + kk - mid);
                 idx < 0 ? idx = nV +idx : 0;
-                printf("%ld -> %ld\n", (ii+kk - mid), idx);
                 buffer[ii] += K[kk]*V[stride*idx];
             }
         }
@@ -1604,7 +1605,9 @@ void fim_conv1(float * restrict V, const size_t nV, const int stride,
                 int64_t idx = ii + kk - mid;
                 if(idx < inV)
                 { buffer[ii] += K[kk]*V[stride*idx]; }
-            }}}
+            }
+        }
+    }
 
     if(bc == FIM_BC_PERIODIC)
     {
@@ -3531,8 +3534,7 @@ void fim_min_ut()
 
 void fim_conv1_ut(fim_boundary_condition bc)
 {
-    printf("fim_conv1_ut()\n");
-    printf("bc: %s\n", fim_boundary_condition_str(bc));
+    printf("fim_conv1_ut(), bc: %s\n", fim_boundary_condition_str(bc));
     size_t nV = 7;
     size_t nK = 3;
     size_t stride = 1;
