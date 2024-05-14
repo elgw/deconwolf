@@ -306,6 +306,8 @@ static ftab_t * append_fitting(opts * s, ftab_t * T, float * I,
     config->M = M;
     config->N = N;
     config->P = P;
+    // TODO use sigma_fit_lateral and sigma_fit_axial if set.
+    // TODO put formulas in utility function DRY and central documentation.
     config->sigma_xy = s->lambda/(2.0*s->NA)/s->dx / (2.0*sqrt(2*log(2)));
     config->sigma_z = 2.0*s->lambda / pow(s->NA, 2.0) / s->dz / (2.0*sqrt(2*log(2)));
     config->log = s->log;
