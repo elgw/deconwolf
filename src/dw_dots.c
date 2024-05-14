@@ -84,8 +84,8 @@ static void opts_print(FILE * f, opts * s)
     if(s->LoG)
     {
         fprintf(f, "Dot detection method: Laplacian of Gaussian (LoG)\n");
-        fprintf(f, "   Lateral sigma: %.2f\n", s->lsigma);
-        fprintf(f, "   Axial sigma: %.2f\n", s->asigma);
+        fprintf(f, "   Lateral sigma: %.2f pixels\n", s->lsigma);
+        fprintf(f, "   Axial sigma: %.2f pixels\n", s->asigma);
     }
     if(s->ndots > 0)
     {
@@ -115,6 +115,9 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
            "using a Laplacian of Gaussian filter.\n");
     printf("\n");
     printf("usage: %s [<options>] input.tif input2.tif ...\n", argv[0]);
+    // TODO: dogls, dogas, fitls, fitas, for specifying
+    // exacly what sigmas to use. If not, use based on
+    // optical parameters.
     printf("Options:\n");
     printf(" --lsigma s\n\t Lateral sigma (location of zero-crossing)\n");
     printf(" --asigma s\n\t Axial sigma (location of zero-crossing)\n");
@@ -303,8 +306,8 @@ static ftab_t * append_fitting(opts * s, ftab_t * T, float * I,
     config->M = M;
     config->N = N;
     config->P = P;
-    config->sigma_xy = s->lsigma;
-    config->sigma_z = s->asigma;
+    config->sigma_xy = s->lambda/(2.0*s->NA)/s->dx / (2.0*sqrt(2*log(2)));
+    config->sigma_z = 2.0*s->lambda / pow(s->NA, 2.0) / s->dz / (2.0*sqrt(2*log(2)));
     config->log = s->log;
     config->verbose = s->verbose;
     config->X = X;
@@ -348,6 +351,23 @@ static ftab_t * append_fitting(opts * s, ftab_t * T, float * I,
     ftab_t * TT = ftab_concatenate_columns(T, TF);
     ftab_free(TF);
     ftab_free(T);
+
+    xcol = ftab_get_col(TT, "x");
+    ycol = ftab_get_col(TT, "y");
+    zcol = ftab_get_col(TT, "z");
+    int fxcol = ftab_get_col(TT, "f_x");
+    int fycol = ftab_get_col(TT, "f_y");
+    int fzcol = ftab_get_col(TT, "f_z");
+
+    /* Make the fitted positions absolute */
+    for(size_t kk = 0; kk < TT->nrow; kk++)
+    {
+        float * row = TT->T + kk*TT->ncol;
+        row[fxcol]+=row[xcol];
+        row[fycol]+=row[ycol];
+        row[fzcol]+=row[zcol];
+    }
+
     return TT;
 
 
@@ -618,7 +638,7 @@ int dw_dots(int argc, char ** argv)
 #ifdef _OPENMP
     omp_set_num_threads(s->nthreads);
 #endif
-    if(s->verbose > 0)
+    if(s->verbose > 1)
     {
         opts_print(stdout, s);
     }
