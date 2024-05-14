@@ -1640,15 +1640,15 @@ int fim_tiff_maxproj_XYZ(const char * in, const char * out)
     fim_t * Iyz = fim_shiftdim(I);
     fim_t * _max_yz = fimt_maxproj(Iyz);
     fim_t * max_yz = fimt_transpose(_max_yz);
-    fim_delete(_max_yz);
+    fimt_free(_max_yz);
 
     /* Along Y */
     fim_t * Ixz = fim_shiftdim(Iyz);
-    fim_delete(Iyz);
+    fimt_free(Iyz);
     fim_t * _max_xz = fimt_maxproj(Ixz);
     fim_t * max_xz = fimt_transpose(_max_xz);
-    fim_delete(_max_xz);
-    fim_delete(Ixz);
+    fimt_free(_max_xz);
+    fimt_free(Ixz);
 
 
     // TODO: Scale according to pixel size?
@@ -1656,7 +1656,7 @@ int fim_tiff_maxproj_XYZ(const char * in, const char * out)
     /* Concatenation */
     size_t MM = I->M + I->P;
     size_t NN = I->N + I->P;
-    fim_delete(I);
+    fimt_free(I);
 
     fim_t * xview = malloc(sizeof(fim_t));
     assert(xview != NULL);
@@ -1681,12 +1681,12 @@ int fim_tiff_maxproj_XYZ(const char * in, const char * out)
     fimt_blit_2D(xview, max_xz, 0, max_xy->N);
     fimt_blit_2D(xview, max_yz, max_xy->M, 0);
 
-    fim_delete(max_xy);
-    fim_delete(max_xz);
-    fim_delete(max_yz);
+    fimt_free(max_xy);
+    fimt_free(max_xz);
+    fimt_free(max_yz);
 
     fimt_tiff_write(xview, out);
-    fim_delete(xview);
+    fimt_free(xview);
 
     return EXIT_SUCCESS;
 }

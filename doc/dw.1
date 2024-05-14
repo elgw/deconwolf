@@ -73,6 +73,14 @@ n=0: no padding.
 n=1: a compromise between memory/speed and quality.
 n=2 default.
 .TP
+\f[B]--offset v\f[R]
+Add a positive number, \f[I]v\f[R], to the image before processing, and
+then remove it before saving to disk.
+This can make the RL algorithm less sensitive to non-Poissonian noise
+(from the detector).
+A value close the standard deviation of the detector noise seems
+reasonable.
+.TP
 \f[B]--float\f[R]
 Save the output using 32-bit floats, also turns off any scaling.
 Please note that without this flag, images will be saved as 16-bit

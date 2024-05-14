@@ -861,7 +861,7 @@ static void dw_psf(opts * s)
         {
             PSF->V[kk] *= PSF2->V[kk];
         }
-        fim_delete(PSF2);
+        fimt_free(PSF2);
     }
 
 
@@ -886,7 +886,7 @@ static void dw_psf(opts * s)
                          T,
                          PSF->M, PSF->N, PSF->P);
     ttags_free(&T);
-    fim_delete(PSF);
+    fimt_free(PSF);
 }
 
 int dw_psf_cli(int argc, char ** argv)

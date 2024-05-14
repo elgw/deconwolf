@@ -90,12 +90,12 @@ void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_realloc(void * p, size_t 
  */
 void fim_free(void * p);
 
-/** @brief Delete a fim_t object.
+/** @brief Delete/free a fim_t object.
  *
  * Frees all resources associated with the fim_t object.
  * as well as the fim_t object itself.
  */
-void fim_delete(fim_t *);
+void fimt_free(fim_t *);
 
 fim_t * fimt_zeros(size_t M, size_t N, size_t P);
 
@@ -108,6 +108,13 @@ fim_t * fimt_zeros(size_t M, size_t N, size_t P);
  */
 fim_t * fim_image_from_array(const float * restrict V,
                              size_t M, size_t N, size_t P);
+
+/** @brief Wrap an array by a fim_t object
+ *
+ * This creates a pointer to the data, not a copy.
+ *
+*/
+fim_t * fim_wrap_array(float * V, size_t M, size_t N, size_t P);
 
 /* Return a new copy */
 fim_t * fimt_copy(const fim_t * );
@@ -181,6 +188,9 @@ void fim_div(float * restrict  A,
 void fim_add(float * restrict A,
              const float * restrict B,
              size_t N);
+
+/* A[kk] += B[kk] */
+void fimt_add(fim_t * A, const fim_t * B);
 
 void fim_invert(float * restrict A, const size_t N);
 
@@ -445,7 +455,7 @@ void fim_conv1_vector(float * restrict V, int stride, float * restrict W,
  * fim_conv1_vector
  */
 int fim_convn1(float * restrict V, size_t M, size_t N, size_t P,
-               float * K, size_t nK,
+               const float * K, size_t nK,
                int dim, const int normalized);
 
 
@@ -466,6 +476,9 @@ float * fim_LoG(const float * V, size_t M, size_t N, size_t P,
 float * fim_LoG_S(const float * V, size_t M, size_t N, size_t P,
                   float sigmaxy, float sigmaz);
 
+/* Why not a third variant ... */
+float * fim_LoG_S2(const float * V0, const size_t M, const size_t N, const size_t P,
+                   const float sigmaxy, const float sigmaz);
 
 /* Simple interface to write 2D or 3D images without any meta data */
 int fimt_tiff_write(const fim_t * Im, const char * fName);
