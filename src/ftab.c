@@ -484,3 +484,52 @@ int ftab_set_coldata(ftab_t * T, int col, const float * data)
 
     return EXIT_SUCCESS;
 }
+
+
+ftab_t * ftab_concatenate_columns(const ftab_t * L , const ftab_t * R)
+{
+    if(L->nrow != R->nrow)
+    {
+        fprintf(stderr, "frab_concatenate_columns: "
+                "ERROR: tables have different number of rows\n");
+        return NULL;
+    }
+    size_t nrow = L->nrow;
+    size_t ncol = L->ncol + R->ncol;
+
+    ftab_t * T = ftab_new(ncol);
+    for(size_t kk = 0; kk < L->ncol; kk++)
+    {
+        ftab_set_colname(T, kk, L->colnames[kk]);
+    }
+    for(size_t kk = 0; kk < R->ncol; kk++)
+    {
+        ftab_set_colname(T, kk+L->ncol, R->colnames[kk]);
+    }
+    free(T->T);
+    T->T = calloc(nrow*ncol, sizeof(float));
+    assert(T->T != NULL);
+    T->ncol = ncol;
+    T->nrow = nrow;
+    T->nrow_alloc = nrow;
+
+    /* Insert data from L */
+    for(size_t kk = 0; kk < L->nrow; kk++)
+    {
+        for(size_t ll = 0; ll < L->ncol; ll++)
+        {
+            T->T[kk*ncol + ll] = L->T[kk*L->ncol + ll];
+        }
+    }
+
+    /* Insert data from R */
+    for(size_t kk = 0; kk < R->nrow; kk++)
+    {
+        for(size_t ll = 0; ll < R->ncol; ll++)
+        {
+            T->T[kk*ncol + ll + L->ncol] = R->T[kk*R->ncol + ll];
+        }
+    }
+
+    return T;
+}

@@ -606,7 +606,7 @@ static void fwhm_ut_3d(void)
                    fwhm_res[kk].fwhm_axial);
         }
         free(fwhm_res);
-        fim_delete(I);
+        fimt_free(I);
     }
     return;
 }

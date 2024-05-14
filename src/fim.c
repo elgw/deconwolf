@@ -164,7 +164,7 @@ void fim_ianscombe(float * x, size_t n)
 }
 
 
-void fim_delete(fim_t * F)
+void fimt_free(fim_t * F)
 {
     if(F != NULL)
     {
@@ -173,6 +173,18 @@ void fim_delete(fim_t * F)
         free(F);
     }
     return;
+}
+
+
+fim_t * fim_wrap_array(float * V, size_t M, size_t N, size_t P)
+{
+    fim_t * I = malloc(sizeof(fim_t));
+    assert(I != NULL);
+    I->V = V;
+    I->M = M;
+    I->N = N;
+    I->P = P;
+    return I;
 }
 
 fim_t * fim_image_from_array(const float * restrict V, size_t M, size_t N, size_t P)
@@ -402,6 +414,15 @@ void fim_minus(float * restrict  A,
     {
         A[kk] = B[kk] - C[kk];
     }
+    return;
+}
+
+void fimt_add(fim_t * A, const fim_t * B)
+{
+    assert(A->M == B->M);
+    assert(A->N == B->N);
+    assert(A->P == B->P);
+    fim_add(A->V, B->V, A->M * A->N * A->P);
     return;
 }
 
@@ -1327,14 +1348,14 @@ void fim_LoG_ut()
             exit(EXIT_FAILURE);
         }
     }
-    fim_delete(T);
+    fimt_free(T);
     T = NULL;
     assert(S1->V != S2->V);
-    fim_delete(S1);
+    fimt_free(S1);
     S1 = NULL;
-    fim_delete(S2);
+    fimt_free(S2);
     S2 = NULL;
-    fim_delete(S3);
+    fimt_free(S3);
 
 
     for(size_t kk = 0; kk<M*N*P; kk++)
@@ -1411,6 +1432,11 @@ void fim_LoG_ut()
         fim_show(LoG2, M, N, P);
     }
 
+    dw_gettime(&tstart);
+    float * LoGS2 = fim_LoG_S2(V, M, N, P, sigma_l, sigma_a);
+    dw_gettime(&tend);
+    free(LoGS2);
+    printf("fim_LoG_S2 took %f s\n", clockdiff(&tend, &tstart));
     fim_free(V);
     fim_free(LoG);
     fim_free(LoG2);
@@ -1459,6 +1485,31 @@ static float fim_interp_bc(float * V, int64_t nV,
     return 0;
 }
 
+void fimt_conv1_x(fim_t * V, fim_t * K, fim_boundary_condition bc)
+{
+
+#pragma omp parallel
+    {
+        float * B = fim_malloc(V->M*sizeof(float));
+
+        for(size_t pp = 0; pp<V->P; pp++)
+        {
+#pragma omp for
+            for(size_t nn = 0; nn<V->N; nn++)
+            {
+                float * line = V->V+pp*(V->M*V->N) + nn*(V->M);
+                fim_conv1(line, V->M,
+                          1, // stride
+                          K->V,
+                          fimt_nel(K),
+                          B,
+                          bc);
+            }
+        }
+        free(B);
+    }
+}
+
 /* like here: https://diplib.org/diplib-docs/boundary.html#dip-BoundaryCondition */
 void fim_conv1(float * restrict V, const size_t nV, const int stride,
                const float * restrict K, const size_t nK,
@@ -1466,6 +1517,7 @@ void fim_conv1(float * restrict V, const size_t nV, const int stride,
                fim_boundary_condition bc)
 {
     assert(V != NULL);
+    memset(buffer, 0, nV*sizeof(float));
 
     if(nK % 2 == 0)
     {
@@ -1574,7 +1626,8 @@ void fim_conv1(float * restrict V, const size_t nV, const int stride,
         for(int64_t kk = 0; kk < (int64_t) nK; kk++)
         {
             int64_t idx = ii + kk - mid;
-            idx < 0 ? idx = -idx : 0;
+            //printf("kk: %ld, idx: %ld, ii: %ld\n", kk, idx, ii);
+            //fflush(stdout);
             buffer[ii] += K[kk]*V[stride*idx];
         }
     }
@@ -2746,7 +2799,7 @@ int * fim_conncomp6(const float * im, size_t M, size_t N)
 }
 
 int fim_convn1(float * restrict V, size_t M, size_t N, size_t P,
-               float * K, size_t nK,
+               const float * K, size_t nK,
                int dim, const int normalized)
 {
     if(dim < 0 || dim > 2)
@@ -2805,11 +2858,16 @@ int fim_convn1(float * restrict V, size_t M, size_t N, size_t P,
     return EXIT_SUCCESS;
 }
 
-
-float * conv1_3(const float * V, size_t M, size_t N, size_t P,
-                float * K1, size_t nK1,
-                float * K2, size_t nK2,
-                float * K3, size_t nK3)
+/** Separable convolution.
+ *
+ * Convolve V by K1 in the 1st dimension, K2
+ * in the 2nd dimension and K3 in the third dimension.  This version
+ * use fim_shiftdim to reduce the computational load.
+ */
+float * conv1_3(const float * restrict V, size_t M, size_t N, size_t P,
+                const float * K1, size_t nK1,
+                const float * K2, size_t nK2,
+                const float * K3, size_t nK3)
 {
     const int dim = 0;
     const int norm = 0;
@@ -2929,6 +2987,85 @@ float * fim_LoG_S(const float * V0, const size_t M, const size_t N, const size_t
     memcpy(uLoG, LoG+M*N*apad, M*N*P0*sizeof(float));
     fim_free(LoG);
     return uLoG;
+}
+
+float * fim_LoG_S2(const float * V0, const size_t M, const size_t N, const size_t P,
+                   const float sigmaxy, const float sigmaz)
+{
+
+    fim_boundary_condition bc = FIM_BC_SYMMETRIC_MIRROR;
+
+/* Set up filters */
+    /* Lateral filters */
+    size_t nlG = 0;
+    float * _lG = gaussian_kernel(sigmaxy, &nlG);
+    fim_t * lG = fim_wrap_array(_lG, nlG, 1, 1);
+    size_t nl2;
+    float * _l2 = gaussian_kernel_d2(sigmaxy, &nl2);
+    fim_t * l2 = fim_wrap_array(_l2, nl2, 1, 1);
+    /* Axial filters */
+    size_t naG = 0;
+    float * _aG = gaussian_kernel(sigmaz,  &naG);
+    fim_t * aG = fim_wrap_array(_aG, naG, 1, 1);
+    size_t na2;
+    float * _a2 = gaussian_kernel_d2(sigmaz,  &na2);
+    fim_t * a2 = fim_wrap_array(_a2, na2, 1, 1);
+
+
+    /** First dimension -> GII, LII */
+    fim_t * GII = fim_image_from_array(V0, M, N, P);
+    fimt_conv1_x(GII, lG, bc);
+
+    fim_t * LII = fim_image_from_array(V0, M, N, P);
+    fimt_conv1_x(LII, l2, bc);
+
+    /** 2nd dimension -> GGI, GLI, LGI */
+    /* Prepare buffers */
+    fim_t * GGI = fim_shiftdim(GII);
+    fimt_free(GII);
+    fim_t * GLI = fimt_copy(GGI);
+    fim_t * LGI = fim_shiftdim(LII);
+    fimt_free(LII);
+    /* Apply filters */
+    fimt_conv1_x(GGI, lG, bc);
+    fimt_conv1_x(GLI, l2, bc);
+    fimt_conv1_x(LGI, lG, bc);
+
+    /** 3rd dimension -> GGL, GLG, LGG */
+    fim_t * GGL = fim_shiftdim(GGI);
+    fimt_free(GGI);
+    fim_t * GLG = fim_shiftdim(GLI);
+    fimt_free(GLI);
+    fim_t * LGG = fim_shiftdim(LGI);
+    fimt_free(LGI);
+
+    fimt_conv1_x(GGL, a2, bc);
+    fimt_conv1_x(GLG, aG, bc);
+    fimt_conv1_x(LGG, aG, bc);
+
+    /* Free the filters */
+    fimt_free(lG);
+    fimt_free(l2);
+    fimt_free(aG);
+    fimt_free(a2);
+
+    /** Merge results */
+    fim_t * LoG = GGL;
+    GGL = NULL;
+    fimt_add(LoG, GLG);
+    fimt_free(GLG);
+    fimt_add(LoG, LGG);
+    fimt_free(LGG);
+
+    /** Shift back to original shape */
+    fim_t * result = fim_shiftdim(LoG);
+    fimt_free(LoG);
+
+    float * pLoG = result->V;
+    result->V = NULL;
+    fimt_free(result);
+
+    return pLoG;
 }
 
 
@@ -3176,7 +3313,7 @@ static float total_gm(const float * I0, size_t M, size_t N, float sigma)
     fim_t * I = fim_image_from_array(I0, M, N, 1);
     fim_t * dx = fimt_partial(I, 0, sigma);
     fim_t * dy = fimt_partial(I, 1, sigma);
-    fim_delete(I);
+    fimt_free(I);
 
     double gm = 0;
     for(size_t kk = 0; kk<M*N; kk++)
@@ -3184,8 +3321,8 @@ static float total_gm(const float * I0, size_t M, size_t N, float sigma)
         gm += sqrt( pow(dx->V[kk], 2) + pow(dy->V[kk], 2));
     }
 
-    fim_delete(dx);
-    fim_delete(dy);
+    fimt_free(dx);
+    fimt_free(dy);
     return (float) gm;
 }
 
@@ -3338,12 +3475,12 @@ ftab_t * fim_features_2d(const fim_t * fI)
         debug == 1 ? memcpy(debug_image + M*N*col, value, M*N*sizeof(float)) : 0;
         sprintf(sbuff, "s%.1f_HE_EV_2", sigma);
         ftab_set_colname(T, col++, sbuff);
-        fim_delete(dx);
-        fim_delete(dy);
-        fim_delete(ddx);
-        fim_delete(ddy);
-        fim_delete(dxdy);
-        fim_delete(G);
+        fimt_free(dx);
+        fimt_free(dy);
+        fimt_free(ddx);
+        fimt_free(ddy);
+        fimt_free(dxdy);
+        fimt_free(G);
     }
     free(sbuff); /* Free string buffer */
     printf("\n");
@@ -3385,7 +3522,7 @@ void fim_features_2d_ut()
     T->nrow = 10;
     ftab_print(stdout, T);
     ftab_free(T);
-    fim_delete(I);
+    fimt_free(I);
 }
 
 
@@ -3539,10 +3676,12 @@ void fim_conv1_ut(fim_boundary_condition bc)
     size_t nK = 3;
     size_t stride = 1;
     float * V = calloc(nV, sizeof(float));
+    assert(V != NULL);
     for(size_t kk = 0; kk < nV; kk++)
     { V[kk] = kk+1; }
     printf("V=");fim_show(V, 1, nV, 1);
     float * K = calloc(nK, sizeof(float));
+    assert(K != NULL);
     K[0] = 1;
     K[1] = 1;
     K[2] = 1;

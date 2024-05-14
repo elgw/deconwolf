@@ -60,7 +60,7 @@ int ftab_write_tsv(const ftab_t * T, const char * fname);
 int ftab_print(FILE *, const ftab_t *);
 
 /* Set the name of a column
-* name can be freed */
+* the name is copied, i.e., can be freed */
 void ftab_set_colname(ftab_t *, int col, const char * name);
 
 /* Free a ftab and all associated data */
@@ -77,11 +77,20 @@ int ftab_get_col(const ftab_t * T, const char * name);
 /* Some unit tests */
 int ftab_ut(void);
 
-/* Set the data for one column. It is up to the caller to
- * verify that the number of elements in data is T->nrow
+/** @brief Set the data for one column.
+ * @param T: table to receive data
+ * @param col: column to write to
+ * @param data: pointer to data to insert
  */
+
 int ftab_set_coldata(ftab_t * T, int col, const float * data);
 
+/** @brief Horizontal concatenation
+ *
+ * @param L : data on the left side
+ * @param R : data on the right side
+*/
+ftab_t * ftab_concatenate_columns(const ftab_t * L, const ftab_t * R);
 
 /* Keep n head rows */
 void ftab_head(ftab_t * T, int64_t n);

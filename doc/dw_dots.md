@@ -7,23 +7,35 @@ deconwolf **dw** is a tool for deconvolution of wide field microscopy
 stacks.
 
 **dw dots** is the module that can be used to detect dots in tif
-images and export them to a tsv file.
+images and export them to a tsv file. It uses a Laplacian of Gaussian
+(LoG) filter for initial detection and can further calculate full
+width half max (FWHM) by interpolation if wanted.
 
 # SYNOPSIS
 
 **dw dots** [*OPTIONS*] file1.tif file2.tif ...
 
 # OPTIONS
-**\--LoG**
-: Pre-filter the image with a Laplacian of Gaussian
-  filter. Recommended for non-deconvolved images. Sometimes good for
-  deconvolved as well.
-
 **\--lsigma**
-: Lateral sigma for a Gaussian low pass filter or the LoG filter if enabled.
+: Lateral sigma for the LoG filter.
 
 **\--asigma**
-: Axial sigma for a Gaussian low pass filter or the LoG filter if enabled.
+: Axial sigma for the LoG filter
+
+**\--NA**
+: Numerical Aperture
+
+**\ni**
+: refractive index
+
+**\lambda**
+: emission wave length (in nm)
+
+**\--dx**
+: lateral pixel size of the image (not the sensor) in nm.
+
+**\--dz**
+: axial pixel size / distance between the planes in the image. Specified in nm.
 
 **\--overwrite**
 : If specified existing files will be overwritten.
@@ -50,8 +62,9 @@ images and export them to a tsv file.
 # Method
 **dw dots** will read one input image at a time and will perform the following:
 
- - Filter the image with either a Gaussian low pass filter or a LoG
-  filter using the values specified by **\--lsigma** and **\--asigma**.
+ - Filter the image with LoG filter using the values specified by
+  **\--lsigma** and **\--asigma** (or automatically set if you specify
+  the optical parameters as described below).
  - Extract all local maxima.
  - Sort the maxima according to the dot intensity.
  - Calculate the FWHM value for each dot in the lateral plane (by
@@ -63,13 +76,22 @@ images and export them to a tsv file.
 for log files from deconwolf, and if one is found the input image is
 rescaled according to the log file.
 
-For deconvolved images **\--lsigma** and **\--asigma** can typically
-be left untouched, i.e. at 0. For non-deconvolved images it makes
-sense to match the filters to the airy pattern.
+The size of the LoG filter is determined by lsigma and asigma, which
+coincide with the zero crossings of the LoG. If you don't know how to
+set those values, then, as an alternative, you can specify **\--NA**,
+**\--ni**, **\--lambda**, **\--dx** and **\--dz** instead and those
+parameters will be used to set the sigma values. In that case sigma
+will be set to the fwhm in each direction. That gives a filter that is
+slightly larger than what would be optimal for diffraction limited dots.
 
 # OUTPUT
 A TSV file will be generated per input file (`.dots.tsv`) as well as a
 log file (`.dots.log.txt`). The TSV file will be sorted by the dot intensities.
+
+# DETAILS
+
+- The LoG filter is implemented using symmetric mirroring at the image edges.
+- This routine will only work for 3D images.
 
 # SEE ALSO
 **dw**, **dw_bw**

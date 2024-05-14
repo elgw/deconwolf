@@ -4,7 +4,7 @@ CFLAGS=-Wall -Wextra
 
 DEBUG?=0
 ifeq ($(DEBUG),1)
-CFLAGS+=-g3 -fanalyzer -fno-inline
+CFLAGS+=-g3 -fanalyzer -fno-inline -fstack-protector-all -fsanitize=address -fno-omit-frame-pointer
 else
 CFLAGS+=-O3
 LDFLAGS+=-flto
@@ -56,7 +56,7 @@ dw_nuclei_files=dw_nuclei.c fim.o ftab.o fim_tiff.o prf_forest.o qsort.o prf_tre
 dw_nuclei: $(dw_nuclei_files)
 	$(CC) $(CFLAGS) -DSTANDALONE $(dw_nuclei_files) $(LDFLAGS) -o dw_nuclei
 
-dw_dots_files=dw_dots.c fim.o ftab.o fim_tiff.o fwhm.o dw_util.o fft.o
+dw_dots_files=dw_dots.c fim.o ftab.o fim_tiff.o fwhm.o dw_util.o fft.o gmlfit.o
 dw_dots: $(dw_dots_files)
 	$(CC) $(CFLAGS) -DSTANDALONE $(dw_dots_files) $(LDFLAGS) -o dw_dots
 

@@ -93,6 +93,7 @@ add_executable(dw
   src/method_shb.c
   src/tiling.c
   src/fft.c
+  src/gmlfit.c
   src/sparse_preprocess.c
   src/sparse_preprocess_cli.c)
 
