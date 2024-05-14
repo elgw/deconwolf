@@ -441,7 +441,7 @@ static void gmlfit_print(gmlfit * conf)
     {
         fprintf(conf->log, "   num_threads = %d\n", conf->num_threads);
     } else {
-        fprintf(conf->log, "    num_threads: not set\n");
+        fprintf(conf->log, "   num_threads: not set\n");
     }
     fprintf(conf->log, "\n");
     return;
