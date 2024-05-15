@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## 0.4.0
+Updates to `dw dots`:
+- Updated LoG filter and maxima finding routine gives a speedup > 2x.
+- Setting the filter sizes based on the optical parameters, assuming
+  diffraction limited dots.
+- Addition: Can fit dots using a 3D Gaussian while minimizing the
+  $-\log$ likelihood assuming Poissonian noise. For this purpose the
+  Broyden-Fletcher-Goldfarb-Shanno algoritm (bfgs2 in GSL) is used.
+
 ## 0.3.9
 - Added the **--offset** option. This will add an offset to the image
   before the deconvolution start, which will be removed before saving

@@ -109,3 +109,7 @@ char * dw_prefix_file(const char * file, const char * prefix);
 #ifdef WINDOWS
 int getline(char **lineptr, size_t *n, FILE *stream);
 #endif
+
+
+float abbe_res_xy(float lambda, float NA);
+float abbe_res_z(float lambda, float NA);

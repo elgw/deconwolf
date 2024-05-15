@@ -1517,6 +1517,7 @@ void fim_conv1(float * restrict V, const size_t nV, const int stride,
                fim_boundary_condition bc)
 {
     assert(V != NULL);
+    assert(buffer != NULL);
     memset(buffer, 0, nV*sizeof(float));
 
     if(nK % 2 == 0)
