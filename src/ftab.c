@@ -41,19 +41,14 @@ void ftab_free(ftab_t * T)
     {
         return;
     }
-    if(T->T != NULL)
-    {
-        free(T->T);
-    }
+
+    free(T->T);
 
     if(T->colnames != NULL)
     {
-        for(size_t kk = 0; kk<T->ncol; kk++)
+        for(size_t kk = 0; kk < T->ncol; kk++)
         {
-            if(T->colnames[kk] != NULL)
-            {
-                free(T->colnames[kk]);
-            }
+            free(T->colnames[kk]);
         }
         free(T->colnames);
     }
@@ -332,7 +327,7 @@ void ftab_insert(ftab_t * T, float * row)
 }
 
 /* Count the number of newlines in a file */
-    static size_t count_newlines(const char * fname)
+static size_t count_newlines(const char * fname)
 {
     FILE * fid = fopen(fname, "r");
     assert(fid != NULL);
@@ -385,30 +380,20 @@ void ftab_set_colname(ftab_t * T, int col, const char * name)
 {
     // TODO check that only valid chars are used
     if(col < 0 || col >= (int) T->ncol)
-    {
-        return;
-    }
+    { return; }
 
     if(name == NULL)
-    {
-        return;
-    }
+    { return; }
 
     if(T->colnames == NULL)
     {
-        T->colnames = malloc(T->ncol*sizeof(char*));
+        T->colnames = calloc(T->ncol, sizeof(char*));
         assert(T->colnames != NULL);
-        for(size_t kk = 0; kk<T->ncol; kk++)
-        {
-            T->colnames[kk] = NULL;
-        }
     }
 
-    if(T->colnames[col] != NULL)
-    {
-        free(T->colnames[col]);
-    }
+    free(T->colnames[col]);
     T->colnames[col] = strdup(name);
+    return;
 }
 
 int ftab_ut()

@@ -18,8 +18,6 @@
 
 #ifdef WINDOWS
 
-
-
 #endif
 
 int isdir(const char * dir)
@@ -375,4 +373,15 @@ dw_prefix_file(const char * inFile, const char * prefix)
     free(fname);
 
     return outFile;
+}
+
+float abbe_res_xy(float lambda, float NA)
+{
+    return lambda/(2.0*NA);
+}
+
+
+float abbe_res_z(float lambda, float NA)
+{
+    return 2.0*lambda / pow(NA, 2.0);
 }

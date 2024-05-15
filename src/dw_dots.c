@@ -4,14 +4,15 @@ typedef struct{
     int overwrite;
     int verbose;
     int optpos;
-    int LoG;
     char * image; /* Image to analyze */
     char * outfile; /* Where to write the tsv output */
     char * fout; /* Where to (optionally) write the filtered image */
     int nthreads;
     /* This determines the filter size */
-    float asigma; /* Axial sigma */
-    float lsigma; /* Lateral sigma */
+    float log_asigma; /* Axial sigma for LoG filter */
+    float log_lsigma; /* Lateral sigma */
+    float fit_asigma; /* For dot fitting */
+    float fit_lsigma;
     float NA;
     float ni;
     float lambda;
@@ -43,7 +44,7 @@ static opts * opts_new()
     s->logfile = NULL;
     s->fout = NULL;
     s->fwhm = 0;
-    s->LoG = 1;
+
     s->fitting = 0;
     return s;
 }
@@ -81,12 +82,10 @@ static void opts_print(FILE * f, opts * s)
     }
     fprintf(f, "nthreads = %d\n", s->nthreads);
 
-    if(s->LoG)
-    {
-        fprintf(f, "Dot detection method: Laplacian of Gaussian (LoG)\n");
-        fprintf(f, "   Lateral sigma: %.2f pixels\n", s->lsigma);
-        fprintf(f, "   Axial sigma: %.2f pixels\n", s->asigma);
-    }
+    fprintf(f, "Dot detection method: Laplacian of Gaussian (LoG)\n");
+    fprintf(f, "   Lateral sigma: %.2f pixels\n", s->log_lsigma);
+    fprintf(f, "   Axial sigma: %.2f pixels\n", s->log_asigma);
+
     if(s->ndots > 0)
     {
         fprintf(f, "Will write at most %d dots\n", s->ndots);
@@ -101,7 +100,9 @@ static void opts_print(FILE * f, opts * s)
     }
     if(s->fitting)
     {
-        fprintf(f, "Will fit the dots\n");
+        fprintf(f, "Will fit the dots:\n");
+        fprintf(f, "   Lateral sigma: %.2f\n", s->fit_lsigma);
+        fprintf(f, "   Axial sigma: %.2f\n", s->fit_asigma);
     } else {
         fprintf(f, "Fitting not enabled\n");
     }
@@ -112,23 +113,22 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
 {
     opts * s = opts_new();
     printf("Detection of diffraction limited dots in 3D images\n"
-           "using a Laplacian of Gaussian filter.\n");
+           "using a Laplacian of Gaussian filter. Optional fitting\n"
+           "using a Gaussian model\n");
     printf("\n");
     printf("usage: %s [<options>] input.tif input2.tif ...\n", argv[0]);
-    // TODO: dogls, dogas, fitls, fitas, for specifying
-    // exacly what sigmas to use. If not, use based on
-    // optical parameters.
-    printf("Options:\n");
-    printf(" --lsigma s\n\t Lateral sigma (location of zero-crossing)\n");
-    printf(" --asigma s\n\t Axial sigma (location of zero-crossing)\n");
+    printf("\n");
+    printf("Recommended/required arguments:\n");
     printf(" --NA NA\n\t Set numerical aperture\n");
     printf(" --ni ni\n\t Set refractive index\n");
     printf(" --dx dx\n\t Lateral pixel size\n");
     printf(" --dz dz\n\t Axial pixel size\n");
     printf(" --lambda l\n\t Emission wave length\n");
+    printf(" --ndots n\n\t Number of dots to export (default %d)\n", s->ndots);
+    printf("\n");
+    printf("Additional options\n");
     printf(" --overwrite\n\t Overwrite existing files (default %d)\n", s->overwrite);
     printf(" --help\n\t Show this message\n");
-    printf(" --ndots n\n\t Number of dots to export (default %d)\n", s->ndots);
     printf(" --logfile file.txt\n\t Specify where the log file should be written\n");
     printf(" --fwhm\n\t Include FWHM in the output (default %d). Will be "
            "based on the filtered image.\n", s->fwhm);
@@ -136,13 +136,18 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
     printf(" --nthreads n\n\t Set the number of computational threads\n");
     printf(" --fout file.tif\n\t Write filtered image -- for debugging\n");
     printf("\n");
+    printf("If you want to control the filter sizes, skip the optical parameters "
+           "above and set the filter sizes manually by:\n");
+    printf(" --dog_ls s\n\t Lateral sigma (location of zero-crossing)\n");
+    printf(" --dog_as s\n\t Axial sigma (location of zero-crossing)\n");
+    printf(" --fit_ls\n\t"
+           "Lateral sigma, initial guess for the dot fitting");
+    printf(" --fit_as\n\t"
+           "Axial sigma, initial guess for the dot fitting");
+    printf("\n");
     printf("Notes:\n");
-    printf(" - The filter size (lsigma and asigma) can either be specified\n"
-           "   directly OR you can set NA, ni, lambda, dx, and dz which\n"
-           "   will be used to estimate a good value of the sigmas assuming\n"
-           "   that the input is a wide field image\n");
-    printf(" - The log messages will be written to input.tif.log.txt\n");
-    printf(" - Dots will be exported to input.tif.dots.tsv\n");
+    printf(" - Log messages will be written to [input file].log.txt\n");
+    printf(" - Dots will be exported to [input file].dots.tsv\n");
     printf("\n");
     printf(" See the man page for more information.\n");
     free(s);
@@ -173,13 +178,18 @@ ftab_t * ftab_insert_col(ftab_t * T, float * C, const char * cname)
 static void argparsing(int argc, char ** argv, opts * s)
 {
     struct option longopts[] = {
-        {"logfile", required_argument, NULL, 'L'},
+        {"dog_as", required_argument, NULL, 'a'},
+        {"fit_as", required_argument, NULL, 'A'},
+        {"logfile", required_argument, NULL, 'w'},
         {"out", required_argument, NULL, 'O'},
-        {"asigma", required_argument, NULL, 'a'},
+
+        {"dog_ls", required_argument, NULL, 'l'},
+        {"fit_ls", required_argument, NULL, 'l'},
+
         {"fwhm", no_argument, NULL, 'f'},
         {"fitting", no_argument, NULL, 'F'},
         {"help", no_argument, NULL, 'h'},
-        {"lsigma", required_argument, NULL, 'l'},
+
         {"ndots",   required_argument, NULL, 'n'},
         {"overwrite", no_argument, NULL, 'o'},
         {"fout",     required_argument, NULL, 'p'},
@@ -192,7 +202,7 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"ni",     required_argument, NULL, '6'},
         {NULL, 0, NULL, 0}};
     int ch;
-    while((ch = getopt_long(argc, argv, "1:3:4:5:6:L:a:fF:hi:l:n:op:r:v:", longopts, NULL)) != -1)
+    while((ch = getopt_long(argc, argv, "1:3:4:5:6:L:a:A:fF:hi:l:n:op:r:v:w:", longopts, NULL)) != -1)
     {
         switch(ch){
         case '1':
@@ -210,18 +220,11 @@ static void argparsing(int argc, char ** argv, opts * s)
         case '6':
             s->ni = atof(optarg);
             break;
-        case 'L':
-            free(s->logfile);
-            s->logfile = strdup(optarg);
-            assert(s->logfile != NULL);
-            break;
-        case 'O':
-            free(s->outfile);
-            s->outfile = strdup(optarg);
-            assert(s->outfile != NULL);
-            break;
         case 'a':
-            s->asigma = atof(optarg);
+            s->log_asigma = atof(optarg);
+            break;
+        case 'A':
+            s->fit_asigma = atof(optarg);
             break;
         case 'f':
             s->fwhm = 1;
@@ -233,14 +236,20 @@ static void argparsing(int argc, char ** argv, opts * s)
             usage(argc, argv);
             exit(0);
             break;
-        case 'l':
-            s->lsigma = atof(optarg);
+        case 'L':
+            s->fit_lsigma = atof(optarg);
+            break;
             break;
         case 'n':
             s->ndots = atoi(optarg);
             break;
         case 'o':
             s->overwrite = 1;
+            break;
+        case 'O':
+            free(s->outfile);
+            s->outfile = strdup(optarg);
+            assert(s->outfile != NULL);
             break;
         case 'p':
             s->fout = strdup(optarg);
@@ -252,22 +261,41 @@ static void argparsing(int argc, char ** argv, opts * s)
         case 'v':
             s->verbose = atoi(optarg);
             break;
+        case 'w':
+            free(s->logfile);
+            s->logfile = strdup(optarg);
+            assert(s->logfile != NULL);
+            break;
         default:
             exit(EXIT_FAILURE);
         }
     }
 
-    if( (s->asigma == 0) & (s->lsigma == 0) )
+    if(s->NA*s->ni*s->dx*s->dz*s->lambda > 0)
     {
-        if(s->NA*s->ni*s->dx*s->dz*s->lambda <= 0)
+        float fwhm_pixels = abbe_res_xy(s->lambda, s->NA)/s->dx;
+        float fwhm_pixels_z = abbe_res_z(s->lambda, s->NA) / s->dz;
+        s->log_asigma = fwhm_pixels;
+        s->log_lsigma = fwhm_pixels_z;
+        /* Set as the FWHM */
+        s->fit_lsigma = abbe_res_xy(s->lambda, s->NA)
+            / s->dx / (2.0*sqrt(2*log(2)));
+        s->fit_asigma = abbe_res_z(s->lambda, s->NA) / s->dz / (2.0*sqrt(2*log(2)));
+    }
+
+    if( (s->log_asigma == 0)*(s->log_lsigma) <= 0 )
+    {
+        fprintf(stderr, "Please specify --log_ls and --log_as OR NA, ni, lambda, dx and dz\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if(s->fitting)
+    {
+        if( (s->fit_asigma == 0)*(s->fit_lsigma) <= 0)
         {
-            fprintf(stderr, "Please specify asigma and lsigma OR NA, ni, lambda, dx and dz\n");
+            fprintf(stderr, "Please specify --fit_ls and --fit_as OR NA, ni, lambda, dx and dz\n");
             exit(EXIT_FAILURE);
         }
-        float fwhm_pixels = s->lambda/(2.0*s->NA)/s->dx;
-        float fwhm_pixels_z = 2.0*s->lambda / pow(s->NA, 2.0) / s->dz;
-        s->asigma = fwhm_pixels;
-        s->lsigma = fwhm_pixels_z;
     }
 
     s->optpos = optind;
@@ -306,15 +334,21 @@ static ftab_t * append_fitting(opts * s, ftab_t * T, float * I,
     config->M = M;
     config->N = N;
     config->P = P;
-    // TODO use sigma_fit_lateral and sigma_fit_axial if set.
-    // TODO put formulas in utility function DRY and central documentation.
-    config->sigma_xy = s->lambda/(2.0*s->NA)/s->dx / (2.0*sqrt(2*log(2)));
-    config->sigma_z = 2.0*s->lambda / pow(s->NA, 2.0) / s->dz / (2.0*sqrt(2*log(2)));
+    config->sigma_xy = s->fit_lsigma;
+    config->sigma_z = s->fit_asigma;
     config->log = s->log;
     config->verbose = s->verbose;
     config->X = X;
     config->nX = T->nrow;
-    printf("Fitting %zu dots\n", config->nX);
+    if(s->verbose > 0)
+    {
+        printf("Fitting %zu dots\n", config->nX);
+    }
+    if(s->log != NULL)
+    {
+        fprintf(s->log, "Fitting %zu dots\n", config->nX);
+    }
+
     double * F = gmlfit_run(config);
     free(config);
     free(X);
@@ -497,29 +531,16 @@ void detect_dots(opts * s, char * inFile)
     }
 
     float * feature = NULL;
-    if(s->LoG == 1)
+
+    if(s->verbose > 1)
     {
-        if(s->verbose > 1)
-        {
-            printf("LoG filter, lsigma=%.2f asigma=%.2f\n", s->lsigma, s->asigma);
-        }
-        fim_set_verbose(2);
-        //feature = fim_LoG_S(A, M, N, P, s->lsigma, s->asigma);
-        feature = fim_LoG_S2(A, M, N, P, s->lsigma, s->asigma);
-        fim_set_verbose(0);
-
-    } else {
-        if(s->verbose > 1)
-        {
-            printf("Low pass filtering with lsigma=%f, asigma=%f\n",
-                   s->lsigma, s->asigma);
-        }
-        feature = malloc(M*N*P*sizeof(float));
-        assert(feature != NULL);
-        memcpy(feature, A, M*N*P*sizeof(float));
-        fim_gsmooth_aniso(feature, M, N, P, s->lsigma, s->asigma);
+        printf("LoG filter, lsigma=%.2f asigma=%.2f\n",
+               s->log_lsigma, s->log_asigma);
     }
-
+    fim_set_verbose(2);
+    //feature = fim_LoG_S(A, M, N, P, s->lsigma, s->asigma);
+    feature = fim_LoG_S2(A, M, N, P, s->log_lsigma, s->log_asigma);
+    fim_set_verbose(0);
 
     if(s->fout != NULL)
     {
@@ -600,14 +621,13 @@ void detect_dots(opts * s, char * inFile)
 
     if(s->fitting)
     {
-        T = append_fitting(s, T, A, M, N, P);
+        T = append_fitting(s, T,
+                           A, M, N, P);
     }
 
     free(A);
 
     free(feature);
-
-
 
     /* Write to file */
     if(s->verbose > 0)
