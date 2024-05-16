@@ -106,6 +106,7 @@ static void opts_print(FILE * f, opts * s)
     } else {
         fprintf(f, "Fitting not enabled\n");
     }
+    fprintf(f, "NA: %f, ni: %f, lambda: %f, dx: %f, dz: %f\n", s->NA, s->ni, s->lambda, s->dx, s->dz);
     return;
 }
 
@@ -271,29 +272,48 @@ static void argparsing(int argc, char ** argv, opts * s)
         }
     }
 
+
+
     if(s->NA*s->ni*s->dx*s->dz*s->lambda > 0)
     {
         float fwhm_pixels = abbe_res_xy(s->lambda, s->NA)/s->dx;
         float fwhm_pixels_z = abbe_res_z(s->lambda, s->NA) / s->dz;
-        s->log_asigma = fwhm_pixels;
-        s->log_lsigma = fwhm_pixels_z;
-        /* Set as the FWHM */
-        s->fit_lsigma = abbe_res_xy(s->lambda, s->NA)
-            / s->dx / (2.0*sqrt(2*log(2)));
-        s->fit_asigma = abbe_res_z(s->lambda, s->NA) / s->dz / (2.0*sqrt(2*log(2)));
+        /* Set log size as the FWHM */
+        s->log_lsigma = fwhm_pixels;
+        s->log_asigma = fwhm_pixels_z;
+        /* Set fitting size as the spot size */
+        s->fit_lsigma = fwhm_pixels / (2.0*sqrt(2*log(2)));
+        s->fit_asigma = fwhm_pixels_z / (2.0*sqrt(2*log(2)));
     }
 
-    if( (s->log_asigma == 0)*(s->log_lsigma) <= 0 )
+    if(s->verbose > 1)
     {
-        fprintf(stderr, "Please specify --log_ls and --log_as OR NA, ni, lambda, dx and dz\n");
+        printf("VERBOSE>1: Printing out the settings just before validation:\n");
+        opts_print(stdout, s);
+    }
+
+    if( (s->log_asigma)*(s->log_lsigma) <= 0 )
+    {
+        fprintf(stderr, "ERROR: "
+                "Not enough parameters specified to determine the LoG filter size\n");
+        fprintf(stderr, "Please specify\n");
+        fprintf(stderr, "          --log_ls and --log_as\n");
+        fprintf(stderr, "      OR\n");
+        fprintf(stderr, "          --NA, --ni, --lambda, --dx and --dz\n");
         exit(EXIT_FAILURE);
     }
 
     if(s->fitting)
     {
-        if( (s->fit_asigma == 0)*(s->fit_lsigma) <= 0)
+        if( (s->fit_asigma)*(s->fit_lsigma) <= 0)
         {
-            fprintf(stderr, "Please specify --fit_ls and --fit_as OR NA, ni, lambda, dx and dz\n");
+            fprintf(stderr, "ERROR: "
+                    "Not enough parameters specified to determine the initial spot size for fitting\n");
+            fprintf(stderr, "Please specify\n");
+            fprintf(stderr, "Please specify\n");
+            fprintf(stderr, "          --fit_ls and --fit_as\n");
+            fprintf(stderr, "      OR\n");
+            fprintf(stderr, "          --NA, --ni, --lambda, --dx and --dz\n");
             exit(EXIT_FAILURE);
         }
     }
@@ -678,6 +698,15 @@ int dw_dots(int argc, char ** argv)
         detect_dots(s, argv[kk]);
     }
 
+    if(s->verbose > 1)
+    {
+        printf("Peak memory usage: %zu kB\n",
+               get_peakMemoryKB());
+    }
+
     opts_free(s);
+
+
+
     return EXIT_SUCCESS;
 }
