@@ -64,7 +64,7 @@ static void opts_free(opts * s)
     free(s->logfile);
     if(s->log != NULL)
     {
-        fclose(s->log);
+         fclose(s->log);
     }
     free(s->cmdline);
     free(s->scales);
