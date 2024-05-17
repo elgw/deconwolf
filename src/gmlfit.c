@@ -467,7 +467,7 @@ double * gmlfit_run(gmlfit * conf)
     assert(F != NULL);
 
     /** Determine a good windows size
-     * Currently 4*sigma pixels in each dimension, and at least 5^3 pixels.
+     * Currently 3*sigma pixels in each dimension, and at least 5^3 pixels.
      * If the window is too small:
      * - More noisy estimates (less data to base the fitting on)
      * - hard to guess the initial background value.
@@ -475,14 +475,12 @@ double * gmlfit_run(gmlfit * conf)
      * - More biased by nearby dots
      * - Slower
      *
-     * The setting 4 was found to be better than 3 and 5 on synthetic
-     * Gaussian dots.
      */
-    size_t wMN = ceil(4*conf->sigma_xy);
+    size_t wMN = ceil(3*conf->sigma_xy);
     wMN < 5 ? wMN = 5 : 0;
     wMN % 2 == 0 ? wMN++ : 0;
 
-    size_t wP = ceil(4*conf->sigma_z);
+    size_t wP = ceil(3*conf->sigma_z);
     wP < 5 ? wP = 5: 0;
     wP % 2 == 0 ? wP++ : 0;
 

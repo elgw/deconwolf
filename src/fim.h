@@ -403,6 +403,12 @@ float * fim_remove_small(const float * im, size_t M, size_t N,
 /* Find local maxima in I */
 //ftab_t * fim_lmax(const float * I, size_t M, size_t N, size_t P);
 ftab_t * fim_lmax(const float * Im, size_t M, size_t N, size_t P);
+
+/* Find local minima in several images
+ *  */
+ftab_t * fim_lmax_multiscale(float ** II, float * scales, size_t nscales,
+                             size_t M, size_t N, size_t P);
+
 /* Sort with largest value first */
 void ftab_sort(ftab_t * T, int col);
 
