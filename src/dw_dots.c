@@ -18,6 +18,7 @@ typedef struct{
     float lambda;
     float dx;
     float dz;
+    float swell;
     int ndots; /* Number of dots to export */
     char * logfile;
     FILE * log;
@@ -25,6 +26,10 @@ typedef struct{
     int fitting; /* Set to 1 to enable fitting */
     float th;
     int optind;
+    char * cmdline;
+    int nscale;
+    float max_rel_scale;
+    float * scales;
 } opts;
 
 static opts * opts_new();
@@ -44,8 +49,10 @@ static opts * opts_new()
     s->logfile = NULL;
     s->fout = NULL;
     s->fwhm = 0;
-
+    s->swell = 1;
     s->fitting = 0;
+    s->nscale = 1;
+    s->max_rel_scale = 2;
     return s;
 }
 
@@ -59,6 +66,8 @@ static void opts_free(opts * s)
     {
         fclose(s->log);
     }
+    free(s->cmdline);
+    free(s->scales);
     free(s);
 }
 
@@ -66,6 +75,7 @@ static void opts_print(FILE * f, opts * s)
 {
     assert(s != NULL);
     assert(f != NULL);
+    fprintf(f, "CMD: %s\n", s->cmdline);
     fprintf(f, "overwrite = %d\n", s->overwrite);
     fprintf(f, "verbose = %d\n", s->verbose);
     if(s->image != NULL)
@@ -82,9 +92,19 @@ static void opts_print(FILE * f, opts * s)
     }
     fprintf(f, "nthreads = %d\n", s->nthreads);
 
+    fprintf(f, "Assuming that the dots look like Gaussians with\n"
+            "a lateral sigma of %f and an axial sigma of %f\n",
+            s->fit_lsigma, s->fit_asigma);
     fprintf(f, "Dot detection method: Laplacian of Gaussian (LoG)\n");
     fprintf(f, "   Lateral sigma: %.2f pixels\n", s->log_lsigma);
     fprintf(f, "   Axial sigma: %.2f pixels\n", s->log_asigma);
+
+    if(s->nscale < 2)
+    {
+        fprintf(f, "Multiscale: No\n");
+    } else {
+        fprintf(f, "Multiscale: Yes, %d scales\n", s->nscale);
+    }
 
     if(s->ndots > 0)
     {
@@ -94,7 +114,7 @@ static void opts_print(FILE * f, opts * s)
     }
     if(s->fwhm)
     {
-        fprintf(f, "Will calculate FWHM on the filtered image\n");
+        fprintf(f, "Will calculate FWHM\n");
     } else {
         fprintf(f, "No FWHM calculations\n");
     }
@@ -128,11 +148,18 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
     printf(" --ndots n\n\t Number of dots to export (default %d)\n", s->ndots);
     printf("\n");
     printf("Additional options\n");
+    printf(" --nscale n\n"
+           "\t set the number of scales to use\n");
+    printf(" --swell f\n\t"
+           "Tell the program how much larger the dots are compared to\n"
+           "the diffraction limit. Default = 1, i.e. diffraction limited dots\n"
+           "For some experiments values up to 2 makes sense\n");
     printf(" --overwrite\n\t Overwrite existing files (default %d)\n", s->overwrite);
     printf(" --help\n\t Show this message\n");
     printf(" --logfile file.txt\n\t Specify where the log file should be written\n");
-    printf(" --fwhm\n\t Include FWHM in the output (default %d). Will be "
-           "based on the filtered image.\n", s->fwhm);
+    printf(" --fwhm\n"
+           "\tInclude FWHM based on interpolation in the output (default %d)\n",
+           s->fwhm);
     printf(" --verbose v\n\t Verbosity level (default %d)\n", s->verbose);
     printf(" --nthreads n\n\t Set the number of computational threads\n");
     printf(" --fout file.tif\n\t Write filtered image -- for debugging\n");
@@ -162,7 +189,7 @@ ftab_t * ftab_insert_col(ftab_t * T, float * C, const char * cname)
     {
         ftab_set_colname(T2, cc, T->colnames[cc]);
     }
-    float * row = malloc((T->nrow+1)*sizeof(float));
+    float * row = malloc((T->ncol+1)*sizeof(float));
     assert(row != NULL);
     for(size_t rr = 0; rr<T->nrow; rr++)
     {
@@ -178,6 +205,19 @@ ftab_t * ftab_insert_col(ftab_t * T, float * C, const char * cname)
 
 static void argparsing(int argc, char ** argv, opts * s)
 {
+    size_t cmdline_size = 2 + 3*argc;
+    for(int kk = 0; kk < argc; kk++)
+    { cmdline_size += strlen(argv[kk]); }
+    s->cmdline = calloc(cmdline_size, 1);
+    assert(s->cmdline != NULL);
+    for(int kk = 0; kk < argc; kk++)
+    {
+        strncat(s->cmdline, "'", cmdline_size);
+        strncat(s->cmdline, argv[kk], cmdline_size);
+        strncat(s->cmdline, "' ", cmdline_size);
+    }
+
+
     struct option longopts[] = {
         {"dog_as", required_argument, NULL, 'a'},
         {"fit_as", required_argument, NULL, 'A'},
@@ -192,8 +232,10 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"help", no_argument, NULL, 'h'},
 
         {"ndots",   required_argument, NULL, 'n'},
+        {"nscale",  required_argument, NULL, 'N'},
         {"overwrite", no_argument, NULL, 'o'},
         {"fout",     required_argument, NULL, 'p'},
+        {"swell",   required_argument, NULL, 's'},
         {"threads", required_argument, NULL, 't'},
         {"verbose", required_argument, NULL, 'v'},
         {"lambda", required_argument, NULL, '1'},
@@ -203,7 +245,7 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"ni",     required_argument, NULL, '6'},
         {NULL, 0, NULL, 0}};
     int ch;
-    while((ch = getopt_long(argc, argv, "1:3:4:5:6:L:a:A:fF:hi:l:n:op:r:v:w:", longopts, NULL)) != -1)
+    while((ch = getopt_long(argc, argv, "1:3:4:5:6:L:a:A:fF:hi:l:n:N:op:r:s:v:w:", longopts, NULL)) != -1)
     {
         switch(ch){
         case '1':
@@ -244,6 +286,9 @@ static void argparsing(int argc, char ** argv, opts * s)
         case 'n':
             s->ndots = atoi(optarg);
             break;
+        case 'N':
+            s->nscale = atoi(optarg);
+            break;
         case 'o':
             s->overwrite = 1;
             break;
@@ -255,6 +300,9 @@ static void argparsing(int argc, char ** argv, opts * s)
         case 'p':
             s->fout = strdup(optarg);
             assert(s->fout != NULL);
+            break;
+        case 's':
+            s->swell = atof(optarg);
             break;
         case 't':
             s->nthreads = atoi(optarg);
@@ -278,12 +326,24 @@ static void argparsing(int argc, char ** argv, opts * s)
     {
         float fwhm_pixels = abbe_res_xy(s->lambda, s->NA)/s->dx;
         float fwhm_pixels_z = abbe_res_z(s->lambda, s->NA) / s->dz;
-        /* Set log size as the FWHM */
-        s->log_lsigma = fwhm_pixels;
-        s->log_asigma = fwhm_pixels_z;
-        /* Set fitting size as the spot size */
-        s->fit_lsigma = fwhm_pixels / (2.0*sqrt(2*log(2)));
-        s->fit_asigma = fwhm_pixels_z / (2.0*sqrt(2*log(2)));
+        /* To determine the initial guess for the fitting,
+         * we assume a Gaussian signal and convert the
+         * fwhm to sigma
+         */
+        s->fit_lsigma = fwhm_pixels / (2.0*sqrt(2.0*log(2.0)));
+        s->fit_asigma = fwhm_pixels_z / (2.0*sqrt(2.0*log(2.0)));
+        /* The LoG achieve the maximum response when sigma = r/sqrt(2)
+         * for disks. For Gaussians it seems that the max response is given
+         * when sigma_LoG = sqrt(2)*sigma_sigmal
+         */
+        s->log_lsigma = s->fit_lsigma*sqrt(2.0);
+        s->log_asigma = s->fit_asigma*sqrt(2.0);
+
+        /* Apply swelling correction */
+        s->fit_lsigma *= s->swell;
+        s->fit_asigma *= s->swell;
+        s->log_lsigma *= s->swell;
+        s->log_asigma *= s->swell;
     }
 
     if(s->verbose > 1)
@@ -315,6 +375,16 @@ static void argparsing(int argc, char ** argv, opts * s)
             fprintf(stderr, "      OR\n");
             fprintf(stderr, "          --NA, --ni, --lambda, --dx and --dz\n");
             exit(EXIT_FAILURE);
+        }
+    }
+
+    if(s->nscale > 1)
+    {
+        s->scales = calloc(s->nscale, sizeof(float));
+        double f = exp( log(s->max_rel_scale)/ (double) (s->nscale -1.0));
+        for(int kk = 0; kk<s->nscale; kk++)
+        {
+            s->scales[kk] = pow(f, kk);
         }
     }
 
@@ -533,13 +603,15 @@ void detect_dots(opts * s, char * inFile)
     fprintf(s->log, "Reading %s\n", inFile);
     int64_t M = 0, N = 0, P = 0;
     float * A = fim_tiff_read(inFile, NULL, &M, &N, &P, s->verbose);
-    float scaling = dw_read_scaling(inFile);
-    if(scaling != 1)
     {
-        if(s->verbose > 0)
+        float scaling = dw_read_scaling(inFile);
+        if(scaling != 1)
         {
-            printf("Scaling by %f\n", 1.0/scaling);
-            fim_mult_scalar(A, M*N*P, 1.0/scaling);
+            if(s->verbose > 0)
+            {
+                printf("Scaling by %f\n", 1.0/scaling);
+                fim_mult_scalar(A, M*N*P, 1.0/scaling);
+            }
         }
     }
 
@@ -557,27 +629,75 @@ void detect_dots(opts * s, char * inFile)
         printf("LoG filter, lsigma=%.2f asigma=%.2f\n",
                s->log_lsigma, s->log_asigma);
     }
-    fim_set_verbose(2);
-    //feature = fim_LoG_S(A, M, N, P, s->lsigma, s->asigma);
-    feature = fim_LoG_S2(A, M, N, P, s->log_lsigma, s->log_asigma);
-    fim_set_verbose(0);
+    //fim_set_verbose(2);
 
-    if(s->fout != NULL)
+    ftab_t * T = NULL;
+    if(s->nscale < 2)
     {
+        feature = fim_LoG_S2(A, M, N, P, s->log_lsigma, s->log_asigma);
+
+
+        if(s->fout != NULL)
+        {
+            if(s->verbose > 1)
+            {
+                printf("Writing filtered image to %s\n", s->fout);
+            }
+            fim_tiff_write_float(s->fout, feature, NULL, M, N, P);
+        }
+
+        /* Detect local maxima */
         if(s->verbose > 1)
         {
-            printf("Writing filtered image to %s\n", s->fout);
+            printf("Detecting local maxima\n");
         }
-        fim_tiff_write_float(s->fout, feature, NULL, M, N, P);
+
+        T = fim_lmax(feature, M, N, P);
+        free(feature);
+        feature = NULL;
     }
 
-    /* Detect local maxima */
-    if(s->verbose > 1)
+
+    if(s->nscale > 1)
     {
-        printf("Detecting local maxima\n");
-    }
+        /* use s->nscale, starting at factor 1 (for diffraction limited dots)
+         * and continue up till max_rel_scale
+         * f^(nscale-1) = max_rel_scale;
+         *
+         */
+        float ** LoG = calloc(s->nscale, sizeof(float**));
+        for(int ss = 0; ss < s->nscale; ss++)
+        {
+            float scaling = s->scales[ss];
+            if(s->verbose > 0)
+            {
+                printf("LoG filter %d/%d, sigma = %f, %f\n",
+                       ss+1, s->nscale,
+                       scaling*s->log_lsigma,
+                       scaling*s->log_asigma);
+            }
 
-    ftab_t * T = fim_lmax(feature, M, N, P);
+            LoG[ss] = fim_LoG_S2(A, M, N, P,
+                                 scaling*s->log_lsigma,
+                                 scaling*s->log_asigma);
+
+            float s2 = scaling*scaling;
+            #pragma omp parallel for
+            for(size_t kk = 0; kk < M*N*P; kk++)
+            {
+                LoG[ss][kk] *= s2;
+            }
+
+        }
+        printf("Multiscale maxima detection\n");
+
+        T = fim_lmax_multiscale(LoG, s->scales, s->nscale, M, N, P);
+        for(int kk = 0 ; kk < s->nscale; kk++)
+        {
+            free(LoG[kk]);
+        }
+        free(LoG);
+    }
 
     if(s->verbose > 1)
     {
@@ -610,8 +730,14 @@ void detect_dots(opts * s, char * inFile)
     fim_histogram_t * H = fim_histogram(values, T->nrow);
     free(values);
     //s->th = fim_histogram_otsu(H);
-    fim_histogram_log(H);
-    s->th = fim_histogram_otsu(H);
+    if(H != NULL)
+    {
+        fim_histogram_log(H);
+        s->th = fim_histogram_otsu(H);
+    } else {
+        fprintf(stderr, "Warning: could not create a histogram for the dots\n");
+        s->th = -1;
+    }
     if(s->verbose > 1)
     {
         printf("Suggested threshold (from %zu dots): %f\n", T->nrow, s->th);
@@ -634,7 +760,7 @@ void detect_dots(opts * s, char * inFile)
 
     if(s->fwhm)
     {
-        fim_t * fI = fim_image_from_array(feature, M, N, P);
+        fim_t * fI = fim_image_from_array(A, M, N, P);
         T = append_fwhm(s, T, fI, "fwhm_lateral_filtered", "fwhm_axial_filtered");
         fimt_free(fI);
     }
@@ -647,7 +773,7 @@ void detect_dots(opts * s, char * inFile)
 
     free(A);
 
-    free(feature);
+
 
     /* Write to file */
     if(s->verbose > 0)
@@ -705,8 +831,6 @@ int dw_dots(int argc, char ** argv)
     }
 
     opts_free(s);
-
-
 
     return EXIT_SUCCESS;
 }

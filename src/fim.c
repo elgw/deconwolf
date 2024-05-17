@@ -1527,6 +1527,15 @@ void fim_conv1(float * restrict V, const size_t nV, const int stride,
         return;
     }
 
+    if(nK > nV)
+    {
+        fprintf(stderr, "Kernel size: %zu, Vector size: %zu\n", nK, nV);
+        fprintf(stderr,
+                "Someone did not bother to implement fim_conv1 when the kernel was larger than the input vector ... please file a bug report!\n");
+        fprintf(stderr, "The program will crash now\n");
+        exit(EXIT_FAILURE);
+    }
+
     const int64_t mid = (nK-1)/2;
     if(nK > nV)
     {
@@ -1835,16 +1844,23 @@ void fim_conv1_vector(float * restrict V, const int stride, float * restrict W,
     return;
 }
 
+static void flip_sign(float * X, size_t N)
+{
+    for(size_t kk = 0; kk<N; kk++)
+    {
+        X[kk]*=-1;
+    }
+}
+
+/* A Gaussian kernel
+ * Note: Always normalized to have sum 1.0 */
 static float * gaussian_kernel(float sigma, size_t * nK)
 {
-    /* A Gaussian kernel */
-
     /* Determine the size so that most of the signal is captured */
-    int len = 1; /* The total number of elements will be at least 3 */
-    while(erf((len+1.0)/sigma) < 1.0-1e-8)
-    {
-        len++;
-    }
+
+    int len = ceil(3.0*sigma);
+    len < 1 ? len = 1 : 0;
+
     int N = 2*len + 1;
 
     float * K = fim_malloc(N*sizeof(float));
@@ -1852,19 +1868,12 @@ static float * gaussian_kernel(float sigma, size_t * nK)
     float mid = (N-1)/2;
 
     float s2 = pow(sigma, 2);
+    float k0 = 1.0/sigma/sqrt(2.0*M_PI);
     for(int kk = 0; kk<N; kk++)
     {
-        float x = (float) kk-mid;
-        K[kk] = exp(-0.5*pow(x,2)/s2);
+        float x = (float) kk - mid;
+        K[kk] = k0*exp(-0.5*pow(x,2)/s2);
     }
-
-    /* Normalize the sum to 1 */
-    float sum = 0;
-    for(int kk = 0; kk<N; kk++)
-        sum+=K[kk];
-
-    for(int kk = 0; kk<N; kk++)
-        K[kk]/=sum;
 
     nK[0] = N;
     return K;
@@ -1875,11 +1884,10 @@ static float * gaussian_kernel_d1(float sigma, size_t * nK)
     /* First derivative of a Gaussian kernel */
 
     /* Determine the size so that most of the signal is captured */
-    int len = 1; /* The total number of elements will be at least 3 */
-    while(erf((len+1.0)/sigma) < 1.0-1e-8)
-    {
-        len++;
-    }
+    int len = ceil(3.0*sigma);
+    len < 1 ? len = 1 : 0;
+
+    /* Total number of elements */
     int N = 2*len + 1;
 
     float * K = fim_malloc(N*sizeof(float));
@@ -1912,23 +1920,35 @@ static float * gaussian_kernel_d1(float sigma, size_t * nK)
 }
 
 
+/** @brief 1D Laplacian of Gaussian
+ *
+ * The filter is centered in the returned array. nK
+ * is the number of elements.
+ *
+ * Note: Besides being truncated, the Laplacian is only sampled at the
+ * middle of the pixels, not integrated. Hence it might not integrate
+ * to 0.
+ */
 static float * gaussian_kernel_d2(float sigma, size_t * nK)
 {
     /* d2/dx2 Gaussian kernel */
-    float * K = gaussian_kernel(sigma, nK);
+    int m = ceil(4.0*sigma);
+    m < 1 ? m = 1 : 0;
+    int n = 2*m + 1;
 
-    int n = (int) nK[0];
-    int m = (n-1)/2;
-    float s2 = pow(sigma, 2);
-    float b = 1.0/(2*s2);
+    float * K = fim_malloc(n*sizeof(float));
 
+    nK[0] = n;
+
+    float s2 = pow(sigma, 2.0);
+    float s4 = pow(sigma, 4.0);
+    float k0 = 1.0/sigma/sqrt(2.0*M_PI);
     for(int kk = 0; kk < n; kk++)
     {
-        float x = kk-m;
-        float x2 = pow(x, 2);
-        K[kk] *= -2*b*(2*b*x2-1.0);
+        float x = (float) kk- (float) m;
+        float G = k0*exp(-0.5*pow(x,2)/s2);
+        K[kk] = (pow(x, 2.0)-s2)/s4*G;
     }
-
 
     return K;
 }
@@ -2379,6 +2399,92 @@ float strel333_max(const float * I, size_t M, size_t N,
     return max;
 }
 
+ftab_t * fim_lmax_multiscale(float ** II, float * scales, size_t nscales,
+                             size_t M, size_t N, size_t P)
+{
+    int ncol = 4 + nscales;
+    ftab_t * T = ftab_new(ncol);
+    ftab_set_colname(T, 0, "x");
+    ftab_set_colname(T, 1, "y");
+    ftab_set_colname(T, 2, "z");
+    ftab_set_colname(T, 3, "value");
+    for(size_t kk = 0; kk<nscales; kk++)
+    {
+        char * cname = calloc(128, 1);
+        sprintf(cname, "LoG_%f", scales[kk]);
+        ftab_set_colname(T, 4+kk, cname);
+        free(cname);
+    }
+
+    float * row = calloc(ncol, sizeof(float));
+
+    /* Detect if a pixel is a local maxima
+     * at any scale, i.e. if any of the nscales pixels
+     * is a local maxima in the 4D neighbourhood
+     * we skip the border pixels
+     **/
+    float * strel = malloc(27*sizeof(float));
+    assert(strel != NULL);
+    for(int kk = 0; kk<27; kk++)
+    {
+        strel[kk] = 1;
+    }
+    strel[13] = 0;
+
+    for(size_t pp = 1; pp+1 < P; pp++)
+    {
+        for(size_t nn = 1; nn+1 < N; nn++)
+        {
+            for(size_t mm = 1; mm+1 < M; mm++)
+            {
+                size_t idx = pp*M*N + nn*M + mm;
+                /* Assume that it is a local maxima
+                 * until rejected hypothesis */
+                int lmax = 1;
+
+                float smax = II[0][idx];
+                for(size_t kk = 1; kk<nscales; kk++)
+                {
+                    smax < II[kk][idx] ? smax = II[kk][idx] : 0;
+                }
+
+                // Check the 26*nscale other pixels ...
+                for(size_t kk = 0; kk < nscales; kk++)
+                {
+                    if(lmax)
+                    {
+                        if(smax < strel333_max(II[kk] + idx, M, N, P, strel))
+                        {
+                            lmax = 0;
+                        }
+                    }
+                }
+
+
+                if(lmax)
+                {
+                    /* Pos is s a local maxima */
+                    row[0] = mm; row[1] = nn; row[2] = pp;
+                    float max_value = II[0][idx];
+                    for(size_t kk = 0; kk < nscales; kk++)
+                    {
+                        float value = II[kk][idx];
+                        row[4+kk] = value;
+                        value > max_value ? max_value = value : 0;
+
+                    }
+                    row[3] = max_value;
+                    ftab_insert(T, row);
+                }
+            }
+        }
+    }
+
+    free(strel);
+    free(row);
+    return T;
+}
+
 ftab_t * fim_lmax(const float * I, size_t M, size_t N, size_t P)
 {
     ftab_t * T = ftab_new(4);
@@ -2420,6 +2526,10 @@ ftab_t * fim_lmax(const float * I, size_t M, size_t N, size_t P)
 
 fim_histogram_t * fim_histogram(const float * Im, size_t N)
 {
+    if(N < 2)
+    {
+        return NULL;
+    }
     float min = fim_min(Im, N);
     float max = fim_max(Im, N);
     size_t nbin = pow(2, 16)+1;
@@ -2793,9 +2903,9 @@ int * fim_conncomp6(const float * im, size_t M, size_t N)
             lab[kk] = e2;
         }
     }
-    fim_free(E2);
+    fim_free(E2); E2 = NULL;
 
-    fim_free(E);
+    fim_free(E); E = NULL;
     return lab;
 }
 
@@ -2903,11 +3013,13 @@ float * fim_LoG_S(const float * V0, const size_t M, const size_t N, const size_t
     float * lG = gaussian_kernel(sigmaxy, &nlG);
     size_t nl2;
     float * l2 = gaussian_kernel_d2(sigmaxy, &nl2);
+    flip_sign(l2, nl2);
     /* Axial filters */
     size_t naG = 0;
     float * aG = gaussian_kernel(sigmaz,  &naG);
     size_t na2;
     float * a2 = gaussian_kernel_d2(sigmaz,  &na2);
+    flip_sign(a2, na2);
 
     /* Padding */
     int apad = (naG-1)/2;
@@ -3003,6 +3115,7 @@ float * fim_LoG_S2(const float * V0, const size_t M, const size_t N, const size_
     fim_t * lG = fim_wrap_array(_lG, nlG, 1, 1);
     size_t nl2;
     float * _l2 = gaussian_kernel_d2(sigmaxy, &nl2);
+    flip_sign(_l2, nl2);
     fim_t * l2 = fim_wrap_array(_l2, nl2, 1, 1);
     /* Axial filters */
     size_t naG = 0;
@@ -3010,6 +3123,7 @@ float * fim_LoG_S2(const float * V0, const size_t M, const size_t N, const size_
     fim_t * aG = fim_wrap_array(_aG, naG, 1, 1);
     size_t na2;
     float * _a2 = gaussian_kernel_d2(sigmaz,  &na2);
+    flip_sign(_a2, na2);
     fim_t * a2 = fim_wrap_array(_a2, na2, 1, 1);
 
 
@@ -3120,11 +3234,13 @@ float * fim_LoG(const float * V, const size_t M, const size_t N, const size_t P,
     float * lG = gaussian_kernel(sigmaxy, &nlG);
     size_t nl2;
     float * l2 = gaussian_kernel_d2(sigmaxy, &nl2);
+    flip_sign(l2, nl2);
     /* Axial filters */
     size_t naG = 0;
     float * aG = gaussian_kernel(sigmaz,  &naG);
     size_t na2;
     float * a2 = gaussian_kernel_d2(sigmaz,  &na2);
+    flip_sign(a2, na2);
 
     /* 1st dimension */
     float * LoG = NULL;
