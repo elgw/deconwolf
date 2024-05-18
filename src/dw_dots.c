@@ -1,5 +1,7 @@
 #include "dw_dots.h"
 
+// TODO: In fitting, use LoG_scale if available
+
 typedef struct{
     int overwrite;
     int verbose;
@@ -380,11 +382,14 @@ static void argparsing(int argc, char ** argv, opts * s)
 
     if(s->nscale > 1)
     {
+        int nbefore = 1;
+        int nafter = s->nscale - 2;
+
         s->scales = calloc(s->nscale, sizeof(float));
-        double f = exp( log(s->max_rel_scale)/ (double) (s->nscale -1.0));
+        double f = exp( log(s->max_rel_scale)/ (double) (nafter));
         for(int kk = 0; kk<s->nscale; kk++)
         {
-            s->scales[kk] = pow(f, kk);
+            s->scales[kk] = pow(f, kk-nbefore);
         }
     }
 
@@ -671,10 +676,11 @@ void detect_dots(opts * s, char * inFile)
             float scaling = s->scales[ss];
             if(s->verbose > 0)
             {
-                printf("LoG filter %d/%d, sigma = %f, %f\n",
+                printf("LoG filter %d/%d, sigma = %f, %f (%f x)\n",
                        ss+1, s->nscale,
                        scaling*s->log_lsigma,
-                       scaling*s->log_asigma);
+                       scaling*s->log_asigma,
+                       scaling);
             }
 
             LoG[ss] = fim_LoG_S2(A, M, N, P,
