@@ -51,6 +51,9 @@ typedef struct{
     size_t N; /* 2nd dimension, stride M */
     size_t P; /* 3rd dimension, stride M*N */
     const double * X; /* 3 x nX coordinates of start points */
+/* Optional per dot scaling. sigma is multiplied with this if available.*/
+    const double * DS;
+
     size_t nX;
     int x_base; /* 0-based or 1-based coordinates in X */
     double sigma_xy; /* Start size in lateral plane */

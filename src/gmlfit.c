@@ -476,6 +476,8 @@ double * gmlfit_run(gmlfit * conf)
      * - Slower
      *
      */
+    size_t max_patch_size = 0;
+    {
     size_t wMN = ceil(3*conf->sigma_xy);
     wMN < 5 ? wMN = 5 : 0;
     wMN % 2 == 0 ? wMN++ : 0;
@@ -492,16 +494,41 @@ double * gmlfit_run(gmlfit * conf)
                    wMN, wMN, wP);
         }
     }
+    /* Determine max patch size */
+    double max_scale = 2;
+    wMN = ceil(max_scale*3*conf->sigma_xy);
+    wMN < 5 ? wMN = 5 : 0;
+    wMN % 2 == 0 ? wMN++ : 0;
+
+    wP = ceil(max_scale*3*conf->sigma_z);
+    wP < 5 ? wP = 5: 0;
+    wP % 2 == 0 ? wP++ : 0;
+    max_patch_size = wMN*wMN*wP;
+    }
 
 #pragma omp parallel
     {
         /* Allocate memory for a local patch */
-        pfloat * R = calloc(wMN*wMN*wP, sizeof(pfloat));
+        pfloat * R = calloc(max_patch_size, sizeof(pfloat));
         assert(R != NULL);
 
 #pragma omp for schedule(dynamic)
         for(size_t kk = 0; kk < conf->nX; kk++)
         {
+            /* Per-dot scaling if available */
+            float scale = 1;
+            if(conf->DS != NULL)
+            {
+                scale = conf->DS[kk];
+            }
+            size_t wMN = ceil(scale*3*conf->sigma_xy);
+            wMN < 5 ? wMN = 5 : 0;
+            wMN % 2 == 0 ? wMN++ : 0;
+
+            size_t wP = ceil(scale*3*conf->sigma_z);
+            wP < 5 ? wP = 5: 0;
+            wP % 2 == 0 ? wP++ : 0;
+
             /* Copy the neighbourhood around each D into W
                This fails if the dot is completely outside of the image
             */
@@ -511,7 +538,7 @@ double * gmlfit_run(gmlfit * conf)
             {
                 //printf("Processing dot %zu / %zu\n", kk+1, nX);
                 localize_dot(R, wMN, wMN, wP,
-                             conf->sigma_xy, conf->sigma_z,
+                             scale*conf->sigma_xy, scale*conf->sigma_z,
                              F + nFeatures*kk, conf->max_iter);
             } else {
                 for(int ff = 0; ff < nFeatures; ff++)

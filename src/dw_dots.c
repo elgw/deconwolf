@@ -1,6 +1,13 @@
 #include "dw_dots.h"
 
-// TODO: In fitting, use LoG_scale if available
+// TODO:
+// - '--multiscale' as the only option for multiscaling ...
+// --dots option for nd2tool
+/* Possible improvements:
+ * - Code path for 2D images (max projections etc)
+ * - Separate Dot vs edge/ridge using the Hessian or the structure tensor.
+ * - Use GPU
+ */
 
 typedef struct{
     int overwrite;
@@ -53,7 +60,7 @@ static opts * opts_new()
     s->fwhm = 0;
     s->swell = 1;
     s->fitting = 0;
-    s->nscale = 1;
+    s->nscale = 4;
     s->max_rel_scale = 2;
     return s;
 }
@@ -380,18 +387,68 @@ static void argparsing(int argc, char ** argv, opts * s)
         }
     }
 
+    // TODO: if s->multiscale. Also scale factor as a parameter.
     if(s->nscale > 1)
     {
-        int nbefore = 1;
-        int nafter = s->nscale - 2;
+        /* scale == 1 means at the scale of diffraction limited dots
+         * deduced from the optical parameters.
+         *
+         * The multi scale detection is performed with sizes with consecutive
+         * ratio of sqrt(2) (same number again :)). This is because
+         * for some reason we like to have LoG filter at four scales:
+         * a) 1/sqrt(2), b) 1, c) sqrt(2), d) 2
+         *
+         * The LoG filter has a sigma sqrt(2) times larger than the dots.
+         * it performs quite poor when it is below 1 i.e. when the dots
+         * has a sigma < 1/sqrt(2) in the axial or lateral direction.
+         * If that occurs, we start at at the first possible scale, and
+         * continue with as many as possible until we reach double the
+         * theoretical dot size.
+         */
+
+        /* What we would like to use */
+        const float min_scale_ideal = 1.0/sqrt(2.0);
+        float min_scale = min_scale_ideal;
+
+        const float max_scale = 2.0;
+        const float f = sqrt(2.0); /* ratio between scales */
+
+        /* See what lowest scale we can use ...  */
+        float min_fit_sigma = 1.0/sqrt(2.0);
+        if(s->fit_lsigma*min_scale < min_fit_sigma)
+        {
+            min_scale = min_fit_sigma / s->fit_lsigma;
+        }
+        if(s->fit_asigma*min_scale < min_fit_sigma)
+        {
+            min_scale = min_fit_sigma / s->fit_asigma;
+        }
+        if(min_scale > 1.0/sqrt(2.0))
+        {
+            if(s->verbose > 0)
+            {
+            printf("Warning: Couldn't start at scale %f due to the sampling of\n"
+                   "the image. Starting at scale %f\n",
+                   1.0/sqrt(2), min_scale);
+            }
+        }
+
+        /* It is possible that the max scale is problematic, typically when
+         * there are too few z planes. In that case it might be better to do 2D
+         * dot detection ... */
 
         s->scales = calloc(s->nscale, sizeof(float));
-        double f = exp( log(s->max_rel_scale)/ (double) (nafter));
+        s->nscale = ceil( (log(max_scale) - log(min_scale)) / log(f));
+        if(s->verbose > 0)
+        {
+            printf("Will use %d scales\n", s->nscale);
+        }
         for(int kk = 0; kk<s->nscale; kk++)
         {
-            s->scales[kk] = pow(f, kk-nbefore);
+            s->scales[kk] = min_scale*pow(f, kk);
         }
     }
+
 
     s->optpos = optind;
     s->optpos = optind;
@@ -422,6 +479,25 @@ static ftab_t * append_fitting(opts * s, ftab_t * T, float * I,
         X[3*kk+2] = row[zcol];
     }
 
+    /* Per dot scaling */
+    double * DS = NULL;
+    int row_id_scale = ftab_get_col(T, "LoG_scale");
+    if(s->verbose > 1)
+    {
+        printf("row_id_scale = %d\n", row_id_scale);
+    }
+    if(row_id_scale > -1)
+    {
+        DS = calloc(T->nrow, sizeof(double));
+        assert(DS != NULL);
+
+        for(size_t kk = 0; kk < T->nrow; kk++)
+        {
+            float * row = T->T + kk*T->ncol;
+            DS[kk] = row[row_id_scale];
+        }
+    }
+
     /* 2. Run the fitting */
     gmlfit * config = gmlfit_new();
     assert(config != NULL);
@@ -435,6 +511,7 @@ static ftab_t * append_fitting(opts * s, ftab_t * T, float * I,
     config->verbose = s->verbose;
     config->X = X;
     config->nX = T->nrow;
+    config->DS = DS;
     if(s->verbose > 0)
     {
         printf("Fitting %zu dots\n", config->nX);
@@ -447,6 +524,7 @@ static ftab_t * append_fitting(opts * s, ftab_t * T, float * I,
     double * F = gmlfit_run(config);
     free(config);
     free(X);
+    free(DS);
 
     /* 3. Insert into the table */
     if(F == NULL)
@@ -629,17 +707,32 @@ void detect_dots(opts * s, char * inFile)
 
     float * feature = NULL;
 
-    if(s->verbose > 1)
-    {
-        printf("LoG filter, lsigma=%.2f asigma=%.2f\n",
-               s->log_lsigma, s->log_asigma);
-    }
+
     //fim_set_verbose(2);
 
     ftab_t * T = NULL;
     if(s->nscale < 2)
     {
-        feature = fim_LoG_S2(A, M, N, P, s->log_lsigma, s->log_asigma);
+        float scaling = 1;
+        if(s->scales != NULL)
+        {
+            scaling = s->scales[0];
+        }
+        if(s->verbose > 1)
+        {
+            printf("LoG filter, LoG_lsigma=%.2f LoG_asigma=%.2f\n",
+                   s->log_lsigma, s->log_asigma);
+            if(scaling != 1)
+            {
+                printf("Using scaling %f\n", scaling);
+                printf("-> lsigma = %.2f, asigma=%.2f\n",
+                       scaling*s->log_lsigma, scaling*s->log_asigma);
+            }
+        }
+
+        feature = fim_LoG_S2(A, M, N, P,
+                             scaling*s->log_lsigma,
+                             scaling*s->log_asigma);
 
 
         if(s->fout != NULL)

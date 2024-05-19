@@ -2408,7 +2408,8 @@ float strel333_max(const float * I, size_t M, size_t N,
  * y = c_0 + c_1 x + c_2 x^2
  * based on x[i-1], x[i], x[i+1], y[i-1], y[i], y[i+1]
  */
-static float locate_max_poly2(float * x, float * y, int n)
+static float locate_max_poly2(const float * x, const float * y, int n,
+                              int use_log)
 {
     int maxpos = 0;
     int max = y[0];
@@ -2430,9 +2431,18 @@ static float locate_max_poly2(float * x, float * y, int n)
     }
 
     /* Find coefficients */
-    float a = x[maxpos-1]; float a2 = pow(a, 2);
-    float b = x[maxpos]; float b2 = pow(b, 2);
-    float c = x[maxpos+1]; float c2 = pow(c, 2);
+    float a = x[maxpos-1];
+    float b = x[maxpos];
+    float c = x[maxpos+1];
+    if(use_log)
+    {
+        a = log(a);
+        b = log(b);
+        c = log(c);
+    }
+    float a2 = pow(a, 2);
+    float b2 = pow(b, 2);
+    float c2 = pow(c, 2);
 
     /* c0 not needed */
     float C1 = y[maxpos-1]*((-b - c)/(a2 - a*b - a*c + b*c))
@@ -2442,6 +2452,10 @@ static float locate_max_poly2(float * x, float * y, int n)
         + y[maxpos]*(-1.0/(a*b - a*c - b2 + b*c))
         + y[maxpos+1]*(1.0/(a*b - a*c - b*c + c2));
 /* d/dx y(x) = 0 -> 0 = c1 + 2*c2*x, x=-c1/(2*c2) */
+    if(use_log)
+    {
+        return exp(-C1 / (2.0 * C2));
+    }
     return -C1 / (2.0 * C2);
 }
 
@@ -2546,7 +2560,8 @@ ftab_t * fim_lmax_multiscale(float ** II, float * scales, size_t nscales,
                             value > max_value ? max_value = value : 0;
                         }
                         row[3] = max_value;
-                        row[4] = locate_max_poly2(scales, log_values, nscales);
+                        int use_log = 1;
+                        row[4] = locate_max_poly2(scales, log_values, nscales, use_log);
                         #pragma omp critical
                         ftab_insert(T, row);
                     }
