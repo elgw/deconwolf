@@ -1494,7 +1494,7 @@ void fimt_conv1_x(fim_t * V, fim_t * K, fim_boundary_condition bc)
 
         for(size_t pp = 0; pp<V->P; pp++)
         {
-#pragma omp for
+#pragma omp for schedule(dynamic)
             for(size_t nn = 0; nn<V->N; nn++)
             {
                 float * line = V->V+pp*(V->M*V->N) + nn*(V->M);
@@ -3475,7 +3475,7 @@ fim_t * fim_shiftdim(const fim_t * restrict I)
 
     const size_t blocksize = 2*64;
 
-#pragma omp parallel for shared(V, S)
+#pragma omp parallel for shared(V, S) schedule(dynamic)
     for(size_t pp = 0; pp< P; pp++)
     {
         /* Blocks are of size blocksize x blocksize in M and N */

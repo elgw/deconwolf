@@ -495,7 +495,7 @@ double * gmlfit_run(gmlfit * conf)
         }
     }
     /* Determine max patch size */
-    double max_scale = 2;
+    double max_scale = 5;
     wMN = ceil(max_scale*3*conf->sigma_xy);
     wMN < 5 ? wMN = 5 : 0;
     wMN % 2 == 0 ? wMN++ : 0;
@@ -528,6 +528,8 @@ double * gmlfit_run(gmlfit * conf)
             size_t wP = ceil(scale*3*conf->sigma_z);
             wP < 5 ? wP = 5: 0;
             wP % 2 == 0 ? wP++ : 0;
+
+            assert(wMN*wP <= max_patch_size);
 
             /* Copy the neighbourhood around each D into W
                This fails if the dot is completely outside of the image
