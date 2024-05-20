@@ -27,7 +27,6 @@ typedef struct{
     float lambda;
     float dx;
     float dz;
-    float swell;
     int ndots; /* Number of dots to export */
     char * logfile;
     FILE * log;
@@ -58,9 +57,8 @@ static opts * opts_new()
     s->logfile = NULL;
     s->fout = NULL;
     s->fwhm = 0;
-    s->swell = 1;
     s->fitting = 0;
-    s->nscale = 4;
+    s->nscale = 1;
     s->max_rel_scale = 2;
     return s;
 }
@@ -239,7 +237,7 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"fwhm", no_argument, NULL, 'f'},
         {"fitting", no_argument, NULL, 'F'},
         {"help", no_argument, NULL, 'h'},
-
+        {"max_scale", required_argument, NULL, 'm'},
         {"ndots",   required_argument, NULL, 'n'},
         {"nscale",  required_argument, NULL, 'N'},
         {"overwrite", no_argument, NULL, 'o'},
@@ -254,7 +252,7 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"ni",     required_argument, NULL, '6'},
         {NULL, 0, NULL, 0}};
     int ch;
-    while((ch = getopt_long(argc, argv, "1:3:4:5:6:L:a:A:fF:hi:l:n:N:op:r:s:v:w:", longopts, NULL)) != -1)
+    while((ch = getopt_long(argc, argv, "1:3:4:5:6:L:a:A:fF:hi:l:m:n:N:op:r:s:v:w:", longopts, NULL)) != -1)
     {
         switch(ch){
         case '1':
@@ -292,6 +290,9 @@ static void argparsing(int argc, char ** argv, opts * s)
             s->fit_lsigma = atof(optarg);
             break;
             break;
+        case 'm':
+            s->max_rel_scale = atof(optarg);
+            break;
         case 'n':
             s->ndots = atoi(optarg);
             break;
@@ -311,7 +312,11 @@ static void argparsing(int argc, char ** argv, opts * s)
             assert(s->fout != NULL);
             break;
         case 's':
-            s->swell = atof(optarg);
+            free(s->scales);
+            s->scales = calloc(1, sizeof(float));
+            assert(s->scales != 0);
+            s->scales[0] = atof(optarg);
+            s->nscale = 1;
             break;
         case 't':
             s->nthreads = atoi(optarg);
@@ -347,12 +352,6 @@ static void argparsing(int argc, char ** argv, opts * s)
          */
         s->log_lsigma = s->fit_lsigma*sqrt(2.0);
         s->log_asigma = s->fit_asigma*sqrt(2.0);
-
-        /* Apply swelling correction */
-        s->fit_lsigma *= s->swell;
-        s->fit_asigma *= s->swell;
-        s->log_lsigma *= s->swell;
-        s->log_asigma *= s->swell;
     }
 
     if(s->verbose > 1)
@@ -410,7 +409,7 @@ static void argparsing(int argc, char ** argv, opts * s)
         const float min_scale_ideal = 1.0/sqrt(2.0);
         float min_scale = min_scale_ideal;
 
-        const float max_scale = 2.0;
+        const float max_scale = s->max_rel_scale;
         const float f = sqrt(2.0); /* ratio between scales */
 
         /* See what lowest scale we can use ...  */
@@ -486,6 +485,7 @@ static ftab_t * append_fitting(opts * s, ftab_t * T, float * I,
     {
         printf("row_id_scale = %d\n", row_id_scale);
     }
+
     if(row_id_scale > -1)
     {
         DS = calloc(T->nrow, sizeof(double));
@@ -498,6 +498,12 @@ static ftab_t * append_fitting(opts * s, ftab_t * T, float * I,
         }
     }
 
+    float scaling = 1;
+    if(s->scales != NULL)
+    {
+        scaling = s->scales[0];
+    }
+
     /* 2. Run the fitting */
     gmlfit * config = gmlfit_new();
     assert(config != NULL);
@@ -505,8 +511,8 @@ static ftab_t * append_fitting(opts * s, ftab_t * T, float * I,
     config->M = M;
     config->N = N;
     config->P = P;
-    config->sigma_xy = s->fit_lsigma;
-    config->sigma_z = s->fit_asigma;
+    config->sigma_xy = scaling*s->fit_lsigma;
+    config->sigma_z = scaling*s->fit_asigma;
     config->log = s->log;
     config->verbose = s->verbose;
     config->X = X;
@@ -713,27 +719,35 @@ void detect_dots(opts * s, char * inFile)
     ftab_t * T = NULL;
     if(s->nscale < 2)
     {
+        if(s->verbose > 0)
+        {
+        printf("Diffraction limited dots: sigma = %.2f, %.2f\n",
+               s->fit_lsigma, s->fit_asigma);
+        }
         float scaling = 1;
         if(s->scales != NULL)
         {
             scaling = s->scales[0];
         }
+        if(scaling != 1)
+        {
+            if(s->verbose > 0)
+            {
+                printf("Size multiplier: %.2f -> sigma = %.2f, %.2f\n",
+                       scaling, scaling*s->fit_lsigma, scaling*s->fit_asigma);
+            }
+        }
+
         if(s->verbose > 1)
         {
             printf("LoG filter, LoG_lsigma=%.2f LoG_asigma=%.2f\n",
-                   s->log_lsigma, s->log_asigma);
-            if(scaling != 1)
-            {
-                printf("Using scaling %f\n", scaling);
-                printf("-> lsigma = %.2f, asigma=%.2f\n",
-                       scaling*s->log_lsigma, scaling*s->log_asigma);
-            }
+                   scaling*s->log_lsigma, scaling*s->log_asigma);
+
         }
 
         feature = fim_LoG_S2(A, M, N, P,
                              scaling*s->log_lsigma,
                              scaling*s->log_asigma);
-
 
         if(s->fout != NULL)
         {
