@@ -2579,8 +2579,73 @@ ftab_t * fim_lmax_multiscale(float ** II, float * scales, size_t nscales,
     return T;
 }
 
+static float max_float(float a, float b)
+{
+    if(a > b) {
+        return a;
+    }
+    return b;
+}
+
+static int lmax_2d(const float * I, size_t stride)
+{
+    float other = I[-1];
+    other = max_float(other, I[1]);
+    other = max_float(other, I[ stride]);
+    other = max_float(other, I[-stride]);
+    other = max_float(other, I[1+stride]);
+    other = max_float(other, I[1-stride]);
+    other = max_float(other, I[-1+stride]);
+    other = max_float(other, I[-1-stride]);
+
+    return I[0] > other;
+}
+
+ftab_t * fim_lmax_2d(const float * I, size_t M, size_t N, size_t P)
+{
+    ftab_t * T = ftab_new(4);
+    ftab_set_colname(T, 0, "x");
+    ftab_set_colname(T, 1, "y");
+    ftab_set_colname(T, 2, "z");
+    ftab_set_colname(T, 3, "value");
+
+    // TODO
+    /* 3x3x3 structuring element with 26-connectivity */
+    float * strel = malloc(27*sizeof(float));
+    assert(strel != NULL);
+    for(int kk = 0; kk<27; kk++)
+    {
+        strel[kk] = 1;
+    }
+    strel[13] = 0;
+
+    assert(P > 0);
+#pragma omp parallel for
+        for(size_t nn = 1; nn < N-1; nn++)
+        {
+            for(size_t mm = 1; mm+1 < M; mm++)
+            {
+                size_t pos = mm + nn*M;
+                if(lmax_2d(I + pos, M))
+                {
+                    /* Pos is s a local maxima */
+                    float row[4] = {mm, nn, 0.0, I[pos]};
+#pragma omp critical
+                    ftab_insert(T, row);
+                }
+            }
+        }
+
+    return T;
+}
+
 ftab_t * fim_lmax(const float * I, size_t M, size_t N, size_t P)
 {
+    if(P == 1)
+    {
+        return fim_lmax_2d(I, M, N, P);
+    }
+
     ftab_t * T = ftab_new(4);
     ftab_set_colname(T, 0, "x");
     ftab_set_colname(T, 1, "y");
@@ -2596,7 +2661,9 @@ ftab_t * fim_lmax(const float * I, size_t M, size_t N, size_t P)
     }
     strel[13] = 0;
 
-    for(size_t pp = 1; pp+1 < P; pp++)
+    assert(P > 0);
+    #pragma omp parallel for
+    for(size_t pp = 1; pp < P-1; pp++)
     {
         for(size_t nn = 1; nn+1 < N; nn++)
         {
@@ -2607,6 +2674,7 @@ ftab_t * fim_lmax(const float * I, size_t M, size_t N, size_t P)
                 {
                     /* Pos is s a local maxima */
                     float row[4] = {mm, nn, pp, I[pos]};
+                    #pragma omp critical
                     ftab_insert(T, row);
                 }
             }
@@ -3211,16 +3279,70 @@ float * fim_LoG_S2(const float * V0, const size_t M, const size_t N, const size_
     float * _l2 = gaussian_kernel_d2(sigmaxy, &nl2);
     flip_sign(_l2, nl2);
     fim_t * l2 = fim_wrap_array(_l2, nl2, 1, 1);
+
+    /* 2D */
+    if(P == 1)
+    {
+        assert(fimt_nel(lG) > 1);
+        assert(fimt_nel(l2) > 1);
+
+        printf("2D path\n");
+        /** Gaussian, Laplacian **/
+        fim_t * GI = fim_image_from_array(V0, M, N, P);
+        fimt_conv1_x(GI, lG, bc);
+        fim_t * GL = fim_shiftdim2(GI);
+        assert(GL->P == 1);
+        fim_free(GI);
+        fimt_conv1_x(GL, l2, bc);
+
+        /** Laplacian, Gaussian **/
+        fim_t * LI = fim_image_from_array(V0, M, N, P);
+        fimt_conv1_x(LI, l2, bc);
+        assert(LI->P == 1);
+        fim_t * LG = fim_shiftdim2(LI);
+        fim_free(LI);
+        fimt_conv1_x(LG, lG, bc);
+
+        /* Free filters */
+        fimt_free(lG);
+        fimt_free(l2);
+
+        /* Add together filter responses */
+        fim_t * LoG = GL;
+        GL = NULL;
+        fimt_add(LoG, LG);
+        fimt_free(LG);
+
+        /* Shift back */
+        fim_t * result = fim_shiftdim2(LoG);
+
+        fimt_free(LoG);
+        /* And we are done */
+
+        float * pLoG = result->V;
+
+        result->V = NULL;
+        fimt_free(result);
+        return pLoG;
+    }
+
     /* Axial filters */
-    size_t naG = 0;
-    float * _aG = gaussian_kernel(sigmaz,  &naG);
-    fim_t * aG = fim_wrap_array(_aG, naG, 1, 1);
-    size_t na2;
-    float * _a2 = gaussian_kernel_d2(sigmaz,  &na2);
-    flip_sign(_a2, na2);
-    fim_t * a2 = fim_wrap_array(_a2, na2, 1, 1);
+    fim_t * aG = NULL;
+    fim_t * a2 = NULL;
 
+    {
+        size_t naG = 0;
+        size_t na2 = 0;
+        float * _aG = gaussian_kernel(sigmaz,  &naG);
+        aG = fim_wrap_array(_aG, naG, 1, 1);
+        float * _a2 = gaussian_kernel_d2(sigmaz,  &na2);
+        flip_sign(_a2, na2);
+        a2 = fim_wrap_array(_a2, na2, 1, 1);
+    }
 
+    /* 3D */
+    if(P > 1)
+    {
     /** First dimension -> GII, LII */
     fim_t * GII = fim_image_from_array(V0, M, N, P);
     fimt_conv1_x(GII, lG, bc);
@@ -3248,9 +3370,9 @@ float * fim_LoG_S2(const float * V0, const size_t M, const size_t N, const size_
     fim_t * LGG = fim_shiftdim(LGI);
     fimt_free(LGI);
 
-    fimt_conv1_x(GGL, a2, bc);
-    fimt_conv1_x(GLG, aG, bc);
-    fimt_conv1_x(LGG, aG, bc);
+        fimt_conv1_x(GGL, a2, bc);
+        fimt_conv1_x(GLG, aG, bc);
+        fimt_conv1_x(LGG, aG, bc);
 
     /* Free the filters */
     fimt_free(lG);
@@ -3273,8 +3395,10 @@ float * fim_LoG_S2(const float * V0, const size_t M, const size_t N, const size_
     float * pLoG = result->V;
     result->V = NULL;
     fimt_free(result);
-
     return pLoG;
+    }
+
+    return NULL; // We should not reach this
 }
 
 
@@ -3452,6 +3576,51 @@ double * fim_get_line_double(fim_t * I,
         }
     }
     return L;
+}
+
+fim_t * fim_shiftdim2(const fim_t * restrict I)
+{
+    const float * V = I->V;
+    const size_t M = I->M;
+    const size_t N = I->N;
+    const size_t P = I->P;
+    assert(P == 1);
+    /* Output image */
+    fim_t * O = malloc(sizeof(fim_t));
+    assert(O != NULL);
+    O->V = fim_malloc(M*N*P*sizeof(float));
+    O->M = N;
+    O->N = M;
+    O->P = P;
+    float * S = O->V;
+    const size_t blocksize = 2*64;
+
+    /* Blocks are of size blocksize x blocksize in M and N */
+    for(size_t bm = 0; bm<M; bm = bm+blocksize)
+    {
+        size_t bm_end = bm+blocksize;
+        bm_end > M ? bm_end = M : 0;
+
+        const size_t bm_end_c = bm_end;
+
+        for(size_t bn = 0; bn<N; bn = bn+blocksize)
+        {
+            size_t bn_end = bn+blocksize;
+            bn_end > N ? bn_end = N : 0;
+
+            const size_t bn_end_c = bn_end;
+
+            for(size_t nn = bn; nn< bn_end_c; nn++)
+            {
+                for(size_t mm = bm; mm< bm_end_c; mm++)
+                {
+                    S[nn + mm*M] = V[mm + nn*M];
+                }
+            }
+        }
+    }
+
+    return O;
 }
 
 fim_t * fim_shiftdim(const fim_t * restrict I)

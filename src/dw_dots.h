@@ -12,7 +12,6 @@
 #include "fim_tiff.h"
 #include "ftab.h"
 #include "dw_version.h"
-#include "fwhm.h"
 #include "gmlfit.h"
 
 int dw_dots(int argc, char ** argv);

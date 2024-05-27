@@ -127,6 +127,10 @@ double * fim_get_line_double(fim_t * Im,
 /* Similar to MATLABs shiftfim, [M,N,P] -> [N,P,M] */
 fim_t * fim_shiftdim(const fim_t * restrict );
 
+/* Similar to MATLABs shiftfim, [M,N] -> [N,M] */
+fim_t * fim_shiftdim2(const fim_t * restrict );
+
+
 /* [M, N, P] -> [N, M, P] */
 fim_t * fimt_transpose(const fim_t * restrict);
 

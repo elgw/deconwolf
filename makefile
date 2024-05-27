@@ -348,7 +348,6 @@ method_shb.o \
 dw_imshift.o \
 fft.o \
 dw_dots.o \
-fwhm.o \
 ftab.o \
 dw_psf.o \
 dw_tiff_merge.o \

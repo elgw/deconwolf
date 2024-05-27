@@ -40,7 +40,11 @@
  *
  * You might want to discard dots that moved more than sqrt(3) pixels.
  *
- * Updated: 2024-05-06.
+ * 2D images:
+ * When P == 1 z and sigma_z will not be estimated. In the output table these values
+ * will be set to 0.
+ *
+ * Updated: 2024-05-27.
  **/
 
 typedef float ifloat;

@@ -1,5 +1,8 @@
 #include "gmlfit.h"
 
+// #define gmlfit_debug
+
+
 static const int nFeatures = 10;
 
 /* Precision for the patch representation */
@@ -14,10 +17,20 @@ typedef struct {
     size_t M, N, P; /* Size of ROI */
 } optParams;
 
+#define OPTIDX_BG 0
+#define OPTIDX_NPHOT 1
+#define OPTIDX_X 2
+#define OPTIDX_Y 3
+#define OPTIDX_S_XY 4
+// these are not used for 2D images
+#define OPTIDX_Z 5
+#define OPTIDX_S_Z 6
+
+/* Columns in output table */
 enum features {
     f_bg = 0, /* Background level  */
     f_G = 1, /* Number of photons in signal */
-    f_G0 = 2, /* Peak signal */
+    f_G0 = 2, /* Peak signal, excluding background */
     f_x = 3, /* Fitted x */
     f_y = 4,
     f_z = 5,
@@ -34,7 +47,13 @@ enum features {
  */
 static double mvnpdf0(double sxy, double sz)
 {
-    return pow(2*M_PI, -3.0/2.0)*pow( pow(sxy,4.0)*pow(sz,2.0), -1.0/2.0);
+    if(sz > 0)
+    {
+        return pow(2*M_PI, -3.0/2.0)*pow( pow(sxy,4.0)*pow(sz,2.0), -1.0/2.0);
+    } else {
+        // TODO: fix constant for 2D
+        return pow(2*M_PI, -3.0/2.0)*pow( pow(sxy,4.0), -1.0/2.0);
+    }
 }
 
 /** Extract a 3D region centered at D[0], D[1], D[2]
@@ -56,7 +75,6 @@ get_roi(pfloat * restrict W,
         const size_t Vm, const size_t Vn, const size_t Vp,
         const double * D, int onebased)
 {
-
     assert(Wm % 2 == 1);
     assert(Wn % 2 == 1);
     assert(Wp % 2 == 1);
@@ -109,24 +127,22 @@ get_roi(pfloat * restrict W,
 double error_fun(const gsl_vector * v, void * _params)
 {
     /* Check background value */
-    if(gsl_vector_get(v, 0) < 0)
+    if(gsl_vector_get(v, OPTIDX_BG) < 0)
     {
         return 1e99;
     }
     /* Check photon count*/
-    if(gsl_vector_get(v, 1) < 0)
+    if(gsl_vector_get(v, OPTIDX_NPHOT) < 0)
     {
         return 1e99;
     }
     /* Check size of signal */
-    if(gsl_vector_get(v, 5) < 0)
+    if(gsl_vector_get(v, OPTIDX_S_XY) < 0)
     {
         return 1e99;
     }
-    if(gsl_vector_get(v, 6) < 0)
-    {
-        return 1e99;
-    }
+
+
 
     const optParams * restrict params = (optParams*) _params;
     const pfloat * restrict R = params->R; /* Image data */
@@ -134,20 +150,42 @@ double error_fun(const gsl_vector * v, void * _params)
     const size_t N = params->N;
     const size_t P = params->P;
 
+    if(P > 1)
+    {
+        if(gsl_vector_get(v, OPTIDX_S_Z) < 0)
+        {
+            return 1e99;
+        }
+    }
 
-    double mx = gsl_vector_get(v, 2);
-    double my = gsl_vector_get(v, 3);
-    double mz = gsl_vector_get(v, 4);
-    double sxy = gsl_vector_get(v, 5);
-    double sz = gsl_vector_get(v, 6);
+    /* 0: background */
+    /* 1: multiple before Gaussian */
+    double mx = gsl_vector_get(v, OPTIDX_X);
+    double my = gsl_vector_get(v, OPTIDX_Y);
+    double sxy = gsl_vector_get(v, OPTIDX_S_XY);
+
+    double mz = 0;
+    double sz = 0;
+    if(P > 1)
+    {
+        mz = gsl_vector_get(v, OPTIDX_Z);
+        sz = gsl_vector_get(v, OPTIDX_S_Z);
+    }
 
     double G0 = mvnpdf0(sxy, sz);
-
+    assert(isnan(G0) == 0);
+    /* Special handling for the 2D case */
+    double sz_div = sz;
+    if(P == 1)
+    {
+        sz_div = 1;
+    }
     double E = 0;
     for(size_t pp = 0; pp < P; pp++)
     {
 
         double z = (double) pp - (P-1)/2;
+
         for (size_t nn = 0; nn < N; nn++)
         {
             double y = (double) nn - (N-1)/2;
@@ -165,9 +203,9 @@ double error_fun(const gsl_vector * v, void * _params)
                 double G = G0*exp( - 0.5*(
                                          pow( (x-mx)/sxy, 2)
                                        + pow( (y-my)/sxy, 2)
-                                       + pow( (z-mz)/sz, 2) ) );
+                                       + pow( (z-mz)/sz_div, 2) ) );
                 /* Full model */
-                double Model = gsl_vector_get(v, 0) + gsl_vector_get(v,1)*G;
+                double Model = gsl_vector_get(v, OPTIDX_BG) + gsl_vector_get(v, OPTIDX_NPHOT)*G;
 
                 E += Pixel*log(Model) - Model;
                 assert(isnan(E) == 0);
@@ -259,21 +297,36 @@ localize_dot(const pfloat * restrict V,
     //printf("bg: %f, nphot: %f\n", bg, nphot);
 
     /* Starting point for parameters to be optimized */
-    gsl_vector * x = gsl_vector_alloc(7);
-    gsl_vector_set(x, 0, bg);
-    gsl_vector_set(x, 1, nphot);
-    gsl_vector_set(x, 2, 0); // x
-    gsl_vector_set(x, 3, 0); // y
-    gsl_vector_set(x, 4, 0); // z
-    gsl_vector_set(x, 5, sigma_xy);
-    gsl_vector_set(x, 6, sigma_z);
+    gsl_vector * x;
+    if(P > 1)
+    {
+        x = gsl_vector_alloc(7);
+    } else {
+        x = gsl_vector_alloc(5);
+    }
 
+
+    gsl_vector_set(x, OPTIDX_BG, bg);
+    gsl_vector_set(x, OPTIDX_NPHOT, nphot);
+    gsl_vector_set(x, OPTIDX_X, 0); // x
+    gsl_vector_set(x, OPTIDX_Y, 0); // y
+    gsl_vector_set(x, OPTIDX_S_XY, sigma_xy);
+    if(P > 1)
+    {
+        gsl_vector_set(x, OPTIDX_Z, 0); // z
+        gsl_vector_set(x, OPTIDX_S_Z, sigma_z);
+    }
 
     /* Initialize method and iterate */
 
 
     gsl_multimin_function_fdf minex_func_fdf;
-    minex_func_fdf.n = 7;
+    if(P > 1)
+    {
+        minex_func_fdf.n = 7;
+    } else {
+        minex_func_fdf.n = 5;
+    }
     minex_func_fdf.f = &error_fun;
     minex_func_fdf.df = &error_fun_df;
     minex_func_fdf.fdf = &error_fun_fdf;
@@ -295,11 +348,16 @@ localize_dot(const pfloat * restrict V,
     * 0.5 is slower but results are not better.
     */
     const gsl_multimin_fdfminimizer_type * T = gsl_multimin_fdfminimizer_vector_bfgs2;
-    gsl_multimin_fdfminimizer *s = gsl_multimin_fdfminimizer_alloc (T, 7);
+    gsl_multimin_fdfminimizer *s;
+    if(P > 1){
+        s = gsl_multimin_fdfminimizer_alloc (T, 7);
+    } else {
+        s = gsl_multimin_fdfminimizer_alloc (T, 5);
+    }
     gsl_multimin_fdfminimizer_set(s, // Optimizer
                                   &minex_func_fdf, // Function to optimize
                                   x,// Start point
-                                  0.01, // step size
+                                  0.04, // step size
                                   0.1); // line search tol
 
     int status = 0;
@@ -327,18 +385,45 @@ localize_dot(const pfloat * restrict V,
         }
         assert(status == GSL_CONTINUE);
 
+        #ifdef gmlfit_debug
+        if(P > 1)
+        {
+        printf("%03d, %f, %f, (%f, %f, %f), (%f, %f)\n", iter,
+               gsl_vector_get(s->x, OPTIDX_BG),
+               gsl_vector_get(s->x, OPTIDX_NPHOT),
+               gsl_vector_get(s->x, OPTIDX_X),
+               gsl_vector_get(s->x, OPTIDX_Y),
+               gsl_vector_get(s->x, OPTIDX_Z),
+               gsl_vector_get(s->x, OPTIDX_S_XY),
+               gsl_vector_get(s->x, OPTIDX_Z));
+        } else {
+            printf("%03d, %f, %f, (%f, %f, %f), (%f, %f)\n", iter,
+                   gsl_vector_get(s->x, OPTIDX_BG),
+                   gsl_vector_get(s->x, OPTIDX_NPHOT),
+                   gsl_vector_get(s->x, OPTIDX_X),
+                   gsl_vector_get(s->x, OPTIDX_Y),
+                   0,
+                   gsl_vector_get(s->x, OPTIDX_S_XY),
+                   0);
+        }
+#endif
     } while (status == GSL_CONTINUE && iter < max_iterations);
 
     //printf("iter = %zu\n", iter);
 
-    F[f_bg] = gsl_vector_get(s->x, 0);
-    F[f_G] = gsl_vector_get(s->x, 1);
-    F[f_x] = gsl_vector_get(s->x, 2);
-    F[f_y] = gsl_vector_get(s->x, 3);
-    F[f_z] = gsl_vector_get(s->x, 4);
-    F[f_sxy] = gsl_vector_get(s->x, 5);
-    F[f_sz] = gsl_vector_get(s->x, 6);
-
+    F[f_bg] = gsl_vector_get(s->x, OPTIDX_BG);
+    F[f_G] = gsl_vector_get(s->x, OPTIDX_NPHOT);
+    F[f_x] = gsl_vector_get(s->x, OPTIDX_X);
+    F[f_y] = gsl_vector_get(s->x, OPTIDX_X);
+    F[f_sxy] = gsl_vector_get(s->x, OPTIDX_S_XY);
+    if(P > 1)
+    {
+        F[f_z] = gsl_vector_get(s->x, OPTIDX_Z);
+        F[f_sz] = gsl_vector_get(s->x, OPTIDX_S_Z);
+    } else {
+        F[f_z] = 0;
+        F[f_sz] = 0;
+    }
 
     F[f_G0] = F[f_G]*mvnpdf0(F[f_sxy], F[f_sz]);
     F[f_status] = status;
@@ -476,35 +561,45 @@ double * gmlfit_run(gmlfit * conf)
      * - Slower
      *
      */
+
+
+    const float width_factor = 4;
+
     size_t max_patch_size = 0;
     {
-    size_t wMN = ceil(3*conf->sigma_xy);
+    size_t wMN = ceil(width_factor*conf->sigma_xy);
     wMN < 5 ? wMN = 5 : 0;
     wMN % 2 == 0 ? wMN++ : 0;
 
-    size_t wP = ceil(3*conf->sigma_z);
+    size_t wP = ceil(width_factor*conf->sigma_z);
     wP < 5 ? wP = 5: 0;
     wP % 2 == 0 ? wP++ : 0;
+    if(conf->P < 2)
+    {
+        wP = 1;
+    }
 
     if(conf->verbose > 1)
     {
         if(conf->log != NULL)
         {
-            printf("Using a ROI size of %zu x %zu x %zu pixels\n",
+            printf("gmlfit: Using a ROI size of %zu x %zu x %zu pixels\n",
                    wMN, wMN, wP);
         }
     }
     /* Determine max patch size */
     double max_scale = 5;
-    wMN = ceil(max_scale*3*conf->sigma_xy);
+    wMN = ceil(max_scale*width_factor*conf->sigma_xy);
     wMN < 5 ? wMN = 5 : 0;
     wMN % 2 == 0 ? wMN++ : 0;
 
-    wP = ceil(max_scale*3*conf->sigma_z);
+    wP = ceil(max_scale*width_factor*conf->sigma_z);
     wP < 5 ? wP = 5: 0;
     wP % 2 == 0 ? wP++ : 0;
     max_patch_size = wMN*wMN*wP;
     }
+
+
 
 #pragma omp parallel
     {
@@ -521,13 +616,17 @@ double * gmlfit_run(gmlfit * conf)
             {
                 scale = conf->DS[kk];
             }
-            size_t wMN = ceil(scale*3*conf->sigma_xy);
+            size_t wMN = ceil(scale*width_factor*conf->sigma_xy);
             wMN < 5 ? wMN = 5 : 0;
             wMN % 2 == 0 ? wMN++ : 0;
 
-            size_t wP = ceil(scale*3*conf->sigma_z);
+            size_t wP = ceil(scale*width_factor*conf->sigma_z);
             wP < 5 ? wP = 5: 0;
             wP % 2 == 0 ? wP++ : 0;
+            if(conf->P < 2)
+            {
+                wP = 1;
+            }
 
             assert(wMN*wP <= max_patch_size);
 

@@ -17,24 +17,33 @@ typedef struct{
     char * outfile; /* Where to write the tsv output */
     char * fout; /* Where to (optionally) write the filtered image */
     int nthreads;
-    /* This determines the filter size */
+
+    /* Diffraction limited size of dots*/
+    float fit_asigma;
+    float fit_lsigma;
+
+    /* Size of the LoG filter */
     float log_asigma; /* Axial sigma for LoG filter */
     float log_lsigma; /* Lateral sigma */
-    float fit_asigma; /* For dot fitting */
-    float fit_lsigma;
+
+/* Optical configuration */
     float NA;
     float ni;
     float lambda;
     float dx;
     float dz;
+
     int ndots; /* Number of dots to export */
     char * logfile;
     FILE * log;
-    int fwhm;
     int fitting; /* Set to 1 to enable fitting */
     float th;
     int optind;
     char * cmdline;
+
+    /* For multi scale dot detection.
+     *For single scale paths,
+     * scales[0] is also used to scale up filter sizes if set. */
     int nscale;
     float max_rel_scale;
     float * scales;
@@ -56,7 +65,6 @@ static opts * opts_new()
     s->log = NULL;
     s->logfile = NULL;
     s->fout = NULL;
-    s->fwhm = 0;
     s->fitting = 0;
     s->nscale = 1;
     s->max_rel_scale = 2;
@@ -119,12 +127,7 @@ static void opts_print(FILE * f, opts * s)
     } else {
         fprintf(f, "Automatic number of dots in the output\n");
     }
-    if(s->fwhm)
-    {
-        fprintf(f, "Will calculate FWHM\n");
-    } else {
-        fprintf(f, "No FWHM calculations\n");
-    }
+
     if(s->fitting)
     {
         fprintf(f, "Will fit the dots:\n");
@@ -164,9 +167,7 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
     printf(" --overwrite\n\t Overwrite existing files (default %d)\n", s->overwrite);
     printf(" --help\n\t Show this message\n");
     printf(" --logfile file.txt\n\t Specify where the log file should be written\n");
-    printf(" --fwhm\n"
-           "\tInclude FWHM based on interpolation in the output (default %d)\n",
-           s->fwhm);
+
     printf(" --verbose v\n\t Verbosity level (default %d)\n", s->verbose);
     printf(" --nthreads n\n\t Set the number of computational threads\n");
     printf(" --fout file.tif\n\t Write filtered image -- for debugging\n");
@@ -233,8 +234,6 @@ static void argparsing(int argc, char ** argv, opts * s)
 
         {"dog_ls", required_argument, NULL, 'l'},
         {"fit_ls", required_argument, NULL, 'l'},
-
-        {"fwhm", no_argument, NULL, 'f'},
         {"fitting", no_argument, NULL, 'F'},
         {"help", no_argument, NULL, 'h'},
         {"max_scale", required_argument, NULL, 'm'},
@@ -252,7 +251,7 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"ni",     required_argument, NULL, '6'},
         {NULL, 0, NULL, 0}};
     int ch;
-    while((ch = getopt_long(argc, argv, "1:3:4:5:6:L:a:A:fF:hi:l:m:n:N:op:r:s:v:w:", longopts, NULL)) != -1)
+    while((ch = getopt_long(argc, argv, "1:3:4:5:6:L:a:A:F:hi:l:m:n:N:op:r:s:v:w:", longopts, NULL)) != -1)
     {
         switch(ch){
         case '1':
@@ -275,9 +274,6 @@ static void argparsing(int argc, char ** argv, opts * s)
             break;
         case 'A':
             s->fit_asigma = atof(optarg);
-            break;
-        case 'f':
-            s->fwhm = 1;
             break;
         case 'F':
             s->fitting = 1;
@@ -590,49 +586,6 @@ static ftab_t * append_fitting(opts * s, ftab_t * T, float * I,
     return T;
 }
 
-static ftab_t * append_fwhm(opts * s, ftab_t * T, fim_t * V,
-                            const char * cname_lateral,
-                            const char * cname_axial)
-{
-    int xcol = ftab_get_col(T, "x");
-    int ycol = ftab_get_col(T, "y");
-    int zcol = ftab_get_col(T, "z");
-
-    struct timespec tstart, tend;
-
-
-    if(s->verbose > 1)
-    {
-        printf("Calculating fwhm..."); fflush(stdout);
-    }
-    dw_gettime(&tstart);
-    float * fwhm_vals_lateral = malloc(T->nrow*sizeof(float));
-    assert(fwhm_vals_lateral != NULL);
-    float * fwhm_vals_axial = malloc(T->nrow*sizeof(float));
-    assert(fwhm_vals_axial != NULL);
-
-#pragma omp parallel for
-    for(size_t kk = 0; kk<T->nrow; kk++)
-    {
-        float * row = T->T + kk*T->ncol;
-        fwhm_vals_lateral[kk] = fwhm_lateral(V, row[xcol], row[ycol], row[zcol], s->verbose);
-        fwhm_vals_axial[kk] = fwhm_axial(V, row[xcol], row[ycol], row[zcol], s->verbose);
-    }
-    dw_gettime(&tend);
-    double t = timespec_diff(&tend, &tstart);
-    if(s->verbose > 1)
-    {
-        printf(" took %.4f s\n", t);
-    }
-
-    T = ftab_insert_col(T, fwhm_vals_lateral, cname_lateral);
-    free(fwhm_vals_lateral);
-    T = ftab_insert_col(T, fwhm_vals_axial, cname_axial);
-    free(fwhm_vals_axial);
-
-    return T;
-}
-
 
 #ifdef STANDALONE
 int main(int argc, char ** argv)
@@ -702,6 +655,11 @@ void detect_dots(opts * s, char * inFile)
                 fim_mult_scalar(A, M*N*P, 1.0/scaling);
             }
         }
+    }
+
+    if(s->verbose > 1)
+    {
+        printf("Image size: %ld x %ld x %ld\n", M, N, P);
     }
 
     if(s->ndots < 0)
@@ -789,7 +747,7 @@ void detect_dots(opts * s, char * inFile)
                        scaling*s->log_asigma,
                        scaling);
             }
-
+            assert(P > 0);
             LoG[ss] = fim_LoG_S2(A, M, N, P,
                                  scaling*s->log_lsigma,
                                  scaling*s->log_asigma);
@@ -814,7 +772,7 @@ void detect_dots(opts * s, char * inFile)
 
     if(s->verbose > 1)
     {
-        printf("Found %zu points\n", T->ncol);
+        printf("Found %zu points\n", T->nrow);
         printf("Sorting the local maxima by value\n");
     }
 
@@ -871,12 +829,6 @@ void detect_dots(opts * s, char * inFile)
     /* Discard unwanted dots before the computationally demanding fitting */
     ftab_head(T, s->ndots);
 
-    if(s->fwhm)
-    {
-        fim_t * fI = fim_image_from_array(A, M, N, P);
-        T = append_fwhm(s, T, fI, "fwhm_lateral_filtered", "fwhm_axial_filtered");
-        fimt_free(fI);
-    }
 
     if(s->fitting)
     {
