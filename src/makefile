@@ -56,15 +56,15 @@ dw_nuclei_files=dw_nuclei.c fim.o ftab.o fim_tiff.o prf_forest.o qsort.o prf_tre
 dw_nuclei: $(dw_nuclei_files)
 	$(CC) $(CFLAGS) -DSTANDALONE $(dw_nuclei_files) $(LDFLAGS) -o dw_nuclei
 
-dw_dots_files=dw_dots.c fim.o ftab.o fim_tiff.o fwhm.o dw_util.o fft.o gmlfit.o
+dw_dots_files=dw_dots.c fim.o ftab.o fim_tiff.o  dw_util.o fft.o gmlfit.o
 dw_dots: $(dw_dots_files)
 	$(CC) $(CFLAGS) -DSTANDALONE $(dw_dots_files) $(LDFLAGS) -o dw_dots
 
-psf_files = dw_psf.c fim.o ftab.o fim_tiff.o fwhm.o dw_util.o fft.o
+psf_files = dw_psf.c fim.o ftab.o fim_tiff.o  dw_util.o fft.o
 dw_psf: $(psf_files)
 	$(CC) $(CFLAGS) -DSTANDALONE $(psf_files) $(LDFLAGS) -o dw_psf
 
-spsf_files = dw_psf_sted.c fim.o ftab.o fim_tiff.o fwhm.o dw_util.o fft.o
+spsf_files = dw_psf_sted.c fim.o ftab.o fim_tiff.o  dw_util.o fft.o
 dw_psf_sted: $(spsf_files)
 	$(CC) $(CFLAGS) -DSTANDALONE $(spsf_files) $(LDFLAGS) -o dw_psf_sted
 
@@ -87,10 +87,6 @@ dw_tiff_max: $(dw_tiff_max_files)
 tiff_from_raw_files=tiff_from_raw.c fim.o fim_tiff.o ftab.o fft.o dw_util.o
 tiff_from_raw:
 	$(CC) $(CFLAGS) $(tiff_from_raw_files) $(LDFLAGS) -o tiff_from_raw
-
-fwhm_ut_files=fwhm_ut.c fwhm.c fim.o ftab.o fim_tiff.o fft.o dw_util.o
-fwhm_ut: $(fwhm_ut_files)
-	$(CC) $(CFLAGS) $(fwhm_ut_files) $(LDFLAGS) -o fwhm_ut
 
 li:
 	$(CC) -DLI_TEST li.c  -o li_ut -lm `pkg-config --CFLAGS --libs gsl`
