@@ -1460,29 +1460,22 @@ static size_t max_size_t(size_t a, size_t b)
 }
 
 
-static float fim_interp_bc(float * V, int64_t nV,
-                           int64_t stride,
-                           int64_t idx, fim_boundary_condition bc)
+static float fim_interp_symmetric_mirror(const float * V, int64_t nV,
+                                         int64_t stride,
+                                         int64_t idx)
 {
-    /* Neither VALID or WEIGHTED can be handled like this ...  */
-    switch(bc)
-    {
-    case FIM_BC_SYMMETRIC_MIRROR:
-        idx < 0 ? idx = -idx : 0;
-        idx >= nV ? idx = (nV-1)-(idx+1-nV) : 0;
-        assert(idx >= 0);
-        assert(idx < nV);
-        return V[stride*idx];
-        break;
-    case FIM_BC_PERIODIC:
-        return V[stride*(idx % nV)];
-        break;
-    default:
-        assert(0);
-        return 0;
-    }
-    assert(0);
-    return 0;
+    idx < 0 ? idx = -idx : 0;
+    idx >= nV ? idx = (nV-1)-(idx+1-nV) : 0;
+    assert(idx >= 0);
+    assert(idx < nV);
+    return V[stride*idx];
+}
+
+static float fim_interp_periodic(const float * V, int64_t nV,
+                                 int64_t stride,
+                                 int64_t idx)
+{
+    return V[stride*(idx % nV)];
 }
 
 void fimt_conv1_x(fim_t * V, fim_t * K, fim_boundary_condition bc)
@@ -1510,7 +1503,8 @@ void fimt_conv1_x(fim_t * V, fim_t * K, fim_boundary_condition bc)
     }
 }
 
-/* like here: https://diplib.org/diplib-docs/boundary.html#dip-BoundaryCondition */
+/* Boundary conditions like here:
+ * https://diplib.org/diplib-docs/boundary.html#dip-BoundaryCondition */
 void fim_conv1(float * restrict V, const size_t nV, const int stride,
                const float * restrict K, const size_t nK,
                float * restrict buffer,
@@ -1518,37 +1512,67 @@ void fim_conv1(float * restrict V, const size_t nV, const int stride,
 {
     assert(V != NULL);
     assert(buffer != NULL);
-    memset(buffer, 0, nV*sizeof(float));
-
     if(nK % 2 == 0)
     {
         fprintf(stderr,
                 "fim_conv1 error: will only work with kernels of odd size\n");
+        exit(EXIT_FAILURE);
         return;
     }
 
-    if(nK > nV)
+    if( (nK+1)/2 > nV)
     {
-        fprintf(stderr, "Kernel size: %zu, Vector size: %zu\n", nK, nV);
-        fprintf(stderr,
-                "Someone did not bother to implement fim_conv1 when the kernel was larger than the input vector ... please file a bug report!\n");
-        fprintf(stderr, "The program will crash now\n");
+        fprintf(stderr, "\n"
+                "fim_conv1 errror:\n"
+                "   Kernel size: %zu, Vector size: %zu\n"
+                "   The kernel is too large: unable to perform the convolution\n"
+                "   Even if this could be done, it would probably be a bad idea\n"
+                "   The program will crash now\n",
+                nK, nV);
         exit(EXIT_FAILURE);
     }
 
+    memset(buffer, 0, nV*sizeof(float));
+
+    /* Tight case, when the kernel is larger than the input image */
     const int64_t mid = (nK-1)/2;
     if(nK > nV)
     {
-        for(int64_t ii = 0 ; ii < (int64_t) nV; ii++)
+        if(bc == FIM_BC_SYMMETRIC_MIRROR)
         {
-            for(int64_t kk = 0; kk < (int64_t )nK; kk++)
+            for(int64_t ii = 0 ; ii < (int64_t) nV; ii++)
             {
-                int64_t idx = ii + kk - mid;
-                buffer[ii] += K[kk]*fim_interp_bc(V, nV, stride, idx, bc);
+                for(int64_t kk = 0; kk < (int64_t ) nK; kk++)
+                {
+                    int64_t idx = ii + kk - mid;
+                    buffer[ii] += K[kk]*fim_interp_symmetric_mirror(V, nV, stride, idx);
+                }
             }
+            return;
         }
+        if(bc == FIM_BC_PERIODIC)
+        {
+            for(int64_t ii = 0 ; ii < (int64_t) nV; ii++)
+            {
+                for(int64_t kk = 0; kk < (int64_t ) nK; kk++)
+                {
+                    int64_t idx = ii + kk - mid;
+                    buffer[ii] += K[kk]*fim_interp_periodic(V, nV, stride, idx);
+                }
+            }
+            return;
+        }
+        fprintf(stderr, "\n"
+                "fim_conv1 errror:\n"
+                "   Kernel size: %zu, Vector size: %zu\n"
+                "   The boundary condition is not implemented for this problem size\n"
+                "   The program will crash now\n",
+                nK, nV);
+        exit(EXIT_FAILURE);
         return;
     }
+
+    /* Normal case, the kernel is smaller than the vector */
 
     if(K == NULL) { return; }
     int buffer_allocation = 0;
@@ -1704,7 +1728,6 @@ void fim_conv1(float * restrict V, const size_t nV, const int stride,
             buffer[ii]*=Wtotal/W;
         }
     }
-
 
     /* Write back the result to the input array */
     for(size_t ii = 0; ii<nV; ii++)
@@ -2451,7 +2474,7 @@ static float locate_max_poly2(const float * x, const float * y, int n,
     float C2 = y[maxpos-1]*(1.0/(a2 - a*b - a*c + b*c))
         + y[maxpos]*(-1.0/(a*b - a*c - b2 + b*c))
         + y[maxpos+1]*(1.0/(a*b - a*c - b*c + c2));
-/* d/dx y(x) = 0 -> 0 = c1 + 2*c2*x, x=-c1/(2*c2) */
+    /* d/dx y(x) = 0 -> 0 = c1 + 2*c2*x, x=-c1/(2*c2) */
     if(use_log)
     {
         return exp(-C1 / (2.0 * C2));
@@ -2479,102 +2502,102 @@ ftab_t * fim_lmax_multiscale(float ** II, float * scales, size_t nscales,
 
 #pragma omp parallel
     {
-    float * row = calloc(ncol, sizeof(float));
-    assert(row != NULL);
-    float * log_values = calloc(ncol, sizeof(float));
-    assert(log_values != NULL);
+        float * row = calloc(ncol, sizeof(float));
+        assert(row != NULL);
+        float * log_values = calloc(ncol, sizeof(float));
+        assert(log_values != NULL);
 
-    /* Detect if a pixel is a local maxima
-     * at any scale, i.e. if any of the nscales pixels
-     * is a local maxima in the 4D neighbourhood
-     * we skip the border pixels
-     **/
-    float * strel = malloc(27*sizeof(float));
-    assert(strel != NULL);
-    for(int kk = 0; kk<27; kk++)
-    {
-        strel[kk] = 1;
-    }
-    strel[13] = 0;
-
-    /* For each scale, save the local max */
-    float * local_max = calloc(nscales, sizeof(float));
-    /* Indicator if the central pixel is the largest for the given scale */
-    int * is_local_max = calloc(nscales, sizeof(int));
-    int * is_scale_max = calloc(nscales, sizeof(int));
-
-    #pragma omp for
-    for(size_t pp = 1; pp < P-1; pp++)
-    {
-        for(size_t nn = 1; nn+1 < N; nn++)
+        /* Detect if a pixel is a local maxima
+         * at any scale, i.e. if any of the nscales pixels
+         * is a local maxima in the 4D neighbourhood
+         * we skip the border pixels
+         **/
+        float * strel = malloc(27*sizeof(float));
+        assert(strel != NULL);
+        for(int kk = 0; kk<27; kk++)
         {
-            for(size_t mm = 1; mm+1 < M; mm++)
+            strel[kk] = 1;
+        }
+        strel[13] = 0;
+
+        /* For each scale, save the local max */
+        float * local_max = calloc(nscales, sizeof(float));
+        /* Indicator if the central pixel is the largest for the given scale */
+        int * is_local_max = calloc(nscales, sizeof(int));
+        int * is_scale_max = calloc(nscales, sizeof(int));
+
+#pragma omp for
+        for(size_t pp = 1; pp < P-1; pp++)
+        {
+            for(size_t nn = 1; nn+1 < N; nn++)
             {
-                size_t idx = pp*M*N + nn*M + mm;
-
-                /* For each scale, determine if the pixel is a local maxima
-                 * also save the maxima of the region */
-                for(size_t ss = 0; ss < nscales; ss++)
+                for(size_t mm = 1; mm+1 < M; mm++)
                 {
-                    local_max[ss] = strel333_max(II[ss]+idx, M, N, P, strel);
-                    is_local_max[ss] = II[ss][idx] > local_max[ss];
-                    II[ss][idx] > local_max[ss] ? local_max[ss] = II[ss][idx] : 0 ;
-                }
+                    size_t idx = pp*M*N + nn*M + mm;
 
-                /* To be a maxima in the scale space, the pixel
-                 * has to be a maxima also compared to the adjacent
-                 * scales. */
-                for(int ss = 0; ss < (int) nscales; ss++)
-                {
-                    is_scale_max[ss] = is_local_max[ss];
-
-                    if(ss > 0) /* Compare with the previous scale */
+                    /* For each scale, determine if the pixel is a local maxima
+                     * also save the maxima of the region */
+                    for(size_t ss = 0; ss < nscales; ss++)
                     {
-                        if(local_max[ss-1] > local_max[ss])
+                        local_max[ss] = strel333_max(II[ss]+idx, M, N, P, strel);
+                        is_local_max[ss] = II[ss][idx] > local_max[ss];
+                        II[ss][idx] > local_max[ss] ? local_max[ss] = II[ss][idx] : 0 ;
+                    }
+
+                    /* To be a maxima in the scale space, the pixel
+                     * has to be a maxima also compared to the adjacent
+                     * scales. */
+                    for(int ss = 0; ss < (int) nscales; ss++)
+                    {
+                        is_scale_max[ss] = is_local_max[ss];
+
+                        if(ss > 0) /* Compare with the previous scale */
                         {
-                            is_scale_max[ss] = 0;
+                            if(local_max[ss-1] > local_max[ss])
+                            {
+                                is_scale_max[ss] = 0;
+                            }
+                        }
+                        if(ss + 1 < (int) nscales)
+                        {
+                            if(local_max[ss+1] > local_max[ss])
+                            {
+                                is_scale_max[ss] = 0;
+                            }
                         }
                     }
-                    if(ss + 1 < (int) nscales)
-                    {
-                        if(local_max[ss+1] > local_max[ss])
-                        {
-                            is_scale_max[ss] = 0;
-                        }
-                    }
-                }
 
-                /* Save the coordinates of the maximas */
-                for(size_t ss = 0; ss < nscales; ss++)
-                {
-                    if(is_scale_max[ss])
+                    /* Save the coordinates of the maximas */
+                    for(size_t ss = 0; ss < nscales; ss++)
                     {
-                        /* Pos is s a local maxima */
-                        row[0] = mm; row[1] = nn; row[2] = pp;
-                        float max_value = II[0][idx];
-                        for(size_t kk = 0; kk < nscales; kk++)
+                        if(is_scale_max[ss])
                         {
-                            float value = II[kk][idx];
-                            log_values[kk] = value;
-                            row[5+kk] = value;
-                            value > max_value ? max_value = value : 0;
+                            /* Pos is s a local maxima */
+                            row[0] = mm; row[1] = nn; row[2] = pp;
+                            float max_value = II[0][idx];
+                            for(size_t kk = 0; kk < nscales; kk++)
+                            {
+                                float value = II[kk][idx];
+                                log_values[kk] = value;
+                                row[5+kk] = value;
+                                value > max_value ? max_value = value : 0;
+                            }
+                            row[3] = max_value;
+                            int use_log = 1;
+                            row[4] = locate_max_poly2(scales, log_values, nscales, use_log);
+#pragma omp critical
+                            ftab_insert(T, row);
                         }
-                        row[3] = max_value;
-                        int use_log = 1;
-                        row[4] = locate_max_poly2(scales, log_values, nscales, use_log);
-                        #pragma omp critical
-                        ftab_insert(T, row);
                     }
                 }
             }
         }
-    }
 
-    free(is_local_max);
-    free(local_max);
-    free(strel);
-    free(row);
-    free(log_values);
+        free(is_local_max);
+        free(local_max);
+        free(strel);
+        free(row);
+        free(log_values);
     }
     return T;
 }
@@ -2621,20 +2644,20 @@ ftab_t * fim_lmax_2d(const float * I, size_t M, size_t N, size_t P)
 
     assert(P > 0);
 #pragma omp parallel for
-        for(size_t nn = 1; nn < N-1; nn++)
+    for(size_t nn = 1; nn < N-1; nn++)
+    {
+        for(size_t mm = 1; mm+1 < M; mm++)
         {
-            for(size_t mm = 1; mm+1 < M; mm++)
+            size_t pos = mm + nn*M;
+            if(lmax_2d(I + pos, M))
             {
-                size_t pos = mm + nn*M;
-                if(lmax_2d(I + pos, M))
-                {
-                    /* Pos is s a local maxima */
-                    float row[4] = {mm, nn, 0.0, I[pos]};
+                /* Pos is s a local maxima */
+                float row[4] = {mm, nn, 0.0, I[pos]};
 #pragma omp critical
-                    ftab_insert(T, row);
-                }
+                ftab_insert(T, row);
             }
         }
+    }
 
     return T;
 }
@@ -2662,7 +2685,7 @@ ftab_t * fim_lmax(const float * I, size_t M, size_t N, size_t P)
     strel[13] = 0;
 
     assert(P > 0);
-    #pragma omp parallel for
+#pragma omp parallel for
     for(size_t pp = 1; pp < P-1; pp++)
     {
         for(size_t nn = 1; nn+1 < N; nn++)
@@ -2674,7 +2697,7 @@ ftab_t * fim_lmax(const float * I, size_t M, size_t N, size_t P)
                 {
                     /* Pos is s a local maxima */
                     float row[4] = {mm, nn, pp, I[pos]};
-                    #pragma omp critical
+#pragma omp critical
                     ftab_insert(T, row);
                 }
             }
@@ -3169,7 +3192,7 @@ float * fim_LoG_S(const float * V0, const size_t M, const size_t N, const size_t
                   const float sigmaxy, const float sigmaz)
 {
 
-/* Set up filters */
+    /* Set up filters */
     /* Lateral filters */
     size_t nlG = 0;
     float * lG = gaussian_kernel(sigmaxy, &nlG);
@@ -3270,7 +3293,7 @@ float * fim_LoG_S2(const float * V0, const size_t M, const size_t N, const size_
 
     fim_boundary_condition bc = FIM_BC_SYMMETRIC_MIRROR;
 
-/* Set up filters */
+    /* Set up filters */
     /* Lateral filters */
     size_t nlG = 0;
     float * _lG = gaussian_kernel(sigmaxy, &nlG);
@@ -3343,59 +3366,59 @@ float * fim_LoG_S2(const float * V0, const size_t M, const size_t N, const size_
     /* 3D */
     if(P > 1)
     {
-    /** First dimension -> GII, LII */
-    fim_t * GII = fim_image_from_array(V0, M, N, P);
-    fimt_conv1_x(GII, lG, bc);
+        /** First dimension -> GII, LII */
+        fim_t * GII = fim_image_from_array(V0, M, N, P);
+        fimt_conv1_x(GII, lG, bc);
 
-    fim_t * LII = fim_image_from_array(V0, M, N, P);
-    fimt_conv1_x(LII, l2, bc);
+        fim_t * LII = fim_image_from_array(V0, M, N, P);
+        fimt_conv1_x(LII, l2, bc);
 
-    /** 2nd dimension -> GGI, GLI, LGI */
-    /* Prepare buffers */
-    fim_t * GGI = fim_shiftdim(GII);
-    fimt_free(GII);
-    fim_t * GLI = fimt_copy(GGI);
-    fim_t * LGI = fim_shiftdim(LII);
-    fimt_free(LII);
-    /* Apply filters */
-    fimt_conv1_x(GGI, lG, bc);
-    fimt_conv1_x(GLI, l2, bc);
-    fimt_conv1_x(LGI, lG, bc);
+        /** 2nd dimension -> GGI, GLI, LGI */
+        /* Prepare buffers */
+        fim_t * GGI = fim_shiftdim(GII);
+        fimt_free(GII);
+        fim_t * GLI = fimt_copy(GGI);
+        fim_t * LGI = fim_shiftdim(LII);
+        fimt_free(LII);
+        /* Apply filters */
+        fimt_conv1_x(GGI, lG, bc);
+        fimt_conv1_x(GLI, l2, bc);
+        fimt_conv1_x(LGI, lG, bc);
 
-    /** 3rd dimension -> GGL, GLG, LGG */
-    fim_t * GGL = fim_shiftdim(GGI);
-    fimt_free(GGI);
-    fim_t * GLG = fim_shiftdim(GLI);
-    fimt_free(GLI);
-    fim_t * LGG = fim_shiftdim(LGI);
-    fimt_free(LGI);
+        /** 3rd dimension -> GGL, GLG, LGG */
+        fim_t * GGL = fim_shiftdim(GGI);
+        fimt_free(GGI);
+        fim_t * GLG = fim_shiftdim(GLI);
+        fimt_free(GLI);
+        fim_t * LGG = fim_shiftdim(LGI);
+        fimt_free(LGI);
 
         fimt_conv1_x(GGL, a2, bc);
         fimt_conv1_x(GLG, aG, bc);
         fimt_conv1_x(LGG, aG, bc);
 
-    /* Free the filters */
-    fimt_free(lG);
-    fimt_free(l2);
-    fimt_free(aG);
-    fimt_free(a2);
+        /* Free the filters */
+        fimt_free(lG);
+        fimt_free(l2);
+        fimt_free(aG);
+        fimt_free(a2);
 
-    /** Merge results */
-    fim_t * LoG = GGL;
-    GGL = NULL;
-    fimt_add(LoG, GLG);
-    fimt_free(GLG);
-    fimt_add(LoG, LGG);
-    fimt_free(LGG);
+        /** Merge results */
+        fim_t * LoG = GGL;
+        GGL = NULL;
+        fimt_add(LoG, GLG);
+        fimt_free(GLG);
+        fimt_add(LoG, LGG);
+        fimt_free(LGG);
 
-    /** Shift back to original shape */
-    fim_t * result = fim_shiftdim(LoG);
-    fimt_free(LoG);
+        /** Shift back to original shape */
+        fim_t * result = fim_shiftdim(LoG);
+        fimt_free(LoG);
 
-    float * pLoG = result->V;
-    result->V = NULL;
-    fimt_free(result);
-    return pLoG;
+        float * pLoG = result->V;
+        result->V = NULL;
+        fimt_free(result);
+        return pLoG;
     }
 
     return NULL; // We should not reach this
