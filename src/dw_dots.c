@@ -145,17 +145,18 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
     opts * s = opts_new();
     printf("Detection of diffraction limited dots in 3D images\n"
            "using a Laplacian of Gaussian filter. Optional fitting\n"
-           "using a Gaussian model\n");
+           "using a Gaussian model\n"
+           "Limited functionality for 2D images\n");
     printf("\n");
     printf("usage: %s [<options>] input.tif input2.tif ...\n", argv[0]);
     printf("\n");
     printf("Recommended/required arguments:\n");
     printf(" --NA NA\n\t Set numerical aperture\n");
     printf(" --ni ni\n\t Set refractive index\n");
-    printf(" --dx dx\n\t Lateral pixel size\n");
-    printf(" --dz dz\n\t Axial pixel size\n");
-    printf(" --lambda l\n\t Emission wave length\n");
-    printf(" --ndots n\n\t Number of dots to export (default %d)\n", s->ndots);
+    printf(" --dx dx\n\t Lateral pixel size [nm]\n");
+    printf(" --dz dz\n\t Axial pixel size [nm]\n");
+    printf(" --lambda l\n\t Emission wave length [nm]\n");
+    printf(" --ndots n\n\t Number of dots to export (default M x N x 0.005)\n");
     printf("\n");
     printf("Additional options\n");
     printf(" --nscale n\n"
@@ -164,7 +165,8 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
            "Tell the program how much larger the dots are compared to\n"
            "the diffraction limit. Default = 1, i.e. diffraction limited dots\n"
            "For some experiments values up to 2 makes sense\n");
-    printf(" --overwrite\n\t Overwrite existing files (default %d)\n", s->overwrite);
+    printf(" --overwrite\n\t Overwrite existing files (default %d)\n",
+           s->overwrite);
     printf(" --help\n\t Show this message\n");
     printf(" --logfile file.txt\n\t Specify where the log file should be written\n");
 
@@ -177,7 +179,7 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
     printf(" --dog_ls s\n\t Lateral sigma (location of zero-crossing)\n");
     printf(" --dog_as s\n\t Axial sigma (location of zero-crossing)\n");
     printf(" --fit_ls\n\t"
-           "Lateral sigma, initial guess for the dot fitting");
+           "Lateral sigma, initial guess for the dot fitting\n");
     printf(" --fit_as\n\t"
            "Axial sigma, initial guess for the dot fitting");
     printf("\n");
@@ -664,7 +666,7 @@ void detect_dots(opts * s, char * inFile)
 
     if(s->ndots < 0)
     {
-        s->ndots = 0.025 * (float) M * (float) N;
+        s->ndots = 0.005 * (float) M * (float) N;
         fprintf(s->log, "Setting the max number of output dots to %d\n",
                 s->ndots);
     }

@@ -8,27 +8,26 @@ stacks.
 
 **dw dots** is the module that can be used to detect dots in tif
 images and export them to a tsv file. It uses a Laplacian of Gaussian
-(LoG) filter for initial detection and can further calculate full
-width half max (FWHM) by interpolation if wanted.
+(LoG) filter for initial detection and can further fit the dots using
+a Gaussian model.
 
 # SYNOPSIS
 
 **dw dots** [*OPTIONS*] file1.tif file2.tif ...
 
 # OPTIONS
-**\--lsigma**
-: Lateral sigma for the LoG filter.
 
-**\--asigma**
-: Axial sigma for the LoG filter
+The program will assume that the dots are diffraction limited. The
+following arguments are required for the program to know how to set
+the filter sizes:
 
 **\--NA**
 : Numerical Aperture
 
-**\ni**
+**\--ni**
 : refractive index
 
-**\lambda**
+**\--lambda**
 : emission wave length (in nm)
 
 **\--dx**
@@ -37,61 +36,90 @@ width half max (FWHM) by interpolation if wanted.
 **\--dz**
 : axial pixel size / distance between the planes in the image. Specified in nm.
 
-**\--overwrite**
-: If specified existing files will be overwritten.
+It is probably also a good idea to set:
+
+**\--fitting**
+: Enable fitting of dots. Note that this take much more time than the
+  initial dot detection, especially if the dots are large (in terms of
+  pixels).
+
+**\--ndots**
+: Specify the max amount of dots that should be exported (and possiby
+  fitted). It is recommended that this is set manually when fitting is
+  enabled.
 
 **\--threads t**
 : Set the number of computational threads to use.
+
+If the dots are larger than the diffraction limit, you can use the
+
+**\--swell** parameter to hint how much larger they are.
+
+**\--swell s**
+: Specify how much larger the dots are, relative to the diffraction
+  limit, i.e. valid values are $s \leq 1$.
+
+To have full control of the filter sizes, it is possible to set them
+explicitly (not reccomended) by the following options:
+
+**\--dog_ls**
+: Lateral sigma for the LoG filter.
+
+**\--dot_as**
+: Axial sigma for the LoG filter
+
+**\--fit_ls**
+: Lateral sigma for the initial guess of the dot fitting routine.
+
+**\--fit_as**
+: Axial sigma for the initial guess of the dot fitting routine.
+
+**\--overwrite**
+: If specified existing files will be overwritten.
+
+The remaining options are:
 
 **\--fout file.tif**
 : Write out the filtered images (e.g. the LoG filtered image). Only
   for debugging and only to be used when there is just one input file.
 
-**\--ndots**
-: Specify the max amount of dots that should be exported.
-
 **\--help**
 : Show a brief help message
-
-**\--nthreads**
-: Specify the number of threads to use.
 
 **\--verbose**
 : Set the verbosity level.
 
 # Method
-**dw dots** will read one input image at a time and will perform the following:
+**dw dots** will read one 2D or 3D image at a time and will perform
+the following:
 
- - Filter the image with LoG filter using the values specified by
-  **\--lsigma** and **\--asigma** (or automatically set if you specify
-  the optical parameters as described below).
- - Extract all local maxima.
- - Sort the maxima according to the dot intensity.
- - Calculate the FWHM value for each dot in the lateral plane (by
-   intersection).
- - Write out at most **\--ndots** dots to a TSV file.
+ - Filter the image with a $-$LoG filter, using settings either derived
+   from the optical parameters or given explicitly at command line.
+ - Extract all local maxima, excluding pixels at the edges.
+ - Sort the maxima according to the $-$LoG value.
+ - Keep at most **\--ndots**.
+ - If **\--fitting** is set, determine the dot locations with sub
+   pixel accuracy.
+ - Write the dots to a TSV file.
 
 # INPUT
 **dw dots** can read the same kind of files as **dw**. It does look
 for log files from deconwolf, and if one is found the input image is
-rescaled according to the log file.
-
-The size of the LoG filter is determined by lsigma and asigma, which
-coincide with the zero crossings of the LoG. If you don't know how to
-set those values, then, as an alternative, you can specify **\--NA**,
-**\--ni**, **\--lambda**, **\--dx** and **\--dz** instead and those
-parameters will be used to set the sigma values. In that case sigma
-will be set to the fwhm in each direction. That gives a filter that is
-slightly larger than what would be optimal for diffraction limited dots.
+rescaled according to the log file. It works with 2D as well as 3D
+images.
 
 # OUTPUT
 A TSV file will be generated per input file (`.dots.tsv`) as well as a
 log file (`.dots.log.txt`). The TSV file will be sorted by the dot intensities.
 
-# DETAILS
+# NOTES
 
-- The LoG filter is implemented using symmetric mirroring at the image edges.
-- This routine will only work for 3D images.
+- The LoG filter is implemented using symmetric mirroring at the image
+  edges. It is possible that there are too few image planes for a 3D
+  LoG filter, in that case try running the program on a 2D projection.
+- For 2D images the same columns will be seen in the output. However
+  the fitted z position as well as the fitted z size will be set to 0.
+
 
 # SEE ALSO
 **dw**, **dw_bw**
