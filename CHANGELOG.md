@@ -1,6 +1,10 @@
 # CHANGELOG
 
 ## 0.4.0
+
+- Added pre-generated header files under `/src/kernels/`
+so that `make kernels` is not needed during the build process.
+
 Updates to `dw dots`:
 - Updated LoG filter and maxima finding routine gives a speedup > 2x.
 - Setting the filter sizes based on the optical parameters, assuming
