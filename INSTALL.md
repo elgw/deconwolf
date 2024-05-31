@@ -24,13 +24,36 @@ cmake ..
 cmake --build .
 ```
 
-To install:
+### Without GPU acceleration:
 
+By default **dw** will be compiled with OpenCL/GPU support enabled. If
+ that does not work for you, turn that option off by passing
+ `-DENABLE_GPU=OFF` to **cmake**, i.e. use:
+
+ ``` shell
+mkdir builddir
+cd builddir
+cmake -DENABLE_GPU=OFF ..
+cmake --build .
+ ```
+
+### Machine specific optimizations
+
+To enable optimizations for your particular machine, pass the option
+ `-DENABLE_NATIVE_OPTIMIZATION=ON`. Doing that might create binaries
+ that run faster on your machine. However it might not be possible to
+ run the same binaries on another machine.
+
+
+### To install
+
+A direct install (files will be copied to default paths), use:
 ``` shell
 sudo make install
 ```
 
-To use the system package manager:
+To use the system package manager is probably the better way since it
+offers a cleaner way to uninstall:
 
 ``` shell
 mkdir builddir
@@ -40,18 +63,21 @@ cpack -G DEB # see cpack --help for other types
 sudo apt-get install ./deconwolf-0.3.8-Linux.deb # on Ubuntu
 ```
 
-Build options:
 
- - **OpenCL** By default **dw** will be compiled with OpenCL/GPU
- support enabled. To explicitly turn that option off, pass
- `-DENABLE_GPU=OFF` to cmake, i.e. use:
+## GPU Acceleration via OpenCL
 
- - **Machine specific optimizations** To enable optimizations for your
- particular machine, pass the option
- `-DENABLE_NATIVE_OPTIMIZATION=ON`. Doing that might create binaries
- that run faster on your machine. However it might not be possible to
- run the same binaries on another machine.
+- If you have more than one OpenCL device, please use the `--cldevice
+  n` argument to tell deconwolf which device to use. The devices are
+  ordered with 0 being the first. If available use the command
+  `clinfo` to list the OpenCL devices available on your system.
 
+- Under WSL2 and with the current version of pocl it does not seem to
+work, see [issue
+#56](https://github.com/elgw/deconwolf/issues/56). Hopefully it can
+work in the future.
+
+- If cmake can't find OpenCL and you are on a cluster, check out:
+  [https://github.com/elgw/deconwolf/issues/55#issuecomment-2137579066]
 
 ## macOS Big Sur
 
@@ -68,10 +94,13 @@ brew install gsl
 ```
 
 ## Windows 10/11
-Deconwolf can be built and run using WSL. Most likely there will be a [performance
-penalty](https://www.phoronix.com/scan.php?page=article&item=wsl-wsl2-tr3970x&num=1), and it will not be possible to enable GPU acceleration.
+Deconwolf can be built and run using WSL. Most likely there will be a
+[performance
+penalty](https://www.phoronix.com/scan.php?page=article&item=wsl-wsl2-tr3970x&num=1),
+and it will not be possible to enable GPU acceleration, see [issue
+#56](https://github.com/elgw/deconwolf/issues/56).
 
-It can also be built using [msys2](https://www.msys2.org/) or
+Deconwolf can also be built using [msys2](https://www.msys2.org/) or
 [cygwin](https://www.cygwin.com/), however those options will be
 slower since OpenMP will be using an pthreads emulation on top of
 windows threads. It might be possible to get OpenCL working.

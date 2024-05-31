@@ -2,8 +2,11 @@
 
 ## 0.4.0
 
+**TLDR** New features and bug fixes. Update if you are on version
+0.3.7 or below.
+
 - Added pre-generated header files under `/src/kernels/`
-so that `make kernels` is not needed during the build process.
+so that `make kernels` is not needed during the build process. Solves [issue #55](https://github.com/elgw/deconwolf/issues/55)
 
 Updates to `dw dots`:
 - Updated LoG filter and maxima finding routine gives a speedup > 2x.

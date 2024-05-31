@@ -1,4 +1,4 @@
-# deconwolf v0.3.8
+# deconwolf v0.4.0
 
 **deconwolf** is a software for 3-D deconvolution of fluorescent wide-field
 images:
@@ -243,11 +243,12 @@ For more documentation see the short [usage guide](USAGE.md), and the manual
 pages for both binaries, [man dw](doc/dw.txt) [man dw_bw](doc/dw_bw.txt).
 
 
-### Bugs
+## Bugs
 
 Most likely there are bugs and they can only be fixed when they are known.
 Please open a [new ticket](https://github.com/elgw/deconwolf/issues) if you
 have any issues with the program.
+
 
 
 ## Alternatives
