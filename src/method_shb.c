@@ -229,6 +229,11 @@ float * deconvolve_shb(float * restrict im,
             if(it->iter % s->iterdump == 0)
             {
                 float * temp = fim_subregion(x, wM, wN, wP, M, N, P);
+                if(s->offset > 0)
+                {
+                    fim_add_scalar(temp, M*N*P, -s->offset);
+                    fim_project_positive(im, M*N*P);
+                }
                 char * outname = gen_iterdump_name(s, it->iter);
                 //printf(" Writing current guess to %s\n", outname);
                 if(s->outFormat == 32)

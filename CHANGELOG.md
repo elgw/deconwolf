@@ -1,5 +1,44 @@
 # CHANGELOG
 
+## 0.4.0
+
+**TLDR** New features and bug fixes. Update if you are on version
+0.3.7 or below.
+
+- Added pre-generated header files under `/src/kernels/`
+so that `make kernels` is not needed during the build process. Solves [issue #55](https://github.com/elgw/deconwolf/issues/55)
+
+Updates to `dw dots`:
+- Updated LoG filter and maxima finding routine gives a speedup > 2x.
+- Setting the filter sizes based on the optical parameters, assuming
+  diffraction limited dots.
+- Addition: Can fit dots using a 3D Gaussian while minimizing the
+  $-\log$ likelihood assuming Poissonian noise. For this purpose the
+  Broyden-Fletcher-Goldfarb-Shanno algoritm (bfgs2 in GSL) is used.
+
+## 0.3.9
+- Added the **--offset** option. This will add an offset to the image
+  before the deconvolution start, which will be removed before saving
+  the result to disk. Initial tests suggests that this can reduce the
+  effect of detector noise (non-Poisson) by decreasing the relative
+  weight of pixels with low values. See some numerical tests below, on
+  the microtubules image:
+
+  ![iterations vs mse](doc/20240422.png)
+
+  The default value is set to 5 which should be safe in most
+  situations, but it is suggested that it is set to the standard
+  deviation of the detector noise. To revert to the old behaviour,
+  use **--offset 0**.
+
+- Removed the **--relax** option since it made no sense.
+
+- Reverted the default start guess to flat, like it was before v
+  0.3.8. The **--start_lp** still seems to produce better images but
+  takes a little too long to initialize for being a default
+  method. Might still be the default in future version when there is a
+  GPU implementation.
+
 
 ## 0.3.8
 - Fixed crashes when trying to read a non tif file.

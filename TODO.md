@@ -5,7 +5,15 @@ github](https://github.com/elgw/deconwolf/issues).
 
 ## Planned
 
-- [ ] c2r and c2r plans needed any more? Probably only the in-place versions.
+- [ ] Improve the documentation, and give more examples.
+
+- [ ] Finish `dw dots` and document it well.
+
+- [ ] Update to the latest VkFFT version.
+
+- [ ] Better build instruction for native builds on Windows **help wanted**
+
+- [ ] Figure out how if it works on Apple silicon **help wanted**
 
 - [ ] dynamic loading of OpenCL, for examples using [https://github.com/yugr/Implib.so]
 
@@ -19,8 +27,6 @@ github](https://github.com/elgw/deconwolf/issues).
   destination when the write has finished. Avoids some bad luck.
 
 - [ ] Add OpenCL-RL method (as a low mem option).
-
-- [ ] Get documentation up to date and write a general introduction.
 
 - [ ] Set default PSF size in `dw_bw` based on the geometry of the PSF
 and expected sample thickness.
@@ -36,14 +42,11 @@ and expected sample thickness.
 - [ ] Still one kernel to write in order to speedup the initialization
       in `method_shbcl2` when bq > 0.
 
-- [ ] Wrap image pointers in some abstraction, would be especially
-      useful for Windows where there are multiple **free**-functions.
-
 - [ ] Make the **--lookahead** option work again, and possibly enable
-      it by default, at least on the CPU side.
+      it by default, at least on the CPU side where memory often isn't
+      a limiting factor.
 
 ## Nice to have
-- [ ] Build deb files etc with cmake.
 - [ ] Skip libtiff, especially for writing.
 - [ ] See if Pinned memory allocations can improve the performance for shbcl (don't expect anything drastic from shbcl2).
 [LFAT](https://ltfat.github.io/notes/ltfatnote017.pdf),

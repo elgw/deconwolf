@@ -23,6 +23,25 @@ static void cumsum_array(float * A, size_t N, size_t stride);
 static void fim_show(float * A, size_t M, size_t N, size_t P);
 static void fim_show_int(int * A, size_t M, size_t N, size_t P);
 
+static const char * fim_boundary_condition_str(fim_boundary_condition bc)
+{
+    switch(bc)
+    {
+    case FIM_BC_VALID:
+        return "VALID";
+    case FIM_BC_SYMMETRIC_MIRROR:
+        return "SYMMETRIC MIRROR";
+    case FIM_BC_PERIODIC:
+        return "PERIODIC";
+    case FIM_BC_WEIGHTED:
+        return "WEIGHTED";
+    case FIM_BC_ZEROS:
+        return "ZEROS";
+    }
+    assert(0);
+    return "UNKNOWN";
+}
+
 #ifdef __linux__
 void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_malloc(size_t nbytes)
 {
@@ -34,7 +53,7 @@ void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_malloc(size_t nbytes)
         exit(EXIT_FAILURE);
     }
 
-    #if 0
+#if 0
     const size_t HPAGE_SIZE  = (1 << 21); // 2 Mb
     if(FIM_ALIGNMENT == HPAGE_SIZE)
     {
@@ -51,7 +70,7 @@ void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_malloc(size_t nbytes)
             }
         }
     }
-    #endif
+#endif
 
     memset(p, 0, nbytes);
 
@@ -60,9 +79,9 @@ void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_malloc(size_t nbytes)
 #else
 void * fim_malloc(size_t nbytes)
 {
-    #ifdef WINDOWS
+#ifdef WINDOWS
     return _aligned_malloc(nbytes, FIM_ALIGNMENT);
-    #else
+#else
     void * p;
     if(posix_memalign(&p, FIM_ALIGNMENT, nbytes))
     {
@@ -72,7 +91,7 @@ void * fim_malloc(size_t nbytes)
     }
     assert(p != NULL);
     return p;
-    #endif
+#endif
 }
 #endif
 
@@ -106,11 +125,11 @@ void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_realloc(void * p, size_t 
 
 void fim_free(void * p)
 {
-    #ifdef WINDOWS
+#ifdef WINDOWS
     _aligned_free(p);
-    #else
+#else
     free(p);
-    #endif
+#endif
 }
 
 void fim_set_verbose(int v)
@@ -128,7 +147,7 @@ static double clockdiff(struct timespec* end, struct timespec * start)
 /* https://en.wikipedia.org/wiki/Anscombe_transform  */
 void fim_anscombe(float * x, size_t n)
 {
-    #pragma omp parallel for
+#pragma omp parallel for
     for(size_t kk = 0; kk<n; kk++)
     {
         x[kk] = 2.0*sqrt(x[kk] + 3.0/8.0);
@@ -145,7 +164,7 @@ void fim_ianscombe(float * x, size_t n)
 }
 
 
-void fim_delete(fim_t * F)
+void fimt_free(fim_t * F)
 {
     if(F != NULL)
     {
@@ -154,6 +173,18 @@ void fim_delete(fim_t * F)
         free(F);
     }
     return;
+}
+
+
+fim_t * fim_wrap_array(float * V, size_t M, size_t N, size_t P)
+{
+    fim_t * I = malloc(sizeof(fim_t));
+    assert(I != NULL);
+    I->V = V;
+    I->M = M;
+    I->N = N;
+    I->P = P;
+    return I;
 }
 
 fim_t * fim_image_from_array(const float * restrict V, size_t M, size_t N, size_t P)
@@ -383,6 +414,15 @@ void fim_minus(float * restrict  A,
     {
         A[kk] = B[kk] - C[kk];
     }
+    return;
+}
+
+void fimt_add(fim_t * A, const fim_t * B)
+{
+    assert(A->M == B->M);
+    assert(A->N == B->N);
+    assert(A->P == B->P);
+    fim_add(A->V, B->V, A->M * A->N * A->P);
     return;
 }
 
@@ -632,6 +672,27 @@ void fim_mult_scalar(float * restrict I, size_t N, float x)
     }
     return;
 }
+
+void fim_project_positive(float * I, size_t N)
+{
+#pragma omp parallel for shared(I)
+    for(size_t kk = 0; kk < N ; kk++)
+    {
+        I[kk] < 0 ? I[kk] = 0 : 0;
+    }
+    return;
+}
+
+void fim_add_scalar(float * restrict I, size_t N, float x)
+{
+#pragma omp parallel for shared(I)
+    for(size_t kk = 0; kk < N ; kk++)
+    {
+        I[kk]+=x;
+    }
+    return;
+}
+
 
 void fim_normalize_sum1(float * restrict psf, int64_t M, int64_t N, int64_t P)
 {
@@ -1214,7 +1275,7 @@ void fim_conncomp6_ut()
     printf("Input image\n");
     fim_show(Im, M, N, 1);
     int * L = fim_conncomp6(Im, M, N);
-    printf("Labelled array\n");
+    printf("Labeled array\n");
     fim_show_int(L, M, N, 1);
     fim_free(L);
     fim_free(Im);
@@ -1235,7 +1296,7 @@ void fim_conv1_vector_ut()
     float * W = NULL;
     printf("V=\n");
     fim_show(V, 1, nV, 1);
-    for(int nK = 3; nK<8; nK+=2)
+    for(int nK = 3; nK<= (int) nV; nK+=2)
     {
         for(size_t kk = 0; kk<nV; kk++)
         {
@@ -1259,11 +1320,11 @@ void fim_conv1_vector_ut()
 
 void fim_LoG_ut()
 {
-    printf("-> fim_LoG_ut");
+    printf("-> fim_LoG_ut\n");
     struct timespec tstart, tend;
-    size_t M = 12;
-    size_t N = 12;
-    size_t P = 12;
+    size_t M = 256;
+    size_t N = 512;
+    size_t P = 128;
     float sigma_l = 3.1;
     float sigma_a = 1.1;
     float * V = fim_malloc(M*N*P*sizeof(float));
@@ -1287,14 +1348,14 @@ void fim_LoG_ut()
             exit(EXIT_FAILURE);
         }
     }
-    fim_delete(T);
+    fimt_free(T);
     T = NULL;
     assert(S1->V != S2->V);
-    fim_delete(S1);
+    fimt_free(S1);
     S1 = NULL;
-    fim_delete(S2);
+    fimt_free(S2);
     S2 = NULL;
-    fim_delete(S3);
+    fimt_free(S3);
 
 
     for(size_t kk = 0; kk<M*N*P; kk++)
@@ -1371,6 +1432,11 @@ void fim_LoG_ut()
         fim_show(LoG2, M, N, P);
     }
 
+    dw_gettime(&tstart);
+    float * LoGS2 = fim_LoG_S2(V, M, N, P, sigma_l, sigma_a);
+    dw_gettime(&tend);
+    free(LoGS2);
+    printf("fim_LoG_S2 took %f s\n", clockdiff(&tend, &tstart));
     fim_free(V);
     fim_free(LoG);
     fim_free(LoG2);
@@ -1393,12 +1459,302 @@ static size_t max_size_t(size_t a, size_t b)
     return b;
 }
 
+
+static float fim_interp_symmetric_mirror(const float * V, int64_t nV,
+                                         int64_t stride,
+                                         int64_t idx)
+{
+    idx < 0 ? idx = -idx : 0;
+    idx >= nV ? idx = (nV-1)-(idx+1-nV) : 0;
+    assert(idx >= 0);
+    assert(idx < nV);
+    return V[stride*idx];
+}
+
+static float fim_interp_periodic(const float * V, int64_t nV,
+                                 int64_t stride,
+                                 int64_t idx)
+{
+    return V[stride*(idx % nV)];
+}
+
+void fimt_conv1_x(fim_t * V, fim_t * K, fim_boundary_condition bc)
+{
+
+#pragma omp parallel
+    {
+        float * B = fim_malloc(V->M*sizeof(float));
+
+        for(size_t pp = 0; pp<V->P; pp++)
+        {
+#pragma omp for schedule(dynamic)
+            for(size_t nn = 0; nn<V->N; nn++)
+            {
+                float * line = V->V+pp*(V->M*V->N) + nn*(V->M);
+                fim_conv1(line, V->M,
+                          1, // stride
+                          K->V,
+                          fimt_nel(K),
+                          B,
+                          bc);
+            }
+        }
+        free(B);
+    }
+}
+
+/* Boundary conditions like here:
+ * https://diplib.org/diplib-docs/boundary.html#dip-BoundaryCondition */
+void fim_conv1(float * restrict V, const size_t nV, const int stride,
+               const float * restrict K, const size_t nK,
+               float * restrict buffer,
+               fim_boundary_condition bc)
+{
+    assert(V != NULL);
+    assert(buffer != NULL);
+    if(nK % 2 == 0)
+    {
+        fprintf(stderr,
+                "fim_conv1 error: will only work with kernels of odd size\n");
+        exit(EXIT_FAILURE);
+        return;
+    }
+
+    if( (nK+1)/2 > nV)
+    {
+        fprintf(stderr, "\n"
+                "fim_conv1 errror:\n"
+                "   Kernel size: %zu, Vector size: %zu\n"
+                "   The kernel is too large: unable to perform the convolution\n"
+                "   Even if this could be done, it would probably be a bad idea\n"
+                "   The program will crash now\n",
+                nK, nV);
+        exit(EXIT_FAILURE);
+    }
+
+    memset(buffer, 0, nV*sizeof(float));
+
+    /* Tight case, when the kernel is larger than the input image */
+    const int64_t mid = (nK-1)/2;
+    if(nK > nV)
+    {
+        if(bc == FIM_BC_SYMMETRIC_MIRROR)
+        {
+            for(int64_t ii = 0 ; ii < (int64_t) nV; ii++)
+            {
+                for(int64_t kk = 0; kk < (int64_t ) nK; kk++)
+                {
+                    int64_t idx = ii + kk - mid;
+                    buffer[ii] += K[kk]*fim_interp_symmetric_mirror(V, nV, stride, idx);
+                }
+            }
+            return;
+        }
+        if(bc == FIM_BC_PERIODIC)
+        {
+            for(int64_t ii = 0 ; ii < (int64_t) nV; ii++)
+            {
+                for(int64_t kk = 0; kk < (int64_t ) nK; kk++)
+                {
+                    int64_t idx = ii + kk - mid;
+                    buffer[ii] += K[kk]*fim_interp_periodic(V, nV, stride, idx);
+                }
+            }
+            return;
+        }
+        fprintf(stderr, "\n"
+                "fim_conv1 errror:\n"
+                "   Kernel size: %zu, Vector size: %zu\n"
+                "   The boundary condition is not implemented for this problem size\n"
+                "   The program will crash now\n",
+                nK, nV);
+        exit(EXIT_FAILURE);
+        return;
+    }
+
+    /* Normal case, the kernel is smaller than the vector */
+
+    if(K == NULL) { return; }
+    int buffer_allocation = 0;
+    if(buffer == NULL)
+    {
+        buffer_allocation = 1;
+        buffer = calloc(nV, sizeof(float));
+    }
+
+    double Wtotal = 0;
+    if(bc == FIM_BC_WEIGHTED)
+    {
+        for(size_t kk = 0 ; kk<nK; kk++)
+        {
+            Wtotal += K[kk];
+        }
+    }
+
+    /* Part I: The kernel is overlapping the edge
+       if bc == FIM_BC_VALID, this part is skipped */
+
+
+    if(bc == FIM_BC_SYMMETRIC_MIRROR)
+    {
+        for(int64_t ii = 0 ; ii < mid; ii++)
+        {
+            for(int64_t kk = 0; kk < (int64_t) nK; kk++)
+            {
+                int64_t idx = ii + kk - mid;
+                idx < 0 ? idx = -idx : 0;
+                buffer[ii] += K[kk]*V[stride*idx];
+            }
+        }
+    }
+
+    if(bc == FIM_BC_ZEROS)
+    {
+        for(int64_t ii = 0 ; ii < mid; ii++)
+        {
+            for(int64_t kk = 0; kk < (int64_t) nK; kk++)
+            {
+                int64_t idx = ii + kk - mid;
+                if(idx >= 0)
+                {
+                    buffer[ii] += K[kk]*V[stride*idx];
+                }
+            }
+        }
+    }
+
+    if(bc == FIM_BC_PERIODIC)
+    {
+        for(int64_t ii = 0 ; ii < mid; ii++)
+        {
+            for(int64_t kk = 0; kk < (int64_t) nK; kk++)
+            {
+                int64_t idx = (ii + kk - mid);
+                idx < 0 ? idx = nV +idx : 0;
+                buffer[ii] += K[kk]*V[stride*idx];
+            }
+        }
+    }
+
+    if(bc == FIM_BC_WEIGHTED)
+    {
+        for(int64_t ii = 0 ; ii < mid; ii++)
+        {
+            float W = 0;
+            for(int64_t kk = 0; kk < (int64_t) nK; kk++)
+            {
+                int64_t idx = (ii + kk - mid);
+                if(idx >= 0)
+                {
+                    buffer[ii] += K[kk]*V[stride*idx];
+                    W+=K[kk];
+                }
+            }
+            buffer[ii]*=Wtotal/W;
+        }
+    }
+
+    /* Part II: Central, the kernels is inside the image */
+    for(int64_t ii = mid ; ii < (int64_t) nV-mid; ii++)
+    {
+        for(int64_t kk = 0; kk < (int64_t) nK; kk++)
+        {
+            int64_t idx = ii + kk - mid;
+            //printf("kk: %ld, idx: %ld, ii: %ld\n", kk, idx, ii);
+            //fflush(stdout);
+            buffer[ii] += K[kk]*V[stride*idx];
+        }
+    }
+
+    /* Part III: Last, where kernel is beyond the last pixel
+       if bc == FIM_BC_VALID, this part is skipped */
+    if(bc == FIM_BC_SYMMETRIC_MIRROR)
+    {
+        int64_t inV = nV;
+        for(int64_t ii = inV-mid ; ii < inV; ii++)
+        {
+            for(int64_t kk = 0; kk < (int64_t) nK; kk++)
+            {
+                int64_t idx = ii + kk - mid;
+                idx >= inV ? idx = (inV-1)-(idx+1-inV) : 0;
+                buffer[ii] += K[kk]*V[stride*idx];
+            }
+        }
+    }
+
+    if(bc == FIM_BC_ZEROS)
+    {
+        int64_t inV = nV;
+        for(int64_t ii = inV-mid ; ii < inV; ii++)
+        {
+            for(int64_t kk = 0; kk < (int64_t) nK; kk++)
+            {
+                int64_t idx = ii + kk - mid;
+                if(idx < inV)
+                { buffer[ii] += K[kk]*V[stride*idx]; }
+            }
+        }
+    }
+
+    if(bc == FIM_BC_PERIODIC)
+    {
+        int64_t inV = nV;
+        for(int64_t ii = inV-mid ; ii < inV; ii++)
+        {
+            for(int64_t kk = 0; kk < (int64_t) nK; kk++)
+            {
+                int64_t idx = (ii + kk - mid) % nV;
+                buffer[ii] += K[kk]*V[stride*idx];
+            }
+        }
+    }
+
+    if(bc == FIM_BC_WEIGHTED)
+    {
+        int64_t inV = nV;
+        for(int64_t ii = inV-mid ; ii < inV; ii++)
+        {
+            float W = 0;
+            assert(buffer[ii] == 0);
+            for(int64_t kk = 0; kk < (int64_t) nK; kk++)
+            {
+                int64_t idx = (ii + kk - mid);
+                if(idx < inV)
+                {
+                    buffer[ii] += K[kk]*V[stride*idx];
+                    W+=K[kk];
+                }
+            }
+            buffer[ii]*=Wtotal/W;
+        }
+    }
+
+    /* Write back the result to the input array */
+    for(size_t ii = 0; ii<nV; ii++)
+    {
+        V[ii*stride] = buffer[ii];
+    }
+
+    if(buffer_allocation)
+    {
+        free(buffer);
+    }
+    return;
+}
+
 void fim_conv1_vector(float * restrict V, const int stride, float * restrict W,
                       const size_t nV,
                       const float * restrict K, const size_t nKu, const int normalized)
 {
     if(V == NULL || K == NULL)
     {
+        return;
+    }
+
+    if(nKu > nV)
+    {
+        fprintf(stderr,
+                "fim_conv1_vector: error - kernel can't be longer than data\n");
         return;
     }
 
@@ -1453,7 +1809,9 @@ void fim_conv1_vector(float * restrict V, const int stride, float * restrict W,
             double kacc = 0;
             for(size_t kk = k2-vv; kk<nKu; kk++)
             {
+                assert((vv-k2+kk) < nV);
                 acc0 = acc0 + K[kk]*V[(vv-k2+kk)*stride];
+
                 kacc += K[kk];
             }
             if(normalized)
@@ -1471,6 +1829,7 @@ void fim_conv1_vector(float * restrict V, const int stride, float * restrict W,
             for(size_t kk = 0; kk < nKu; kk++)
             {
                 size_t vpos = ((vv-k2)+kk)*stride;
+                assert(vpos/stride < nV);
                 acc = acc + K[kk]*V[vpos];
             }
             W[bpos++] = acc;
@@ -1508,16 +1867,23 @@ void fim_conv1_vector(float * restrict V, const int stride, float * restrict W,
     return;
 }
 
+static void flip_sign(float * X, size_t N)
+{
+    for(size_t kk = 0; kk<N; kk++)
+    {
+        X[kk]*=-1;
+    }
+}
+
+/* A Gaussian kernel
+ * Note: Always normalized to have sum 1.0 */
 static float * gaussian_kernel(float sigma, size_t * nK)
 {
-    /* A Gaussian kernel */
-
     /* Determine the size so that most of the signal is captured */
-    int len = 1; /* The total number of elements will be at least 3 */
-    while(erf((len+1.0)/sigma) < 1.0-1e-8)
-    {
-        len++;
-    }
+
+    int len = ceil(3.0*sigma);
+    len < 1 ? len = 1 : 0;
+
     int N = 2*len + 1;
 
     float * K = fim_malloc(N*sizeof(float));
@@ -1525,19 +1891,12 @@ static float * gaussian_kernel(float sigma, size_t * nK)
     float mid = (N-1)/2;
 
     float s2 = pow(sigma, 2);
+    float k0 = 1.0/sigma/sqrt(2.0*M_PI);
     for(int kk = 0; kk<N; kk++)
     {
-        float x = (float) kk-mid;
-        K[kk] = exp(-0.5*pow(x,2)/s2);
+        float x = (float) kk - mid;
+        K[kk] = k0*exp(-0.5*pow(x,2)/s2);
     }
-
-    /* Normalize the sum to 1 */
-    float sum = 0;
-    for(int kk = 0; kk<N; kk++)
-        sum+=K[kk];
-
-    for(int kk = 0; kk<N; kk++)
-        K[kk]/=sum;
 
     nK[0] = N;
     return K;
@@ -1548,11 +1907,10 @@ static float * gaussian_kernel_d1(float sigma, size_t * nK)
     /* First derivative of a Gaussian kernel */
 
     /* Determine the size so that most of the signal is captured */
-    int len = 1; /* The total number of elements will be at least 3 */
-    while(erf((len+1.0)/sigma) < 1.0-1e-8)
-    {
-        len++;
-    }
+    int len = ceil(3.0*sigma);
+    len < 1 ? len = 1 : 0;
+
+    /* Total number of elements */
     int N = 2*len + 1;
 
     float * K = fim_malloc(N*sizeof(float));
@@ -1585,23 +1943,35 @@ static float * gaussian_kernel_d1(float sigma, size_t * nK)
 }
 
 
+/** @brief 1D Laplacian of Gaussian
+ *
+ * The filter is centered in the returned array. nK
+ * is the number of elements.
+ *
+ * Note: Besides being truncated, the Laplacian is only sampled at the
+ * middle of the pixels, not integrated. Hence it might not integrate
+ * to 0.
+ */
 static float * gaussian_kernel_d2(float sigma, size_t * nK)
 {
     /* d2/dx2 Gaussian kernel */
-    float * K = gaussian_kernel(sigma, nK);
+    int m = ceil(4.0*sigma);
+    m < 1 ? m = 1 : 0;
+    int n = 2*m + 1;
 
-    int n = (int) nK[0];
-    int m = (n-1)/2;
-    float s2 = pow(sigma, 2);
-    float b = 1.0/(2*s2);
+    float * K = fim_malloc(n*sizeof(float));
 
+    nK[0] = n;
+
+    float s2 = pow(sigma, 2.0);
+    float s4 = pow(sigma, 4.0);
+    float k0 = 1.0/sigma/sqrt(2.0*M_PI);
     for(int kk = 0; kk < n; kk++)
     {
-        float x = kk-m;
-        float x2 = pow(x, 2);
-        K[kk] *= -2*b*(2*b*x2-1.0);
+        float x = (float) kk- (float) m;
+        float G = k0*exp(-0.5*pow(x,2)/s2);
+        K[kk] = (pow(x, 2.0)-s2)/s4*G;
     }
-
 
     return K;
 }
@@ -1811,8 +2181,8 @@ static void fim_show(float * A, size_t M, size_t N, size_t P)
             }
             printf("\n");
         }
-        printf("\n");
     }
+    return;
 }
 
 static void fim_show_int(int * A, size_t M, size_t N, size_t P)
@@ -1831,8 +2201,8 @@ static void fim_show_int(int * A, size_t M, size_t N, size_t P)
             }
             printf("\n");
         }
-        printf("\n");
     }
+    return;
 }
 
 
@@ -2052,8 +2422,253 @@ float strel333_max(const float * I, size_t M, size_t N,
     return max;
 }
 
+/** @brief Locate the max of a vector using 2nd deg poly2
+ *
+ * i = arg max y[i]
+ * if i==0 return x[i]
+ * if i==n-1 return x[i]
+ * For anything in between, use a polynomial model
+ * y = c_0 + c_1 x + c_2 x^2
+ * based on x[i-1], x[i], x[i+1], y[i-1], y[i], y[i+1]
+ */
+static float locate_max_poly2(const float * x, const float * y, int n,
+                              int use_log)
+{
+    int maxpos = 0;
+    int max = y[0];
+    for(int kk = 1; kk < n; kk++)
+    {
+        if(y[kk] > max)
+        {
+            max = y[kk];
+            maxpos = kk;
+        }
+    }
+    if(maxpos == 0)
+    {
+        return x[0];
+    }
+    if(maxpos == n-1)
+    {
+        return x[n-1];
+    }
+
+    /* Find coefficients */
+    float a = x[maxpos-1];
+    float b = x[maxpos];
+    float c = x[maxpos+1];
+    if(use_log)
+    {
+        a = log(a);
+        b = log(b);
+        c = log(c);
+    }
+    float a2 = pow(a, 2);
+    float b2 = pow(b, 2);
+    float c2 = pow(c, 2);
+
+    /* c0 not needed */
+    float C1 = y[maxpos-1]*((-b - c)/(a2 - a*b - a*c + b*c))
+        +y[maxpos]*((a + c)/(a*b - a*c - b2 + b*c))
+        +y[maxpos+1]*((-a - b)/(a*b - a*c - b*c + c2));
+    float C2 = y[maxpos-1]*(1.0/(a2 - a*b - a*c + b*c))
+        + y[maxpos]*(-1.0/(a*b - a*c - b2 + b*c))
+        + y[maxpos+1]*(1.0/(a*b - a*c - b*c + c2));
+    /* d/dx y(x) = 0 -> 0 = c1 + 2*c2*x, x=-c1/(2*c2) */
+    if(use_log)
+    {
+        return exp(-C1 / (2.0 * C2));
+    }
+    return -C1 / (2.0 * C2);
+}
+
+ftab_t * fim_lmax_multiscale(float ** II, float * scales, size_t nscales,
+                             size_t M, size_t N, size_t P)
+{
+    int ncol = 4 + 1 + nscales;
+    ftab_t * T = ftab_new(ncol);
+    ftab_set_colname(T, 0, "x");
+    ftab_set_colname(T, 1, "y");
+    ftab_set_colname(T, 2, "z");
+    ftab_set_colname(T, 3, "value");
+    ftab_set_colname(T, 4, "LoG_scale");
+    for(size_t kk = 0; kk<nscales; kk++)
+    {
+        char * cname = calloc(128, 1);
+        sprintf(cname, "LoG_%f", scales[kk]);
+        ftab_set_colname(T, 5+kk, cname);
+        free(cname);
+    }
+
+#pragma omp parallel
+    {
+        float * row = calloc(ncol, sizeof(float));
+        assert(row != NULL);
+        float * log_values = calloc(ncol, sizeof(float));
+        assert(log_values != NULL);
+
+        /* Detect if a pixel is a local maxima
+         * at any scale, i.e. if any of the nscales pixels
+         * is a local maxima in the 4D neighbourhood
+         * we skip the border pixels
+         **/
+        float * strel = malloc(27*sizeof(float));
+        assert(strel != NULL);
+        for(int kk = 0; kk<27; kk++)
+        {
+            strel[kk] = 1;
+        }
+        strel[13] = 0;
+
+        /* For each scale, save the local max */
+        float * local_max = calloc(nscales, sizeof(float));
+        /* Indicator if the central pixel is the largest for the given scale */
+        int * is_local_max = calloc(nscales, sizeof(int));
+        int * is_scale_max = calloc(nscales, sizeof(int));
+
+#pragma omp for
+        for(size_t pp = 1; pp < P-1; pp++)
+        {
+            for(size_t nn = 1; nn+1 < N; nn++)
+            {
+                for(size_t mm = 1; mm+1 < M; mm++)
+                {
+                    size_t idx = pp*M*N + nn*M + mm;
+
+                    /* For each scale, determine if the pixel is a local maxima
+                     * also save the maxima of the region */
+                    for(size_t ss = 0; ss < nscales; ss++)
+                    {
+                        local_max[ss] = strel333_max(II[ss]+idx, M, N, P, strel);
+                        is_local_max[ss] = II[ss][idx] > local_max[ss];
+                        II[ss][idx] > local_max[ss] ? local_max[ss] = II[ss][idx] : 0 ;
+                    }
+
+                    /* To be a maxima in the scale space, the pixel
+                     * has to be a maxima also compared to the adjacent
+                     * scales. */
+                    for(int ss = 0; ss < (int) nscales; ss++)
+                    {
+                        is_scale_max[ss] = is_local_max[ss];
+
+                        if(ss > 0) /* Compare with the previous scale */
+                        {
+                            if(local_max[ss-1] > local_max[ss])
+                            {
+                                is_scale_max[ss] = 0;
+                            }
+                        }
+                        if(ss + 1 < (int) nscales)
+                        {
+                            if(local_max[ss+1] > local_max[ss])
+                            {
+                                is_scale_max[ss] = 0;
+                            }
+                        }
+                    }
+
+                    /* Save the coordinates of the maximas */
+                    for(size_t ss = 0; ss < nscales; ss++)
+                    {
+                        if(is_scale_max[ss])
+                        {
+                            /* Pos is s a local maxima */
+                            row[0] = mm; row[1] = nn; row[2] = pp;
+                            float max_value = II[0][idx];
+                            for(size_t kk = 0; kk < nscales; kk++)
+                            {
+                                float value = II[kk][idx];
+                                log_values[kk] = value;
+                                row[5+kk] = value;
+                                value > max_value ? max_value = value : 0;
+                            }
+                            row[3] = max_value;
+                            int use_log = 1;
+                            row[4] = locate_max_poly2(scales, log_values, nscales, use_log);
+#pragma omp critical
+                            ftab_insert(T, row);
+                        }
+                    }
+                }
+            }
+        }
+
+        free(is_local_max);
+        free(local_max);
+        free(strel);
+        free(row);
+        free(log_values);
+    }
+    return T;
+}
+
+static float max_float(float a, float b)
+{
+    if(a > b) {
+        return a;
+    }
+    return b;
+}
+
+static int lmax_2d(const float * I, size_t stride)
+{
+    float other = I[-1];
+    other = max_float(other, I[1]);
+    other = max_float(other, I[ stride]);
+    other = max_float(other, I[-stride]);
+    other = max_float(other, I[1+stride]);
+    other = max_float(other, I[1-stride]);
+    other = max_float(other, I[-1+stride]);
+    other = max_float(other, I[-1-stride]);
+
+    return I[0] > other;
+}
+
+ftab_t * fim_lmax_2d(const float * I, size_t M, size_t N, size_t P)
+{
+    ftab_t * T = ftab_new(4);
+    ftab_set_colname(T, 0, "x");
+    ftab_set_colname(T, 1, "y");
+    ftab_set_colname(T, 2, "z");
+    ftab_set_colname(T, 3, "value");
+
+    // TODO
+    /* 3x3x3 structuring element with 26-connectivity */
+    float * strel = malloc(27*sizeof(float));
+    assert(strel != NULL);
+    for(int kk = 0; kk<27; kk++)
+    {
+        strel[kk] = 1;
+    }
+    strel[13] = 0;
+
+    assert(P > 0);
+#pragma omp parallel for
+    for(size_t nn = 1; nn < N-1; nn++)
+    {
+        for(size_t mm = 1; mm+1 < M; mm++)
+        {
+            size_t pos = mm + nn*M;
+            if(lmax_2d(I + pos, M))
+            {
+                /* Pos is s a local maxima */
+                float row[4] = {mm, nn, 0.0, I[pos]};
+#pragma omp critical
+                ftab_insert(T, row);
+            }
+        }
+    }
+
+    return T;
+}
+
 ftab_t * fim_lmax(const float * I, size_t M, size_t N, size_t P)
 {
+    if(P == 1)
+    {
+        return fim_lmax_2d(I, M, N, P);
+    }
+
     ftab_t * T = ftab_new(4);
     ftab_set_colname(T, 0, "x");
     ftab_set_colname(T, 1, "y");
@@ -2069,17 +2684,20 @@ ftab_t * fim_lmax(const float * I, size_t M, size_t N, size_t P)
     }
     strel[13] = 0;
 
-    for(size_t mm = 1; mm+1 < M; mm++)
+    assert(P > 0);
+#pragma omp parallel for
+    for(size_t pp = 1; pp < P-1; pp++)
     {
         for(size_t nn = 1; nn+1 < N; nn++)
         {
-            for(size_t pp = 1; pp+1 < P; pp++)
+            for(size_t mm = 1; mm+1 < M; mm++)
             {
                 size_t pos = mm + nn*M + pp*M*N;
                 if(I[pos] > strel333_max(I + pos, M, N, P, strel))
                 {
                     /* Pos is s a local maxima */
                     float row[4] = {mm, nn, pp, I[pos]};
+#pragma omp critical
                     ftab_insert(T, row);
                 }
             }
@@ -2093,6 +2711,10 @@ ftab_t * fim_lmax(const float * I, size_t M, size_t N, size_t P)
 
 fim_histogram_t * fim_histogram(const float * Im, size_t N)
 {
+    if(N < 2)
+    {
+        return NULL;
+    }
     float min = fim_min(Im, N);
     float max = fim_max(Im, N);
     size_t nbin = pow(2, 16)+1;
@@ -2466,14 +3088,14 @@ int * fim_conncomp6(const float * im, size_t M, size_t N)
             lab[kk] = e2;
         }
     }
-    fim_free(E2);
+    fim_free(E2); E2 = NULL;
 
-    fim_free(E);
+    fim_free(E); E = NULL;
     return lab;
 }
 
 int fim_convn1(float * restrict V, size_t M, size_t N, size_t P,
-               float * K, size_t nK,
+               const float * K, size_t nK,
                int dim, const int normalized)
 {
     if(dim < 0 || dim > 2)
@@ -2482,67 +3104,66 @@ int fim_convn1(float * restrict V, size_t M, size_t N, size_t P,
     }
 
     /* Temporary storage/buffer for conv1_vector */
-    // TODO: one buffer per thread
-    size_t nW = max_size_t(M, max_size_t(N, P));
+    size_t nBuff = max_size_t(M, max_size_t(N, P));
 
-    int nThreads = 1;
 #pragma omp parallel
     {
-        nThreads = omp_get_num_threads();
-    }
 
+        float * buff = fim_malloc(nBuff*sizeof(float));
+        assert(buff != NULL);
 
-    float * W = fim_malloc(nThreads*nW*sizeof(float));
-    assert(W != NULL);
-
-    if(dim == 0)
-    {
-#pragma omp parallel for
-        for(size_t pp = 0; pp < P; pp++)
+        if(dim == 0)
         {
-            float * buff = W+omp_get_thread_num()*nW;
-            for(size_t nn = 0; nn < N; nn++)
+#pragma omp for
+            for(size_t pp = 0; pp < P; pp++)
             {
-                fim_conv1_vector(V+pp*(M*N)+nn*M, 1, buff, M, K, nK, normalized);
+                for(size_t nn = 0; nn < N; nn++)
+                {
+                    fim_conv1_vector(V+pp*(M*N)+nn*M, 1, buff, M, K, nK, normalized);
+                }
             }
         }
-    }
 
-    if(dim == 1)
-    {
-#pragma omp parallel for
-        for(size_t pp = 0; pp<P; pp++)
+        if(dim == 1)
         {
-            float * buff = W+omp_get_thread_num()*nW;
-            for(size_t mm = 0; mm<M; mm++)
+#pragma omp for
+            for(size_t pp = 0; pp<P; pp++)
             {
-                fim_conv1_vector(V + pp*(M*N) + mm, M, buff, N, K, nK, normalized);
+                for(size_t mm = 0; mm<M; mm++)
+                {
+                    fim_conv1_vector(V + pp*(M*N) + mm, M, buff, N, K, nK, normalized);
+                }
             }
         }
-    }
 
-    if(dim == 2)
-    {
-#pragma omp parallel for
-        for(size_t mm = 0; mm<M; mm++)
+        if(dim == 2)
         {
-            float * buff = W+omp_get_thread_num()*nW;
+#pragma omp for
             for(size_t nn = 0; nn<N; nn++)
             {
-                fim_conv1_vector(V+mm+M*nn, M*N, buff, P, K, nK, normalized);
+
+                for(size_t mm = 0; mm<M; mm++)
+                {
+                    fim_conv1_vector(V+mm+M*nn, M*N, buff, P, K, nK, normalized);
+                }
             }
         }
-    }
 
-    fim_free(W);
+        fim_free(buff);
+    }
     return EXIT_SUCCESS;
 }
 
-
-float * conv1_3(const float * V, size_t M, size_t N, size_t P,
-                float * K1, size_t nK1,
-                float * K2, size_t nK2,
-                float * K3, size_t nK3)
+/** Separable convolution.
+ *
+ * Convolve V by K1 in the 1st dimension, K2
+ * in the 2nd dimension and K3 in the third dimension.  This version
+ * use fim_shiftdim to reduce the computational load.
+ */
+float * conv1_3(const float * restrict V, size_t M, size_t N, size_t P,
+                const float * K1, size_t nK1,
+                const float * K2, size_t nK2,
+                const float * K3, size_t nK3)
 {
     const int dim = 0;
     const int norm = 0;
@@ -2571,17 +3192,19 @@ float * fim_LoG_S(const float * V0, const size_t M, const size_t N, const size_t
                   const float sigmaxy, const float sigmaz)
 {
 
-/* Set up filters */
+    /* Set up filters */
     /* Lateral filters */
     size_t nlG = 0;
     float * lG = gaussian_kernel(sigmaxy, &nlG);
     size_t nl2;
     float * l2 = gaussian_kernel_d2(sigmaxy, &nl2);
+    flip_sign(l2, nl2);
     /* Axial filters */
     size_t naG = 0;
     float * aG = gaussian_kernel(sigmaz,  &naG);
     size_t na2;
     float * a2 = gaussian_kernel_d2(sigmaz,  &na2);
+    flip_sign(a2, na2);
 
     /* Padding */
     int apad = (naG-1)/2;
@@ -2664,6 +3287,143 @@ float * fim_LoG_S(const float * V0, const size_t M, const size_t N, const size_t
     return uLoG;
 }
 
+float * fim_LoG_S2(const float * V0, const size_t M, const size_t N, const size_t P,
+                   const float sigmaxy, const float sigmaz)
+{
+
+    fim_boundary_condition bc = FIM_BC_SYMMETRIC_MIRROR;
+
+    /* Set up filters */
+    /* Lateral filters */
+    size_t nlG = 0;
+    float * _lG = gaussian_kernel(sigmaxy, &nlG);
+    fim_t * lG = fim_wrap_array(_lG, nlG, 1, 1);
+    size_t nl2;
+    float * _l2 = gaussian_kernel_d2(sigmaxy, &nl2);
+    flip_sign(_l2, nl2);
+    fim_t * l2 = fim_wrap_array(_l2, nl2, 1, 1);
+
+    /* 2D */
+    if(P == 1)
+    {
+        assert(fimt_nel(lG) > 1);
+        assert(fimt_nel(l2) > 1);
+
+        printf("2D path\n");
+        /** Gaussian, Laplacian **/
+        fim_t * GI = fim_image_from_array(V0, M, N, P);
+        fimt_conv1_x(GI, lG, bc);
+        fim_t * GL = fim_shiftdim2(GI);
+        assert(GL->P == 1);
+        fim_free(GI);
+        fimt_conv1_x(GL, l2, bc);
+
+        /** Laplacian, Gaussian **/
+        fim_t * LI = fim_image_from_array(V0, M, N, P);
+        fimt_conv1_x(LI, l2, bc);
+        assert(LI->P == 1);
+        fim_t * LG = fim_shiftdim2(LI);
+        fim_free(LI);
+        fimt_conv1_x(LG, lG, bc);
+
+        /* Free filters */
+        fimt_free(lG);
+        fimt_free(l2);
+
+        /* Add together filter responses */
+        fim_t * LoG = GL;
+        GL = NULL;
+        fimt_add(LoG, LG);
+        fimt_free(LG);
+
+        /* Shift back */
+        fim_t * result = fim_shiftdim2(LoG);
+
+        fimt_free(LoG);
+        /* And we are done */
+
+        float * pLoG = result->V;
+
+        result->V = NULL;
+        fimt_free(result);
+        return pLoG;
+    }
+
+    /* Axial filters */
+    fim_t * aG = NULL;
+    fim_t * a2 = NULL;
+
+    {
+        size_t naG = 0;
+        size_t na2 = 0;
+        float * _aG = gaussian_kernel(sigmaz,  &naG);
+        aG = fim_wrap_array(_aG, naG, 1, 1);
+        float * _a2 = gaussian_kernel_d2(sigmaz,  &na2);
+        flip_sign(_a2, na2);
+        a2 = fim_wrap_array(_a2, na2, 1, 1);
+    }
+
+    /* 3D */
+    if(P > 1)
+    {
+        /** First dimension -> GII, LII */
+        fim_t * GII = fim_image_from_array(V0, M, N, P);
+        fimt_conv1_x(GII, lG, bc);
+
+        fim_t * LII = fim_image_from_array(V0, M, N, P);
+        fimt_conv1_x(LII, l2, bc);
+
+        /** 2nd dimension -> GGI, GLI, LGI */
+        /* Prepare buffers */
+        fim_t * GGI = fim_shiftdim(GII);
+        fimt_free(GII);
+        fim_t * GLI = fimt_copy(GGI);
+        fim_t * LGI = fim_shiftdim(LII);
+        fimt_free(LII);
+        /* Apply filters */
+        fimt_conv1_x(GGI, lG, bc);
+        fimt_conv1_x(GLI, l2, bc);
+        fimt_conv1_x(LGI, lG, bc);
+
+        /** 3rd dimension -> GGL, GLG, LGG */
+        fim_t * GGL = fim_shiftdim(GGI);
+        fimt_free(GGI);
+        fim_t * GLG = fim_shiftdim(GLI);
+        fimt_free(GLI);
+        fim_t * LGG = fim_shiftdim(LGI);
+        fimt_free(LGI);
+
+        fimt_conv1_x(GGL, a2, bc);
+        fimt_conv1_x(GLG, aG, bc);
+        fimt_conv1_x(LGG, aG, bc);
+
+        /* Free the filters */
+        fimt_free(lG);
+        fimt_free(l2);
+        fimt_free(aG);
+        fimt_free(a2);
+
+        /** Merge results */
+        fim_t * LoG = GGL;
+        GGL = NULL;
+        fimt_add(LoG, GLG);
+        fimt_free(GLG);
+        fimt_add(LoG, LGG);
+        fimt_free(LGG);
+
+        /** Shift back to original shape */
+        fim_t * result = fim_shiftdim(LoG);
+        fimt_free(LoG);
+
+        float * pLoG = result->V;
+        result->V = NULL;
+        fimt_free(result);
+        return pLoG;
+    }
+
+    return NULL; // We should not reach this
+}
+
 
 /* Parital derivative in dimension dim */
 fim_t * fimt_partial(const fim_t * F, const int dim, const float sigma)
@@ -2715,11 +3475,13 @@ float * fim_LoG(const float * V, const size_t M, const size_t N, const size_t P,
     float * lG = gaussian_kernel(sigmaxy, &nlG);
     size_t nl2;
     float * l2 = gaussian_kernel_d2(sigmaxy, &nl2);
+    flip_sign(l2, nl2);
     /* Axial filters */
     size_t naG = 0;
     float * aG = gaussian_kernel(sigmaz,  &naG);
     size_t na2;
     float * a2 = gaussian_kernel_d2(sigmaz,  &na2);
+    flip_sign(a2, na2);
 
     /* 1st dimension */
     float * LoG = NULL;
@@ -2839,6 +3601,51 @@ double * fim_get_line_double(fim_t * I,
     return L;
 }
 
+fim_t * fim_shiftdim2(const fim_t * restrict I)
+{
+    const float * V = I->V;
+    const size_t M = I->M;
+    const size_t N = I->N;
+    const size_t P = I->P;
+    assert(P == 1);
+    /* Output image */
+    fim_t * O = malloc(sizeof(fim_t));
+    assert(O != NULL);
+    O->V = fim_malloc(M*N*P*sizeof(float));
+    O->M = N;
+    O->N = M;
+    O->P = P;
+    float * S = O->V;
+    const size_t blocksize = 2*64;
+
+    /* Blocks are of size blocksize x blocksize in M and N */
+    for(size_t bm = 0; bm<M; bm = bm+blocksize)
+    {
+        size_t bm_end = bm+blocksize;
+        bm_end > M ? bm_end = M : 0;
+
+        const size_t bm_end_c = bm_end;
+
+        for(size_t bn = 0; bn<N; bn = bn+blocksize)
+        {
+            size_t bn_end = bn+blocksize;
+            bn_end > N ? bn_end = N : 0;
+
+            const size_t bn_end_c = bn_end;
+
+            for(size_t nn = bn; nn< bn_end_c; nn++)
+            {
+                for(size_t mm = bm; mm< bm_end_c; mm++)
+                {
+                    S[nn + mm*M] = V[mm + nn*M];
+                }
+            }
+        }
+    }
+
+    return O;
+}
+
 fim_t * fim_shiftdim(const fim_t * restrict I)
 {
     const float * V = I->V;
@@ -2860,7 +3667,7 @@ fim_t * fim_shiftdim(const fim_t * restrict I)
 
     const size_t blocksize = 2*64;
 
-#pragma omp parallel for shared(V, S)
+#pragma omp parallel for shared(V, S) schedule(dynamic)
     for(size_t pp = 0; pp< P; pp++)
     {
         /* Blocks are of size blocksize x blocksize in M and N */
@@ -2909,7 +3716,7 @@ static float total_gm(const float * I0, size_t M, size_t N, float sigma)
     fim_t * I = fim_image_from_array(I0, M, N, 1);
     fim_t * dx = fimt_partial(I, 0, sigma);
     fim_t * dy = fimt_partial(I, 1, sigma);
-    fim_delete(I);
+    fimt_free(I);
 
     double gm = 0;
     for(size_t kk = 0; kk<M*N; kk++)
@@ -2917,8 +3724,8 @@ static float total_gm(const float * I0, size_t M, size_t N, float sigma)
         gm += sqrt( pow(dx->V[kk], 2) + pow(dy->V[kk], 2));
     }
 
-    fim_delete(dx);
-    fim_delete(dy);
+    fimt_free(dx);
+    fimt_free(dy);
     return (float) gm;
 }
 
@@ -3071,12 +3878,12 @@ ftab_t * fim_features_2d(const fim_t * fI)
         debug == 1 ? memcpy(debug_image + M*N*col, value, M*N*sizeof(float)) : 0;
         sprintf(sbuff, "s%.1f_HE_EV_2", sigma);
         ftab_set_colname(T, col++, sbuff);
-        fim_delete(dx);
-        fim_delete(dy);
-        fim_delete(ddx);
-        fim_delete(ddy);
-        fim_delete(dxdy);
-        fim_delete(G);
+        fimt_free(dx);
+        fimt_free(dy);
+        fimt_free(ddx);
+        fimt_free(ddy);
+        fimt_free(dxdy);
+        fimt_free(G);
     }
     free(sbuff); /* Free string buffer */
     printf("\n");
@@ -3118,7 +3925,7 @@ void fim_features_2d_ut()
     T->nrow = 10;
     ftab_print(stdout, T);
     ftab_free(T);
-    fim_delete(I);
+    fimt_free(I);
 }
 
 
@@ -3265,9 +4072,64 @@ void fim_min_ut()
     return;
 }
 
+void fim_conv1_ut(fim_boundary_condition bc)
+{
+    printf("fim_conv1_ut(), bc: %s\n", fim_boundary_condition_str(bc));
+    size_t nV = 7;
+    size_t nK = 3;
+    size_t stride = 1;
+    float * V = calloc(nV, sizeof(float));
+    assert(V != NULL);
+    for(size_t kk = 0; kk < nV; kk++)
+    { V[kk] = kk+1; }
+    printf("V=");fim_show(V, 1, nV, 1);
+    float * K = calloc(nK, sizeof(float));
+    assert(K != NULL);
+    K[0] = 1;
+    K[1] = 1;
+    K[2] = 1;
+    printf("K=");fim_show(K, 1, nK, 1);
+    fim_conv1(V, nV, stride,
+              K, nK,
+              NULL, bc);
+    printf("V*K=");fim_show(V, 1, nV, 1);
+    if(bc == FIM_BC_ZEROS)
+    {
+        assert(V[0] == 1+2);
+        assert(V[6] == 6+7);
+    }
+    if(bc == FIM_BC_SYMMETRIC_MIRROR)
+    {
+        assert(V[0] == 2+1+2);
+        assert(V[6] == 6+7+6);
+    }
+    if(bc == FIM_BC_VALID)
+    {
+        assert(V[0] == 0);
+        assert(V[6] == 0);
+    }
+    if(bc == FIM_BC_PERIODIC)
+    {
+        assert(V[0] == 1 + 2 + 7);
+        assert(V[6] == 6 + 7 + 1);
+    }
+    if(bc == FIM_BC_WEIGHTED)
+    {
+        assert(fabs(V[0] - (1.0+2.0)*3.0/2.0) < 1e-5);
+        assert(fabs(V[6] - (6.0+7.0)*3.0/2.0) < 1e-5);
+    }
+    free(V);
+    free(K);
+    return;
+}
+
 void fim_ut()
 {
-
+    fim_conv1_ut(FIM_BC_SYMMETRIC_MIRROR);
+    fim_conv1_ut(FIM_BC_ZEROS);
+    fim_conv1_ut(FIM_BC_VALID);
+    fim_conv1_ut(FIM_BC_PERIODIC);
+    fim_conv1_ut(FIM_BC_WEIGHTED);
     fim_argmax_max_ut();
     fim_min_ut();
     fim_max_ut();

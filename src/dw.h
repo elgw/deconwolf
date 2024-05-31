@@ -143,9 +143,9 @@ struct _dw_opts{
     int showTime; /* For dev: show detailed timings */
     int iterdump; /* Dump each iteration to file */
 
-    float relax;
     float bg; /* Background level, set automatically by default */
     int bg_auto; /* Indicator if background was set on CLI */
+    float offset;
     float psf_pass; /* For low-pass filtering by the PSF */
 
     /* Selection of method */

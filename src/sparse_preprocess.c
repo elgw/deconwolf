@@ -1,6 +1,6 @@
 #include "sparse_preprocess.h"
 
-#define LL /* For log-likelihood (not L2 ) */
+// #define LL /* For log-likelihood (not L2 ) */
 #define ff
 
 typedef struct {
@@ -13,7 +13,75 @@ typedef struct {
     u64 P;
     float * restrict buff;
     int periodic;
+    int directions;
 } sparse_conf_t;
+
+static float error_H9_L1_block(const u64 mm, const u64 nn, const u64 pp,
+                                 const float * restrict u,
+                               const u64 M, const u64 N, const u64 P)
+{
+    float E = 0;
+    const int D[27]= { 1, 0, 0,
+        0, 1, 0,
+        0, 0, 1,
+        1, 1, 0,
+        1, 0, 1,
+        0, 1, 1,
+        1, -1, 0,
+        1, 0, -1,
+        0, 1, -1};
+
+    size_t b = mm + nn*M + pp*M*N;
+    //printf("POS = %lu %lu %lu\n", mm, nn, pp);
+    for(int dd = 0; dd < 9; dd++)
+    {
+        if(mm == 0 && D[3*dd] != 0)
+            continue;
+        if(mm == M-1 && D[3*dd] != 0)
+            continue;
+        if(nn == 0 && D[3*dd+1] != 0)
+            continue;
+        if(nn == N-1 && D[3*dd+1] != 0)
+            continue;
+        if(pp == 0 && D[3*dd+2] != 0)
+            continue;
+        if(pp == P-1 && D[3*dd+2] != 0)
+            continue;
+        // printf("D = %d %d %d\n", D[3*dd], D[3*dd+1], D[3*dd+2]); fflush(stdout);
+        size_t a = (mm-D[3*dd])
+            + (nn-D[3*dd+1])*M
+            + (pp-D[3*dd+2])*M*N;
+        size_t c = (mm+D[3*dd])
+            + (nn+D[3*dd+1])*M
+            + (pp+D[3*dd+2])*M*N;
+        E += fabs(u[a] -2*u[b] + u[c]);
+    }
+    return E;
+}
+
+static float error_H9_L1(const float * restrict u,
+                         const u64 M,
+                         const u64 N,
+                         const u64 P)
+{
+
+    float E = 0;
+#pragma omp parallel for reduction(+:E)
+    for(size_t pp = 0; pp < P; pp++)
+    {
+        for(size_t nn = 0 ; nn < N; nn++)
+        {
+            for(size_t mm = 0; mm < M; mm++)
+            {
+                E+=error_H9_L1_block(mm, nn, pp,
+                                     u, M, N, P);
+            }
+        }
+    }
+
+    return E;
+}
+
 
 /** Note: this function does not care about the smoothness prior at
  * the boundary. */
@@ -55,46 +123,55 @@ get_error(const sparse_conf_t * s, const float * restrict u)
 
     double E_smooth = 0;
 
-    /* x */
-#pragma omp parallel for reduction(+:E_smooth)
-    for(size_t pp = 0; pp < P; pp++)
+    if(s->directions == 9)
     {
-        for(size_t nn = 0; nn < N; nn++)
-        {
-            const float * restrict lu = u + pp*M*N + nn*M;
-            for(size_t mm = 1; mm+1 < M ; mm++)
-            {
-                E_smooth += fabs(lu[mm-1] + lu[mm+1] - 2*lu[mm]);
-            }
-        }
+        E_smooth = error_H9_L1(u, M, N, P);
+        //printf("E_smooth = %f\n", E_smooth);
     }
 
-    /* y */
-#pragma omp parallel for reduction(+:E_smooth)
-    for(size_t pp = 0; pp < P; pp++)
+    if(s->directions == 3)
     {
-        for(size_t nn = 1; nn+1 < N; nn++)
-        {
-            const float * restrict lu = u + pp*M*N + nn*M;
-            for(size_t mm = 0; mm < M ; mm++)
-            {
-                E_smooth += fabs(lu[mm-M] + lu[mm+M] - 2*lu[mm]);
-            }
-        }
-    }
-
-    /* z  */
-    {
-        const size_t MN = M*N;
+        /* x */
 #pragma omp parallel for reduction(+:E_smooth)
-        for(size_t pp = 1; pp < P-1; pp++)
+        for(size_t pp = 0; pp < P; pp++)
         {
             for(size_t nn = 0; nn < N; nn++)
             {
                 const float * restrict lu = u + pp*M*N + nn*M;
+                for(size_t mm = 1; mm+1 < M ; mm++)
+                {
+                    E_smooth += fabs(lu[mm-1] + lu[mm+1] - 2*lu[mm]);
+                }
+            }
+        }
+
+        /* y */
+#pragma omp parallel for reduction(+:E_smooth)
+        for(size_t pp = 0; pp < P; pp++)
+        {
+            for(size_t nn = 1; nn+1 < N; nn++)
+            {
+                const float * restrict lu = u + pp*M*N + nn*M;
                 for(size_t mm = 0; mm < M ; mm++)
                 {
-                    E_smooth += fabs(lu[mm-MN] + lu[mm+MN] - 2*lu[mm]);
+                    E_smooth += fabs(lu[mm-M] + lu[mm+M] - 2*lu[mm]);
+                }
+            }
+        }
+
+        /* z  */
+        {
+            const size_t MN = M*N;
+#pragma omp parallel for reduction(+:E_smooth)
+            for(size_t pp = 1; pp < P-1; pp++)
+            {
+                for(size_t nn = 0; nn < N; nn++)
+                {
+                    const float * restrict lu = u + pp*M*N + nn*M;
+                    for(size_t mm = 0; mm < M ; mm++)
+                    {
+                        E_smooth += fabs(lu[mm-MN] + lu[mm+MN] - 2*lu[mm]);
+                    }
                 }
             }
         }
@@ -117,6 +194,104 @@ static float asign(const float x)
 {
     return (x >= 0) - (x < 0);
 }
+
+static void gradient_H9_L1_block(const u64 mm, const u64 nn, const u64 pp,
+                                 float * restrict dE, const float * restrict u,
+                                 const u64 M, const u64 N, const u64 P, const float lambda)
+{
+    const int D[27]= { 1, 0, 0,
+        0, 1, 0,
+        0, 0, 1,
+        1, 1, 0,
+        1, 0, 1,
+        0, 1, 1,
+        1, -1, 0,
+        1, 0, -1,
+        0, 1, -1};
+
+    size_t b = mm + nn*M + pp*M*N;
+    //printf("POS = %lu %lu %lu\n", mm, nn, pp);
+    for(int dd = 0; dd < 9; dd++)
+    {
+        if(mm == 0 && D[3*dd] != 0)
+            continue;
+        if(mm == M-1 && D[3*dd] != 0)
+            continue;
+        if(nn == 0 && D[3*dd+1] != 0)
+            continue;
+        if(nn == N-1 && D[3*dd+1] != 0)
+            continue;
+        if(pp == 0 && D[3*dd+2] != 0)
+            continue;
+        if(pp == P-1 && D[3*dd+2] != 0)
+            continue;
+        // printf("D = %d %d %d\n", D[3*dd], D[3*dd+1], D[3*dd+2]); fflush(stdout);
+        size_t a = (mm-D[3*dd])
+            + (nn-D[3*dd + 1])*M
+            + (pp-D[3*dd + 2])*M*N;
+        size_t c = (mm+D[3*dd])
+            + (nn+D[3*dd + 1])*M
+            + (pp+D[3*dd + 2])*M*N;
+        float s = asign(u[a] -2*u[b] + u[c]);
+        dE[a] +=  lambda*s;
+        dE[b] -= 2.0*lambda*s;
+        dE[c] += lambda*s;
+    }
+}
+
+
+
+static void gradient_H9_L1(float * restrict dE,
+                           const float * restrict u,
+                           const u64 M,
+                           const u64 N,
+                           const u64 P,
+                           const float lambda)
+{
+#pragma omp parallel for
+    for(size_t mm = 0; mm < M; mm+=3)
+    {
+        for(size_t nn = 0 ; nn < N; nn++)
+        {
+            for(size_t pp = 0; pp < P; pp++)
+            {
+                gradient_H9_L1_block(mm, nn, pp,
+                                     dE, u, M, N, P, lambda);
+            }
+        }
+    }
+
+#pragma omp parallel for
+    for(size_t mm = 1; mm < M; mm+=3)
+    {
+        for(size_t nn = 0 ; nn < N; nn++)
+        {
+            for(size_t pp = 0; pp < P; pp++)
+            {
+                gradient_H9_L1_block(mm, nn, pp,
+                                     dE, u, M, N, P, lambda);
+            }
+        }
+    }
+
+
+#pragma omp parallel for
+    for(size_t mm = 2; mm < M; mm+=3)
+    {
+        for(size_t nn = 0 ; nn < N; nn++)
+        {
+            for(size_t pp = 0; pp < P; pp++)
+            {
+                gradient_H9_L1_block(mm, nn, pp,
+                                     dE, u, M, N, P, lambda);
+            }
+        }
+    }
+
+    return;
+}
+
+
 
 static void get_gradient(const sparse_conf_t * restrict s,
                          const float * restrict u,
@@ -149,297 +324,305 @@ static void get_gradient(const sparse_conf_t * restrict s,
 #endif
     }
 
-
-    /* x */
-#pragma omp parallel for
-    for(size_t pp = 0; pp < P; pp++)
+    if(s->directions == 9)
     {
-        for(size_t nn = 0; nn < N; nn++)
-        {
-            const float * restrict lu = u + pp*M*N + nn*M;
-            float * restrict lbuff = s->buff + pp*M*N + nn*M;
-            if(s->periodic)
-            {
-                lbuff[0] = asign(lu[M-1] + lu[1] - 2*lu[0]);
-            } else {
-                lbuff[0] = asign(lu[1] - lu[0]);
-            }
-            for(size_t mm = 1; mm+1 < M ; mm++)
-            {
-                //lbuff[mm] = copysignf(1, lI[mm-1] + lI[mm+1] - 2*lI[mm]);
-                lbuff[mm] = asign(lu[mm-1] + lu[mm+1] - 2*lu[mm]);
-            }
-            if(s->periodic)
-            {
-                lbuff[M-1] = asign(lu[M-2] + lu[0] - 2*lu[M-1]);
-            } else {
-                lbuff[M-1] = asign(lu[M-2]-lu[M-1]);
-            }
-
-        }
+        gradient_H9_L1(dE, u, M, N, P, s->lambda_h);
     }
 
-#pragma omp parallel for
-    for(size_t pp = 0; pp < P; pp++)
+    if(s->directions == 3)
     {
-        for(size_t nn = 0; nn < N; nn++)
-        {
-            float * restrict lbuff = s->buff + pp*M*N + nn*M;
-            float * restrict ldE = dE + pp*M*N + nn*M;;
-
-            if(s->periodic)
-            {
-                ldE[0] += s->lambda_h*(-2*lbuff[0] + lbuff[1] + lbuff[M-1]);
-            } else {
-                ldE[0] = s->lambda_h*(-lbuff[0] + lbuff[1]);
-            }
-
-            for(size_t mm = 1; mm+1 < M ; mm++)
-            {
-                ldE[mm] += s->lambda_h*(-2*lbuff[mm] + lbuff[mm-1] + lbuff[mm+1]);
-            }
-            if(s->periodic)
-            {
-                ldE[M-1] = s->lambda_h*(lbuff[0] - 2*lbuff[M-1] + lbuff[M-2]);
-            } else {
-                ldE[M-1] = s->lambda_h*(-lbuff[M-1]+lbuff[M-2]);
-            }
-        }
-    }
-
-
-    /* y */
+        /* x */
 #pragma omp parallel for
-    for(size_t pp = 0; pp < P; pp++)
-    {
-        for(size_t nn = 0; nn == 0; nn++)
+        for(size_t pp = 0; pp < P; pp++)
         {
-            const float * restrict lu = u + pp*M*N +nn*M;
-            float * restrict lbuff = s->buff + pp*M*N+nn*M;
-
-            if(s->periodic)
-            {
-                for(size_t mm = 0; mm < M ; mm++)
-                {
-                    lbuff[mm] = asign(lu[mm+M] - 2*lu[mm] + u[ pp*M*N + M*(N-1) + mm ]);
-                }
-            } else {
-                for(size_t mm = 0; mm < M ; mm++)
-                {
-                    lbuff[mm] = asign(lu[mm+M] - lu[mm]);
-                }
-            }
-        }
-
-        for(size_t nn = 1; nn+1 < N; nn++)
-        {
-            const float * restrict lu = u + pp*M*N+nn*M;
-            float * restrict lbuff = s->buff + pp*M*N+nn*M;
-
-            for(size_t mm = 0; mm < M ; mm++)
-            {
-                lbuff[mm] = asign(lu[mm-M] + lu[mm+M] - 2*lu[mm]);
-            }
-        }
-
-        for(size_t nn = N-1; nn == N-1; nn++)
-        {
-            const float * restrict lu = u + pp*M*N+nn*M;
-            float * restrict lbuff = s->buff + pp*M*N+nn*M;
-
-            if(s->periodic)
-            {
-                for(size_t mm = 0; mm < M ; mm++)
-                {
-                    lbuff[mm] = asign(lu[mm-M] - 2*lu[mm] + u[ pp*M*N + mm ]);
-                }
-            } else {
-                for(size_t mm = 0; mm < M ; mm++)
-                {
-                    lbuff[mm] = asign(lu[mm-M] - lu[mm]);
-                }
-            }
-        }
-    }
-
-#pragma omp parallel for
-    for(size_t pp = 0; pp < P; pp++)
-    {
-        for(size_t nn = 0; nn== 0 ; nn++)
-        {
-            float * restrict lbuff = s->buff + pp*M*N+nn*M;
-            float * restrict ldE = dE + pp*M*N+nn*M;
-            if(s->periodic){
-                for(size_t mm = 0; mm < M ; mm++)
-                {
-                    ldE[mm] += s->lambda_h*(-2*lbuff[mm] + lbuff[mm+M] + s->buff[pp*M*N+mm]);
-                }
-            } else {
-                for(size_t mm = 0; mm < M ; mm++)
-                {
-                    ldE[mm] += s->lambda_h*(-lbuff[mm] + lbuff[mm+M]);
-                }
-            }
-        }
-
-        for(size_t nn = 1; nn+1 < N; nn++)
-        {
-            float * restrict lbuff = s->buff + pp*M*N+nn*M;
-
-            float * restrict ldE = dE + pp*M*N+nn*M;;
-
-            for(size_t mm = 0; mm < M ; mm++)
-            {
-                ldE[mm] += s->lambda_h*(-2*lbuff[mm] + lbuff[mm-M] + lbuff[mm+M]);
-            }
-        }
-
-        for(size_t nn = N-1; nn== N-1 ; nn++)
-        {
-            float * restrict lbuff = s->buff + pp*M*N+nn*M;
-            float * restrict ldE = dE + pp*M*N+nn*M;;
-            if(s->periodic){
-                for(size_t mm = 0; mm < M ; mm++)
-                {
-                    ldE[mm] += s->lambda_h*(-2*lbuff[mm] + lbuff[mm-M] + s->buff[pp*M*N+M*(N-1) + mm]);
-                }
-            } else {
-
-                for(size_t mm = 0; mm < M ; mm++)
-                {
-                    ldE[mm] += s->lambda_h*(-lbuff[mm] + lbuff[mm-M]);
-                }
-            }
-        }
-
-    }
-
-    /* z */
-    const size_t MN = s->M * s->N;
-
-
-#pragma omp parallel for
-    for(size_t pp = 0; pp < P; pp++)
-    {
-        if(pp == 0)
-        {
-            if(s->periodic) {
-                for(size_t nn = 0; nn < N; nn++)
-                {
-                    const float * restrict lu = u + pp*M*N + nn*M;
-                    float * restrict lbuff = s->buff + pp*M*N + nn*M;
-
-                    for(size_t mm = 0; mm < M ; mm++)
-                    {
-                        lbuff[mm] = asign(lu[mm+MN] - 2*lu[mm]+ u[nn*M + mm + M*N*(P-1)]);
-                    }
-                }
-            } else {
-                for(size_t nn = 0; nn < N; nn++)
-                {
-                    const float * restrict lu = u + pp*M*N + nn*M;
-                    float * restrict lbuff = s->buff + pp*M*N + nn*M;
-
-                    for(size_t mm = 0; mm < M ; mm++)
-                    {
-                        lbuff[mm] = asign(lu[mm+MN] - lu[mm]);
-                    }
-                }
-            }
-        } else if(pp == P-1)
-        {
-            if(s->periodic) {
-                for(size_t nn = 0; nn < N; nn++)
-                {
-                    const float * restrict lu = u + pp*M*N + nn*M;
-                    float * restrict lbuff = s->buff + pp*M*N + nn*M;
-
-                    for(size_t mm = 0; mm < M ; mm++)
-                    {
-                        lbuff[mm] = asign(lu[mm-MN] - 2*lu[mm] + u[nn*M + mm]);
-                    }
-                }
-            } else {
-                for(size_t nn = 0; nn < N; nn++)
-                {
-                    const float * restrict lu = u + pp*M*N + nn*M;
-                    float * restrict lbuff = s->buff + pp*M*N + nn*M;
-
-                    for(size_t mm = 0; mm < M ; mm++)
-                    {
-                        lbuff[mm] = asign(lu[mm-MN] - lu[mm]);
-                    }
-                }
-            }
-        } else {
-
             for(size_t nn = 0; nn < N; nn++)
             {
                 const float * restrict lu = u + pp*M*N + nn*M;
                 float * restrict lbuff = s->buff + pp*M*N + nn*M;
-
-                for(size_t mm = 0; mm < M ; mm++)
+                if(s->periodic)
                 {
-                    lbuff[mm] = asign(lu[mm-MN] + lu[mm+MN] - 2*lu[mm]);
+                    lbuff[0] = asign(lu[M-1] + lu[1] - 2*lu[0]);
+                } else {
+                    lbuff[0] = asign(lu[1] - lu[0]);
                 }
+                for(size_t mm = 1; mm+1 < M ; mm++)
+                {
+                    //lbuff[mm] = copysignf(1, lI[mm-1] + lI[mm+1] - 2*lI[mm]);
+                    lbuff[mm] = asign(lu[mm-1] + lu[mm+1] - 2*lu[mm]);
+                }
+                if(s->periodic)
+                {
+                    lbuff[M-1] = asign(lu[M-2] + lu[0] - 2*lu[M-1]);
+                } else {
+                    lbuff[M-1] = asign(lu[M-2]-lu[M-1]);
+                }
+
             }
         }
-    }
 
 #pragma omp parallel for
-    for(size_t pp = 0; pp < P; pp++)
-    {
-        if(pp == 0)
+        for(size_t pp = 0; pp < P; pp++)
         {
             for(size_t nn = 0; nn < N; nn++)
             {
                 float * restrict lbuff = s->buff + pp*M*N + nn*M;
-                float * restrict ldE = dE + pp*M*N + nn*M;
-                if(s->periodic == 1)
+                float * restrict ldE = dE + pp*M*N + nn*M;;
+
+                if(s->periodic)
                 {
-                    for(size_t mm = 0; mm < M ; mm++)
-                    {
-                        ldE[mm] += s->lambda_h*(-2*lbuff[mm] + lbuff[mm+MN] + s->buff[(P-1)*M*N + nn*M + mm]);
-                    }
+                    ldE[0] += s->lambda_h*(-2*lbuff[0] + lbuff[1] + lbuff[M-1]);
                 } else {
-                    for(size_t mm = 0; mm < M ; mm++)
-                    {
-                        ldE[mm] += s->lambda_h*(-lbuff[mm] + lbuff[mm+MN]);
-                    }
+                    ldE[0] = s->lambda_h*(-lbuff[0] + lbuff[1]);
+                }
+
+                for(size_t mm = 1; mm+1 < M ; mm++)
+                {
+                    ldE[mm] += s->lambda_h*(-2*lbuff[mm] + lbuff[mm-1] + lbuff[mm+1]);
+                }
+                if(s->periodic)
+                {
+                    ldE[M-1] = s->lambda_h*(lbuff[0] - 2*lbuff[M-1] + lbuff[M-2]);
+                } else {
+                    ldE[M-1] = s->lambda_h*(-lbuff[M-1]+lbuff[M-2]);
                 }
             }
-        } else if(pp == P-1)
+        }
+
+
+        /* y */
+#pragma omp parallel for
+        for(size_t pp = 0; pp < P; pp++)
         {
-            for(size_t nn = 0; nn < N; nn++)
+            for(size_t nn = 0; nn == 0; nn++)
             {
-                float * restrict lbuff = s->buff + pp*M*N + nn*M;
-                float * restrict ldE = dE + pp*M*N + nn*M;
-                if(s->periodic == 1)
+                const float * restrict lu = u + pp*M*N +nn*M;
+                float * restrict lbuff = s->buff + pp*M*N+nn*M;
+
+                if(s->periodic)
                 {
                     for(size_t mm = 0; mm < M ; mm++)
                     {
-                        ldE[mm] += s->lambda_h*(-2*lbuff[mm] + lbuff[mm-MN] + s->buff[nn*N+mm]);
+                        lbuff[mm] = asign(lu[mm+M] - 2*lu[mm] + u[ pp*M*N + M*(N-1) + mm ]);
                     }
                 } else {
                     for(size_t mm = 0; mm < M ; mm++)
                     {
-                        ldE[mm] += s->lambda_h*(-lbuff[mm] + lbuff[mm-MN]);
+                        lbuff[mm] = asign(lu[mm+M] - lu[mm]);
                     }
                 }
             }
-        } else {
-            for(size_t nn = 0; nn < N; nn++)
+
+            for(size_t nn = 1; nn+1 < N; nn++)
             {
-                float * restrict lbuff = s->buff + pp*M*N + nn*M;
-                float * restrict ldE = dE + pp*M*N + nn*M;
+                const float * restrict lu = u + pp*M*N+nn*M;
+                float * restrict lbuff = s->buff + pp*M*N+nn*M;
 
                 for(size_t mm = 0; mm < M ; mm++)
                 {
-                    ldE[mm] += s->lambda_h*(-2*lbuff[mm] + lbuff[mm-MN] + lbuff[mm+MN]);
+                    lbuff[mm] = asign(lu[mm-M] + lu[mm+M] - 2*lu[mm]);
+                }
+            }
+
+            for(size_t nn = N-1; nn == N-1; nn++)
+            {
+                const float * restrict lu = u + pp*M*N+nn*M;
+                float * restrict lbuff = s->buff + pp*M*N+nn*M;
+
+                if(s->periodic)
+                {
+                    for(size_t mm = 0; mm < M ; mm++)
+                    {
+                        lbuff[mm] = asign(lu[mm-M] - 2*lu[mm] + u[ pp*M*N + mm ]);
+                    }
+                } else {
+                    for(size_t mm = 0; mm < M ; mm++)
+                    {
+                        lbuff[mm] = asign(lu[mm-M] - lu[mm]);
+                    }
+                }
+            }
+        }
+
+#pragma omp parallel for
+        for(size_t pp = 0; pp < P; pp++)
+        {
+            for(size_t nn = 0; nn== 0 ; nn++)
+            {
+                float * restrict lbuff = s->buff + pp*M*N+nn*M;
+                float * restrict ldE = dE + pp*M*N+nn*M;
+                if(s->periodic){
+                    for(size_t mm = 0; mm < M ; mm++)
+                    {
+                        ldE[mm] += s->lambda_h*(-2*lbuff[mm] + lbuff[mm+M] + s->buff[pp*M*N+mm]);
+                    }
+                } else {
+                    for(size_t mm = 0; mm < M ; mm++)
+                    {
+                        ldE[mm] += s->lambda_h*(-lbuff[mm] + lbuff[mm+M]);
+                    }
+                }
+            }
+
+            for(size_t nn = 1; nn+1 < N; nn++)
+            {
+                float * restrict lbuff = s->buff + pp*M*N+nn*M;
+
+                float * restrict ldE = dE + pp*M*N+nn*M;;
+
+                for(size_t mm = 0; mm < M ; mm++)
+                {
+                    ldE[mm] += s->lambda_h*(-2*lbuff[mm] + lbuff[mm-M] + lbuff[mm+M]);
+                }
+            }
+
+            for(size_t nn = N-1; nn== N-1 ; nn++)
+            {
+                float * restrict lbuff = s->buff + pp*M*N+nn*M;
+                float * restrict ldE = dE + pp*M*N+nn*M;;
+                if(s->periodic){
+                    for(size_t mm = 0; mm < M ; mm++)
+                    {
+                        ldE[mm] += s->lambda_h*(-2*lbuff[mm] + lbuff[mm-M] + s->buff[pp*M*N+M*(N-1) + mm]);
+                    }
+                } else {
+
+                    for(size_t mm = 0; mm < M ; mm++)
+                    {
+                        ldE[mm] += s->lambda_h*(-lbuff[mm] + lbuff[mm-M]);
+                    }
+                }
+            }
+
+        }
+
+        /* z */
+        const size_t MN = s->M * s->N;
+
+
+#pragma omp parallel for
+        for(size_t pp = 0; pp < P; pp++)
+        {
+            if(pp == 0)
+            {
+                if(s->periodic) {
+                    for(size_t nn = 0; nn < N; nn++)
+                    {
+                        const float * restrict lu = u + pp*M*N + nn*M;
+                        float * restrict lbuff = s->buff + pp*M*N + nn*M;
+
+                        for(size_t mm = 0; mm < M ; mm++)
+                        {
+                            lbuff[mm] = asign(lu[mm+MN] - 2*lu[mm]+ u[nn*M + mm + M*N*(P-1)]);
+                        }
+                    }
+                } else {
+                    for(size_t nn = 0; nn < N; nn++)
+                    {
+                        const float * restrict lu = u + pp*M*N + nn*M;
+                        float * restrict lbuff = s->buff + pp*M*N + nn*M;
+
+                        for(size_t mm = 0; mm < M ; mm++)
+                        {
+                            lbuff[mm] = asign(lu[mm+MN] - lu[mm]);
+                        }
+                    }
+                }
+            } else if(pp == P-1)
+            {
+                if(s->periodic) {
+                    for(size_t nn = 0; nn < N; nn++)
+                    {
+                        const float * restrict lu = u + pp*M*N + nn*M;
+                        float * restrict lbuff = s->buff + pp*M*N + nn*M;
+
+                        for(size_t mm = 0; mm < M ; mm++)
+                        {
+                            lbuff[mm] = asign(lu[mm-MN] - 2*lu[mm] + u[nn*M + mm]);
+                        }
+                    }
+                } else {
+                    for(size_t nn = 0; nn < N; nn++)
+                    {
+                        const float * restrict lu = u + pp*M*N + nn*M;
+                        float * restrict lbuff = s->buff + pp*M*N + nn*M;
+
+                        for(size_t mm = 0; mm < M ; mm++)
+                        {
+                            lbuff[mm] = asign(lu[mm-MN] - lu[mm]);
+                        }
+                    }
+                }
+            } else {
+
+                for(size_t nn = 0; nn < N; nn++)
+                {
+                    const float * restrict lu = u + pp*M*N + nn*M;
+                    float * restrict lbuff = s->buff + pp*M*N + nn*M;
+
+                    for(size_t mm = 0; mm < M ; mm++)
+                    {
+                        lbuff[mm] = asign(lu[mm-MN] + lu[mm+MN] - 2*lu[mm]);
+                    }
+                }
+            }
+        }
+
+#pragma omp parallel for
+        for(size_t pp = 0; pp < P; pp++)
+        {
+            if(pp == 0)
+            {
+                for(size_t nn = 0; nn < N; nn++)
+                {
+                    float * restrict lbuff = s->buff + pp*M*N + nn*M;
+                    float * restrict ldE = dE + pp*M*N + nn*M;
+                    if(s->periodic == 1)
+                    {
+                        for(size_t mm = 0; mm < M ; mm++)
+                        {
+                            ldE[mm] += s->lambda_h*(-2*lbuff[mm] + lbuff[mm+MN] + s->buff[(P-1)*M*N + nn*M + mm]);
+                        }
+                    } else {
+                        for(size_t mm = 0; mm < M ; mm++)
+                        {
+                            ldE[mm] += s->lambda_h*(-lbuff[mm] + lbuff[mm+MN]);
+                        }
+                    }
+                }
+            } else if(pp == P-1)
+            {
+                for(size_t nn = 0; nn < N; nn++)
+                {
+                    float * restrict lbuff = s->buff + pp*M*N + nn*M;
+                    float * restrict ldE = dE + pp*M*N + nn*M;
+                    if(s->periodic == 1)
+                    {
+                        for(size_t mm = 0; mm < M ; mm++)
+                        {
+                            ldE[mm] += s->lambda_h*(-2*lbuff[mm] + lbuff[mm-MN] + s->buff[nn*N+mm]);
+                        }
+                    } else {
+                        for(size_t mm = 0; mm < M ; mm++)
+                        {
+                            ldE[mm] += s->lambda_h*(-lbuff[mm] + lbuff[mm-MN]);
+                        }
+                    }
+                }
+            } else {
+                for(size_t nn = 0; nn < N; nn++)
+                {
+                    float * restrict lbuff = s->buff + pp*M*N + nn*M;
+                    float * restrict ldE = dE + pp*M*N + nn*M;
+
+                    for(size_t mm = 0; mm < M ; mm++)
+                    {
+                        ldE[mm] += s->lambda_h*(-2*lbuff[mm] + lbuff[mm-MN] + lbuff[mm+MN]);
+                    }
                 }
             }
         }
     }
+
 
     return;
 }
@@ -464,7 +647,7 @@ add(float * restrict dtu,
 float *
 sparse_preprocess(const float * image, const u64 M, const u64 N, const u64 P,
                   const double lambda, const double lambda_s,
-                  const int periodic, const u64 iter,
+                  const int periodic, const int directions, const u64 iter,
                   int verbose, FILE * log)
 {
 
@@ -490,7 +673,8 @@ sparse_preprocess(const float * image, const u64 M, const u64 N, const u64 P,
     s->image = image;
     s->lambda = lambda;
     s->lambda_s = lambda_s;
-    s->lambda_h = 1.0;
+    s->lambda_h = 2.0;
+    s->directions = directions;
 
     float lmax = max(max(s->lambda, s->lambda_s), s->lambda_h);
     s->lambda /= lmax;
@@ -567,9 +751,9 @@ sparse_preprocess(const float * image, const u64 M, const u64 N, const u64 P,
         {
             if(verbose > 0)
             {
-            printf("\n");
-            printf("Stopping because dt < min_step (%e < %e)\n", dt, min_step);
-            break;
+                printf("\n");
+                printf("Stopping because dt < min_step (%e < %e)\n", dt, min_step);
+                break;
             }
             if(log != NULL)
             {

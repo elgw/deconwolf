@@ -377,7 +377,7 @@ static void dw_psf_sted(opts * s)
                          T,
                          PSF->M, PSF->N, PSF->P);
     ttags_free(&T);
-    fim_delete(PSF);
+    fimt_free(PSF);
 }
 
 int dw_psf_sted_cli(int argc, char ** argv)

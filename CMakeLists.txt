@@ -87,12 +87,12 @@ add_executable(dw
   src/fim.c
   src/fim_tiff.c
   src/ftab.c
-  src/fwhm.c
   src/method_identity.c
   src/method_rl.c
   src/method_shb.c
   src/tiling.c
   src/fft.c
+  src/gmlfit.c
   src/sparse_preprocess.c
   src/sparse_preprocess_cli.c)
 
