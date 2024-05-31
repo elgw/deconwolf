@@ -56,8 +56,17 @@ ftab_t * ftab_from_tsv(const char * fname);
 /* Write tsv file do disk */
 int ftab_write_tsv(const ftab_t * T, const char * fname);
 
-/* Print as tsv to FILE */
-int ftab_print(FILE *, const ftab_t *);
+/* Write tsv file do disk */
+int ftab_write_csv(const ftab_t * T, const char * fname);
+
+
+/** Print table to file
+ * @param[in] fid An open FILE to write to
+ * @param[in] T the table to write
+ * @param[in] sep The separator or deliminator to use, e.g., "," or "\t"
+ * @return EXIT_SUCCESS if file could be written
+ */
+int ftab_print(FILE * fid, const ftab_t * T, const char * sep);
 
 /* Set the name of a column
 * the name is copied, i.e., can be freed */

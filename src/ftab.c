@@ -64,12 +64,24 @@ int ftab_write_tsv(const ftab_t * T, const char * fname)
     {
         return EXIT_FAILURE;
     }
-    int ret = ftab_print(fid, T);
+    int ret = ftab_print(fid, T, "\t");
     fclose(fid);
     return ret;
 }
 
-int ftab_print(FILE * fid, const ftab_t * T)
+int ftab_write_csv(const ftab_t * T, const char * fname)
+{
+    FILE * fid = fopen(fname, "w");
+    if(fid == NULL)
+    {
+        return EXIT_FAILURE;
+    }
+    int ret = ftab_print(fid, T, ",");
+    fclose(fid);
+    return ret;
+}
+
+int ftab_print(FILE * fid, const ftab_t * T, const char * sep)
 {
     /* Write column names if they exist, otherwise col_1 etc */
     for(size_t cc = 0; cc<T->ncol; cc++)
@@ -89,7 +101,7 @@ int ftab_print(FILE * fid, const ftab_t * T)
         }
         if(cc+1 != T->ncol)
         {
-            fprintf(fid, "\t");
+            fprintf(fid, "%s", sep);
         }
     }
     fprintf(fid, "\n");
@@ -102,7 +114,7 @@ int ftab_print(FILE * fid, const ftab_t * T)
             fprintf(fid, "%f", T->T[rr*T->ncol + cc]);
             if(cc+1 != T->ncol)
             {
-                fprintf(fid, "\t");
+                fprintf(fid, "%s", sep);
             }
         }
         fprintf(fid, "\n");
@@ -405,11 +417,11 @@ int ftab_ut()
     ftab_set_colname(T, 1, "y");
     ftab_set_colname(T, 2, "z");
     ftab_set_colname(T, 3, "value");
-    ftab_print(stdout, T);
+    ftab_print(stdout, T, "\t");
 
     float row[4] = {1, 2, 3, 1.23};
     ftab_insert(T, row);
-    ftab_print(stdout, T);
+    ftab_print(stdout, T, "\t");
 
     /* Save and read */
     char * fname = malloc(1024);
@@ -444,7 +456,7 @@ int ftab_ut()
     unlink(fname);
 #endif
     free(fname);
-    ftab_print(stdout, T);
+    ftab_print(stdout, T, "\t");
     ftab_free(T);
     ftab_free(T2);
     return EXIT_SUCCESS;
