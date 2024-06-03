@@ -33,9 +33,8 @@
 #include "ftab.h"
 #include "dw_util.h"
 
-#ifdef _OPENMP // turned on with -fopenmp
 #include <omp.h>
-#endif
+
 
 #ifdef __linux__
 #include <sys/mman.h>
