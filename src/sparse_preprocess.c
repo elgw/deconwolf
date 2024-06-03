@@ -182,7 +182,7 @@ get_error(const sparse_conf_t * s, const float * restrict u)
     return (s->lambda*E_data + s->lambda_h*E_smooth + s->lambda_s*E_sparse) / (double) (M*N*P);
 }
 
-static float max(const float a, const float b)
+static float float_max(const float a, const float b)
 {
     if(a > b)
         return a;
@@ -317,7 +317,7 @@ static void get_gradient(const sparse_conf_t * restrict s,
         //dE[kk] = s->lambda * (1.0-I[kk]/max(u[kk], 0.5)) + s->lambda_s;
 
 #else
-        dE[kk] = s->lambda * logf(max(u[kk], 1e-4)/max(I[kk], 1e-4)) + s->lambda_s;
+        dE[kk] = s->lambda * logf(float_max(u[kk], 1e-4)/max(I[kk], 1e-4)) + s->lambda_s;
 #endif
 #else
         dE[kk] = s->lambda*(u[kk]-I[kk]) + s->lambda_s;
@@ -638,7 +638,7 @@ add(float * restrict dtu,
 #pragma omp parallel for
     for(size_t kk = 0; kk < n ; kk++)
     {
-        dtu[kk] = max(u[kk] + dt*dE[kk], 0);
+        dtu[kk] = float_max(u[kk] + dt*dE[kk], 0);
     }
     return;
 }
@@ -676,7 +676,7 @@ sparse_preprocess(const float * image, const u64 M, const u64 N, const u64 P,
     s->lambda_h = 2.0;
     s->directions = directions;
 
-    float lmax = max(max(s->lambda, s->lambda_s), s->lambda_h);
+    float lmax = float_max(float_max(s->lambda, s->lambda_s), s->lambda_h);
     s->lambda /= lmax;
     s->lambda_s /= lmax;
     s->lambda_h /= lmax;

@@ -1,7 +1,7 @@
 #include <getopt.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <unistd.h>
+//#include <unistd.h>
 #include <string.h>
 #include "fim_tiff.h"
 #include "dw_util.h"
