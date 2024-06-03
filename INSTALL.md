@@ -94,19 +94,20 @@ brew install gsl
 ```
 
 ## Windows 10/11
-Deconwolf can be built and run using WSL. Most likely there will be a
+Deconwolf can be built several different ways under Windows:
+1. Using WSL, then follow the instructions for Ubuntu. Most likely there will be a
 [performance
 penalty](https://www.phoronix.com/scan.php?page=article&item=wsl-wsl2-tr3970x&num=1),
 and it will not be possible to enable GPU acceleration, see [issue
 #56](https://github.com/elgw/deconwolf/issues/56).
-
-Deconwolf can also be built using [msys2](https://www.msys2.org/) or
+2.  [msys2](https://www.msys2.org/) or
 [cygwin](https://www.cygwin.com/), however those options will be
 slower since OpenMP will be using an pthreads emulation on top of
 windows threads. It might be possible to get OpenCL working.
+3. As a native windows program. This is the preferred way since it should work with OpenCL without any problems..
 
 To build native windows programs, at least the following software is
-needed:
+required:
 
 - [git](https://git-scm.com/download)
 - [cmake](https://cmake.org/download/)
@@ -118,20 +119,28 @@ The dependencies can get retrieved by vcpkg:
 git clone https://github.com/microsoft/vcpkg
 .\vcpkg\bootstrap-vcpkg.bat
 .\vcpkg integrate install
-.\vcpkg\vcpkg.exe install fftw3
+.\vcpkg\vcpkg.exe install fftw3[threads]
 .\vcpkg\vcpkg.exe install tiff
 .\vcpkg\vcpkg.exe install gsl
 .\vcpkg\vcpkg.exe install opencl
+.\vcpkg\vcpkg.exe install getopt
+.\vcpkg\vcpkg integrate install
 ```
+Please note the value of the `CMAKE_TOOLCHAIN_FILE` as it will be used later.
 
 A visual studio project can be created by
 
 ``` shell
 cd deconwolf
-mkdir winbuild
-cd winbuild
-cmake .. -G "Visual Studio 17 2022" -T ClangCL -A x64
+mkdir build
+cd build
+cmake "-DCMAKE_TOOLCHAIN_FILE=C:/YOUR/OWN/PATH/vcpkg/scripts/buildsystems/vcpkg.cmake" -T ClangCL -A x64 ../
 ```
+Important: Please use the correct path to `vcpkg.cmake`.
+
+Open visual studio and compile it from there. Don't forget to change the build type to release. 
+
+If you are a windows developer and reading this, please help us out get make this process smoother (if possible). 
 
 ## FreeBSD
 - Use `gmake`, not `make`.
