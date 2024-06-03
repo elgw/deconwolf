@@ -92,6 +92,11 @@ void clu_exit_error(cl_int err,
                 "   and look up the option --tilesize\n");
     }
     fprintf(stderr, "\n");
+    fprintf(stderr,
+            "   If you are sure that OpenCL works on this machine\n"
+            "   and that it is a problem only related to deconwolf,\n"
+            "   check open issues or create a new one at\n"
+            "   https://github.com/elgw/deconwolf/issues\n");
     exit(EXIT_FAILURE);
 }
 
@@ -1097,9 +1102,10 @@ static double clockdiff(struct timespec* start, struct timespec * finish)
 
 char * get_cl_device_info_string(cl_device_id dev_id, cl_device_info info_type)
 {
-    size_t string_size = 1024;
+    size_t string_size = 16*1024;
     size_t string_size_used = 0;
-    char * string = malloc(string_size);
+    char * string = calloc(string_size, 1);
+    // Note: Can return CL_INVALID_VALUE if the string_size is not large enough.
     check_CL(clGetDeviceInfo(dev_id,
                              info_type,
                              string_size,
