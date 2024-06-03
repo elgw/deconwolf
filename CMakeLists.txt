@@ -169,17 +169,34 @@ endif()
 endif()
 
 #
+# Getopt
+#
+if(WIN32)
+# find_path(GETOPT_INCLUDE_DIR getopt.h)
+find_library(GETOPT_LIBRARY getopt)
+message("getopt found at: ${GETOPT_LIBRARY}")
+SET(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} ${GETOPT_LIBRARY}")
+endif()
+
+#
 # FFTW3
 #
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/util/findFFTW)
+if(UNIX)
 find_package(FFTW REQUIRED FLOAT_LIB FLOAT_OPENMP_LIB)
+else()
+find_package(FFTW REQUIRED FLOAT_LIB)
+endif()
 target_link_libraries(dw FFTW::Double)
 target_link_libraries(dw FFTW::Float)
-target_link_libraries(dw FFTW::FloatOpenMP)
+
 
 target_link_libraries(dw_bw FFTW::Float)
-target_link_libraries(dw_bw FFTW::FloatOpenMP)
 
+if(UNIX)
+target_link_libraries(dw_bw FFTW::FloatOpenMP)
+target_link_libraries(dw FFTW::FloatOpenMP)
+endif()
 
 
 # There is no _threads version or _omp version
@@ -244,7 +261,18 @@ if(OpenMP_C_FOUND)
   message("Found OpenMP")
   target_link_libraries(dw OpenMP::OpenMP_C)
   target_link_libraries(dw_bw OpenMP::OpenMP_C)
+else()
+message("OpenMP not found automatically, trying manual")
+
+set(
+  CMAKE_C_FLAGS
+  "${CMAKE_C_FLAGS} -fopenmp=omp /openmp"
+)
+SET(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} -fopenmp=omp -lomp")
+
 endif()
+
+
 
 
 # Enable -flto (GCC) and similar if available, see
