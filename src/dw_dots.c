@@ -26,7 +26,7 @@ typedef struct{
     float log_asigma; /* Axial sigma for LoG filter */
     float log_lsigma; /* Lateral sigma */
 
-/* Optical configuration */
+    /* Optical configuration */
     float NA;
     float ni;
     float lambda;
@@ -40,6 +40,7 @@ typedef struct{
     float th;
     int optind;
     char * cmdline;
+    int write_csv;
 
     /* For multi scale dot detection.
      *For single scale paths,
@@ -79,7 +80,7 @@ static void opts_free(opts * s)
     free(s->logfile);
     if(s->log != NULL)
     {
-         fclose(s->log);
+        fclose(s->log);
     }
     free(s->cmdline);
     free(s->scales);
@@ -135,6 +136,14 @@ static void opts_print(FILE * f, opts * s)
         fprintf(f, "   Axial sigma: %.2f\n", s->fit_asigma);
     } else {
         fprintf(f, "Fitting not enabled\n");
+    }
+
+    fprintf(f, "Output format: ");
+    if(s->write_csv)
+    {
+        fprintf(f, "CSV\n");
+    } else {
+        fprintf(f, "TSV\n");
     }
     fprintf(f, "NA: %f, ni: %f, lambda: %f, dx: %f, dz: %f\n", s->NA, s->ni, s->lambda, s->dx, s->dz);
     return;
@@ -231,6 +240,7 @@ static void argparsing(int argc, char ** argv, opts * s)
     struct option longopts[] = {
         {"dog_as", required_argument, NULL, 'a'},
         {"fit_as", required_argument, NULL, 'A'},
+        {"csv",    no_argument, NULL, 'c'},
         {"logfile", required_argument, NULL, 'w'},
         {"out", required_argument, NULL, 'O'},
 
@@ -253,7 +263,7 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"ni",     required_argument, NULL, '6'},
         {NULL, 0, NULL, 0}};
     int ch;
-    while((ch = getopt_long(argc, argv, "1:3:4:5:6:L:a:A:F:hi:l:m:n:N:op:r:s:v:w:", longopts, NULL)) != -1)
+    while((ch = getopt_long(argc, argv, "1:3:4:5:6:L:a:A:cF:hi:l:m:n:N:op:r:s:v:w:", longopts, NULL)) != -1)
     {
         switch(ch){
         case '1':
@@ -276,6 +286,9 @@ static void argparsing(int argc, char ** argv, opts * s)
             break;
         case 'A':
             s->fit_asigma = atof(optarg);
+            break;
+        case 'c':
+            s->write_csv = 1;
             break;
         case 'F':
             s->fitting = 1;
@@ -424,9 +437,9 @@ static void argparsing(int argc, char ** argv, opts * s)
         {
             if(s->verbose > 0)
             {
-            printf("Warning: Couldn't start at scale %f due to the sampling of\n"
-                   "the image. Starting at scale %f\n",
-                   1.0/sqrt(2), min_scale);
+                printf("Warning: Couldn't start at scale %f due to the sampling of\n"
+                       "the image. Starting at scale %f\n",
+                       1.0/sqrt(2), min_scale);
             }
         }
 
@@ -624,7 +637,12 @@ void detect_dots(opts * s, char * inFile)
     free(s->outfile);
     s->outfile = malloc(strlen(s->image) + 64);
     assert(s->outfile != NULL);
-    sprintf(s->outfile, "%s.dots.tsv", s->image);
+    if(s->write_csv)
+    {
+        sprintf(s->outfile, "%s.dots.csv", s->image);
+    } else {
+        sprintf(s->outfile, "%s.dots.tsv", s->image);
+    }
 
     char * outFile = s->outfile;
 
@@ -681,8 +699,8 @@ void detect_dots(opts * s, char * inFile)
     {
         if(s->verbose > 0)
         {
-        printf("Diffraction limited dots: sigma = %.2f, %.2f\n",
-               s->fit_lsigma, s->fit_asigma);
+            printf("Diffraction limited dots: sigma = %.2f, %.2f\n",
+                   s->fit_lsigma, s->fit_asigma);
         }
         float scaling = 1;
         if(s->scales != NULL)
@@ -755,7 +773,7 @@ void detect_dots(opts * s, char * inFile)
                                  scaling*s->log_asigma);
 
             float s2 = scaling*scaling;
-            #pragma omp parallel for
+#pragma omp parallel for
             for(size_t kk = 0; kk < M*N*P; kk++)
             {
                 LoG[ss][kk] *= s2;
@@ -848,10 +866,19 @@ void detect_dots(opts * s, char * inFile)
         printf("Writing dots to %s\n", s->outfile);
     }
 
-    if(ftab_write_tsv(T, s->outfile))
+    if(s->write_csv == 1)
     {
-        fprintf(stderr, "Failed to write to %s\n", s->outfile);
-        exit(EXIT_FAILURE);
+        if(ftab_write_csv(T, s->outfile))
+        {
+            fprintf(stderr, "Failed to write to %s\n", s->outfile);
+            exit(EXIT_FAILURE);
+        }
+    } else {
+        if(ftab_write_tsv(T, s->outfile))
+        {
+            fprintf(stderr, "Failed to write to %s\n", s->outfile);
+            exit(EXIT_FAILURE);
+        }
     }
 
     fprintf(s->log, "Wrote %zu dots. Done!\n", T->nrow);

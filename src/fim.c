@@ -3923,7 +3923,7 @@ void fim_features_2d_ut()
     I->P = P;
     ftab_t * T = fim_features_2d(I);
     T->nrow = 10;
-    ftab_print(stdout, T);
+    ftab_print(stdout, T, ",");
     ftab_free(T);
     fimt_free(I);
 }
