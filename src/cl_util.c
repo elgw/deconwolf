@@ -1496,7 +1496,10 @@ void clu_prepare_kernels(clu_env_t * clu,
     {
         if(clu->verbose > 0)
         {
-            printf("Warning: could not determine your home directory\n");
+            printf("Warning: Will write the VkFFT configuration in the current folder.\n");
+            if(clu->verbose > 1) {
+                printf("Reason: Can not determine a suitable folder under Windows.\n");
+            }
         }
         vkfft_cache_file_name = malloc(1024);
         sprintf(vkfft_cache_file_name, "VkFFT_kernelCache_%zux%zux%zu.binary",
