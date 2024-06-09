@@ -242,6 +242,7 @@ fimcl_t * fimcl_new(clu_env_t * clu, fimcl_type type,
                                 Y->buf_size_nf*sizeof(float),
                                 NULL, &ret );
         clu->nb_allocated += Y->buf_size_nf*sizeof(float);
+        clu->n_alloc++;
 
     check_CL(ret);
 
@@ -316,7 +317,12 @@ fimcl_t * fimcl_copy(fimcl_t * G)
 
 void fimcl_free(fimcl_t * G)
 {
-    assert(G != NULL);
+    if(G == NULL)
+    {
+        fprintf(stderr, "Warning: fimcl_free(NULL);\n");
+        return;
+    }
+
     fimcl_sync(G);
     check_CL(clReleaseMemObject(G->buf));
     G->clu->n_release++;
@@ -844,6 +850,7 @@ fimcl_t * fimcl_ifft(fimcl_t * fX)
                             NULL, &ret );
     X->buf_size_nf = padsize(fX->M)*fX->N*fX->P;
     fX->clu->nb_allocated += fX->M*fX->N*fX->P*sizeof(float);
+    fX->clu->n_alloc++;
     check_CL(ret);
 
     /* And back again */
@@ -961,6 +968,7 @@ fimcl_t * fimcl_fft(fimcl_t * X)
                              fX->buf_size_nf *  sizeof(float),
                              NULL, &ret );
     X->clu->nb_allocated += fX->buf_size_nf *  sizeof(float);
+    X->clu->n_alloc++;
     check_CL(ret);
 
 
@@ -1642,14 +1650,16 @@ void clu_destroy(clu_env_t * clu)
         if(clu->clfft_buffer_size > 0)
         {
             check_CL(clReleaseMemObject(clu->clfft_buffer));
-        }
-
-        if(clu->float_gpu != NULL)
-        {
-            check_CL(clReleaseMemObject(clu->float_gpu));
+            clu->n_released++;
         }
     }
 #endif
+
+    if(clu->float_gpu != NULL)
+    {
+        check_CL(clReleaseMemObject(clu->float_gpu));
+        clu->n_release++;
+    }
 
     /* Clear up the OpenCL stuff */
     check_CL(clFlush(clu->command_queue));
@@ -1674,7 +1684,12 @@ void clu_destroy(clu_env_t * clu)
     check_CL(clReleaseContext(clu->context));
 
 
-
+    if(clu->n_alloc != clu->n_release)
+    {
+        fprintf(stderr, "clu_destroy warning: allocated: %zu, released: %zu\n",
+                clu->n_alloc, clu->n_release);
+        fprintf(stderr, "This indicates a potential memory leak on the GPU.\n");
+    }
     free(clu);
     return;
 }
@@ -2048,12 +2063,14 @@ cl_int clu_increase_clfft_buffer(clu_env_t * clu, size_t req_size)
     {
         /* If there was already a smaller buffer allocated */
         check_CL(clReleaseMemObject( clu->clfft_buffer));
+        clu->n_release++;
     }
     clu->clfft_buffer = clCreateBuffer(clu->context,
                                        CL_MEM_READ_WRITE,
                                        req_size,
                                        NULL, &ret );
     clu->nb_allocated += req_size;
+    clu->n_alloc++;
     check_CL(ret);
     clu->clfft_buffer_size = req_size;
 
@@ -2195,6 +2212,7 @@ void clu_benchmark_transfer(clu_env_t * clu)
                                     buf_size_nf*sizeof(float),
                                     NULL, &ret );
     clu->nb_allocated += buf_size_nf*sizeof(float);
+    clu->n_alloc++;
     check_CL(ret);
     dw_gettime(&t0);
     check_CL( clEnqueueWriteBuffer( clu->command_queue,
@@ -2231,6 +2249,7 @@ void clu_benchmark_transfer(clu_env_t * clu)
     fim_free(buf);
     fim_free(buf_copy);
     check_CL(clReleaseMemObject(buf_gpu));
+    clu->n_release++;
     return;
 }
 
@@ -2360,6 +2379,8 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
                                              numWorkGroups * sizeof(float),
                                              NULL,
                                              &status );
+    forward->clu->n_alloc++;
+
     if(timers){
         dw_gettime(&t1);
     printf("Create buffer: %f \n", timespec_diff(&t1, &t0));
@@ -2419,6 +2440,7 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
 
     if(timers){dw_gettime(&t0);}
     clReleaseMemObject(partial_sums_gpu);
+    forward->clu->n_release++;
     if(timers)
     {
     dw_gettime(&t1);
