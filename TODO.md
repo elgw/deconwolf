@@ -11,6 +11,9 @@ github](https://github.com/elgw/deconwolf/issues).
 
 - [ ] Update to the latest VkFFT version.
 
+- [ ] Add a signature to the `fimcl_t` objects and to validate that
+      the right kind of objects are used in functions using them.
+
 - [ ] Better build instruction for native builds on Windows **help wanted**
 
 - [ ] Figure out how if it works on Apple silicon **help wanted**
