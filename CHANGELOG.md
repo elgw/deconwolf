@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## 0.4.1
+- Fixes [issue #62](https://github.com/elgw/deconwolf/issues/62).
+
 ## 0.4.0
 
 **TLDR** New features and bug fixes. Update if you are on version
