@@ -89,9 +89,9 @@ static void opts_free(opts * s)
  * than green set to 2. Everything else set to 0.
  * http://www.libpng.org/pub/png/libpng-manual.txt
  */
-fim_t * fim_png_read_green_red(char * fname)
+fimo * fim_png_read_green_red(char * fname)
 {
-    fim_t * F = NULL;
+    fimo * F = NULL;
 
     png_image image;
     memset(&image, 0, sizeof(image));
@@ -113,7 +113,7 @@ fim_t * fim_png_read_green_red(char * fname)
             size_t N = image.height;
             //printf("M=%zu, N=%zu image buffer %u b\n", M, N, PNG_IMAGE_SIZE(image));
 
-            F = malloc(sizeof(fim_t));
+            F = malloc(sizeof(fimo));
             assert(F != NULL);
             F->M = M;
             F->N = N;
@@ -291,7 +291,7 @@ static int float_arg_max(const float * v, size_t N)
     return argmax;
 }
 
-fim_t * get_reduction(opts * s, char * file)
+fimo * get_reduction(opts * s, char * file)
 {
 
 
@@ -325,7 +325,7 @@ fim_t * get_reduction(opts * s, char * file)
     {
         float * maxI = fim_maxproj(I, M, N, P);
         free(I);
-        fim_t * result = fim_image_from_array(maxI, M, N, 1);
+        fimo * result = fim_image_from_array(maxI, M, N, 1);
         free(maxI);
         return result;
     }
@@ -336,12 +336,12 @@ fim_t * get_reduction(opts * s, char * file)
         {
             printf("Finding focus\n"); fflush(stdout);
         }
-        fim_t * II = fim_image_from_array(I, M, N, P);
+        fimo * II = fim_image_from_array(I, M, N, P);
         free(I);
         float sigma = 1;
         float * gm = fim_focus_gm(II, sigma);
         int slice = float_arg_max(gm, II->P);
-        fim_t * result = malloc(sizeof(fim_t));
+        fimo * result = malloc(sizeof(fimo));
         assert(result != NULL);
         result->M = M;
         result->N = N;
@@ -349,7 +349,7 @@ fim_t * get_reduction(opts * s, char * file)
         result->V = malloc(M*N*sizeof(float));
         assert(result->V != NULL);
         memcpy(result->V, II->V+slice*M*N, M*N*sizeof(float));
-        fimt_free(II);
+        fimo_free(II);
         if(s->verbose > 0)
         {
             printf("Returning slice %d\n", slice); fflush(stdout);
@@ -387,7 +387,7 @@ void segment_image_rf(opts * s, PrfForest * F, char * file)
     printf("\n");
 
     /* Read the image */
-    fim_t * redu = get_reduction(s, file);
+    fimo * redu = get_reduction(s, file);
     assert(redu != NULL);
     printf("1\n"); fflush(stdout);
     /* Extract features */
@@ -453,7 +453,7 @@ void segment_image_rf(opts * s, PrfForest * F, char * file)
 
     fim_tiff_write_noscale(outfile, result, NULL,
                            redu->M, redu->N, 1);
-    fimt_free(redu);
+    fimo_free(redu);
     return;
 }
 
@@ -471,7 +471,7 @@ PrfForest * loop_training_data(opts * s, float * features_cm,
         }
 
         /* Read annotated image */
-        fim_t * anno = fim_png_read_green_red(s->anno_label);
+        fimo * anno = fim_png_read_green_red(s->anno_label);
         assert(anno != NULL);
 
         /* Append one columns for the annotations */
@@ -551,7 +551,7 @@ PrfForest * loop_training_data(opts * s, float * features_cm,
         }
         free(features_cma);
         free(features_cma_train);
-        fimt_free(anno);
+        fimo_free(anno);
         free(result);
     }
 
@@ -562,7 +562,7 @@ void random_forest_pipeline(opts * s, int argc, char ** argv)
 {
 
     /* Read raw image */
-    fim_t * anno_raw = get_reduction(s, s->anno_image);
+    fimo * anno_raw = get_reduction(s, s->anno_image);
 
     /* Extract features */
     ftab_t * features = fim_features_2d(anno_raw);

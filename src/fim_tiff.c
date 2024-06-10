@@ -1062,11 +1062,11 @@ int fim_tiff_get_size(const char * fname,
     return 0;
 }
 
-fim_t * fimt_tiff_read(const char * fName)
+fimo * fimo_tiff_read(const char * fName)
 {
     int64_t M, N, P;
     float * V = fim_tiff_read(fName, NULL, &M, &N, &P, 0);
-    fim_t * I = malloc(sizeof(fim_t));
+    fimo * I = malloc(sizeof(fimo));
     assert(I != NULL);
     I->V = V;
     I->M = M;
@@ -1630,25 +1630,25 @@ char * tiff_is_supported(TIFF * tiff)
 
 int fim_tiff_maxproj_XYZ(const char * in, const char * out)
 {
-    fim_t * I = fimt_tiff_read(in);
+    fimo * I = fimo_tiff_read(in);
     //printf("[%zu, %zu, %zu]\n", I->M, I->N, I->P);
 
     /* Along Z */
-    fim_t * max_xy = fimt_maxproj(I);
+    fimo * max_xy = fimo_maxproj(I);
 
     /* Along X */
-    fim_t * Iyz = fim_shiftdim(I);
-    fim_t * _max_yz = fimt_maxproj(Iyz);
-    fim_t * max_yz = fimt_transpose(_max_yz);
-    fimt_free(_max_yz);
+    fimo * Iyz = fim_shiftdim(I);
+    fimo * _max_yz = fimo_maxproj(Iyz);
+    fimo * max_yz = fimo_transpose(_max_yz);
+    fimo_free(_max_yz);
 
     /* Along Y */
-    fim_t * Ixz = fim_shiftdim(Iyz);
-    fimt_free(Iyz);
-    fim_t * _max_xz = fimt_maxproj(Ixz);
-    fim_t * max_xz = fimt_transpose(_max_xz);
-    fimt_free(_max_xz);
-    fimt_free(Ixz);
+    fimo * Ixz = fim_shiftdim(Iyz);
+    fimo_free(Iyz);
+    fimo * _max_xz = fimo_maxproj(Ixz);
+    fimo * max_xz = fimo_transpose(_max_xz);
+    fimo_free(_max_xz);
+    fimo_free(Ixz);
 
 
     // TODO: Scale according to pixel size?
@@ -1656,9 +1656,9 @@ int fim_tiff_maxproj_XYZ(const char * in, const char * out)
     /* Concatenation */
     size_t MM = I->M + I->P;
     size_t NN = I->N + I->P;
-    fimt_free(I);
+    fimo_free(I);
 
-    fim_t * xview = malloc(sizeof(fim_t));
+    fimo * xview = malloc(sizeof(fimo));
     assert(xview != NULL);
     xview->M = MM;
     xview->N = NN;
@@ -1672,21 +1672,21 @@ int fim_tiff_maxproj_XYZ(const char * in, const char * out)
         printf("[%zu, %zu, %zu] XZ\n", max_xz->M, max_xz->N, max_xz->P);
         printf("[%zu, %zu, %zu] YZ\n", max_yz->M, max_yz->N, max_yz->P);
 
-        fimt_tiff_write(max_xy, "max_xy.tif");
-        fimt_tiff_write(max_xz, "max_xz.tif");
-        fimt_tiff_write(max_yz, "max_yz.tif");
+        fimo_tiff_write(max_xy, "max_xy.tif");
+        fimo_tiff_write(max_xz, "max_xz.tif");
+        fimo_tiff_write(max_yz, "max_yz.tif");
     }
 
-    fimt_blit_2D(xview, max_xy, 0, 0);
-    fimt_blit_2D(xview, max_xz, 0, max_xy->N);
-    fimt_blit_2D(xview, max_yz, max_xy->M, 0);
+    fimo_blit_2D(xview, max_xy, 0, 0);
+    fimo_blit_2D(xview, max_xz, 0, max_xy->N);
+    fimo_blit_2D(xview, max_yz, max_xy->M, 0);
 
-    fimt_free(max_xy);
-    fimt_free(max_xz);
-    fimt_free(max_yz);
+    fimo_free(max_xy);
+    fimo_free(max_xz);
+    fimo_free(max_yz);
 
-    fimt_tiff_write(xview, out);
-    fimt_free(xview);
+    fimo_tiff_write(xview, out);
+    fimo_free(xview);
 
     return EXIT_SUCCESS;
 }

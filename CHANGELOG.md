@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## 0.4.2
+- Upgraded VkFFT from v1.3.3 to v1.3.4.
+
 ## 0.4.1
 - Fixes the GPU memory leak reported in [issue
   #62](https://github.com/elgw/deconwolf/issues/62).

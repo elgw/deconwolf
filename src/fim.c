@@ -164,7 +164,7 @@ void fim_ianscombe(float * x, size_t n)
 }
 
 
-void fimt_free(fim_t * F)
+void fimo_free(fimo * F)
 {
     if(F != NULL)
     {
@@ -176,9 +176,9 @@ void fimt_free(fim_t * F)
 }
 
 
-fim_t * fim_wrap_array(float * V, size_t M, size_t N, size_t P)
+fimo * fim_wrap_array(float * V, size_t M, size_t N, size_t P)
 {
-    fim_t * I = malloc(sizeof(fim_t));
+    fimo * I = malloc(sizeof(fimo));
     assert(I != NULL);
     I->V = V;
     I->M = M;
@@ -187,9 +187,9 @@ fim_t * fim_wrap_array(float * V, size_t M, size_t N, size_t P)
     return I;
 }
 
-fim_t * fim_image_from_array(const float * restrict V, size_t M, size_t N, size_t P)
+fimo * fim_image_from_array(const float * restrict V, size_t M, size_t N, size_t P)
 {
-    fim_t * I = malloc(sizeof(fim_t));
+    fimo * I = malloc(sizeof(fimo));
     assert(I != NULL);
     I->V = fim_malloc(M*N*P*sizeof(float));
 
@@ -417,7 +417,7 @@ void fim_minus(float * restrict  A,
     return;
 }
 
-void fimt_add(fim_t * A, const fim_t * B)
+void fimo_add(fimo * A, const fimo * B)
 {
     assert(A->M == B->M);
     assert(A->N == B->N);
@@ -717,9 +717,9 @@ float * fim_copy(const float * restrict V, const size_t N)
     return C;
 }
 
-fim_t * fimt_copy(const fim_t * restrict F)
+fimo * fimo_copy(const fimo * restrict F)
 {
-    fim_t * C = malloc(sizeof(fim_t));
+    fimo * C = malloc(sizeof(fimo));
     assert(C != NULL);
     C->V = fim_copy(F->V, F->M*F->N*F->P);
     C->M = F->M;
@@ -736,11 +736,11 @@ float * fim_zeros(const size_t N)
     return A;
 }
 
-fim_t * fimt_zeros(const size_t M, const size_t N, const size_t P)
+fimo * fimo_zeros(const size_t M, const size_t N, const size_t P)
 // Allocate and return an array of N floats
 {
     size_t n = M*N*P;
-    fim_t * F = malloc(sizeof(fim_t));
+    fimo * F = malloc(sizeof(fimo));
     assert(F != NULL);
     F->V = fim_malloc(n*sizeof(float));
 
@@ -751,14 +751,14 @@ fim_t * fimt_zeros(const size_t M, const size_t N, const size_t P)
     return F;
 }
 
-size_t fimt_nel(fim_t * F)
+size_t fimo_nel(fimo * F)
 {
     return F->M*F->N*F->P;
 }
 
-float fimt_sum(fim_t * F)
+float fimo_sum(fimo * F)
 {
-    return fim_sum(F->V, fimt_nel(F));
+    return fim_sum(F->V, fimo_nel(F));
 }
 
 float * fim_constant(const size_t N, const float value)
@@ -1335,10 +1335,10 @@ void fim_LoG_ut()
     }
 
 
-    fim_t * T = fim_image_from_array(V, M, N, P);
-    fim_t * S1 = fim_shiftdim(T);
-    fim_t * S2 = fim_shiftdim(S1);
-    fim_t * S3 = fim_shiftdim(S2);
+    fimo * T = fim_image_from_array(V, M, N, P);
+    fimo * S1 = fim_shiftdim(T);
+    fimo * S2 = fim_shiftdim(S1);
+    fimo * S3 = fim_shiftdim(S2);
     for(size_t kk = 0; kk<M*N*P; kk++)
     {
         if(T->V[kk] != S3->V[kk])
@@ -1348,14 +1348,14 @@ void fim_LoG_ut()
             exit(EXIT_FAILURE);
         }
     }
-    fimt_free(T);
+    fimo_free(T);
     T = NULL;
     assert(S1->V != S2->V);
-    fimt_free(S1);
+    fimo_free(S1);
     S1 = NULL;
-    fimt_free(S2);
+    fimo_free(S2);
     S2 = NULL;
-    fimt_free(S3);
+    fimo_free(S3);
 
 
     for(size_t kk = 0; kk<M*N*P; kk++)
@@ -1478,7 +1478,7 @@ static float fim_interp_periodic(const float * V, int64_t nV,
     return V[stride*(idx % nV)];
 }
 
-void fimt_conv1_x(fim_t * V, fim_t * K, fim_boundary_condition bc)
+void fimo_conv1_x(fimo * V, fimo * K, fim_boundary_condition bc)
 {
 
 #pragma omp parallel
@@ -1494,7 +1494,7 @@ void fimt_conv1_x(fim_t * V, fim_t * K, fim_boundary_condition bc)
                 fim_conv1(line, V->M,
                           1, // stride
                           K->V,
-                          fimt_nel(K),
+                          fimo_nel(K),
                           B,
                           bc);
             }
@@ -2348,10 +2348,10 @@ float * fim_maxproj_ref(const float * V, size_t M, size_t N, size_t P)
     return Pr;
 }
 
-fim_t * fimt_maxproj(const fim_t * F)
+fimo * fimo_maxproj(const fimo * F)
 {
     float * _M = fim_maxproj(F->V, F->M, F->N, F->P);
-    fim_t * M = malloc(sizeof(fim_t));
+    fimo * M = malloc(sizeof(fimo));
     assert(M != NULL);
     M->V = _M;
     M->M = F->M;
@@ -3168,18 +3168,18 @@ float * conv1_3(const float * restrict V, size_t M, size_t N, size_t P,
     const int dim = 0;
     const int norm = 0;
 
-    fim_t * F = fim_image_from_array(V, M, N, P);
+    fimo * F = fim_image_from_array(V, M, N, P);
 
     fim_convn1(F->V, F->M, F->N, F->P, K1, nK1, dim, norm);
-    fim_t * F2 = fim_shiftdim(F);
+    fimo * F2 = fim_shiftdim(F);
     fim_free(F->V);
     fim_free(F);
     fim_convn1(F2->V, F2->M, F2->N, F2->P, K2, nK2, dim, norm);
-    fim_t * F3 = fim_shiftdim(F2);
+    fimo * F3 = fim_shiftdim(F2);
     fim_free(F2->V);
     fim_free(F2);
     fim_convn1(F3->V, F3->M, F3->N, F3->P, K3, nK3, dim, norm);
-    fim_t * F4 = fim_shiftdim(F3);
+    fimo * F4 = fim_shiftdim(F3);
     fim_free(F3->V);
     fim_free(F3);
     float * out = F4->V;
@@ -3297,61 +3297,61 @@ float * fim_LoG_S2(const float * V0, const size_t M, const size_t N, const size_
     /* Lateral filters */
     size_t nlG = 0;
     float * _lG = gaussian_kernel(sigmaxy, &nlG);
-    fim_t * lG = fim_wrap_array(_lG, nlG, 1, 1);
+    fimo * lG = fim_wrap_array(_lG, nlG, 1, 1);
     size_t nl2;
     float * _l2 = gaussian_kernel_d2(sigmaxy, &nl2);
     flip_sign(_l2, nl2);
-    fim_t * l2 = fim_wrap_array(_l2, nl2, 1, 1);
+    fimo * l2 = fim_wrap_array(_l2, nl2, 1, 1);
 
     /* 2D */
     if(P == 1)
     {
-        assert(fimt_nel(lG) > 1);
-        assert(fimt_nel(l2) > 1);
+        assert(fimo_nel(lG) > 1);
+        assert(fimo_nel(l2) > 1);
 
         printf("2D path\n");
         /** Gaussian, Laplacian **/
-        fim_t * GI = fim_image_from_array(V0, M, N, P);
-        fimt_conv1_x(GI, lG, bc);
-        fim_t * GL = fim_shiftdim2(GI);
+        fimo * GI = fim_image_from_array(V0, M, N, P);
+        fimo_conv1_x(GI, lG, bc);
+        fimo * GL = fim_shiftdim2(GI);
         assert(GL->P == 1);
         fim_free(GI);
-        fimt_conv1_x(GL, l2, bc);
+        fimo_conv1_x(GL, l2, bc);
 
         /** Laplacian, Gaussian **/
-        fim_t * LI = fim_image_from_array(V0, M, N, P);
-        fimt_conv1_x(LI, l2, bc);
+        fimo * LI = fim_image_from_array(V0, M, N, P);
+        fimo_conv1_x(LI, l2, bc);
         assert(LI->P == 1);
-        fim_t * LG = fim_shiftdim2(LI);
+        fimo * LG = fim_shiftdim2(LI);
         fim_free(LI);
-        fimt_conv1_x(LG, lG, bc);
+        fimo_conv1_x(LG, lG, bc);
 
         /* Free filters */
-        fimt_free(lG);
-        fimt_free(l2);
+        fimo_free(lG);
+        fimo_free(l2);
 
         /* Add together filter responses */
-        fim_t * LoG = GL;
+        fimo * LoG = GL;
         GL = NULL;
-        fimt_add(LoG, LG);
-        fimt_free(LG);
+        fimo_add(LoG, LG);
+        fimo_free(LG);
 
         /* Shift back */
-        fim_t * result = fim_shiftdim2(LoG);
+        fimo * result = fim_shiftdim2(LoG);
 
-        fimt_free(LoG);
+        fimo_free(LoG);
         /* And we are done */
 
         float * pLoG = result->V;
 
         result->V = NULL;
-        fimt_free(result);
+        fimo_free(result);
         return pLoG;
     }
 
     /* Axial filters */
-    fim_t * aG = NULL;
-    fim_t * a2 = NULL;
+    fimo * aG = NULL;
+    fimo * a2 = NULL;
 
     {
         size_t naG = 0;
@@ -3367,57 +3367,57 @@ float * fim_LoG_S2(const float * V0, const size_t M, const size_t N, const size_
     if(P > 1)
     {
         /** First dimension -> GII, LII */
-        fim_t * GII = fim_image_from_array(V0, M, N, P);
-        fimt_conv1_x(GII, lG, bc);
+        fimo * GII = fim_image_from_array(V0, M, N, P);
+        fimo_conv1_x(GII, lG, bc);
 
-        fim_t * LII = fim_image_from_array(V0, M, N, P);
-        fimt_conv1_x(LII, l2, bc);
+        fimo * LII = fim_image_from_array(V0, M, N, P);
+        fimo_conv1_x(LII, l2, bc);
 
         /** 2nd dimension -> GGI, GLI, LGI */
         /* Prepare buffers */
-        fim_t * GGI = fim_shiftdim(GII);
-        fimt_free(GII);
-        fim_t * GLI = fimt_copy(GGI);
-        fim_t * LGI = fim_shiftdim(LII);
-        fimt_free(LII);
+        fimo * GGI = fim_shiftdim(GII);
+        fimo_free(GII);
+        fimo * GLI = fimo_copy(GGI);
+        fimo * LGI = fim_shiftdim(LII);
+        fimo_free(LII);
         /* Apply filters */
-        fimt_conv1_x(GGI, lG, bc);
-        fimt_conv1_x(GLI, l2, bc);
-        fimt_conv1_x(LGI, lG, bc);
+        fimo_conv1_x(GGI, lG, bc);
+        fimo_conv1_x(GLI, l2, bc);
+        fimo_conv1_x(LGI, lG, bc);
 
         /** 3rd dimension -> GGL, GLG, LGG */
-        fim_t * GGL = fim_shiftdim(GGI);
-        fimt_free(GGI);
-        fim_t * GLG = fim_shiftdim(GLI);
-        fimt_free(GLI);
-        fim_t * LGG = fim_shiftdim(LGI);
-        fimt_free(LGI);
+        fimo * GGL = fim_shiftdim(GGI);
+        fimo_free(GGI);
+        fimo * GLG = fim_shiftdim(GLI);
+        fimo_free(GLI);
+        fimo * LGG = fim_shiftdim(LGI);
+        fimo_free(LGI);
 
-        fimt_conv1_x(GGL, a2, bc);
-        fimt_conv1_x(GLG, aG, bc);
-        fimt_conv1_x(LGG, aG, bc);
+        fimo_conv1_x(GGL, a2, bc);
+        fimo_conv1_x(GLG, aG, bc);
+        fimo_conv1_x(LGG, aG, bc);
 
         /* Free the filters */
-        fimt_free(lG);
-        fimt_free(l2);
-        fimt_free(aG);
-        fimt_free(a2);
+        fimo_free(lG);
+        fimo_free(l2);
+        fimo_free(aG);
+        fimo_free(a2);
 
         /** Merge results */
-        fim_t * LoG = GGL;
+        fimo * LoG = GGL;
         GGL = NULL;
-        fimt_add(LoG, GLG);
-        fimt_free(GLG);
-        fimt_add(LoG, LGG);
-        fimt_free(LGG);
+        fimo_add(LoG, GLG);
+        fimo_free(GLG);
+        fimo_add(LoG, LGG);
+        fimo_free(LGG);
 
         /** Shift back to original shape */
-        fim_t * result = fim_shiftdim(LoG);
-        fimt_free(LoG);
+        fimo * result = fim_shiftdim(LoG);
+        fimo_free(LoG);
 
         float * pLoG = result->V;
         result->V = NULL;
-        fimt_free(result);
+        fimo_free(result);
         return pLoG;
     }
 
@@ -3426,12 +3426,12 @@ float * fim_LoG_S2(const float * V0, const size_t M, const size_t N, const size_
 
 
 /* Parital derivative in dimension dim */
-fim_t * fimt_partial(const fim_t * F, const int dim, const float sigma)
+fimo * fimo_partial(const fimo * F, const int dim, const float sigma)
 {
 
     if(F->P != 1)
     {
-        fprintf(stderr, "fimt_partial only supports 2D images (please fix me)\n");
+        fprintf(stderr, "fimo_partial only supports 2D images (please fix me)\n");
         exit(EXIT_FAILURE);
     }
 
@@ -3441,7 +3441,7 @@ fim_t * fimt_partial(const fim_t * F, const int dim, const float sigma)
     float * D1 = gaussian_kernel_d1(sigma, &nD1);
 
 
-    fim_t * D = fimt_copy(F);
+    fimo * D = fimo_copy(F);
     if(dim == 0)
     {
         fim_convn1(D->V, D->M, D->N, D->P, D1, nD1, 0, 0);
@@ -3459,7 +3459,7 @@ fim_t * fimt_partial(const fim_t * F, const int dim, const float sigma)
         return D;
     }
 
-    fprintf(stderr, "Something went wrong in fimt_partial dim=%d\n", dim);
+    fprintf(stderr, "Something went wrong in fimo_partial dim=%d\n", dim);
     exit(EXIT_FAILURE);
 
 
@@ -3557,7 +3557,7 @@ float * fim_LoG(const float * V, const size_t M, const size_t N, const size_t P,
     return LoG;
 }
 
-double * fim_get_line_double(fim_t * I,
+double * fim_get_line_double(fimo * I,
                              int x, int y, int z,
                              int dim, int nPix)
 {
@@ -3601,7 +3601,7 @@ double * fim_get_line_double(fim_t * I,
     return L;
 }
 
-fim_t * fim_shiftdim2(const fim_t * restrict I)
+fimo * fim_shiftdim2(const fimo * restrict I)
 {
     const float * V = I->V;
     const size_t M = I->M;
@@ -3609,7 +3609,7 @@ fim_t * fim_shiftdim2(const fim_t * restrict I)
     const size_t P = I->P;
     assert(P == 1);
     /* Output image */
-    fim_t * O = malloc(sizeof(fim_t));
+    fimo * O = malloc(sizeof(fimo));
     assert(O != NULL);
     O->V = fim_malloc(M*N*P*sizeof(float));
     O->M = N;
@@ -3646,7 +3646,7 @@ fim_t * fim_shiftdim2(const fim_t * restrict I)
     return O;
 }
 
-fim_t * fim_shiftdim(const fim_t * restrict I)
+fimo * fim_shiftdim(const fimo * restrict I)
 {
     const float * V = I->V;
     const size_t M = I->M;
@@ -3654,7 +3654,7 @@ fim_t * fim_shiftdim(const fim_t * restrict I)
     const size_t P = I->P;
 
     /* Output image */
-    fim_t * O = malloc(sizeof(fim_t));
+    fimo * O = malloc(sizeof(fimo));
     assert(O != NULL);
     O->V = fim_malloc(M*N*P*sizeof(float));
 
@@ -3713,10 +3713,10 @@ static float eig_sym_22_2nd(float a, float b, float c)
 
 static float total_gm(const float * I0, size_t M, size_t N, float sigma)
 {
-    fim_t * I = fim_image_from_array(I0, M, N, 1);
-    fim_t * dx = fimt_partial(I, 0, sigma);
-    fim_t * dy = fimt_partial(I, 1, sigma);
-    fimt_free(I);
+    fimo * I = fim_image_from_array(I0, M, N, 1);
+    fimo * dx = fimo_partial(I, 0, sigma);
+    fimo * dy = fimo_partial(I, 1, sigma);
+    fimo_free(I);
 
     double gm = 0;
     for(size_t kk = 0; kk<M*N; kk++)
@@ -3724,12 +3724,12 @@ static float total_gm(const float * I0, size_t M, size_t N, float sigma)
         gm += sqrt( pow(dx->V[kk], 2) + pow(dy->V[kk], 2));
     }
 
-    fimt_free(dx);
-    fimt_free(dy);
+    fimo_free(dx);
+    fimo_free(dy);
     return (float) gm;
 }
 
-float * fim_focus_gm(const fim_t * I, float sigma)
+float * fim_focus_gm(const fimo * I, float sigma)
 {
     float * gm = malloc(I->P*sizeof(float));
     assert(gm != NULL);
@@ -3740,7 +3740,7 @@ float * fim_focus_gm(const fim_t * I, float sigma)
     return gm;
 }
 
-ftab_t * fim_features_2d(const fim_t * fI)
+ftab_t * fim_features_2d(const fimo * fI)
 {
     int debug = 0; /* Write out the features  */
     const char debug_image_name[] = "fim_features_2d_debug_image.tif";
@@ -3789,15 +3789,15 @@ ftab_t * fim_features_2d(const fim_t * fI)
         float sigma = sigmas[ss];
         printf("%f ", sigma); fflush(stdout);
 
-        fim_t * G = fimt_copy(fI);
+        fimo * G = fimo_copy(fI);
 
         fim_gsmooth(G->V, M, N, P, sigma);
 
-        fim_t * dx = fimt_partial(fI, 0, sigma);
-        fim_t * dy = fimt_partial(fI, 1, sigma);
-        fim_t * ddx = fimt_partial(dx, 0, sigma);
-        fim_t * ddy = fimt_partial(dy, 1, sigma);
-        fim_t * dxdy = fimt_partial(dx, 1, sigma);
+        fimo * dx = fimo_partial(fI, 0, sigma);
+        fimo * dy = fimo_partial(fI, 1, sigma);
+        fimo * ddx = fimo_partial(dx, 0, sigma);
+        fimo * ddy = fimo_partial(dy, 1, sigma);
+        fimo * dxdy = fimo_partial(dx, 1, sigma);
 
         float * value = G->V;
         /* Gaussian, 1f */
@@ -3878,12 +3878,12 @@ ftab_t * fim_features_2d(const fim_t * fI)
         debug == 1 ? memcpy(debug_image + M*N*col, value, M*N*sizeof(float)) : 0;
         sprintf(sbuff, "s%.1f_HE_EV_2", sigma);
         ftab_set_colname(T, col++, sbuff);
-        fimt_free(dx);
-        fimt_free(dy);
-        fimt_free(ddx);
-        fimt_free(ddy);
-        fimt_free(dxdy);
-        fimt_free(G);
+        fimo_free(dx);
+        fimo_free(dy);
+        fimo_free(ddx);
+        fimo_free(ddy);
+        fimo_free(dxdy);
+        fimo_free(G);
     }
     free(sbuff); /* Free string buffer */
     printf("\n");
@@ -3915,7 +3915,7 @@ void fim_features_2d_ut()
 
     float * V = fim_tiff_read(file, NULL, &M, &N, &P, 0);
     printf("%s is %" PRId64 " %" PRId64 " %" PRId64 " image\n", file, M, N, P);
-    fim_t * I = malloc(sizeof(fim_t));
+    fimo * I = malloc(sizeof(fimo));
     assert(I != NULL);
     I->V = V;
     I->M = M;
@@ -3925,7 +3925,7 @@ void fim_features_2d_ut()
     T->nrow = 10;
     ftab_print(stdout, T, ",");
     ftab_free(T);
-    fimt_free(I);
+    fimo_free(I);
 }
 
 
@@ -4178,9 +4178,9 @@ void fim_ut()
     myfftw_stop();
 }
 
-fim_t * fimt_transpose(const fim_t * restrict A)
+fimo * fimo_transpose(const fimo * restrict A)
 {
-    fim_t * B = fimt_copy(A);
+    fimo * B = fimo_copy(A);
     size_t M = A->M;
     size_t N = A->N;
     size_t P = A->P;
@@ -4203,12 +4203,12 @@ fim_t * fimt_transpose(const fim_t * restrict A)
     return B;
 }
 
-int fimt_tiff_write(const fim_t * I, const char * fName)
+int fimo_tiff_write(const fimo * I, const char * fName)
 {
     return fim_tiff_write_float(fName, I->V, NULL, I->M, I->N, I->P);
 }
 
-void fimt_blit_2D(fim_t * A, const fim_t * B, size_t x0, size_t y0)
+void fimo_blit_2D(fimo * A, const fimo * B, size_t x0, size_t y0)
 {
     assert(A != NULL);
     assert(B != NULL);

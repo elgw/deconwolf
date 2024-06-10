@@ -212,7 +212,7 @@ static void argparsing(int argc, char ** argv, opts * s)
 }
 
 
-cairo_surface_t * fim_to_cairo_surface(fim_t * I,
+cairo_surface_t * fim_to_cairo_surface(fimo * I,
                                              float low, float high)
 {
     cairo_surface_t * result;
@@ -247,11 +247,11 @@ cairo_surface_t * fim_to_cairo_surface(fim_t * I,
     return result;
 }
 
-void render(opts * s, const fim_t * I, ftab_t * T)
+void render(opts * s, const fimo * I, ftab_t * T)
 {
     printf("Creating max projection\n");
     float * m = fim_maxproj(I->V, I->M, I->N, I->P);
-    fim_t * M = fim_image_from_array(m, I->M, I->N, 1);
+    fimo * M = fim_image_from_array(m, I->M, I->N, 1);
     free(m);
 
     if(s->lsigma > 0)
@@ -465,7 +465,7 @@ int dw_render(int argc, char ** argv)
 
     int64_t M = 0, N = 0, P = 0;
     float * A = fim_tiff_read(inFile, NULL, &M, &N, &P, s->verbose);
-    fim_t * I = fim_image_from_array(A, M, N, P);
+    fimo * I = fim_image_from_array(A, M, N, P);
     free(A);
 
     ftab_t * T = NULL;
