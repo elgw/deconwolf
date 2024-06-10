@@ -1,7 +1,8 @@
 # CHANGELOG
 
 ## 0.4.1
-- Fixes [issue #62](https://github.com/elgw/deconwolf/issues/62).
+- Fixes the GPU memory leak reported in [issue
+  #62](https://github.com/elgw/deconwolf/issues/62).
 
 ## 0.4.0
 
