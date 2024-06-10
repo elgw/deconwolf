@@ -264,6 +264,8 @@ float * deconvolve_shb_cl2(float * restrict im,
     /* Set up the kernels defined in this function */
     clu_prepare_kernels(clu, M, N, P, wM, wN, wP);
 
+
+
     if(0){
         printf("WARNING: Tests enabled\n");
 
@@ -416,6 +418,8 @@ float * deconvolve_shb_cl2(float * restrict im,
 
     putdot(s);
 
+
+
     /* Create W_gpu that contains the weights used for the
        boundary handling  */
 
@@ -440,6 +444,8 @@ float * deconvolve_shb_cl2(float * restrict im,
 
     if(s->start_condition == DW_START_FLAT)
     {
+        if(s->verbosity > 1)
+        { printf("Start guess: FLAT\n");}
         float sumg = fim_sum(im, M*N*P);
         float * x = fim_constant(wMNP, sumg / (float) wMNP);
         assert(x != NULL);
@@ -451,6 +457,8 @@ float * deconvolve_shb_cl2(float * restrict im,
 
     if(s->start_condition == DW_START_IDENTITY)
     {
+        if(s->verbosity > 1)
+        { printf("Start guess: IDENTITY\n");}
         float * im_full = fim_malloc(wMNP*sizeof(float));
         memset(im_full, 0, wMNP*sizeof(float));
         /* Insert the psf into the bigger Z */
@@ -463,6 +471,8 @@ float * deconvolve_shb_cl2(float * restrict im,
 
     if(s->start_condition == DW_START_LP)
     {
+        if(s->verbosity > 1)
+        { printf("Start guess: LP filtered\n");}
         float * im_lp = fim_copy(im, M*N*P);
         fim_gsmooth(im_lp, M, N, P, 8);
 
@@ -477,8 +487,7 @@ float * deconvolve_shb_cl2(float * restrict im,
     }
 
 
-    if(s->verbosity > 0)
-    {
+    if(s->verbosity > 0) {
         printf("Iterating "); fflush(stdout);
     }
 
@@ -497,6 +506,7 @@ float * deconvolve_shb_cl2(float * restrict im,
          *  p[kk] = x[kk] + alpha*(x[kk]-xp[kk]); */
 
         p_gpu = fimcl_new(clu, fimcl_real, NULL, wM, wN, wP);
+        // p_gpu is freeed inside of iter_shb_cl2
 
         fimcl_shb_update(p_gpu, x_gpu, xp_gpu, alpha);
         fimcl_positivity(p_gpu, s->bg);
@@ -508,9 +518,10 @@ float * deconvolve_shb_cl2(float * restrict im,
                 &xp_gpu, // xp is updated to the next guess
                 im_gpu,
                 fft_PSF_gpu, // FFT of PSF
-                p_gpu, // Current guess
+                p_gpu, // Current guess, will be released
                 W_gpu, // Weights (to handle boundaries)
                 s);
+        p_gpu = NULL;
 
         here();
 
@@ -527,6 +538,7 @@ float * deconvolve_shb_cl2(float * restrict im,
         // benchmark_write(s, it->iter, it->error, x, M, N, P, wM, wN, wP);
         here();
     } /* End of main loop */
+
     dw_iterator_free(it);
     here();
     fimcl_free(fft_PSF_gpu);
@@ -540,19 +552,29 @@ float * deconvolve_shb_cl2(float * restrict im,
         x_gpu = xp_gpu;
         xp_gpu = t;
     }
-    here();
+    fimcl_free(xp_gpu);
+    xp_gpu = NULL;
 
+    here();
+    if(W_gpu != NULL) {
+        fimcl_free(W_gpu);
+    }
+
+    W_gpu = NULL;
     if(s->verbosity > 0) {
         printf("\n");
     }
 
     float * out_full = fimcl_download(x_gpu);
     fimcl_free(x_gpu);
+    x_gpu = NULL;
+
     if(s->fulldump)
     {
         printf("Dumping to fulldump.tif\n");
         fim_tiff_write("fulldump.tif", out_full, NULL, wM, wN, wP);
     }
+
     here();
 
     float * out = fim_subregion(out_full, wM, wN, wP, M, N, P);

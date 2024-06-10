@@ -1,4 +1,4 @@
-DECONWOLF(1)											   DECONWOLF(1)
+DECONWOLF(1)												       DECONWOLF(1)
 
 NAME
        dw_bw is a tool to generate Point Spread Functions according to the Born-Wolf model.
@@ -21,11 +21,11 @@ OPTIONS
 	      Set the pixel size/distance between planes in the axial direction.
 
        --size N
-	      Set  output size to N x N x P [pixels].  This should be set big enough so that the PSF cone isn’t
-	      cropped at the first and last slice of the PSF.
+	      Set  output  size to N x N x P [pixels].	This should be set big enough so that the PSF cone isn’t cropped at
+	      the first and last slice of the PSF.
 
-       P      Set output size to N x N x P [pixels].  P has to be an odd number.  Please not that P  should  be
-	      at least (2Z-1) where Z is the number of slices in the image to be deconvolved
+       P      Set output size to N x N x P [pixels].  P has to be an odd number.  Please not that  P  should  be  at  least
+	      (2Z-1) where Z is the number of slices in the image to be deconvolved
 
        --threads t
 	      Set the number of computational threads to use.
@@ -33,8 +33,8 @@ OPTIONS
        --overwrite
 	      Overwrite the target if it exists.
 
-       --li   Use  Li’s	 method	 (our implementation) for the BW integral.  About 2x faster for the default PSF
-	      size.  Not thoroughly tested.
+       --li   Use  Li’s	 method	 (our  implementation) for the BW integral.  About 2x faster for the default PSF size.	Not
+	      thoroughly tested.
 
        --version, -V
 	      Show version information and quit.
@@ -62,11 +62,11 @@ REPORTING BUGS
        Please report bugs at <https://github.com/elgw/deconwolf/issues/>
 
 COPYRIGHT
-       Copyright © 2022 Erik Wernersson.  License GPLv3+: GNU GPL version 3 or	later  <https://gnu.org/licens‐
-       es/gpl.html>.  This is free software: you are free to change and redistribute it.  There is NO WARRANTY,
-       to the extent permitted by law.
+       Copyright © 2022 Erik Wernersson.  License GPLv3+: GNU GPL version 3 or	later  <https://gnu.org/licenses/gpl.html>.
+       This is free software: you are free to change and redistribute it.  There is NO WARRANTY, to the extent permitted by
+       law.
 
 AUTHORS
        Erik Wernersson.
 
-dw_bw 0.2.2					      2022					   DECONWOLF(1)
+dw_bw 0.4.1						    2022					       DECONWOLF(1)

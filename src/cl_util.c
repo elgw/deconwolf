@@ -56,6 +56,30 @@ static size_t padsize(size_t M)
     return M+1;
 }
 
+/** Instead of bare clReleaseMemObject
+ * since clReleaseMemObject only decrease the reference count,
+ * we check that there is only one reference available, else
+ * the object will not be freed and we have to figure out
+ * what else uses the mem object  (or decrease the reference count again)
+ * We must also check that clReleaseProgram is used and as a worst case
+ * also call clReleaseContext
+ * missing clReleaseEvent ? -- check all cl_event ...(wait_ev)
+ * https://forums.developer.nvidia.com/t/clreleasememobject-not-working-the-clreleasememobject-function-doesnt-release-the-memory/15963/5
+ */
+static int clu_release(clu_env_t * C, cl_mem buf)
+{
+    cl_uint ref_count;
+    check_CL(
+             clGetMemObjectInfo(buf, CL_MEM_REFERENCE_COUNT,
+                                sizeof(ref_count), &ref_count, NULL));
+    if(ref_count != 1)
+    {
+        fprintf(stderr, "clu_release WARNING\n"
+                " - Object has a reference count > 1\n");
+    }
+    check_CL(clReleaseMemObject(buf));
+    C->n_release++;
+}
 
 void clu_exit_error(cl_int err,
                     const char * file,
@@ -126,6 +150,7 @@ static size_t fimcl_ncx(fimcl_t * X)
     return fimcl_hM(X)*fimcl_hN(X)*fimcl_hP(X);
 }
 
+
 float * fimcl_download(fimcl_t * gX)
 {
     here();
@@ -163,6 +188,7 @@ float * fimcl_download(fimcl_t * gX)
                                        NULL,
                                        &gX->wait_ev ));
         fimcl_sync(gX);
+
         float * X = unpad_from_inplace(PX, gX->M, gX->N, gX->P);
         fim_free(PX);
         return X;
@@ -196,6 +222,7 @@ float * fimcl_download(fimcl_t * gX)
                                        NULL,
                                        &gX->wait_ev ));
         fimcl_sync(gX);
+
         return X;
     }
     assert(0);
@@ -242,6 +269,7 @@ fimcl_t * fimcl_new(clu_env_t * clu, fimcl_type type,
                                 Y->buf_size_nf*sizeof(float),
                                 NULL, &ret );
         clu->nb_allocated += Y->buf_size_nf*sizeof(float);
+        clu->n_alloc++;
 
     check_CL(ret);
 
@@ -270,6 +298,7 @@ fimcl_t * fimcl_new(clu_env_t * clu, fimcl_type type,
                                         NULL,
                                         &Y->wait_ev ) );
         fimcl_sync(Y);
+
         fim_free(PX);
     }
 
@@ -308,6 +337,7 @@ fimcl_t * fimcl_copy(fimcl_t * G)
                                  0, //cl_uint num_events_in_wait_list,
                                  NULL, //const cl_event* event_wait_list,
                                  &H->wait_ev)); //cl_event* event);
+    fimcl_sync(H);
 
     H->buf_size_nf = G->buf_size_nf;
     assert(H->buf_size_nf == padsize(G->M)*G->N*G->P);
@@ -316,10 +346,14 @@ fimcl_t * fimcl_copy(fimcl_t * G)
 
 void fimcl_free(fimcl_t * G)
 {
-    assert(G != NULL);
+    if(G == NULL)
+    {
+        fprintf(stderr, "Warning: fimcl_free(NULL);\n");
+        return;
+    }
+
     fimcl_sync(G);
-    check_CL(clReleaseMemObject(G->buf));
-    G->clu->n_release++;
+    clu_release(G->clu, G->buf);
     free(G);
 }
 
@@ -411,6 +445,7 @@ void fimcl_sync(fimcl_t * X)
         return;
     }
     check_CL( clu_wait_for_event(X->wait_ev, 10000));
+    clReleaseEvent(X->wait_ev);
     X->wait_ev = NULL;
 
     clFinish(X->clu->command_queue);
@@ -844,6 +879,7 @@ fimcl_t * fimcl_ifft(fimcl_t * fX)
                             NULL, &ret );
     X->buf_size_nf = padsize(fX->M)*fX->N*fX->P;
     fX->clu->nb_allocated += fX->M*fX->N*fX->P*sizeof(float);
+    fX->clu->n_alloc++;
     check_CL(ret);
 
     /* And back again */
@@ -961,6 +997,7 @@ fimcl_t * fimcl_fft(fimcl_t * X)
                              fX->buf_size_nf *  sizeof(float),
                              NULL, &ret );
     X->clu->nb_allocated += fX->buf_size_nf *  sizeof(float);
+    X->clu->n_alloc++;
     check_CL(ret);
 
 
@@ -1478,6 +1515,8 @@ void clu_prepare_kernels(clu_env_t * clu,
                                     sizeof(float),
                                     NULL, &status);
     check_CL(status);
+    clu->n_alloc++;
+
     check_CL( clEnqueueWriteBuffer( clu->command_queue,
                                     clu->float_gpu,
                                     CL_TRUE,
@@ -1485,7 +1524,7 @@ void clu_prepare_kernels(clu_env_t * clu,
                                     sizeof(float),
                                     &value,
                                     0, NULL, NULL));
-    clu->n_alloc++;
+
 
 
 #ifdef VKFFT
@@ -1496,7 +1535,10 @@ void clu_prepare_kernels(clu_env_t * clu,
     {
         if(clu->verbose > 0)
         {
-            printf("Warning: could not determine your home directory\n");
+            printf("Warning: Will write the VkFFT configuration in the current folder.\n");
+            if(clu->verbose > 1) {
+                printf("Reason: Can not determine a suitable folder under Windows.\n");
+            }
         }
         vkfft_cache_file_name = malloc(1024);
         sprintf(vkfft_cache_file_name, "VkFFT_kernelCache_%zux%zux%zu.binary",
@@ -1638,15 +1680,15 @@ void clu_destroy(clu_env_t * clu)
         /* Free memory */
         if(clu->clfft_buffer_size > 0)
         {
-            check_CL(clReleaseMemObject(clu->clfft_buffer));
-        }
-
-        if(clu->float_gpu != NULL)
-        {
-            check_CL(clReleaseMemObject(clu->float_gpu));
+            clu_release(clu, clu->clfft_buffer);
         }
     }
 #endif
+
+    if(clu->float_gpu != NULL)
+    {
+        clu_release(clu, clu->float_gpu);
+    }
 
     /* Clear up the OpenCL stuff */
     check_CL(clFlush(clu->command_queue));
@@ -1667,10 +1709,17 @@ void clu_destroy(clu_env_t * clu)
 
     clu_kernel_destroy(*clu->update_y_kernel);
 
+    check_CL(clFinish(clu->command_queue));
     check_CL(clReleaseCommandQueue(clu->command_queue) );
     check_CL(clReleaseContext(clu->context));
 
 
+    if(clu->n_alloc != clu->n_release)
+    {
+        fprintf(stderr, "clu_destroy warning: allocated: %zu, released: %zu\n",
+                clu->n_alloc, clu->n_release);
+        fprintf(stderr, "This indicates a potential memory leak on the GPU.\n");
+    }
 
     free(clu);
     return;
@@ -1716,6 +1765,7 @@ clu_kernel_t * clu_kernel_newa(clu_env_t * env,
     }
 
     assert(source_str != NULL);
+    //printf("1 clCreateProgram\n");
     clk->program = clCreateProgramWithSource(env->context, 1,
                                              (const char **) &source_str,
                                              (const size_t *) &source_size,
@@ -1786,6 +1836,7 @@ void clu_kernel_destroy(clu_kernel_t kern)
 {
     check_CL( clReleaseKernel(kern.kernel));
     check_CL( clReleaseProgram(kern.program));
+    //printf("1 clReleaseProgram\n");
     return;
 }
 
@@ -2044,13 +2095,14 @@ cl_int clu_increase_clfft_buffer(clu_env_t * clu, size_t req_size)
     if(clu->clfft_buffer_size > 0)
     {
         /* If there was already a smaller buffer allocated */
-        check_CL(clReleaseMemObject( clu->clfft_buffer));
+        clu_release(clu, clu->clfft_buffer);
     }
     clu->clfft_buffer = clCreateBuffer(clu->context,
                                        CL_MEM_READ_WRITE,
                                        req_size,
                                        NULL, &ret );
     clu->nb_allocated += req_size;
+    clu->n_alloc++;
     check_CL(ret);
     clu->clfft_buffer_size = req_size;
 
@@ -2192,6 +2244,7 @@ void clu_benchmark_transfer(clu_env_t * clu)
                                     buf_size_nf*sizeof(float),
                                     NULL, &ret );
     clu->nb_allocated += buf_size_nf*sizeof(float);
+    clu->n_alloc++;
     check_CL(ret);
     dw_gettime(&t0);
     check_CL( clEnqueueWriteBuffer( clu->command_queue,
@@ -2227,7 +2280,7 @@ void clu_benchmark_transfer(clu_env_t * clu)
 
     fim_free(buf);
     fim_free(buf_copy);
-    check_CL(clReleaseMemObject(buf_gpu));
+    clu_release(clu, buf_gpu);
     return;
 }
 
@@ -2357,6 +2410,8 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
                                              numWorkGroups * sizeof(float),
                                              NULL,
                                              &status );
+    forward->clu->n_alloc++;
+
     if(timers){
         dw_gettime(&t1);
     printf("Create buffer: %f \n", timespec_diff(&t1, &t0));
@@ -2415,7 +2470,8 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
     }
 
     if(timers){dw_gettime(&t0);}
-    clReleaseMemObject(partial_sums_gpu);
+    clu_release(forward->clu, partial_sums_gpu);
+
     if(timers)
     {
     dw_gettime(&t1);

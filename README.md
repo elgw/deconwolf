@@ -1,6 +1,6 @@
-# deconwolf v0.4.0
+# deconwolf v0.4.1
 
-**deconwolf** is a software for 3-D deconvolution of fluorescent wide-field
+**deconwolf**[^9] is a software for 3-D deconvolution of fluorescent wide-field
 images:
  - The deconvolved images shows very mild boundary effects which means
    that relatively small regions of interest can be used.
@@ -311,3 +311,7 @@ Commercial:
     Open-Source GPU FFT Library," in IEEE Access, vol. 11,
     pp. 12039-12058, 2023,
     [doi](https://doi.org/10.1109/ACCESS.2023.3242240)
+
+[^9]: E. Wernersson et al. "Deconwolf enables high-performance
+    deconvolution of widefield fluorescence microscopy images", in
+    Nature Methods, 2024, [doi](https://doi.org/10.1038/s41592-024-02294-7)
