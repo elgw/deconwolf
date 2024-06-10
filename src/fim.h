@@ -41,8 +41,7 @@
 #endif
 
 
-/* fim : operations on 3D floating point images
- * all allocations are done with fftw3f_malloc (for alignment)
+/* fim : operations on 3D Floating point IMages
  *
  * functions ending with `_ref` are reference implementations to be compared
  * tweaked or alternative versions.
@@ -51,12 +50,17 @@
 /* Set verbosity level, default = 0 */
 void fim_set_verbose(int);
 
+#define MAGIC_FIMO 0xFIM35555DEC04301UL
+
 typedef struct{
+    #ifndef NDEBUG
+    uint64_t magic; // TODO: set to MAGIC_FIMO
+    #endif
     float * V;
     size_t M;
     size_t N;
     size_t P;
-} fim_t;
+} fimo;
 
 /* Alignment of fim_malloc and fim_realloc, in bytes */
 
@@ -67,7 +71,7 @@ typedef struct{
 
 /** @brief Aligned allocations
  *
- * Use for images only, not for fim_t etc.
+ * Use for images only, not for fimo etc.
  * make sure to deallocate with fim_free.
  *
  * Calls exit if the allocation fails.
@@ -89,71 +93,71 @@ void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_realloc(void * p, size_t 
  */
 void fim_free(void * p);
 
-/** @brief Delete/free a fim_t object.
+/** @brief Delete/free a fimo object.
  *
- * Frees all resources associated with the fim_t object.
- * as well as the fim_t object itself.
+ * Frees all resources associated with the fimo object.
+ * as well as the fimo object itself.
  */
-void fimt_free(fim_t *);
+void fimo_free(fimo *);
 
-fim_t * fimt_zeros(size_t M, size_t N, size_t P);
+fimo * fimo_zeros(size_t M, size_t N, size_t P);
 
 /** @brief Create a new object with a copy of V
  *
  * Note: Both V and the returned object has to be freed eventually
  *
- * @return A newly allocated fim_t which contains a copy of V
+ * @return A newly allocated fimo which contains a copy of V
  *
  */
-fim_t * fim_image_from_array(const float * restrict V,
+fimo * fim_image_from_array(const float * restrict V,
                              size_t M, size_t N, size_t P);
 
-/** @brief Wrap an array by a fim_t object
+/** @brief Wrap an array by a fimo object
  *
  * This creates a pointer to the data, not a copy.
  *
 */
-fim_t * fim_wrap_array(float * V, size_t M, size_t N, size_t P);
+fimo * fim_wrap_array(float * V, size_t M, size_t N, size_t P);
 
 /* Return a new copy */
-fim_t * fimt_copy(const fim_t * );
+fimo * fimo_copy(const fimo * );
 
 /* Extract a line centered at (x, y, z) with nPix pixels along dimension dim */
-double * fim_get_line_double(fim_t * Im,
+double * fim_get_line_double(fimo * Im,
                              int x, int y, int z,
                              int dim, int nPix);
 
 /* Similar to MATLABs shiftfim, [M,N,P] -> [N,P,M] */
-fim_t * fim_shiftdim(const fim_t * restrict );
+fimo * fim_shiftdim(const fimo * restrict );
 
 /* Similar to MATLABs shiftfim, [M,N] -> [N,M] */
-fim_t * fim_shiftdim2(const fim_t * restrict );
+fimo * fim_shiftdim2(const fimo * restrict );
 
 
 /* [M, N, P] -> [N, M, P] */
-fim_t * fimt_transpose(const fim_t * restrict);
+fimo * fimo_transpose(const fimo * restrict);
 
 /* Partial derivative along dimension dim */
-fim_t * fimt_partial(const fim_t *, int dim, float sigma);
+fimo * fimo_partial(const fimo *, int dim, float sigma);
 
 /* Features for 2D image classification
  * the input image should be 2D.
  * Uses similar features a Ilastic
  * Returns one row per pixel
  */
-ftab_t * fim_features_2d(const fim_t *);
+ftab_t * fim_features_2d(const fimo *);
 
 /* Return a I->P long vector with the integral
  * gradient magnitude per slice in I */
-float * fim_focus_gm(const fim_t * image, float sigma);
+float * fim_focus_gm(const fimo * image, float sigma);
 
 /* Number of elements */
-size_t fimt_nel(fim_t * );
+size_t fimo_nel(fimo * );
 /* Sum of elements */
-float fimt_sum(fim_t * );
+float fimo_sum(fimo * );
 
 /*
- * API not using fim_t
+ * API not using fimo
  */
 
 float fim_min(const float * restrict A, size_t N);
@@ -164,7 +168,7 @@ float fim_sum(const float * restrict A, size_t N);
 /* Standard deviation, normalizing by (N-1) */
 float fim_std(const float * V, size_t N);
 
-fim_t * fimt_maxproj(const fim_t * Im);
+fimo * fimo_maxproj(const fimo * Im);
 
 float * fim_maxproj(const float * A, size_t M, size_t N, size_t P);
 
@@ -193,7 +197,7 @@ void fim_add(float * restrict A,
              size_t N);
 
 /* A[kk] += B[kk] */
-void fimt_add(fim_t * A, const fim_t * B);
+void fimo_add(fimo * A, const fimo * B);
 
 void fim_invert(float * restrict A, const size_t N);
 
@@ -490,11 +494,11 @@ float * fim_LoG_S2(const float * V0, const size_t M, const size_t N, const size_
                    const float sigmaxy, const float sigmaz);
 
 /* Simple interface to write 2D or 3D images without any meta data */
-int fimt_tiff_write(const fim_t * Im, const char * fName);
+int fimo_tiff_write(const fimo * Im, const char * fName);
 
 
 /* Insert into B into A, with upper left corner at x0, y0 */
-void fimt_blit_2D(fim_t * A, const fim_t * B, size_t x0, size_t y0);
+void fimo_blit_2D(fimo * A, const fimo * B, size_t x0, size_t y0);
 
 /**  Anscombe transform and inverse.
  *

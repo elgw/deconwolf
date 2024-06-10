@@ -545,14 +545,14 @@ static void downsample_integrate(float * A, float * B, int nA, int nB)
     free(K);
 }
 
-fim_t * gen_psf(opts * s, double lambda)
+fimo * gen_psf(opts * s, double lambda)
     {
     if(s->verbose > 2) { printf("Allocating for output\n"); fflush(stdout); }
 
     double optical_dx = s->optical.dx/s->oversampling;
 
     fim_tiff_init();
-    fim_t * PSF = fimt_zeros(s->M*s->oversampling, s->M*s->oversampling, s->P);
+    fimo * PSF = fimo_zeros(s->M*s->oversampling, s->M*s->oversampling, s->P);
 
     double Fs = 1/optical_dx;
     double Fn = Fs/2;
@@ -765,7 +765,7 @@ static float * conv2d_float(float * A, float * B,
 }
 
 
-static void pinhole_convolution(opts * s, fim_t * PSF)
+static void pinhole_convolution(opts * s, fimo * PSF)
 {
     /* Convolve PSF by a square filter. The specified pinhole is the
        diameter. */
@@ -840,7 +840,7 @@ static void dw_psf(opts * s)
         printf("Calculating emission PSF\n");
     }
 
-    fim_t * PSF = gen_psf(s, s->optical.lambda);
+    fimo * PSF = gen_psf(s, s->optical.lambda);
     if(s->optical.lambda2 != 0)
     {
         /* We will generate a PSF for a confocal microscope with
@@ -855,13 +855,13 @@ static void dw_psf(opts * s)
         {
             printf("Calculating excitation PSF\n");
         }
-        fim_t * PSF2 = gen_psf(s, s->optical.lambda2);
+        fimo * PSF2 = gen_psf(s, s->optical.lambda2);
         //printf("Multiplying PSFs\n");
-        for(size_t kk = 0; kk<fimt_nel(PSF); kk++)
+        for(size_t kk = 0; kk<fimo_nel(PSF); kk++)
         {
             PSF->V[kk] *= PSF2->V[kk];
         }
-        fimt_free(PSF2);
+        fimo_free(PSF2);
     }
 
 
@@ -869,8 +869,8 @@ static void dw_psf(opts * s)
     {
         printf("Writing to %s\n", s->outfile);
     }
-    float sum = fimt_sum(PSF);
-    fim_mult_scalar(PSF->V, fimt_nel(PSF), 1.0/sum);
+    float sum = fimo_sum(PSF);
+    fim_mult_scalar(PSF->V, fimo_nel(PSF), 1.0/sum);
 
     ttags * T = ttags_new();
     char * swstring = malloc(1024);
@@ -886,7 +886,7 @@ static void dw_psf(opts * s)
                          T,
                          PSF->M, PSF->N, PSF->P);
     ttags_free(&T);
-    fimt_free(PSF);
+    fimo_free(PSF);
 }
 
 int dw_psf_cli(int argc, char ** argv)
