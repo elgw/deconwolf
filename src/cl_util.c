@@ -63,6 +63,7 @@ static size_t padsize(size_t M)
  * what else uses the mem object  (or decrease the reference count again)
  * We must also check that clReleaseProgram is used and as a worst case
  * also call clReleaseContext
+ * missing clReleaseEvent ? -- check all cl_event ...(wait_ev)
  * https://forums.developer.nvidia.com/t/clreleasememobject-not-working-the-clreleasememobject-function-doesnt-release-the-memory/15963/5
  */
 static int clu_release(clu_env_t * C, cl_mem buf)
@@ -187,6 +188,7 @@ float * fimcl_download(fimcl_t * gX)
                                        NULL,
                                        &gX->wait_ev ));
         fimcl_sync(gX);
+
         float * X = unpad_from_inplace(PX, gX->M, gX->N, gX->P);
         fim_free(PX);
         return X;
@@ -220,6 +222,7 @@ float * fimcl_download(fimcl_t * gX)
                                        NULL,
                                        &gX->wait_ev ));
         fimcl_sync(gX);
+
         return X;
     }
     assert(0);
@@ -295,6 +298,7 @@ fimcl_t * fimcl_new(clu_env_t * clu, fimcl_type type,
                                         NULL,
                                         &Y->wait_ev ) );
         fimcl_sync(Y);
+
         fim_free(PX);
     }
 
@@ -333,6 +337,7 @@ fimcl_t * fimcl_copy(fimcl_t * G)
                                  0, //cl_uint num_events_in_wait_list,
                                  NULL, //const cl_event* event_wait_list,
                                  &H->wait_ev)); //cl_event* event);
+    fimcl_sync(H);
 
     H->buf_size_nf = G->buf_size_nf;
     assert(H->buf_size_nf == padsize(G->M)*G->N*G->P);
@@ -440,6 +445,7 @@ void fimcl_sync(fimcl_t * X)
         return;
     }
     check_CL( clu_wait_for_event(X->wait_ev, 10000));
+    clReleaseEvent(X->wait_ev);
     X->wait_ev = NULL;
 
     clFinish(X->clu->command_queue);
