@@ -56,6 +56,26 @@ static size_t padsize(size_t M)
     return M+1;
 }
 
+/** Instead of bare clReleaseMemObject
+ * since clReleaseMemObject only decrease the reference count,
+ * we check that there is only one reference available, else
+ * the object will not be freed and we have to figure out
+ * what else uses the mem object  (or decrease the reference count again)
+ */
+static int clu_release(clu_env_t * C, cl_mem buf)
+{
+    cl_uint ref_count;
+    check_CL(
+             clGetMemObjectInfo(buf, CL_MEM_REFERENCE_COUNT,
+                                sizeof(ref_count), &ref_count, NULL));
+    if(ref_count != 1)
+    {
+        fprintf(stderr, "clu_release WARNING\n"
+                " - Object has a reference count > 1\n");
+    }
+    check_CL(clReleaseMemObject(buf));
+    C->n_release++;
+}
 
 void clu_exit_error(cl_int err,
                     const char * file,
@@ -125,6 +145,7 @@ static size_t fimcl_ncx(fimcl_t * X)
 {
     return fimcl_hM(X)*fimcl_hN(X)*fimcl_hP(X);
 }
+
 
 float * fimcl_download(fimcl_t * gX)
 {
@@ -324,8 +345,7 @@ void fimcl_free(fimcl_t * G)
     }
 
     fimcl_sync(G);
-    check_CL(clReleaseMemObject(G->buf));
-    G->clu->n_release++;
+    clu_release(G->clu, G->buf);
     free(G);
 }
 
@@ -1486,6 +1506,8 @@ void clu_prepare_kernels(clu_env_t * clu,
                                     sizeof(float),
                                     NULL, &status);
     check_CL(status);
+    clu->n_alloc++;
+
     check_CL( clEnqueueWriteBuffer( clu->command_queue,
                                     clu->float_gpu,
                                     CL_TRUE,
@@ -1493,7 +1515,7 @@ void clu_prepare_kernels(clu_env_t * clu,
                                     sizeof(float),
                                     &value,
                                     0, NULL, NULL));
-    clu->n_alloc++;
+
 
 
 #ifdef VKFFT
@@ -1649,16 +1671,14 @@ void clu_destroy(clu_env_t * clu)
         /* Free memory */
         if(clu->clfft_buffer_size > 0)
         {
-            check_CL(clReleaseMemObject(clu->clfft_buffer));
-            clu->n_released++;
+            clu_release(clu, clu->clfft_buffer);
         }
     }
 #endif
 
     if(clu->float_gpu != NULL)
     {
-        check_CL(clReleaseMemObject(clu->float_gpu));
-        clu->n_release++;
+        clu_release(clu, clu->float_gpu);
     }
 
     /* Clear up the OpenCL stuff */
@@ -2062,8 +2082,7 @@ cl_int clu_increase_clfft_buffer(clu_env_t * clu, size_t req_size)
     if(clu->clfft_buffer_size > 0)
     {
         /* If there was already a smaller buffer allocated */
-        check_CL(clReleaseMemObject( clu->clfft_buffer));
-        clu->n_release++;
+        clu_release(clu, clu->clfft_buffer);
     }
     clu->clfft_buffer = clCreateBuffer(clu->context,
                                        CL_MEM_READ_WRITE,
@@ -2248,8 +2267,7 @@ void clu_benchmark_transfer(clu_env_t * clu)
 
     fim_free(buf);
     fim_free(buf_copy);
-    check_CL(clReleaseMemObject(buf_gpu));
-    clu->n_release++;
+    clu_release(clu, buf_gpu);
     return;
 }
 
@@ -2439,8 +2457,8 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
     }
 
     if(timers){dw_gettime(&t0);}
-    clReleaseMemObject(partial_sums_gpu);
-    forward->clu->n_release++;
+    clu_release(forward->clu, partial_sums_gpu);
+
     if(timers)
     {
     dw_gettime(&t1);
