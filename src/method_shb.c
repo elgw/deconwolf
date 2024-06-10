@@ -156,7 +156,7 @@ float * deconvolve_shb(float * restrict im,
         {
             if(P1[kk] > sigma)
             {
-                P1[kk] = 1/P1[kk];
+                P1[kk] = 1.0/P1[kk];
             } else {
                 P1[kk] = 0;
             }

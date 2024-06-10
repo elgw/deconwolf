@@ -733,7 +733,10 @@ fimo * fimo_copy(const fimo * restrict F)
 float * fim_zeros(const size_t N)
 // Allocate and return an array of N floats
 {
+    assert(N > 0);
     float * A = fim_malloc(N*sizeof(float));
+    assert(A[0] == 0);
+    assert(A[N-1] == 0)
     return A;
 }
 
