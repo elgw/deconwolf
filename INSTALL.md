@@ -118,7 +118,6 @@ The dependencies can get retrieved by vcpkg:
 ``` shell
 git clone https://github.com/microsoft/vcpkg
 .\vcpkg\bootstrap-vcpkg.bat
-.\vcpkg integrate install
 .\vcpkg\vcpkg.exe install fftw3[threads]
 .\vcpkg\vcpkg.exe install tiff
 .\vcpkg\vcpkg.exe install gsl
@@ -138,9 +137,17 @@ cmake "-DCMAKE_TOOLCHAIN_FILE=C:/YOUR/OWN/PATH/vcpkg/scripts/buildsystems/vcpkg.
 ```
 Important: Please use the correct path to `vcpkg.cmake`.
 
-Open visual studio and compile it from there. Don't forget to change the build type to release. 
+Open the visual studio solution and oo to Linker->Input->Additional
+dependencies and add:
 
-If you are a windows developer and reading this, please help us out get make this process smoother (if possible). 
+``` shell
+libomp.lib
+```
+
+Change the build type from debug to release and compile.
+
+If you are a windows developer and reading this, please help us out
+to make the build process smoother!
 
 ## FreeBSD
 - Use `gmake`, not `make`.
