@@ -80,7 +80,9 @@ void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_malloc(size_t nbytes)
 void * fim_malloc(size_t nbytes)
 {
 #ifdef WINDOWS
-    return _aligned_malloc(nbytes, FIM_ALIGNMENT);
+    void * p = _aligned_malloc(nbytes, FIM_ALIGNMENT);
+    memset(p, 0, nbytes);
+    return p;
 #else
     void * p;
     if(posix_memalign(&p, FIM_ALIGNMENT, nbytes))
@@ -732,7 +734,6 @@ float * fim_zeros(const size_t N)
 // Allocate and return an array of N floats
 {
     float * A = fim_malloc(N*sizeof(float));
-    //memset(A, 0, N*sizeof(float));
     return A;
 }
 
