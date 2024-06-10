@@ -131,7 +131,9 @@ typedef struct{
  *     Setup and teardown of environment
  *******************************************************/
 
-/* Create an environment with OpenCL and clFFT */
+/** Create an environment with OpenCL and clFFT
+ * See also clu_destroy
+ */
 clu_env_t * clu_new(int verbose, int cl_device);
 
 /* Prepare to do FFTs of real arrays of size wM x wN x wP

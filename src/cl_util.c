@@ -61,6 +61,9 @@ static size_t padsize(size_t M)
  * we check that there is only one reference available, else
  * the object will not be freed and we have to figure out
  * what else uses the mem object  (or decrease the reference count again)
+ * We must also check that clReleaseProgram is used and as a worst case
+ * also call clReleaseContext
+ * https://forums.developer.nvidia.com/t/clreleasememobject-not-working-the-clreleasememobject-function-doesnt-release-the-memory/15963/5
  */
 static int clu_release(clu_env_t * C, cl_mem buf)
 {
@@ -1700,6 +1703,7 @@ void clu_destroy(clu_env_t * clu)
 
     clu_kernel_destroy(*clu->update_y_kernel);
 
+    check_CL(clFinish(clu->command_queue));
     check_CL(clReleaseCommandQueue(clu->command_queue) );
     check_CL(clReleaseContext(clu->context));
 
@@ -1710,6 +1714,7 @@ void clu_destroy(clu_env_t * clu)
                 clu->n_alloc, clu->n_release);
         fprintf(stderr, "This indicates a potential memory leak on the GPU.\n");
     }
+
     free(clu);
     return;
 }
@@ -1754,6 +1759,7 @@ clu_kernel_t * clu_kernel_newa(clu_env_t * env,
     }
 
     assert(source_str != NULL);
+    //printf("1 clCreateProgram\n");
     clk->program = clCreateProgramWithSource(env->context, 1,
                                              (const char **) &source_str,
                                              (const size_t *) &source_size,
@@ -1824,6 +1830,7 @@ void clu_kernel_destroy(clu_kernel_t kern)
 {
     check_CL( clReleaseKernel(kern.kernel));
     check_CL( clReleaseProgram(kern.program));
+    //printf("1 clReleaseProgram\n");
     return;
 }
 
