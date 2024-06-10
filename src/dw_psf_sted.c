@@ -289,9 +289,9 @@ static void argparsing(int argc, char ** argv, opts * s)
 
 
 
-static fim_t * gen_psf(opts * s)
+static fimo * gen_psf(opts * s)
 {
-    fim_t * PSF = fimt_zeros(s->M, s->M, s->P);
+    fimo * PSF = fimo_zeros(s->M, s->M, s->P);
     const double gamma = s->gamma;
     const double sigma = s->sigma;
 
@@ -357,10 +357,10 @@ static void dw_psf_sted(opts * s)
     {
         printf("Writing to %s\n", s->outfile);
     }
-    fim_t * PSF = gen_psf(s);
+    fimo * PSF = gen_psf(s);
 
-    float sum = fimt_sum(PSF);
-    fim_mult_scalar(PSF->V, fimt_nel(PSF), 1.0/sum);
+    float sum = fimo_sum(PSF);
+    fim_mult_scalar(PSF->V, fimo_nel(PSF), 1.0/sum);
 
     ttags * T = ttags_new();
     char * swstring = malloc(1024);
@@ -377,7 +377,7 @@ static void dw_psf_sted(opts * s)
                          T,
                          PSF->M, PSF->N, PSF->P);
     ttags_free(&T);
-    fimt_free(PSF);
+    fimo_free(PSF);
 }
 
 int dw_psf_sted_cli(int argc, char ** argv)
