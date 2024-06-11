@@ -306,10 +306,11 @@ install(FILES "${CMAKE_SOURCE_DIR}/doc/dw_bw.1"
 # https://cmake.org/cmake/help/book/mastering-cmake/chapter/Packaging%20With%20CPack.html
 
 
-SET(CPACK_DEBIAN_PACKAGE_MAINTAINER "Erik Wernersson") #required
-set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON) # resolve dependencies automatically
+SET(CPACK_DEBIAN_PACKAGE_MAINTAINER "Erik Wernersson")
+# resolve dependencies automatically
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
 set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "https://www.github.com/elgw/deconwolf/")
-
+SET(CPACK_DEBIAN_PACKAGE_SECTION "science")
 INCLUDE(CPack)
 
 # The produced deb files are not perfectly portable,
