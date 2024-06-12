@@ -81,7 +81,12 @@ course be swapped with API compatible alternatives like MKL.
 
 ## Build and install
 Deconwolf runs on 64-bit machines with, both aarch64 and x86_64, and
-require no special hardware. To compile and install deconwolf should
+require no special hardware. For some platforms there are pre-compiled
+binaries available, see
+[releases](https://github.com/elgw/deconwolf/releases).
+
+
+To compile and install deconwolf should
 take less than a minute on a Linux machine but might be more
 cumbersome on MacOS and Windows. For platform specific build
 instructions, see [INSTALL.md](INSTALL.md).  We hope to provide
