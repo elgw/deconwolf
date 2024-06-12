@@ -65,11 +65,10 @@ the pixels in the sensor.
 - The axial size of the pixels in the image, i.e. distance between the
 images/planes.
 
-For example: one of our 100x objectives has NA = 1.45, ni = 1.515. At
-the given magnification that gives us image pixel of size 130 nm. The
-distance between planes was set to 250 nm. To generate a PSF with this
-information (we will call it `PSF_dapi.tif`) the following command can
-be used:
+For example: one of our microscopes has a 100x objectives with NA =
+1.45, ni = 1.515 and pixel size is 130 nm. The distance between planes
+was set to 250 nm. To generate a PSF with this information (we will
+call it `PSF_dapi.tif`) the following command can be used:
 
 ``` shell
 dw_bw --resxy 130 --resz 250 --lambda 461 --NA 1.45 --ni 1.515 PSF_dapi.tif
