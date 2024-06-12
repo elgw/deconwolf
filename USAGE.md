@@ -22,19 +22,17 @@ the z-axis. That is something I've never seen in real images.
 It is likely that better results can be obtained by using more
 advanced models (like the Gibson-Lanni) or by experimentally
 estimating the PSF based on image data (of beads). However, to find a
-better PSF for a specific microscope and sample it typically quite
+better PSF for a specific microscope is typically quite
 complicated.
 
 Richardson-Lucy based methods assume that the image formation can be
 described as a linear process, something which is only approximate
-since any interesting sample will both absorb and refract light. If
-there are saturated pixel in the input image, that clearly violates
-the linearity assumption so please check for that before
-deconvolution.
+since any interesting sample will both absorb and refract
+light. Saturated pixel in the input image clearly violates the
+linearity assumption so please check for that before deconvolution.
 
-
-Saturated pixels, PSF mismatch as well as an excessive number of
-iterations, among other things, can cause artifacts. Ideally one
+Saturated pixels, sensor noise, sensor artifacts, PSF mismatches, an
+excessive number of iterations, ..., can cause artifacts. Ideally one
 should acquire samples also with super resolution, to be in a position
 to recognize and distinguish interesting features from potential
 artefacts.
@@ -51,9 +49,9 @@ terminal or script. There is also a limited
 least initially.
 
 
-To deconvolve an image (say `dapi_001.tif`) you need an approximation
-of the PSF of your particular microscope at the given emission wave
-length.
+To deconvolve an image (let's call it `dapi_001.tif`) you need an
+approximation of the PSF of your particular microscope at the given
+emission wave length.
 
 If you don't have one you can create one according to the Born-Wolf
 model with the `dw_bw` program that is shipped with deconwolf.
@@ -70,16 +68,16 @@ images/planes.
 For example: one of our 100x objectives has NA = 1.45, ni = 1.515. At
 the given magnification that gives us image pixel of size 130 nm. The
 distance between planes was set to 250 nm. To generate a PSF with this
-information (we will call it `PSF_DAPI.tif`) the following command can
+information (we will call it `PSF_dapi.tif`) the following command can
 be used:
 
 ``` shell
-dw_bw --resxy 130 --resz 250 --lambda 461 --NA 1.45 --ni 1.515 psf_dapi.tif
+dw_bw --resxy 130 --resz 250 --lambda 461 --NA 1.45 --ni 1.515 PSF_dapi.tif
 ```
 
 > [!TIP]
 > You can of course re-use the PSF with multiple images. Please make sure
-> to keep the `log.txt` file, generated along with the PSF, to know what
+> to keep the `.log.txt` file, generated along with the PSF, to know what
 > parameters were used.
 
 > [!NOTE]
@@ -96,7 +94,8 @@ dw --iter 40 dapi_001.tif psf_dapi.tif
 When done, **dw** will write a new image called `dw_dapi_001.tif`
 along with a log file called `dw_dapi_001.tif.log.txt`.
 
-> [!CAUTION] By default, the pixel values of the output image will be scaled to
+> [!CAUTION]
+> By default, the pixel values of the output image will be scaled to
 > make most out of the 16-bit image format. If absolute intensities matter,
 > please read on the possible ways to handle that below.
 
