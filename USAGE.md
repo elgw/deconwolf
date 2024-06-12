@@ -221,15 +221,14 @@ log file like:
 $ cat dw_dapi_001.tif.log.txt | grep scaling
 scaling: 0.425100
 ```
-That means, in order to go back to absolute intensities, divide by
-that number.
 
-If you care about the absolute intensities there are three things you can do:
+If you care about the absolute intensities there are three things you
+can do:
 
-1. Use the **--float** float to save images as 32-bit floating point
-tif files. The downside is that the output images will be twice as
-large, and that the support for reading such images is not that
-great in other software.
+1. Use the **--float** argument to save images as 32-bit floating
+point tif files. The downside is that the output images will be twice
+as large compared to the default and that the support for reading
+such images is not widespread.
 
 2. Set a scaling factor manually by using **--scale s** where $v$ is
 some value that you have to figure out yourself. $s==1$ is a
@@ -274,12 +273,15 @@ without the **--gpu** option. However differences should be
 negligable (if not, please report a bug). This is because the FFT
 libraries have a limited precision.
 
+- Do you have more than one GPU or "cldevice"? Then you can tell
+  **dw** which one to use with the `--cldevice n` argument, where $n$
+  is the number of the device to use, the first one has number $0$.
 
 ### Do I really need to specify the number of iterations?
 
 RL-based deconvolution methods are iterative and don't know when to
 stop. While some programs have automatic stop conditions we argue that
-it is better if the user specify that manually for two reasons:
+it is better if the user specify the number of iterations for two reasons:
 
 1. How many iterations that are wanted/needed/optimal depends on
 downstream analysis. And who knows what your purposes are?
@@ -400,6 +402,9 @@ dw version 0.1.0 on an AMD Ryzen 3700X:
 It is also possible to mix a few instances of dw using the CPU and a
 few offloading calculations to the GPU (with **--method
 shbcl**). Results would depends on the GPU/CPU combination.
+
+### 2D images?
+No, the option to deconvolve 2D images is deliberately turned off.
 
 ### My question was not in this list!
 
