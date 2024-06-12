@@ -397,13 +397,8 @@ dw version 0.1.0 on an AMD Ryzen 3700X:
 
 -> 52 images / hour or 69 s / image
 
-
-It is also possible to mix a few instances of dw using the CPU and a
-few offloading calculations to the GPU (with **--method
-shbcl**). Results would depends on the GPU/CPU combination.
-
 ### 2D images?
-No, the option to deconvolve 2D images is deliberately turned off.
+No, that option is deliberately turned off.
 
 ### My question was not in this list!
 
