@@ -97,7 +97,7 @@ along with a log file called `dw_dapi_001.tif.log.txt`.
 > [!CAUTION]
 > By default, the pixel values of the output image will be scaled to
 > make most out of the 16-bit image format. If absolute intensities matter,
-> please read on the possible ways to handle that below.
+> please read about the various output options below.
 
 For a list of the available command line options, please see:
 
@@ -121,7 +121,7 @@ found at this link
 
 ## Test data
 
-If you just want to test that **dw** works, there is a single nuclei
+If you want to test that **dw** works, there is a small image of a single nuclei
 in the `demo` subfolder. The image is small enough that it can be
 deconvolved with very modest hardware.
 
@@ -182,21 +182,12 @@ files.
 It is undefined behavior to use pyramidal (multiple resolution) or
 multi-color images.
 
-## Log files and output
+## Log files
 - The reported error, Idiv, is the I-divergence between the input image
   and the current guess convolved with the PSF. Please note that deconwolf
   doesn't know how the deconvolved images should look like so this isn't
   in any way a measurement of how good image quality you get out of the
   program.
-
-- If the 16-bit output format is used, the scaling is reported in the
-  log file like:
-  ``` shell
-  $ cat dw_dapi_001.tif.log.txt | grep scaling
-  scaling: 0.425100
-  ```
-   That means, in order to go back to absolute intensities, divide by
-   that number.
 
 - If deconwolf finished normally you will find that it ends with something
   like:
@@ -212,6 +203,44 @@ multi-color images.
   ```
   If it doesn't, chances are that deconwolf run out of memory and crashed.
 
+## Output format
+
+Internally deconwolf use 32-bit floating point precision but when it
+is time to write the output image to disk 16-bit unsigned tif images
+are used by default since that is more memory efficient, and 16-bits
+per pixel should be good enough in most cases.
+
+To prevent clipping/saturation and to make full use of the 16-bit
+dynamic range all pixel values are scaled by a scaling factor, $s$,
+prior to writing. The value of the scaling factor is based on the
+deconvolved image, $Y$, and set as $s=(2^{16}-1)/\max(Y)$.
+
+The scaling is reported in the
+log file like:
+``` shell
+$ cat dw_dapi_001.tif.log.txt | grep scaling
+scaling: 0.425100
+```
+That means, in order to go back to absolute intensities, divide by
+that number.
+
+If you care about the absolute intensities there are three things you can do:
+
+1. Use the **--float** float to save images as 32-bit floating point
+tif files. The downside is that the output images will be twice as
+large, and that the support for reading such images is not that
+great in other software.
+
+2. Set a scaling factor manually by using **--scale s** where $v$ is
+some value that you have to figure out yourself. $s==1$ is a
+natural choice to start with but might cause saturated pixels. If
+that is the case reduce $s$ until you are satisfied. For example,
+if you use **--scale 0.5** the output pixels will have only half of
+the computed value, if you load the images you can then multiply
+the pixel values by $2$ to get the original values back.
+
+3. Read the scaling value from the log files and divide by that value
+to get the computed intensities back.
 
 ## Questions and Answers
 
@@ -245,31 +274,6 @@ without the **--gpu** option. However differences should be
 negligable (if not, please report a bug). This is because the FFT
 libraries have a limited precision.
 
-### I care about the absolute intensities, what should I do?
-Internally deconwolf use 32-bit floating point precision but when it
-is time to write the output image to disk 16-bit unsigned tif images
-are used by default since that is more memory efficient, and 16-bits
-per pixel should be good enough.
-
-If you care about the absolute intensities there are three things you can do:
-1. Use the **--float** float to save images as 32-bit floating point
-tif files. The downside is that the output images will be twice as
-large, and that the support for reading such images is not that
-great in other software.
-2. Set a scaling factor manually by using **--scale v** where $v$ is
-some value that you have to figure out yourself. $v==1$ is a
-natural choice to start with but might cause saturated pixels. If
-that is the case reduce $v$ until you are satisfied. For example,
-if you use **--scale 0.5** the output pixels will have only half of
-the computed value, if you load the images you can then multiply
-the pixel values by $2$ to get the original values back.
-3. Read the scaling value from the log files and divide by that value
-to get the computed intensities back.
-
-The default scaling factor is based on the deconvolved image, $Y$, and
-set as $s=(2^{16}-1)/\max(Y)$. I.e. for bright images it prevents
-saturation, and for dim images it use as much as possible of the
-dynamic range of the 16-bits.
 
 ### Do I really need to specify the number of iterations?
 
