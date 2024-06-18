@@ -262,23 +262,24 @@ endif
 ## OpenMP
 ##
 
-OMP?=1
-ifeq ($(OMP), 1)
+# OpenMP is required. On windows, compile
+# with clang
+
 $(info -- Enabling OpenMP (OMP))
 ifeq ($(UNAME_S), Darwin)
 CFLAGS+=-Xpreprocessor -fopenmp
 dw_LIBRARIES += -lomp
 dwbw_LIBRARIES += -lomp
 else
-CFLAGS += -fopenmp
 ifeq ($(CC),clang)
-CFLAGS+=-fopenmp=libiomp5
-endif
-endif
+# Ubuntu 24: requires also
+# sudo apt-get install libomp-dev libclang-rt-dev
+CFLAGS+=-fopenmp=libomp
 else
-CFLAGS += -fno-openmp
-$(info OMP disabled)
+CFLAGS += -fopenmp
 endif
+endif
+
 
 
 ##
