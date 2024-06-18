@@ -101,11 +101,11 @@ along with a log file called `dw_dapi_001.tif.log.txt`.
 For a list of the available command line options, please see:
 
 ``` shell
-dw_bw --help
 dw --help
+dw_bw --help
 ```
 
-On Linux/Mac there should also be a manual installed, which can be
+On Linux/Mac there should also be manuals installed which can be
 opened by:
 
 ``` shell
