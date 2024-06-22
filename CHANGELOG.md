@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## 0.4.3
+- Fixed [issue #70](https://github.com/elgw/deconwolf/issues/70) which
+  affected windows builds only.
+
+- Dw will now give a error message if the log file can't be opened
+  instead of quietly crashing.
+
+- Disabled some debug code that caused dw to write the file
+  (`one.tif`) every time that is was run. It has been doing so since
+  version 0.4.1.
+
 ## 0.4.2
 - VkFFT upgraded from v1.3.3 to v1.3.4.
 - Fixed an issue preventing anything than `--bq 0` to be used on
