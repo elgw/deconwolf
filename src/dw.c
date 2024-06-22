@@ -934,29 +934,20 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     }
 
 
+    /* Set s->outFile and s->outFolder based on s->imFile */
     if(s->outFile == NULL)
-    {
-        /* Set s->outFile and s->outFolder based on s->imFile */
-        char * dname = dw_dirname(s->imFile);
-        char * bname = dw_basename(s->imFile);
-        s->outFile = malloc(strlen(dname) + strlen(bname) + strlen(s->prefix) + 10);
-        assert(s->outFile != NULL);
-        if (strlen(dname) > 0)
-        {
-            sprintf(s->outFile, "%s%c%s_%s", dname, FILESEP, s->prefix, bname);
-        }
-        else {
-            sprintf(s->outFile, "%s_%s", s->prefix, bname);
-        }
+    {        
+        s->outFile = dw_prefix_file(s->imFile, s->prefix);
+   
+        char * dname = dw_dirname(s->imFile);        
         s->outFolder = malloc(strlen(dname) + 16);
         assert(s->outFolder != NULL);
-        sprintf(s->outFolder, "%s%c", dname, FILESEP);
-        free(bname);
+        sprintf(s->outFolder, "%s%c", dname, FILESEP);      
         free(dname);
-        if (s->verbosity > 1)
+        if(s->verbosity > 1)
         {
-            printf("outFile: %s\n", s->outFile);
-        } 
+            printf("outFile: %s, outFolder: %s\n", s->outFile, s->outFolder);
+        }
     } else {
         char * dname = dw_dirname(s->outFile);
         free(s->outFolder);
