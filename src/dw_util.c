@@ -85,7 +85,7 @@ void dw_gettime(struct timespec * t)
 
 char * dw_dirname(const char * path)
 {
-    #ifdef WINDOWS
+#ifdef WINDOWS
     size_t maxlen = strlen(path)+1;
     char * drive = malloc(maxlen);
     char * dir = malloc(maxlen);
@@ -93,16 +93,18 @@ char * dw_dirname(const char * path)
     _splitpath(path, drive, dir, NULL, NULL);
     char * outpath = malloc(maxlen);
     _makepath(outpath, drive, dir, NULL, NULL);
+    // Adds a trailing '\'
     free(drive);
     free(dir);
     return outpath;
-    #else
+#else
     char * t = strdup(path);
     char * _dir = dirname(t); // should not be freed
+    // Does not add a trailing '/'
     char * dir = strdup(_dir);
     free(t);
     return dir;
-    #endif
+#endif
 }
 
 char * dw_basename(const char * path)
@@ -128,11 +130,11 @@ char * dw_basename(const char * path)
 
 char * dw_getcwd(char * buf, size_t size)
 {
-    #ifdef WINDOWS
+#ifdef WINDOWS
     return _getcwd(buf, size);
-    #else
+#else
     return getcwd(buf, size);
-    #endif
+#endif
 }
 
 int ptr_alignment_B(const void * p)
@@ -354,7 +356,40 @@ int getline(char **lineptr, size_t *n, FILE *stream)
 char *
 dw_prefix_file(const char * inFile, const char * prefix)
 {
+#ifdef WINDOWS
 
+    char* drive = calloc(strlen(inFile) + 16, 1);
+    char* dir = calloc(strlen(inFile) + 16, 1);
+    char* fname = calloc(strlen(inFile) + 16, 1);
+    char* ext = calloc(strlen(inFile) + 16, 1);
+
+    _splitpath(
+        inFile,
+        drive,
+        dir,
+        fname,
+        ext
+    );
+
+    char* pre_fname = calloc(strlen(fname) + strlen(prefix) + 16, 1);
+    sprintf(pre_fname, "%s_%s", prefix, fname);
+    char* outFile = calloc(strlen(inFile) + strlen(prefix) + 128, 1);
+
+    _makepath(
+        outFile,
+        drive,
+        dir,
+        pre_fname,
+        ext
+    );
+
+    free(drive);
+    free(dir);
+    free(fname);
+    free(pre_fname);
+    free(ext);
+    return outFile;
+#else
     char * dname = dw_dirname(inFile);
     assert(dname != NULL);
     char * fname = dw_basename(inFile);
@@ -373,6 +408,7 @@ dw_prefix_file(const char * inFile, const char * prefix)
     free(fname);
 
     return outFile;
+#endif
 }
 
 float abbe_res_xy(float lambda, float NA)

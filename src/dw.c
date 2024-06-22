@@ -934,19 +934,20 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     }
 
 
+    /* Set s->outFile and s->outFolder based on s->imFile */
     if(s->outFile == NULL)
-    {
-        /* Set s->outFile and s->outFolder based on s->imFile */
-        char * dname = dw_dirname(s->imFile);
-        char * bname = dw_basename(s->imFile);
-        s->outFile = malloc(strlen(dname) + strlen(bname) + strlen(s->prefix) + 10);
-        assert(s->outFile != NULL);
-        sprintf(s->outFile, "%s%c%s_%s", dname, FILESEP, s->prefix, bname);
+    {        
+        s->outFile = dw_prefix_file(s->imFile, s->prefix);
+   
+        char * dname = dw_dirname(s->imFile);        
         s->outFolder = malloc(strlen(dname) + 16);
         assert(s->outFolder != NULL);
-        sprintf(s->outFolder, "%s%c", dname, FILESEP);
-        free(bname);
+        sprintf(s->outFolder, "%s%c", dname, FILESEP);      
         free(dname);
+        if(s->verbosity > 1)
+        {
+            printf("outFile: %s, outFolder: %s\n", s->outFile, s->outFolder);
+        }
     } else {
         char * dname = dw_dirname(s->outFile);
         free(s->outFolder);
@@ -1980,6 +1981,14 @@ float * psf_makeOdd(float * psf, int64_t * pM, int64_t * pN, int64_t *pP)
 void dcw_init_log(dw_opts * s)
 {
     s->log = fopen(s->logFile, "w");
+    if (s->log == NULL)
+    {
+        fprintf(stderr, "Unable to open %s for writing\n", s->logFile);
+        fprintf(stderr,
+            "Please check that you have permissions to write to the folder\n"
+            "and that the drive is not full\n");        
+        exit(EXIT_FAILURE);
+    }
     assert(s->log != NULL);
     show_time(s->log);
     dw_opts_fprint(s->log, s);
@@ -2072,6 +2081,8 @@ fftwf_complex * initial_guess(const int64_t M, const int64_t N, const int64_t P,
             }
         }
     }
+    //printf("writing to one.tif");
+    //fim_tiff_write_float("one.tif", one, NULL, wM, wN, wP);
     //  writetif("one.tif", one, wM, wN, wP);
 
     fftwf_complex * Fone = fft(one, wM, wN, wP);
