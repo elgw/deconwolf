@@ -85,7 +85,7 @@ void dw_gettime(struct timespec * t)
 
 char * dw_dirname(const char * path)
 {
-    #ifdef WINDOWS
+#ifdef WINDOWS
     size_t maxlen = strlen(path)+1;
     char * drive = malloc(maxlen);
     char * dir = malloc(maxlen);
@@ -96,13 +96,13 @@ char * dw_dirname(const char * path)
     free(drive);
     free(dir);
     return outpath;
-    #else
+#else
     char * t = strdup(path);
     char * _dir = dirname(t); // should not be freed
     char * dir = strdup(_dir);
     free(t);
     return dir;
-    #endif
+#endif
 }
 
 char * dw_basename(const char * path)
@@ -128,11 +128,11 @@ char * dw_basename(const char * path)
 
 char * dw_getcwd(char * buf, size_t size)
 {
-    #ifdef WINDOWS
+#ifdef WINDOWS
     return _getcwd(buf, size);
-    #else
+#else
     return getcwd(buf, size);
-    #endif
+#endif
 }
 
 int ptr_alignment_B(const void * p)
