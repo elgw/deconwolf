@@ -1,3 +1,6 @@
+# Note: Please use cmake to build deconwolf
+#       the makefile is only for testing
+#
 # -- Normal build:
 # make -B
 #
@@ -7,6 +10,10 @@
 #
 # To build with debug flags and no OpenMP
 # make DEBUG=1 OMP=0 DEBUG=1
+#
+# There is also ...
+# -D_FORTIFY_SOURCE=2
+# -D_FORTIFY_SOURCE=3
 
 DESTDIR?=/usr/local/bin
 DEBUG?=0
@@ -16,7 +23,18 @@ $(info Host type: $(UNAME_S))
 
 dw = bin/dw
 dwbw = bin/dw_bw
-CFLAGS = -std=gnu11 -Wall -Wextra
+
+CFLAGS += -std=gnu11 -Wall -Wextra
+
+FORTIFY?=0
+ifeq ($(FORTIFY),1)
+CFLAGS+=-D_FORTIFY_SOURCE=3
+endif
+
+SANITIZE?=0
+ifeq ($(SANITIZE),1)
+CFLAGS+=-fsanitize=address -static-libasan
+endif
 
 # FFT Backend, pick __one__
 FFTW3=1
