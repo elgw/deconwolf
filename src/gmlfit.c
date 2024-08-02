@@ -414,7 +414,7 @@ localize_dot(const pfloat * restrict V,
     F[f_bg] = gsl_vector_get(s->x, OPTIDX_BG);
     F[f_G] = gsl_vector_get(s->x, OPTIDX_NPHOT);
     F[f_x] = gsl_vector_get(s->x, OPTIDX_X);
-    F[f_y] = gsl_vector_get(s->x, OPTIDX_X);
+    F[f_y] = gsl_vector_get(s->x, OPTIDX_Y);
     F[f_sxy] = gsl_vector_get(s->x, OPTIDX_S_XY);
     if(P > 1)
     {
