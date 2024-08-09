@@ -300,7 +300,6 @@ static void argparsing(int argc, char ** argv, opts * s)
         case 'L':
             s->fit_lsigma = atof(optarg);
             break;
-            break;
         case 'm':
             s->max_rel_scale = atof(optarg);
             break;
@@ -344,7 +343,6 @@ static void argparsing(int argc, char ** argv, opts * s)
             exit(EXIT_FAILURE);
         }
     }
-
 
 
     if(s->NA*s->ni*s->dx*s->dz*s->lambda > 0)
@@ -459,8 +457,6 @@ static void argparsing(int argc, char ** argv, opts * s)
         }
     }
 
-
-    s->optpos = optind;
     s->optpos = optind;
     return;
 }

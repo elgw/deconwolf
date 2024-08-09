@@ -102,19 +102,18 @@ kdtree_kde(const kdtree_t * T,
            double sigma,
            double cutoff);
 
-/* Query the nQ points in Q for the k nearest neighbors
- *
- * The returned matrix is kxN elements large and should be freed by
- * the caller.
- */
-size_t * kdtree_query_knn_multi(kdtree_t * T,
-                                const double * Q, size_t nQ,
-                                int k, int ntheads);
 
 /* Find the index of the closest point */
 size_t kdtree_query_closest(kdtree_t * T, double * X);
 
 void node_print_bbx(const kdtree_node_t * N);
+
+/* Make a shallow copy of a kd-tree for usage by another thread */
+kdtree_t * kdtree_copy_shallow(kdtree_t * );
+
+/* Free a tree returned from kdtree_copy_shallow */
+void kdtree_free_shallow(kdtree_t * T);
+
 
 /* Run some self-tests */
 void kdtree_validate(kdtree_t * T);

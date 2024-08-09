@@ -31,7 +31,7 @@ kdtree_ut: $(SRC) src/kdtree_ut.c makefile
 
 libkdtree.a: $(SRCFILES) makefile
 	$(CC) -c $(CFLAGS) $(SRC) $(LDFLAGS)
-	ar rcs libkdtree.a kdtree.o
+	ar rcs libkdtree.a *.o
 
 
 libkdtree.so: $(SRCFILES) makefile
