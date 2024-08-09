@@ -54,6 +54,7 @@
 #include "dw_dots.h"
 #include "dw_psf.h"
 #include "dw_psf_sted.h"
+#include "dw_align_dots.h"
 #endif
 
 #include "fim.h"
