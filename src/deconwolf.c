@@ -88,7 +88,7 @@ int main(int argc, char ** argv)
     if( strcmp(argv[1], "align-dots") == 0)
     {
 #ifdef dw_module_align_dots
-        return dw_align_dots(argc-1, argv-1);
+        return dw_align_dots(argc-1, argv+1);
 #else
         fprintf(stderr, "dw was not built with the 'align-dots' module\n");
         exit(EXIT_FAILURE);

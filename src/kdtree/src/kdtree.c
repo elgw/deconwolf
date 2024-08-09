@@ -9,16 +9,13 @@
 #include <gsl/gsl_statistics_double.h>
 #endif
 
-#include <pthread.h>
-
 #include "kdtree.h"
 #include "pqheap.h"
 #include "quickselect.h"
 
 #define XID_STRIDE (KDTREE_DIM + 1)
 
-// Make a shallow copy of a kd-tree for usage by another thread.
-static kdtree_t * kdtree_copy_shallow(kdtree_t * );
+
 
 /* Resolve the index of the right child based on the index of the
  * parent, following a Eytzinger scheme */
@@ -145,7 +142,7 @@ void kdtree_free(kdtree_t * T)
     return;
 }
 
-static kdtree_t * kdtree_copy_shallow(kdtree_t * _T)
+kdtree_t * kdtree_copy_shallow(kdtree_t * _T)
 {
     assert(_T != NULL);
     if(_T == NULL)
@@ -159,7 +156,7 @@ static kdtree_t * kdtree_copy_shallow(kdtree_t * _T)
     return T;
 }
 
-static void kdtree_free_shallow(kdtree_t * T)
+void kdtree_free_shallow(kdtree_t * T)
 {
     pqheap_free(&T->pq);
     free(T->result);
@@ -693,78 +690,6 @@ size_t * kdtree_query_knn(kdtree_t * T, const double * Q, size_t k)
     return T->result;
 }
 
-// Struct for parallel queries
-typedef struct{
-    kdtree_t * T;
-    const double * Q;
-    size_t nQ;
-    int k;
-    int thread;
-    int nthreads;
-    size_t * KNN;
-} _p_query_t;
-
-void * _p_query(void * _config)
-{
-    _p_query_t * config = (_p_query_t *) _config;
-    kdtree_t * T = config->T;
-
-    const double * Q = config->Q;
-    const size_t nQ = config->nQ;
-    const int k = config->k;
-    const int thread = config->thread;
-    const int nthreads = config->nthreads;
-    size_t * KNN = config->KNN;
-    for(size_t kk = thread; kk<nQ; kk+=nthreads)
-    {
-        size_t * knn = kdtree_query_knn(T, Q+2*kk, k);
-        memcpy(KNN + k*kk, knn, k*sizeof(size_t));
-    }
-    return NULL;
-}
-
-size_t * kdtree_query_knn_multi(kdtree_t * T, const double * Q, size_t nQ, int k, int nthreads)
-{
-    size_t * KNN = calloc(nQ*k, sizeof(size_t));
-    assert(KNN != NULL);
-
-    if(nthreads == 1)
-    {
-        for(size_t kk = 0; kk<nQ; kk++)
-        {
-            size_t * knn = kdtree_query_knn(T, Q+2*kk, k);
-            memcpy(KNN + k*kk, knn, k*sizeof(size_t));
-        }
-        return KNN;
-    } else {
-        pthread_t * threads = calloc(nthreads, sizeof(pthread_t));
-        assert(threads != NULL);
-        _p_query_t * confs = calloc(nthreads, sizeof(_p_query_t));
-        assert(confs != NULL);
-
-        for(int kk = 0; kk<nthreads; kk++)
-        {
-            confs[kk].T = kdtree_copy_shallow(T);
-            confs[kk].thread = kk;
-            confs[kk].nthreads = nthreads;
-            confs[kk].KNN = KNN;
-            confs[kk].k = k;
-            confs[kk].Q = Q;
-            confs[kk].nQ = nQ;
-            pthread_create(&threads[kk], NULL, _p_query, (void *) &confs[kk]);
-        }
-
-        for(int kk = 0; kk<nthreads; kk++)
-        {
-            pthread_join(threads[kk], NULL);
-            kdtree_free_shallow(confs[kk].T);
-        }
-        free(confs);
-        free(threads);
-    }
-
-    return KNN;
-}
 
 void kdtree_validate(kdtree_t * T)
 {
