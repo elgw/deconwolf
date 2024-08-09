@@ -581,9 +581,14 @@ static ftab_t * append_fitting(opts * s, ftab_t * T, float * I,
     xcol = ftab_get_col(TT, "x");
     ycol = ftab_get_col(TT, "y");
     zcol = ftab_get_col(TT, "z");
+    assert(xcol != ycol);
+    assert(xcol != zcol);
+
     int fxcol = ftab_get_col(TT, "f_x");
     int fycol = ftab_get_col(TT, "f_y");
     int fzcol = ftab_get_col(TT, "f_z");
+    assert(fxcol != fycol);
+    assert(fxcol != fzcol);
 
     /* Make the fitted positions absolute */
     for(size_t kk = 0; kk < TT->nrow; kk++)
