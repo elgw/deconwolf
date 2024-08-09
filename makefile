@@ -26,6 +26,8 @@ dwbw = bin/dw_bw
 
 CFLAGS += -std=gnu11 -Wall -Wextra
 
+CFLAGS+=-Isrc/kdtree/include
+
 FORTIFY?=0
 ifeq ($(FORTIFY),1)
 CFLAGS+=-D_FORTIFY_SOURCE=3
@@ -143,6 +145,17 @@ endif
 
 dw_LIBRARIES=
 dwbw_LIBRARIES=
+
+#
+# kd tree
+#
+dw_LIBRARIES+=-Lsrc/kdtree/ -lkdtree
+
+FORCE: ;
+
+src/kdtree/libkdtree.a: FORCE
+	$(MAKE) -C $(@D) libkdtree.a
+
 
 #
 # Math library
@@ -373,7 +386,8 @@ dw_tiff_merge.o \
 dw_psf_sted.o \
 sparse_preprocess.o \
 sparse_preprocess_cli.o \
-gmlfit.o
+gmlfit.o \
+dw_align_dots.o
 #dw_nuclei.o
 
 dwbw_OBJECTS = fim.o \
