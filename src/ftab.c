@@ -233,9 +233,9 @@ ftab_t * ftab_from_tsv(const char * fname)
 
     int ncols = parse_col_names(T, line);
 
-    printf("%zu columns\n", T->ncol);
+    // printf("%zu columns\n", T->ncol);
     size_t nrows = count_newlines(fname)+1;
-    printf("at most %zu lines\n", nrows);
+    // printf("at most %zu lines\n", nrows);
 
     // Allocate memory
     T->T = malloc(nrows*ncols*sizeof(float));
