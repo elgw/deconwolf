@@ -22,6 +22,23 @@ typedef struct{
     int npoint;
 } opts;
 
+// Golden ratio
+const double PHI = 1.618033988749;
+
+// The 12 vertices of an icosahedron;
+const double icosahedron[36] = {0, PHI, 1,
+                                0, -PHI, 1,
+                                0, PHI, -1,
+                                0, -PHI, -1,
+                                1, 0, PHI,
+                                -1, 0, PHI,
+                                1, 0, -PHI,
+                                -1, 0, -PHI,
+                                PHI, 1, 0,
+                                -PHI, 1, 0,
+                                PHI, -1, 0,
+                                -PHI, -1, 0};
+
 static opts * opts_new()
 {
     opts * s = calloc(1, sizeof(opts));
@@ -35,6 +52,13 @@ static opts * opts_new()
 static void opts_free(opts * s)
 {
     free(s);
+}
+
+static void opts_print(opts * s, FILE * fid)
+{
+    fprintf(fid, "capture distance: %f\n", s->capture_distance);
+    fprintf(fid, "       KDE sigma: %f\n", s->sigma);
+    return;
 }
 
 static void usage(void)
@@ -59,6 +83,7 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"help", no_argument, NULL, 'h'},
         {"verbose", required_argument, NULL, 'v'},
         {"distance", required_argument, NULL, 'd'},
+        {"radius",   required_argument, NULL, 'd'}, // alias for distance
         {"npoint", required_argument, NULL, 'n'},
         {"sigma", required_argument, NULL, 's'},
         {NULL, 0, NULL, 0}};
@@ -96,22 +121,29 @@ static void argparsing(int argc, char ** argv, opts * s)
 
 double * get_dots(opts * s, ftab_t * T)
 {
-    /* Extract the dots will look for fit_x, fit_y, ...
-     * if not found, look for columns called x, y, z */
+    if(s->verbose > 1)
+    {
+        printf("Looking for columns f_x, f_y and f_z\n");
+    }
 
     int cx, cy, cz;
-    cx = ftab_get_col(T, "fit_x");
-    cy = ftab_get_col(T, "fit_y");
-    cz = ftab_get_col(T, "fit_z");
+    cx = ftab_get_col(T, "f_x");
+    cy = ftab_get_col(T, "f_y");
+    cz = ftab_get_col(T, "f_z");
     if(cx < 0)
     {
-        printf("Warning: Could not find any column named 'fit_x'\n");
+        printf("Warning: Could not find any column named 'f_x'\n");
+        if(s->verbose > 1)
+        {
+            printf("Looking for columns x, y and z\n");
+        }
         cx = ftab_get_col(T, "x");
         cy = ftab_get_col(T, "y");
         cz = ftab_get_col(T, "z");
         if(cx < 0)
         {
-            printf("Error: Could not find any column named 'x'\n");
+            fprintf(stderr,
+                    "Error: Could not find any column named 'f_x' or x'\n");
         }
     }
 
@@ -191,6 +223,11 @@ struct dvarray * dvarray_new(size_t n)
     return A;
 }
 
+static double v3_norm(const double * X)
+{
+    return sqrt( pow(X[0], 2) + pow(X[1], 2) + pow(X[2], 2));
+}
+
 
 static void align_dots(const opts * s,
                        const double * XA, size_t nXA,
@@ -221,25 +258,38 @@ static void align_dots(const opts * s,
         nfound_total += nfound;
         free(A_idx);
     }
-    printf("Found %zu pairs within the capture radius (%f)\n",
-           nfound_total, s->capture_distance);
+    if(s->verbose > 0)
+    {
+        printf("Found %zu pairs within the capture radius (%f)\n",
+               nfound_total, s->capture_distance);
+    }
     kdtree_free(TA); TA = NULL;
 
     kdtree_t * TD = kdtree_new(arr->data, arr->n_used, 10);
     assert(TD != NULL);
-//    kdtree_print_info(TD);
+    //    kdtree_print_info(TD);
     dvarray_free(arr);
     arr = NULL;
 
     double maxkde = 0;
     double maxpos[3] = {0};
-    printf("Grid search\n");
+    if(s->verbose > 1)
+    {
+        printf("Grid search\n");
+    }
     double rs = s->capture_distance;
+    double grid_average = 0;
+    double n_grid = 0;
     for(double x = -rs; x <= rs; x+=0.5) {
         for(double y = -rs; y <= rs; y+=0.5) {
             for(double z = -rs; z <= rs; z+=0.5) {
                 double P[] = {x, y, z};
+                if(v3_norm(P) > rs){
+                    continue;
+                }
                 double v = kdtree_kde(TD, P, s->sigma, 0);
+                grid_average += v;
+                n_grid++;
                 if(v > maxkde)
                 {
                     maxkde = v;
@@ -248,41 +298,93 @@ static void align_dots(const opts * s,
             }
         }
     }
+    grid_average /= n_grid;
 
-    printf("     Grid search: (% .2f, % .2f, % .2f) (kde=%.1f)\n",
-           maxpos[0], maxpos[1], maxpos[2], maxkde);
+    if(s->verbose > 1)
+    {
+        printf("     Grid search: (% .2f, % .2f, % .2f) (kde=%.1f)\n",
+               maxpos[0], maxpos[1], maxpos[2], maxkde);
+    }
 
     /* Refinement over the grid search */
     rs = 2*s->sigma; // Region size
     while(rs > 1e-3)
     {
-    double center[3];
-    memcpy(center, maxpos, 3*sizeof(double));
-    for(double x = -rs; x <= rs; x+= rs/5.0) {
-        for(double y = -rs; y <= rs; y+= rs/5.0) {
-            for(double z = -rs; z <= rs; z+= rs/5.0) {
-                double P[] = {
-                    x+center[0],
-                    y+center[1],
-                    z+center[2]};
-                double v = kdtree_kde(TD, P, s->sigma, 0);
-                //printf("%f, %f, %f -> %f\n", P[0], P[1], P[2], v);
-                if(v > maxkde)
-                {
-                    maxkde = v;
-                    memcpy(maxpos, P, 3*sizeof(double));
+        double center[3];
+        memcpy(center, maxpos, 3*sizeof(double));
+        for(double x = -rs; x <= rs; x+= rs/5.0) {
+            for(double y = -rs; y <= rs; y+= rs/5.0) {
+                for(double z = -rs; z <= rs; z+= rs/5.0) {
+                    double P[] = {
+                        x+center[0],
+                        y+center[1],
+                        z+center[2]};
+                    if(v3_norm(P) > rs){
+                        continue;
+                    }
+                    double v = kdtree_kde(TD, P, s->sigma, 0);
+                    //printf("%f, %f, %f -> %f\n", P[0], P[1], P[2], v);
+                    if(v > maxkde)
+                    {
+                        maxkde = v;
+                        memcpy(maxpos, P, 3*sizeof(double));
+                    }
                 }
             }
         }
-    }
-    rs /= 2.0;
+        rs /= 2.0;
     }
 
-    printf("Refined position: (% .2f, % .2f, % .2f) (kde=%.1f)\n",
-           maxpos[0],maxpos[1], maxpos[2], maxkde);
+    double sphere_radius = 3.0*s->sigma;
+    double kde_sphere = 0;
+    for(size_t kk = 0 ; kk < 12 ; kk++)
+    {
+        double P[3] = {icosahedron[3*kk],
+                       icosahedron[3*kk+1],
+                       icosahedron[3*kk+2]};
+        // Give specific radius
+        double nr = sphere_radius / v3_norm(P);
+        P[0] *= nr;
+        P[1] *= nr;
+        P[2] *= nr;
+        // Place at the maxpos
+        P[0] += maxpos[0];
+        P[1] += maxpos[1];
+        P[2] += maxpos[2];
+        double v = kdtree_kde(TD, P, s->sigma, 0);
+        if(v > kde_sphere)
+        {
+            kde_sphere = v;
+        }
+    }
+    if(kde_sphere > maxkde)
+    {
+        fprintf(stderr, "ERROR: Unexpected result\n");
+    }
 
     double P[] = {0,0,0};
-    printf("At origo, kde=%.2f\n", kdtree_kde(TD, P, s->sigma, 0));
+    double origo_kde = kdtree_kde(TD, P, s->sigma, 0);
+    if(s->verbose > 0)
+    {
+        printf("At origo, kde=%.2f (without any correction)\n", origo_kde);
+    }
+    if(s->verbose > 0)
+    {
+        printf("Refined position: (% .2f, % .2f, % .2f) (kde=%.1f)\n",
+               maxpos[0],maxpos[1], maxpos[2], maxkde);
+    }
+    if(maxkde < origo_kde)
+    {
+        fprintf(stderr, "Error: unexpected result!\n");
+    } else {
+        printf(" %.1fX better than in the surrounding sphere of radius %f\n",
+               maxkde / kde_sphere, sphere_radius );
+    }
+    if(s->verbose > 1)
+    {
+        printf("Grid average: %f\n", grid_average);
+    }
+
 
     kdtree_free(TD);
     TD = NULL;
@@ -303,12 +405,22 @@ int dw_align_dots(int argc, char ** argv)
         return EXIT_FAILURE;
     }
 
+    if(s->verbose > 1)
+    {
+        opts_print(s, stdout);
+    }
+
     /* Load the tables */
     if(s->verbose > 1)
     {
         printf("Reading %s\n", argv[optind]);
     }
     ftab_t * TA = ftab_from_tsv(argv[optind]);
+    if(TA == NULL)
+    {
+        opts_free(s);
+        exit(EXIT_FAILURE);
+    }
     double * XA = get_dots(s, TA);
     size_t nXA = TA->nrow;
     ftab_free(TA); TA = NULL;
@@ -322,6 +434,12 @@ int dw_align_dots(int argc, char ** argv)
         printf("Reading %s\n", argv[optind+1]);
     }
     ftab_t * TB = ftab_from_tsv(argv[optind+1]);
+    if(TB == NULL)
+    {
+        opts_free(s);
+        free(XA);
+        exit(EXIT_FAILURE);
+    }
     double * XB = get_dots(s, TB);
     size_t nXB = TB->nrow;
     ftab_free(TB); TB = NULL;
