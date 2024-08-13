@@ -19,7 +19,21 @@ typedef struct{
     /* Most number of points to use from each file.
      * A value of 0 is interpreted as "use all"
      */
-    int npoint;
+    size_t npoint;
+    /* Name of file to write to (optional) */
+    char * outfile;
+    /* Overwrite outfile ?  */
+    int overwrite;
+    /* Append to the outfile ? */
+    int append;
+
+    /* For storing the result */
+    double dx;
+    double dy;
+    double dz;
+    double kde;
+    /* Some measurement on how certain the result is */
+    double goodness;
 } opts;
 
 // Golden ratio
@@ -51,6 +65,7 @@ static opts * opts_new()
 
 static void opts_free(opts * s)
 {
+    free(s->outfile);
     free(s);
 }
 
@@ -66,12 +81,27 @@ static void usage(void)
     printf("usage: dw align-dots [<options>] file1.tsv file2.tsv\n");
     printf("\n");
     printf("Options:\n");
-    printf("--distance d, -d d\n"
-           "\tSet the capture distance, i.e. largest expected shift in pixels\n");
+    printf("--radius d, -d d\n"
+           "\tSet the capture radius, i.e. largest expected shift in pixels\n");
     printf("--sigma s, -s s\n"
            "\tSet the size of the KDE used to identify the peak\n");
     printf("--npoint n, -n n\n"
-           "\t set the maximum number of points to use from each file\n");
+           "\tset the maximum number of points to use from each file\n");
+    printf("--out file, -o file\n"
+           "\tWhere to write the results.\n");
+    printf("--overwrite\n"
+           "\tOverwrite the destination file if it exists\n");
+    printf("--append, -a\n"
+           "\tAppend to the output file\n");
+    printf("\n");
+    printf("Output columns:\n");
+    printf(" 1. dx\n");
+    printf(" 2. dy\n");
+    printf(" 3. dz\n");
+    printf(" 4. kde\n");
+    printf(" 5. goodness\n");
+    printf(" 6. reference file\n");
+    printf(" 7. other file\n");
     printf("\n");
     return;
 }
@@ -82,19 +112,24 @@ static void argparsing(int argc, char ** argv, opts * s)
     struct option longopts[] = {
         {"help", no_argument, NULL, 'h'},
         {"verbose", required_argument, NULL, 'v'},
-        {"distance", required_argument, NULL, 'd'},
-        {"radius",   required_argument, NULL, 'd'}, // alias for distance
+        {"radius",   required_argument, NULL, 'd'},
         {"npoint", required_argument, NULL, 'n'},
+        {"out",    required_argument, NULL, 'o'},
+        {"append", no_argument, NULL, 'a'},
         {"sigma", required_argument, NULL, 's'},
+        {"overwrite", no_argument, NULL, 'w'},
         {NULL, 0, NULL, 0}};
 
     int ch;
     while( (ch = getopt_long(argc, argv,
-                             "d:hn:s:v:",
+                             "ad:hn:o:s:v:w",
                              longopts, NULL)) != -1)
     {
         switch(ch)
         {
+        case 'a':
+            s->append = 1;
+            break;
         case 'd':
             s->capture_distance = atof(optarg);
             break;
@@ -105,16 +140,37 @@ static void argparsing(int argc, char ** argv, opts * s)
         case 'n':
             s->npoint = atol(optarg);
             break;
+        case 'o':
+            free(s->outfile);
+            s->outfile = strdup(optarg);
+            break;
         case 's':
             s->sigma = atof(optarg);
             break;
         case 'v':
             s->verbose = atoi(optarg);
             break;
+        case 'w':
+            s->overwrite = 1;
+            break;
         default:
             exit(EXIT_FAILURE);
         }
     }
+
+    if(s->outfile != NULL)
+    {
+        if(s->append == 0 && s->overwrite == 0)
+        {
+            if(dw_file_exist(s->outfile))
+            {
+                fprintf(stderr, "Error: The output file does already exists\n");
+                fprintf(stderr, "Consider --overwrite or --append\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
+
     s->optind = optind;
     return;
 }
@@ -229,7 +285,7 @@ static double v3_norm(const double * X)
 }
 
 
-static void align_dots(const opts * s,
+static void align_dots(opts * s,
                        const double * XA, size_t nXA,
                        const double * XB, size_t nXB)
 {
@@ -307,25 +363,30 @@ static void align_dots(const opts * s,
     }
 
     /* Refinement over the grid search */
-    rs = 2*s->sigma; // Region size
-    while(rs > 1e-3)
+    rs = 1.0*s->sigma; // Region size
+    while(rs > 1e-4)
     {
         double center[3];
         memcpy(center, maxpos, 3*sizeof(double));
-        for(double x = -rs; x <= rs; x+= rs/5.0) {
-            for(double y = -rs; y <= rs; y+= rs/5.0) {
-                for(double z = -rs; z <= rs; z+= rs/5.0) {
+        for(double x = -rs; x <= rs; x += rs/7.0) {
+            for(double y = -rs; y <= rs; y += rs/7.0) {
+                for(double z = -rs; z <= rs; z += rs/7.0) {
+                    // Only consider inside a sphere
+                    double X[] = {x, y, z};
+                    if(v3_norm(X) > rs){
+                        continue;
+                    }
+                    // Shift by the best position
                     double P[] = {
                         x+center[0],
                         y+center[1],
                         z+center[2]};
-                    if(v3_norm(P) > rs){
-                        continue;
-                    }
+
                     double v = kdtree_kde(TD, P, s->sigma, 0);
-                    //printf("%f, %f, %f -> %f\n", P[0], P[1], P[2], v);
+
                     if(v > maxkde)
                     {
+                        //printf("%f, %f, %f -> %f\n", P[0], P[1], P[2], v);
                         maxkde = v;
                         memcpy(maxpos, P, 3*sizeof(double));
                     }
@@ -386,6 +447,11 @@ static void align_dots(const opts * s,
     }
 
 
+    s->dx = maxpos[0];
+    s->dy = maxpos[1];
+    s->dz = maxpos[2];
+    s->kde = maxkde;
+    s->goodness = maxkde / kde_sphere;
     kdtree_free(TD);
     TD = NULL;
     return;
@@ -448,6 +514,13 @@ int dw_align_dots(int argc, char ** argv)
         return EXIT_FAILURE;
     }
 
+    /* Limit the number of dots to use? */
+    if(s->npoint > 0)
+    {
+        nXA > s->npoint ? nXA = s->npoint : 0;
+        nXB > s->npoint ? nXB = s->npoint : 0;
+    }
+
     if(s->verbose > 0)
     {
         printf("Will align %zu dots vs %zu\n", nXA, nXB);
@@ -459,6 +532,21 @@ int dw_align_dots(int argc, char ** argv)
     free(XB);
 
     /* Present the result */
+    if(s->outfile != NULL)
+    {
+        FILE * fid = NULL;
+        if(s->append)
+        {
+            fid = fopen(s->outfile, "a");
+        } else {
+            fid = fopen(s->outfile, "w");
+        }
+        fprintf(fid, "%f, %f, %f", s->dx, s->dy, s->dz);
+        fprintf(fid, ", %f, %f", s->kde, s->goodness);
+        fprintf(fid, ", '%s'", argv[optind]);
+        fprintf(fid, ", '%s'", argv[optind+1]);
+        fprintf(fid, "\n");
+    }
 
     opts_free(s);
     s = NULL;
