@@ -83,8 +83,6 @@ int main(int argc, char ** argv)
             return sparse_preprocess_cli(argc-1, argv+1);
         }
 
-    }
-
     if( strcmp(argv[1], "align-dots") == 0)
     {
 #ifdef dw_module_align_dots
@@ -94,6 +92,8 @@ int main(int argc, char ** argv)
         exit(EXIT_FAILURE);
 #endif
     }
+
+    } // argc
 
     dw_opts * s = dw_opts_new(); /* Load default settings and initialize */
     dw_argparsing(argc, argv, s); /* Parse command line */
