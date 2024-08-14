@@ -1,12 +1,17 @@
 #include "kdtree.h"
 #include <assert.h>
 #include <getopt.h>
+#include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "ftab.h"
 #include "dw_version.h"
 #include "dw_util.h"
+
+/* If you want to make it almost twice as fast, store the results from
+* the first grid search, i.e, when looking for maxkde and reuse when
+* looking for maxkde2 */
 
 typedef struct{
     int verbose;
@@ -36,6 +41,7 @@ typedef struct{
     double goodness;
 } opts;
 
+
 // Golden ratio
 const double PHI = 1.618033988749;
 
@@ -53,13 +59,46 @@ const double icosahedron[36] = {0, PHI, 1,
                                 PHI, -1, 0,
                                 -PHI, -1, 0};
 
+/* Get the value of the linspace from a to b with n points at idx */
+static double linspace(double a, double b, size_t n, size_t idx)
+{
+    return a + (b-a)*(double) idx/ (double) (n-1);
+}
+
+/* Return the smallest number of points, n, required for a
+* linspace [a, b] with dx being at most delta */
+static size_t linspace_n(double a, double b, double delta)
+{
+    return (size_t) ceil((b-a) / delta) + 1;
+}
+
+static void linspace_ut()
+{
+
+    for(int kk = 1; kk<5; kk+=kk)
+    {
+        /* Middle point should be 0 */
+        //printf("%f, %f, %zu, %zu, %f\n", -1.0, 1.0, 2*kk+1, kk, linspace(-1, 1, 2*kk+1, kk));
+        assert( linspace(-1, 1, 2*kk+1, kk) == 0 );
+        /* 0 -> a */
+        assert( linspace(-1, 1, 2*kk+1, 0) == -1 );
+        /* n-1 -> b */
+        assert( linspace(-1, 1, 2*kk+1, 2*kk) == 1);
+    }
+    /* [0, 1] */
+    assert(linspace_n(0, 1, 1) == 2);
+    /* [-1, 0] */
+    assert(linspace_n(-1,0, 1) == 2);
+    assert(linspace_n(0, 5, 1) == 6);
+}
+
 static opts * opts_new()
 {
     opts * s = calloc(1, sizeof(opts));
     assert(s != NULL);
     s->verbose = 1;
     s->capture_distance = 10;
-    s->sigma = 1;
+    s->sigma = 0.4;
     return s;
 }
 
@@ -78,13 +117,22 @@ static void opts_print(opts * s, FILE * fid)
 
 static void usage(void)
 {
+    opts * dopts = opts_new();
+    printf(
+           "With the dots in the first table as reference, estimate how the \n"
+           "dots in the second table are shifted. Add the returned value to\n"
+           "the coordinates in the 1st table, or subtract them from the coordinates\n"
+           "in the 2nd table to align the dots\n");
+    printf("\n");
     printf("usage: dw align-dots [<options>] file1.tsv file2.tsv\n");
     printf("\n");
     printf("Options:\n");
     printf("--radius d, -d d\n"
-           "\tSet the capture radius, i.e. largest expected shift in pixels\n");
+           "\tSet the capture radius, i.e. largest expected shift in pixels\n"
+           "\tDefault value: %.1f\n", dopts->capture_distance);
     printf("--sigma s, -s s\n"
-           "\tSet the size of the KDE used to identify the peak\n");
+           "\tSet the size of the KDE used to identify the peak\n"
+           "\tDefault value: %.2f\n", dopts->sigma);
     printf("--npoint n, -n n\n"
            "\tset the maximum number of points to use from each file\n");
     printf("--out file, -o file\n"
@@ -103,6 +151,8 @@ static void usage(void)
     printf(" 6. reference file\n");
     printf(" 7. other file\n");
     printf("\n");
+    opts_free(dopts);
+    dopts = NULL;
     return;
 }
 
@@ -279,11 +329,21 @@ struct dvarray * dvarray_new(size_t n)
     return A;
 }
 
+static double v3_norm_sq(const double * X)
+{
+    return pow(X[0], 2) + pow(X[1], 2) + pow(X[2], 2);
+}
+
+
 static double v3_norm(const double * X)
 {
     return sqrt( pow(X[0], 2) + pow(X[1], 2) + pow(X[2], 2));
 }
 
+static double eudist3_sq(const double * A, const double * B)
+{
+    return pow(A[0]-B[0], 2.0) + pow(A[1]-B[1], 2.0) + pow(A[2]-B[2], 2.0);
+}
 
 static void align_dots(opts * s,
                        const double * XA, size_t nXA,
@@ -321,6 +381,12 @@ static void align_dots(opts * s,
     }
     kdtree_free(TA); TA = NULL;
 
+    if(nfound_total < 1)
+    {
+        printf("No points to work with, exiting\n");
+        exit(EXIT_FAILURE);
+    }
+
     kdtree_t * TD = kdtree_new(arr->data, arr->n_used, 10);
     assert(TD != NULL);
     //    kdtree_print_info(TD);
@@ -334,13 +400,23 @@ static void align_dots(opts * s,
         printf("Grid search\n");
     }
     double rs = s->capture_distance;
+    double rs2 = pow(rs, 2.0);
     double grid_average = 0;
     double n_grid = 0;
-    for(double x = -rs; x <= rs; x+=0.5) {
+
+    size_t n = linspace_n(-rs, rs, 0.5);
+
+    linspace_ut();
+
+    //for(double z = -rs; z <= rs; z+=0.5) {
+    #pragma omp parallel for
+    for(size_t iz = 0; iz < n; iz++) {
+        double z = linspace(-rs, rs, n, iz);
         for(double y = -rs; y <= rs; y+=0.5) {
-            for(double z = -rs; z <= rs; z+=0.5) {
+            for(double x = -rs; x <= rs; x+=0.5) {
+
                 double P[] = {x, y, z};
-                if(v3_norm(P) > rs){
+                if(v3_norm_sq(P) > rs2){
                     continue;
                 }
                 double v = kdtree_kde(TD, P, s->sigma, 0);
@@ -348,8 +424,11 @@ static void align_dots(opts * s,
                 n_grid++;
                 if(v > maxkde)
                 {
+                    #pragma omp critical
+                    {
                     maxkde = v;
                     memcpy(maxpos, P, 3*sizeof(double));
+                    }
                 }
             }
         }
@@ -364,6 +443,7 @@ static void align_dots(opts * s,
 
     /* Refinement over the grid search */
     rs = 1.0*s->sigma; // Region size
+    rs2 = pow(rs, 2.0);
     while(rs > 1e-4)
     {
         double center[3];
@@ -373,7 +453,7 @@ static void align_dots(opts * s,
                 for(double z = -rs; z <= rs; z += rs/7.0) {
                     // Only consider inside a sphere
                     double X[] = {x, y, z};
-                    if(v3_norm(X) > rs){
+                    if(v3_norm_sq(X) > rs2){
                         continue;
                     }
                     // Shift by the best position
@@ -420,40 +500,117 @@ static void align_dots(opts * s,
     }
     if(kde_sphere > maxkde)
     {
-        fprintf(stderr, "ERROR: Unexpected result\n");
+        fprintf(stderr, "Error: unexpected result! Please report this as a bug\n");
+        fprintf(stderr, "       at %s %d\n", __FILE__, __LINE__);
+        exit(EXIT_FAILURE);
+    }
+
+    /* 2nd grid search to figure out what the 2nd best position is */
+    double maxkde2 = 0;
+    double maxpos2[3] = {0};
+    {
+        /* We will exclude points withing 1 + s->sigma */
+        double sigma2 = pow(2.0 + s->sigma, 2.0);
+        if(s->verbose > 1)
+        {
+            printf("Grid search #2 -- searching for 2nd maxima\n");
+        }
+        double rs = s->capture_distance;
+        double rs2 = pow(rs, 2.0);
+
+
+        //for(double z = -rs; z <= rs; z+=0.5) {
+        n = linspace_n(-rs, rs, 0.5);
+        // double * KDE = calloc(n*n*n, sizeof(double)); // TODO
+
+        #pragma omp parallel for
+        for(size_t iz = 0; iz< n; iz++) {
+            double z = linspace(-rs, rs, n, iz);
+            for(double y = -rs; y <= rs; y+=0.5) {
+                for(double x = -rs; x <= rs; x+=0.5) {
+
+                    double P[] = {x, y, z};
+                    if(v3_norm_sq(P) > rs2){
+                        continue;
+                    }
+                    /* Don't compare close the maxima that we found */
+                    if(eudist3_sq(P, maxpos) < sigma2)
+                    {
+                        continue;
+                    }
+                    double v = kdtree_kde(TD, P, s->sigma, 0);
+                    if(v > maxkde2)
+                    {
+                        #pragma omp critical
+                        {
+                            maxkde2 = v;
+                            memcpy(maxpos2, P, 3*sizeof(double));
+                        }
+                    }
+                }
+            }
+        }
     }
 
     double P[] = {0,0,0};
     double origo_kde = kdtree_kde(TD, P, s->sigma, 0);
-    if(s->verbose > 0)
+    if(s->verbose > 1)
     {
         printf("At origo, kde=%.2f (without any correction)\n", origo_kde);
     }
-    if(s->verbose > 0)
+    if(s->verbose > 1)
     {
         printf("Refined position: (% .2f, % .2f, % .2f) (kde=%.1f)\n",
                maxpos[0],maxpos[1], maxpos[2], maxkde);
     }
+
     if(maxkde < origo_kde)
     {
-        fprintf(stderr, "Error: unexpected result!\n");
-    } else {
-        printf(" %.1fX better than in the surrounding sphere of radius %f\n",
-               maxkde / kde_sphere, sphere_radius );
+        fprintf(stderr, "Error: unexpected result! Please report this as a bug\n");
+        fprintf(stderr, "       at %s %d\n", __FILE__, __LINE__);
+        exit(EXIT_FAILURE);
     }
+
     if(s->verbose > 1)
     {
         printf("Grid average: %f\n", grid_average);
     }
 
+    if(s->verbose > 1)
+    {
+        printf("secondary maxima value: %f at (%f, %f, %f)\n",
+               maxkde2,
+               maxpos2[0],
+               maxpos2[1],
+               maxpos2[2]);
+    }
+
+    if(s->verbose > 0)
+    {
+        printf("Estimated shift: [% .2f, % .2f, % .2f] pixels. KDE=%.1f. Score=%.1f (%.1f/%.1f)\n",
+               maxpos[0], maxpos[1], maxpos[2],
+               maxkde, maxkde/maxkde2, maxkde, maxkde2);
+
+        if(maxkde < 2)
+        {
+            printf("Warning: The KDE value is very low, should be at least 2\n");
+        }
+
+        if(maxkde < 2.0 * maxkde2)
+        {
+            printf("Warning: The KDE should be at least 2X of the secondary peak\n");
+        }
+    }
 
     s->dx = maxpos[0];
     s->dy = maxpos[1];
     s->dz = maxpos[2];
     s->kde = maxkde;
-    s->goodness = maxkde / kde_sphere;
+    s->goodness = maxkde / maxkde2;
     kdtree_free(TD);
     TD = NULL;
+
+
     return;
 
 }
