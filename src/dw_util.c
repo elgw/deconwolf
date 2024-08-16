@@ -169,14 +169,19 @@ int dw_get_threads(void)
     return nThreads;
 }
 
-int dw_file_exist(char * fname)
+
+int dw_isfile(const char * fname)
 {
 #ifndef WINDOWS
-    if( access( fname, F_OK ) != -1 ) {
-        return 1; // File exist
-    } else {
+    struct stat buf;
+    if(stat(fname, &buf) < 0) {
         return 0;
     }
+
+    if(S_ISDIR(buf.st_mode) != 0) {
+        return 0;
+    }
+    return 1;
 #else
     FILE * fid = fopen(fname, "r");
     if(fid == NULL)
@@ -277,7 +282,7 @@ float dw_read_scaling(char * file)
     char * logfile = malloc(strlen(file)+32);
     assert(logfile != NULL);
     sprintf(logfile, "%s.log.txt", file);
-    if( ! dw_file_exist(logfile))
+    if( ! dw_isfile(logfile))
     {
         goto leave;
     }

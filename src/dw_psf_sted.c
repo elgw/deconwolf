@@ -249,7 +249,7 @@ static void argparsing(int argc, char ** argv, opts * s)
 
     if(s->overwrite == 0)
     {
-        if(dw_file_exist(s->outfile))
+        if(dw_isfile(s->outfile))
         {
             printf("%s exists, leaving\n", s->outfile);
             printf("if you don't care, use --overwrite\n");

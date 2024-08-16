@@ -59,7 +59,7 @@ void dw_gettime(struct timespec *);
  */
 int ensuredir(const char * dir);
 
-/* Check if directory exist, do not create if missing
+/* Check if directory exist
  * returns 1 if it exist
  * */
 
@@ -70,8 +70,10 @@ int isdir(const char * dir);
  */
 int dw_get_threads(void);
 
-/* Return 1 if the file exist, else 0 */
-int dw_file_exist(char * fname);
+/* Return 1 if the file exist, else 0
+ * also returns 0 if fname is a folder (some consider that to be a file as well)
+ */
+int dw_isfile(const char * fname);
 
 /* Difference between two timepoints */
 float timespec_diff(struct timespec* end, struct timespec * start);

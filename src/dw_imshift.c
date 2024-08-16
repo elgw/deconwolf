@@ -143,7 +143,7 @@ int dw_imshift(int argc, char ** argv)
     double dy = s->dy;
     double dz = s->dz;
 
-    if(!dw_file_exist(inFile))
+    if(!dw_isfile(inFile))
     {
         printf("Can't open %s!\n", inFile);
         exit(1);
@@ -168,7 +168,7 @@ int dw_imshift(int argc, char ** argv)
         fprintf(stdout, "Ouput file: %s\n", outFile);
     }
 
-    if(s->overwrite == 0 && dw_file_exist(outFile))
+    if(s->overwrite == 0 && dw_isfile(outFile))
     {
         printf("%s exists, skipping.\n", outFile);
         exit(EXIT_SUCCESS);

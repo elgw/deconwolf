@@ -370,7 +370,7 @@ fimo * get_reduction(opts * s, char * file)
 
 void segment_image_rf(opts * s, PrfForest * F, char * file)
 {
-    if(!dw_file_exist(file))
+    if(!dw_isfile(file))
     {
         printf("%s does not exist\n", file);
         return;
@@ -379,7 +379,7 @@ void segment_image_rf(opts * s, PrfForest * F, char * file)
     assert(outfile != NULL);
     sprintf(outfile, "%s.mask.tif", file);
     printf("%s -> %s", file, outfile);
-    if(dw_file_exist(outfile) && s->overwrite == 0)
+    if(dw_isfile(outfile) && s->overwrite == 0)
     {
         printf(" File exist. Skipping\n");
         return;

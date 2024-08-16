@@ -1556,7 +1556,7 @@ void clu_prepare_kernels(clu_env_t * clu,
     }
 
     int load_vkfft_from_file = 0;
-    if(dw_file_exist(vkfft_cache_file_name))
+    if(dw_isfile(vkfft_cache_file_name))
     {
         load_vkfft_from_file = 1;
     }
