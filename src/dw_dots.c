@@ -612,7 +612,7 @@ int main(int argc, char ** argv)
 
 void detect_dots(opts * s, char * inFile)
 {
-    if(!dw_file_exist(inFile))
+    if(!dw_isfile(inFile))
     {
         fprintf(stderr, "Can't open %s!\n", inFile);
         return;
@@ -657,7 +657,7 @@ void detect_dots(opts * s, char * inFile)
         fprintf(stdout, "Ouput file: %s\n", outFile);
     }
 
-    if(s->overwrite == 0 && dw_file_exist(outFile))
+    if(s->overwrite == 0 && dw_isfile(outFile))
     {
         printf("%s exists, skipping.\n", outFile);
         return;

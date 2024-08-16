@@ -936,13 +936,13 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
 
     /* Set s->outFile and s->outFolder based on s->imFile */
     if(s->outFile == NULL)
-    {        
+    {
         s->outFile = dw_prefix_file(s->imFile, s->prefix);
-   
-        char * dname = dw_dirname(s->imFile);        
+
+        char * dname = dw_dirname(s->imFile);
         s->outFolder = malloc(strlen(dname) + 16);
         assert(s->outFolder != NULL);
-        sprintf(s->outFolder, "%s%c", dname, FILESEP);      
+        sprintf(s->outFolder, "%s%c", dname, FILESEP);
         free(dname);
         if(s->verbosity > 1)
         {
@@ -959,7 +959,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
 
     if(! s->iterdump)
     {
-        if( s->overwrite == 0 && dw_file_exist(s->outFile))
+        if( s->overwrite == 0 && dw_isfile(s->outFile))
         {
             printf("%s already exist. Use --overwrite to overwrite existing files.\n",
                    s->outFile);
@@ -1986,7 +1986,7 @@ void dcw_init_log(dw_opts * s)
         fprintf(stderr, "Unable to open %s for writing\n", s->logFile);
         fprintf(stderr,
             "Please check that you have permissions to write to the folder\n"
-            "and that the drive is not full\n");        
+            "and that the drive is not full\n");
         exit(EXIT_FAILURE);
     }
     assert(s->log != NULL);

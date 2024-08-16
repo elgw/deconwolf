@@ -126,7 +126,7 @@ int dw_tiff_max(int argc, char ** argv)
     {
         inFile = argv[ff];
 
-        if(!dw_file_exist(inFile))
+        if(!dw_isfile(inFile))
         {
             printf("Can't open %s!\n", inFile);
             exit(EXIT_FAILURE);
@@ -142,7 +142,7 @@ int dw_tiff_max(int argc, char ** argv)
                 fprintf(stdout, "Output file: %s\n", outFile);
             }
 
-            if(s->overwrite == 0 && dw_file_exist(outFile))
+            if(s->overwrite == 0 && dw_isfile(outFile))
             {
                 printf("%s exists, skipping.\n", outFile);
             } else {
@@ -172,7 +172,7 @@ int dw_tiff_max(int argc, char ** argv)
         {
             char * outFile = malloc(strlen(inFile) + 20);
             sprintf(outFile, "s%04d_%s", s->slice, inFile);
-            if(dw_file_exist(outFile) && s->overwrite == 0)
+            if(dw_isfile(outFile) && s->overwrite == 0)
             {
                 printf("%s exists, skipping.\n", outFile);
             } else {

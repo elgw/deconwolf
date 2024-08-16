@@ -92,7 +92,7 @@ int dw_tiff_merge(int argc, char ** argv)
     char * outfile = argv[conf->optind];
     if(conf->overwrite == 0)
     {
-        if(dw_file_exist(outfile) == 1)
+        if(dw_isfile(outfile) == 1)
         {
             printf("%s already exists, doing nothing. Use --overwrite to overwrite existing files\n",
                    outfile);

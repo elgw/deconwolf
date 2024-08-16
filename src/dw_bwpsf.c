@@ -720,7 +720,7 @@ int main(int argc, char ** argv)
     bw_conf * conf = bw_conf_new();
     bw_argparsing(argc, argv, conf);
 
-    if( conf->overwrite == 0 && dw_file_exist(conf->outFile))
+    if( conf->overwrite == 0 && dw_isfile(conf->outFile))
     {
         printf("%s already exist. Doing nothing\n", conf->outFile);
         bw_conf_free(&conf);

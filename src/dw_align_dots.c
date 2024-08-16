@@ -9,10 +9,6 @@
 #include "dw_version.h"
 #include "dw_util.h"
 
-/* If you want to make it almost twice as fast, store the results from
-* the first grid search, i.e, when looking for maxkde and reuse when
-* looking for maxkde2 */
-
 typedef struct{
     int verbose;
     /* Largest shift, in pixels, to consider between
@@ -32,6 +28,9 @@ typedef struct{
     /* Append to the outfile ? */
     int append;
 
+    /* Magnification factor for the 2nd list of dots */
+    double mag;
+
     /* For storing the result */
     double dx;
     double dy;
@@ -39,6 +38,7 @@ typedef struct{
     double kde;
     /* Some measurement on how certain the result is */
     double goodness;
+
 } opts;
 
 
@@ -66,7 +66,7 @@ static double linspace(double a, double b, size_t n, size_t idx)
 }
 
 /* Return the smallest number of points, n, required for a
-* linspace [a, b] with dx being at most delta */
+ * linspace [a, b] with dx being at most delta */
 static size_t linspace_n(double a, double b, double delta)
 {
     return (size_t) ceil((b-a) / delta) + 1;
@@ -99,6 +99,7 @@ static opts * opts_new()
     s->verbose = 1;
     s->capture_distance = 10;
     s->sigma = 0.4;
+    s->mag = 1.0;
     return s;
 }
 
@@ -150,6 +151,9 @@ static void usage(void)
     printf(" 5. goodness\n");
     printf(" 6. reference file\n");
     printf(" 7. other file\n");
+    printf(" 8. magnification\n");
+    printf(" 9. sigma\n");
+    printf("10. search radius\n");
     printf("\n");
     opts_free(dopts);
     dopts = NULL;
@@ -163,6 +167,7 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"help", no_argument, NULL, 'h'},
         {"verbose", required_argument, NULL, 'v'},
         {"radius",   required_argument, NULL, 'd'},
+        {"mag",      required_argument, NULL, 'm'},
         {"npoint", required_argument, NULL, 'n'},
         {"out",    required_argument, NULL, 'o'},
         {"append", no_argument, NULL, 'a'},
@@ -172,7 +177,7 @@ static void argparsing(int argc, char ** argv, opts * s)
 
     int ch;
     while( (ch = getopt_long(argc, argv,
-                             "ad:hn:o:s:v:w",
+                             "ad:hm:n:o:s:v:w",
                              longopts, NULL)) != -1)
     {
         switch(ch)
@@ -186,6 +191,9 @@ static void argparsing(int argc, char ** argv, opts * s)
         case 'h':
             usage();
             exit(EXIT_SUCCESS);
+            break;
+        case 'm':
+            s->mag = atof(optarg);
             break;
         case 'n':
             s->npoint = atol(optarg);
@@ -212,7 +220,7 @@ static void argparsing(int argc, char ** argv, opts * s)
     {
         if(s->append == 0 && s->overwrite == 0)
         {
-            if(dw_file_exist(s->outfile))
+            if(dw_isfile(s->outfile))
             {
                 fprintf(stderr, "Error: The output file does already exists\n");
                 fprintf(stderr, "Consider --overwrite or --append\n");
@@ -222,6 +230,22 @@ static void argparsing(int argc, char ** argv, opts * s)
     }
 
     s->optind = optind;
+    return;
+}
+
+static void magnify_dots(double * X, size_t n, double mag)
+{
+    if(mag == 1.0)
+    {
+        return;
+    }
+    for(size_t kk = 0; kk<n ; kk++)
+    {
+        for(size_t dd = 0; dd < 3; dd++)
+        {
+            X[3*kk + dd] *= mag;
+        }
+    }
     return;
 }
 
@@ -334,12 +358,6 @@ static double v3_norm_sq(const double * X)
     return pow(X[0], 2) + pow(X[1], 2) + pow(X[2], 2);
 }
 
-
-static double v3_norm(const double * X)
-{
-    return sqrt( pow(X[0], 2) + pow(X[1], 2) + pow(X[2], 2));
-}
-
 static double eudist3_sq(const double * A, const double * B)
 {
     return pow(A[0]-B[0], 2.0) + pow(A[1]-B[1], 2.0) + pow(A[2]-B[2], 2.0);
@@ -401,39 +419,49 @@ static void align_dots(opts * s,
     }
     double rs = s->capture_distance;
     double rs2 = pow(rs, 2.0);
-    double grid_average = 0;
-    double n_grid = 0;
 
     size_t n = linspace_n(-rs, rs, 0.5);
 
     linspace_ut();
 
-    //for(double z = -rs; z <= rs; z+=0.5) {
-    #pragma omp parallel for
+    double * KDE = calloc(n*n*n, sizeof(double));
+    assert(KDE != NULL);
+
+    /* Initial grid search */
+#pragma omp parallel for
     for(size_t iz = 0; iz < n; iz++) {
         double z = linspace(-rs, rs, n, iz);
-        for(double y = -rs; y <= rs; y+=0.5) {
-            for(double x = -rs; x <= rs; x+=0.5) {
+        for(size_t iy = 0; iy < n; iy ++) {
+            double y = linspace(-rs, rs, n, iy);
+            for(size_t ix = 0; ix < n; ix++) {
+                double x = linspace(-rs, rs, n, ix);
 
                 double P[] = {x, y, z};
                 if(v3_norm_sq(P) > rs2){
                     continue;
                 }
                 double v = kdtree_kde(TD, P, s->sigma, 0);
-                grid_average += v;
-                n_grid++;
-                if(v > maxkde)
+                KDE[n*n*iz + n*iy + ix] = v;
+            }
+        }
+    }
+
+    /* Search through the grid to determine the max pos and value */
+    for(size_t iz = 0; iz < n; iz++) {
+        for(size_t iy = 0; iy < n; iy ++) {
+            for(size_t ix = 0; ix < n; ix++) {
+                double v = KDE[n*n*iz + n*iy + ix];
+                if( v > maxkde )
                 {
-                    #pragma omp critical
-                    {
+                    double x = linspace(-rs, rs, n, ix);
+                    double y = linspace(-rs, rs, n, iy);
+                    double z = linspace(-rs, rs, n, iz);
                     maxkde = v;
-                    memcpy(maxpos, P, 3*sizeof(double));
-                    }
+                    maxpos[0] = x; maxpos[1] = y; maxpos[2] = z;
                 }
             }
         }
     }
-    grid_average /= n_grid;
 
     if(s->verbose > 1)
     {
@@ -476,34 +504,6 @@ static void align_dots(opts * s,
         rs /= 2.0;
     }
 
-    double sphere_radius = 3.0*s->sigma;
-    double kde_sphere = 0;
-    for(size_t kk = 0 ; kk < 12 ; kk++)
-    {
-        double P[3] = {icosahedron[3*kk],
-                       icosahedron[3*kk+1],
-                       icosahedron[3*kk+2]};
-        // Give specific radius
-        double nr = sphere_radius / v3_norm(P);
-        P[0] *= nr;
-        P[1] *= nr;
-        P[2] *= nr;
-        // Place at the maxpos
-        P[0] += maxpos[0];
-        P[1] += maxpos[1];
-        P[2] += maxpos[2];
-        double v = kdtree_kde(TD, P, s->sigma, 0);
-        if(v > kde_sphere)
-        {
-            kde_sphere = v;
-        }
-    }
-    if(kde_sphere > maxkde)
-    {
-        fprintf(stderr, "Error: unexpected result! Please report this as a bug\n");
-        fprintf(stderr, "       at %s %d\n", __FILE__, __LINE__);
-        exit(EXIT_FAILURE);
-    }
 
     /* 2nd grid search to figure out what the 2nd best position is */
     double maxkde2 = 0;
@@ -524,10 +524,12 @@ static void align_dots(opts * s,
         // double * KDE = calloc(n*n*n, sizeof(double)); // TODO
 
         #pragma omp parallel for
-        for(size_t iz = 0; iz< n; iz++) {
+        for(size_t iz = 0; iz < n; iz++) {
             double z = linspace(-rs, rs, n, iz);
-            for(double y = -rs; y <= rs; y+=0.5) {
-                for(double x = -rs; x <= rs; x+=0.5) {
+            for(size_t iy = 0; iy < n; iy ++) {
+                double y = linspace(-rs, rs, n, iy);
+                for(size_t ix = 0; ix < n; ix++) {
+                    double x = linspace(-rs, rs, n, ix);
 
                     double P[] = {x, y, z};
                     if(v3_norm_sq(P) > rs2){
@@ -538,19 +540,19 @@ static void align_dots(opts * s,
                     {
                         continue;
                     }
-                    double v = kdtree_kde(TD, P, s->sigma, 0);
+                    double v = KDE[n*n*iz + n*iy + ix];
                     if(v > maxkde2)
                     {
-                        #pragma omp critical
-                        {
-                            maxkde2 = v;
-                            memcpy(maxpos2, P, 3*sizeof(double));
-                        }
+                        maxkde2 = v;
+                        memcpy(maxpos2, P, 3*sizeof(double));
                     }
                 }
             }
         }
     }
+
+    free(KDE);
+    KDE = NULL;
 
     double P[] = {0,0,0};
     double origo_kde = kdtree_kde(TD, P, s->sigma, 0);
@@ -573,11 +575,6 @@ static void align_dots(opts * s,
 
     if(s->verbose > 1)
     {
-        printf("Grid average: %f\n", grid_average);
-    }
-
-    if(s->verbose > 1)
-    {
         printf("secondary maxima value: %f at (%f, %f, %f)\n",
                maxkde2,
                maxpos2[0],
@@ -587,9 +584,9 @@ static void align_dots(opts * s,
 
     if(s->verbose > 0)
     {
-        printf("Estimated shift: [% .2f, % .2f, % .2f] pixels. KDE=%.1f. Score=%.1f (%.1f/%.1f)\n",
+        printf("Estimated shift: [% .2f, % .2f, % .2f] pixels, KDE=%.2f, Score=%.2f (%.1f/%.1f) mag=%f\n",
                maxpos[0], maxpos[1], maxpos[2],
-               maxkde, maxkde/maxkde2, maxkde, maxkde2);
+               maxkde, maxkde/maxkde2, maxkde, maxkde2, s->mag);
 
         if(maxkde < 2)
         {
@@ -628,6 +625,22 @@ int dw_align_dots(int argc, char ** argv)
         return EXIT_FAILURE;
     }
 
+    if(!dw_isfile(argv[optind]))
+    {
+        fprintf(stderr, "%s does not exist or can not be opened\n",
+                argv[optind]);
+        opts_free(s);
+        exit(EXIT_FAILURE);
+    }
+
+    if(!dw_isfile(argv[optind+1]))
+    {
+        fprintf(stderr, "%s does not exist or can not be opened\n",
+                argv[optind+1]);
+        opts_free(s);
+        exit(EXIT_FAILURE);
+    }
+
     if(s->verbose > 1)
     {
         opts_print(s, stdout);
@@ -664,6 +677,9 @@ int dw_align_dots(int argc, char ** argv)
         exit(EXIT_FAILURE);
     }
     double * XB = get_dots(s, TB);
+
+
+
     size_t nXB = TB->nrow;
     ftab_free(TB); TB = NULL;
     if(XB == NULL)
@@ -671,12 +687,15 @@ int dw_align_dots(int argc, char ** argv)
         return EXIT_FAILURE;
     }
 
+
     /* Limit the number of dots to use? */
     if(s->npoint > 0)
     {
         nXA > s->npoint ? nXA = s->npoint : 0;
         nXB > s->npoint ? nXB = s->npoint : 0;
     }
+
+    magnify_dots(XB, nXB, s->mag);
 
     if(s->verbose > 0)
     {
@@ -702,6 +721,9 @@ int dw_align_dots(int argc, char ** argv)
         fprintf(fid, ", %f, %f", s->kde, s->goodness);
         fprintf(fid, ", '%s'", argv[optind]);
         fprintf(fid, ", '%s'", argv[optind+1]);
+        fprintf(fid, ", %f", s->mag);
+        fprintf(fid, ", %f", s->sigma);
+        fprintf(fid, ", %f", s->capture_distance);
         fprintf(fid, "\n");
     }
 
