@@ -1771,6 +1771,7 @@ void fim_conv1_vector(float * restrict V, const int stride, float * restrict W,
         Walloc = 1;
     }
 
+
     const size_t k2 = (nKu-1)/2;
 
     size_t bpos = 0;
@@ -1807,17 +1808,19 @@ void fim_conv1_vector(float * restrict V, const int stride, float * restrict W,
     if(nKu <= nV)
     {
         /* Crossing the first edge */
-        for(size_t vv = 0;vv<k2; vv++)
+        for(size_t vv = 0; vv<k2; vv++)
         {
             double acc0 = 0;
             double kacc = 0;
-            for(size_t kk = k2-vv; kk<nKu; kk++)
+            for(size_t kk = k2-vv; kk < nKu; kk++)
             {
+
                 assert((vv-k2+kk) < nV);
                 acc0 = acc0 + K[kk]*V[(vv-k2+kk)*stride];
 
                 kacc += K[kk];
             }
+
             if(normalized)
             {
                 W[bpos++] = acc0/kacc;
@@ -1896,10 +1899,16 @@ static float * gaussian_kernel(float sigma, size_t * nK)
 
     float s2 = pow(sigma, 2);
     float k0 = 1.0/sigma/sqrt(2.0*M_PI);
+    double sum = 0;
     for(int kk = 0; kk<N; kk++)
     {
         float x = (float) kk - mid;
         K[kk] = k0*exp(-0.5*pow(x,2)/s2);
+        sum+=K[kk];
+    }
+    for(int kk = 0; kk<N; kk++)
+    {
+        K[kk] /= sum;
     }
 
     nK[0] = N;
@@ -2063,7 +2072,10 @@ void fim_gsmooth_aniso(float * restrict V,
     return;
 }
 
-void fim_gsmooth(float * restrict V, size_t M, size_t N, size_t P, float sigma)
+/* Isotropic smoothing with Gaussian filter */
+void fim_gsmooth(float * restrict V,
+                 size_t M, size_t N, size_t P,
+                 float sigma)
 {
     fim_gsmooth_aniso(V, M, N, P, sigma, sigma);
 }
@@ -3098,8 +3110,10 @@ int * fim_conncomp6(const float * im, size_t M, size_t N)
     return lab;
 }
 
-int fim_convn1(float * restrict V, size_t M, size_t N, size_t P,
-               const float * K, size_t nK,
+/* 1D convolution along 1 dimension in a 3D image */
+int fim_convn1(float * restrict V,
+               size_t M, size_t N, size_t P, // image size
+               const float * K, size_t nK, // Kernel
                int dim, const int normalized)
 {
     if(dim < 0 || dim > 2)
@@ -3145,7 +3159,6 @@ int fim_convn1(float * restrict V, size_t M, size_t N, size_t P,
 #pragma omp for
             for(size_t nn = 0; nn<N; nn++)
             {
-
                 for(size_t mm = 0; mm<M; mm++)
                 {
                     fim_conv1_vector(V+mm+M*nn, M*N, buff, P, K, nK, normalized);
