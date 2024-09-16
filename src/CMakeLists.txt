@@ -1,94 +1,72 @@
-cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
-project(deconwolf LANGUAGES C)
+# This file is to create a library out of some of the functions
+# in dw.
+# You might want to append the install directory to
+# /etc/ld.so.conf
+# and then run ldconfig
 
-set(WINDOWS, FALSE)
-#set(WINDOWS TRUE)
+cmake_minimum_required(VERSION 3.9 FATAL_ERROR)
+project(libdw LANGUAGES C)
 
-set(CMAKE_C_FLAGS_DEBUG_INIT "-Wall -O0 -g -std=gnu99")
-set(CMAKE_C_FLAGS_RELEASE_INIT "-Wall -O3 -DNDEBUG -flto -march=native -std=gnu99")
+set (CMAKE_C_STANDARD 11)
 
-INCLUDE_DIRECTORIES(/usr/include)
-LINK_DIRECTORIES(/usr/lib/x86_64-linux-gnu)
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
-add_executable(dw
-  dw.c
-  fft.c
+option (ENABLE_GPU "Enable GPU/OpenCL" OFF)
+
+add_library( dwip SHARED
   fim.c
   fim_tiff.c
-  deconwolf.c
-  tiling.c
-  deconwolf_tif_max.c
-  )
-
-add_executable(dwbw
-  dw_bwpsf.c
+  ftab.c
+  fft.c
+  dw_util.c
+  gmlfit.c
   lanczos.c
-  fim.c
-  fft.c
-  fim_tiff.c
-  bw_gsl.c
-  li.c)
+  tiling.c
+)
 
-if(${WINDOWS})
-  set(CMAKE_C_FLAGS "-DWINDOWS -Wall -Wextra -g")
-  set(TIFF_LIBRARY tiff)
-  set(TIFF_INCLUDE_DIR ../win/libtiff/)
-  set(TIFF_LIB_DIR ../win/)
-  set(FFTW3f_LIBRARY fftw3f-3)
-  set(FFTW3f_INCLUDE_DIR ../win/fftw3/)
-  set(GSL_LIBRARY libgsl-25)
-  set(GSL_INCLUDE_DIR ../win/)
+set(DWIP_PUBLIC_HEADERS
+  "dw_util.h"
+  "fim.h"
+  "fim_tiff.h"
+  "fft.h"
+  "ftab.h"
+  "dw_version.h"
+"kdtree/include/kdtree.h")
+
+#
+# kdtree
+#
+add_subdirectory("kdtree/")
+target_include_directories(dwip PUBLIC "kdtree/include/")
+target_link_directories(dwip PUBLIC "kdtree/")
+target_link_libraries(dwip kdtree)
+
+
+#
+# OpenMP
+#
+#  https://cmake.org/cmake/help/v3.9/module/FindOpenMP.html
+find_package(OpenMP)
+if(OpenMP_C_FOUND)
+  message("Found OpenMP")
+  target_link_libraries(dwip OpenMP::OpenMP_C)
 else()
-  set(TIFF_LIBRARY /usr/lib/x86_64-linux-gnu/libtiff.so)
-  set(TIFF_INCLUDE_DIR /usr/include/x86_64-linux-gnu)
-  set(FFTW3f_LIBRARY /usr/lib/x86_64-linux-gnu/libfftw3f.so)
-  set(FFTW3f_INCLUDE_DIR /usr/include)
-  set(FFTW3ft_LIBRARY /usr/lib/x86_64-linux-gnu/libfftw3f_threads.so)
-  set(FFTW3ft_INCLUDE_DIR /usr/include)
+  message("OpenMP not found automatically, trying manual")
+
+  set(
+    CMAKE_C_FLAGS
+    "${CMAKE_C_FLAGS} -fopenmp=omp /openmp"
+  )
+  SET(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} -fopenmp=omp -lomp")
+
 endif()
 
-find_package(GSL REQUIRED)
 
-include(CheckLibraryExists)
-CHECK_LIBRARY_EXISTS(m sin "" HAVE_LIB_M)
-CHECK_LIBRARY_EXISTS($(FFTW3f_LIBRARY) fftwf_execute "" HAVE_LIB_FFTW3)
+set_target_properties( dwip PROPERTIES
+PUBLIC_HEADER "${DWIP_PUBLIC_HEADERS}")
 
-target_link_libraries(dw
-  ${TIFF_LIBRARY}
-  ${FFTW3f_LIBRARY}
-  ${FFTW3ft_LIBRARY}
-  ${GSL_LIBRARY}
-  m)
-
-
-target_include_directories(dw PRIVATE
-  ${TIFF_INCLUDE_DIR}
-  ${FFTW3f_INCLUDE_DIR}
-  ${GSL_INCLUDE_DIR})
-
-target_link_libraries(dwbw
-  ${TIFF_LIBRARY}
-  ${GSL_LIBRARY}
-  ${FFTW3f_LIBRARY}
-  ${FFTW3ft_LIBRARY}
-  ${GSL_LIBRARY}
-  m)
-
-target_include_directories(dwbw PRIVATE
-  ${TIFF_INCLUDE_DIR}
-  ${FFTW3f_INCLUDE_DIR}
-  ${GSL_INCLUDE_DIR}
-  gsl)
-
-target_link_directories(dwbw
-  PUBLIC ${TIFF_LIB_DIR})
-
-target_link_directories(dw
-  PUBLIC ${TIFF_LIB_DIR})
-
-if(${WINDOWS})
-  #set(CMAKE_C_COMPILER i686-w64-mingw32-gcc)
-  set(CMAKE_C_COMPILER x86_64-w64-mingw32-gcc)
-else()
-  set(CMAKE_C_COMPILER gcc)
-endif()
+INSTALL(TARGETS dwip
+  PUBLIC_HEADER DESTINATION include/dwip)
