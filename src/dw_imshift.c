@@ -1,5 +1,7 @@
 #include "dw_imshift.h"
 
+#include <omp.h>
+
 typedef struct{
     int overwrite;
     int verbose;
