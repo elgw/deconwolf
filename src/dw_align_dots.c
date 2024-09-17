@@ -9,6 +9,15 @@
 #include "dw_version.h"
 #include "dw_util.h"
 
+/* TODO
+ *
+ * - automatically scan for the best magnification --magscan in the
+ *    range +/- 1% by default.
+ * - option to rotate ?
+ * - Use paired dots to create a polynomial model.
+ *
+*/
+
 typedef struct{
     int verbose;
     /* Largest shift, in pixels, to consider between
@@ -31,6 +40,9 @@ typedef struct{
     /* Magnification factor for the 2nd list of dots */
     double mag;
 
+    /* Rotation about the z-axis, i.e. in the plane */
+    double rotz;
+
     /* For storing the result */
     double dx;
     double dy;
@@ -41,23 +53,6 @@ typedef struct{
 
 } opts;
 
-
-// Golden ratio
-const double PHI = 1.618033988749;
-
-// The 12 vertices of an icosahedron;
-const double icosahedron[36] = {0, PHI, 1,
-                                0, -PHI, 1,
-                                0, PHI, -1,
-                                0, -PHI, -1,
-                                1, 0, PHI,
-                                -1, 0, PHI,
-                                1, 0, -PHI,
-                                -1, 0, -PHI,
-                                PHI, 1, 0,
-                                -PHI, 1, 0,
-                                PHI, -1, 0,
-                                -PHI, -1, 0};
 
 /* Get the value of the linspace from a to b with n points at idx */
 static double linspace(double a, double b, size_t n, size_t idx)
@@ -136,6 +131,11 @@ static void usage(void)
            "\tDefault value: %.2f\n", dopts->sigma);
     printf("--npoint n, -n n\n"
            "\tset the maximum number of points to use from each file\n");
+    printf("--mag f\n"
+           "\tMultiplicative magnification factor for the 2nd point set\n");
+    printf("--rotz d\n"
+           "\tRotation around the z-axis at (x,y)=(0,0), hence\n"
+           "\tonly small rotations like +/- 0.0001 are meaningful\n");
     printf("--out file, -o file\n"
            "\tWhere to write the results.\n");
     printf("--overwrite\n"
@@ -171,13 +171,14 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"npoint", required_argument, NULL, 'n'},
         {"out",    required_argument, NULL, 'o'},
         {"append", no_argument, NULL, 'a'},
+        {"rotz", required_argument, NULL, 'r'},
         {"sigma", required_argument, NULL, 's'},
         {"overwrite", no_argument, NULL, 'w'},
         {NULL, 0, NULL, 0}};
 
     int ch;
     while( (ch = getopt_long(argc, argv,
-                             "ad:hm:n:o:s:v:w",
+                             "ad:hm:n:o:r:s:v:w",
                              longopts, NULL)) != -1)
     {
         switch(ch)
@@ -201,6 +202,9 @@ static void argparsing(int argc, char ** argv, opts * s)
         case 'o':
             free(s->outfile);
             s->outfile = strdup(optarg);
+            break;
+        case 'r':
+            s->rotz = atof(optarg);
             break;
         case 's':
             s->sigma = atof(optarg);
@@ -247,6 +251,23 @@ static void magnify_dots(double * X, size_t n, double mag)
         }
     }
     return;
+}
+
+static void rotz_dots(double * X, size_t n, double rot)
+{
+    if(rot == 0)
+    {
+        return;
+    }
+    double vcos = cos(rot);
+    double vsin = sin(rot);
+    for(size_t kk = 0; kk<n; kk++)
+    {
+        double x = X[3*kk];
+        double y = X[3*kk+1];
+        X[3*kk] = vcos*x - vsin*y;
+        X[3*kk+1] = vsin*x + vcos*y;
+    }
 }
 
 double * get_dots(opts * s, ftab_t * T)
@@ -696,6 +717,7 @@ int dw_align_dots(int argc, char ** argv)
     }
 
     magnify_dots(XB, nXB, s->mag);
+    rotz_dots(XB, nXB, s->rotz);
 
     if(s->verbose > 0)
     {
