@@ -17,29 +17,10 @@
  */
 
 
-#include <assert.h>
-#include <inttypes.h>
-#include <fftw3.h>
-#define _USE_MATH_DEFINES
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdint.h>
-#include <time.h>
-
 #include "fft.h"
 #include "fim_tiff.h"
 #include "ftab.h"
 #include "dw_util.h"
-
-#include <omp.h>
-
-
-#ifdef __linux__
-#include <sys/mman.h>
-#endif
-
 
 /* fim : operations on 3D Floating point IMages
  *
@@ -299,17 +280,20 @@ void fim_shift(float * restrict A,
                const float dm, const float dn, const float dp);
 
 
-float * fim_expand(const float * restrict in,
-                   const int64_t pM, const int64_t pN, const int64_t pP,
-                   const int64_t M, const int64_t N, const int64_t P);
 /* "expand an image" by making it larger
  * pM, ... current size
  * M, Nm ... new size
  * */
 
-float fim_mse(float * A, float * B, size_t N);
+float * fim_expand(const float * restrict in,
+                   const int64_t pM, const int64_t pN, const int64_t pP,
+                   const int64_t M, const int64_t N, const int64_t P);
+
+
 /* mean( (A(:)-B(:)).^(1/2) )
  */
+
+float fim_mse(float * A, float * B, size_t N);
 
 void shift_vector(float * restrict V,
                   const int64_t S,
@@ -505,3 +489,21 @@ void fimo_blit_2D(fimo * A, const fimo * B, size_t x0, size_t y0);
  * https://en.wikipedia.org/wiki/Anscombe_transform  */
 void fim_anscombe(float * x, size_t n);
 void fim_ianscombe(float * x, size_t n);
+
+
+/* Trilinear interpolation (3D)
+ *
+ * M, N, P specifies the size of A
+ * M is the size in the non-strided dimension
+ *
+ * x is the coordinate in the non-strided dimension
+ *
+ * Returns 0 if the points are out of
+ * bounds
+ *
+ **/
+
+float
+fim_interp3_linear(const float *,
+                   size_t M, size_t N, size_t P,
+                         double x, double y, double z);

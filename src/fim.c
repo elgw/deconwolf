@@ -14,7 +14,25 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
+#include <inttypes.h>
+#include <fftw3.h>
+#define _USE_MATH_DEFINES
+#include <math.h>
+#include <omp.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+#include <time.h>
+
+#ifdef __linux__
+#include <sys/mman.h>
+#endif
+
 #include "fim.h"
+
+
 
 static int fim_verbose = 0;
 
@@ -4247,4 +4265,45 @@ void fimo_blit_2D(fimo * A, const fimo * B, size_t x0, size_t y0)
     }
 
     return;
+}
+
+
+float
+fim_interp3_trilinear(const float * restrict A,
+          const size_t M, const size_t N, const size_t P,
+          const float x, const float y, const float z)
+{
+
+    /* We would like to calculate
+     * A[x + M*y + N*z] by linear interpolation.
+     * For that we need 8 points from A
+     */
+
+
+    if(x < 0 || x > (M - 1)
+       || y < 0 || y > (N - 1)
+       || z < 0 || z > (P - 1))
+    {
+        return 0;
+    }
+
+    int x0 = x;
+    float wx = 1.0 - ( x-(float) x0 );
+    int y0 = y;
+    float wy = 1.0 - ( y-(float) y0 );
+    int z0 = z;
+    float wz = 1.0 - ( z- (float) z0 );
+
+    return wz*(
+        wy*(
+            wx*A[x0 + y0*M + z0*M*N]
+            + (1.0-wx)*A[x0+1 + y0*M + z0*M*N])
+        +(1.0-wy)*(wx*A[x0 + (y0+1)*M + z0*M*N] +
+                   (1.0-wx)*A[x0+1 + (y0+1)*M + z0*M*N]))
+        + (1.0-wz)*(
+            wy*(
+                wx*A[x0 + y0*M + (z0+1)*M*N]
+                + (1.0-wx)*A[x0+1 + y0*M + (z0+1)*M*N])
+            + (1.0-wy)*(wx*A[x0 + (y0+1)*M + (z0+1)*M*N]
+                        + (1.0-wx)*A[x0+1 + (y0+1)*M + (z0+1)*M*N]));
 }
