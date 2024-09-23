@@ -238,13 +238,12 @@ static void argparsing(int argc, char ** argv, opts * s)
 
 
     struct option longopts[] = {
-        {"dog_as", required_argument, NULL, 'a'},
+        {"log_as", required_argument, NULL, 'a'},
         {"fit_as", required_argument, NULL, 'A'},
         {"csv",    no_argument, NULL, 'c'},
         {"logfile", required_argument, NULL, 'w'},
         {"out", required_argument, NULL, 'O'},
-
-        {"dog_ls", required_argument, NULL, 'l'},
+        {"log_ls", required_argument, NULL, 'L'},
         {"fit_ls", required_argument, NULL, 'l'},
         {"fitting", no_argument, NULL, 'F'},
         {"help", no_argument, NULL, 'h'},
@@ -263,7 +262,7 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"ni",     required_argument, NULL, '6'},
         {NULL, 0, NULL, 0}};
     int ch;
-    while((ch = getopt_long(argc, argv, "1:3:4:5:6:L:a:A:cF:hi:l:m:n:N:op:r:s:v:w:", longopts, NULL)) != -1)
+    while((ch = getopt_long(argc, argv, "1:3:4:5:6:L:a:A:cF:hi:l:L:m:n:N:op:r:s:v:w:", longopts, NULL)) != -1)
     {
         switch(ch){
         case '1':
@@ -298,6 +297,9 @@ static void argparsing(int argc, char ** argv, opts * s)
             exit(0);
             break;
         case 'L':
+            s->log_lsigma = atof(optarg);
+            break;
+        case 'l':
             s->fit_lsigma = atof(optarg);
             break;
         case 'm':
@@ -344,6 +346,12 @@ static void argparsing(int argc, char ** argv, opts * s)
         }
     }
 
+    if(s->verbose > 1)
+    {
+        printf("VERBOSE>1: Printing out the settings just before validation:\n");
+        opts_print(stdout, s);
+    }
+
 
     if(s->NA*s->ni*s->dx*s->dz*s->lambda > 0)
     {
@@ -363,11 +371,6 @@ static void argparsing(int argc, char ** argv, opts * s)
         s->log_asigma = s->fit_asigma*sqrt(2.0);
     }
 
-    if(s->verbose > 1)
-    {
-        printf("VERBOSE>1: Printing out the settings just before validation:\n");
-        opts_print(stdout, s);
-    }
 
     if( (s->log_asigma)*(s->log_lsigma) <= 0 )
     {

@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## 0.4.4
+- Fixed issues when using `--psigma` with low values.
+
 ## 0.4.3
 - Fixed [issue #70](https://github.com/elgw/deconwolf/issues/70) which
   affected windows builds only.
