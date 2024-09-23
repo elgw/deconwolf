@@ -232,7 +232,7 @@ libgsl-dev
 FFTW3 is the default FFT backend for deconwolf but it is also possible to use
 Intel MKL. At some point it was possible to choose MKL via
 
-``` shel
+``` shell
 sudo apt install intel-mkl
 make MKL=1 -B
 ```
@@ -244,3 +244,8 @@ export MKL_NUM_THREADS=8
 dw ...
 ```
 If you are interested in using MKL please open a new issue.
+
+## Fedora 20
+``` shell
+sudo dnf install cmake fftw-devel gsl-devel libtiff-devel
+```
