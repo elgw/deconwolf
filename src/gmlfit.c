@@ -180,6 +180,11 @@ double error_fun(const gsl_vector * v, void * _params)
     {
         sz_div = 1;
     }
+
+    // Wanted:
+    // Test if there is any practical difference
+    // using powf, logf, expf
+
     double E = 0;
     for(size_t pp = 0; pp < P; pp++)
     {
