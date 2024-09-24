@@ -42,6 +42,8 @@ typedef struct{
     char * cmdline;
     int write_csv;
 
+    int circularity; /* Set to 1 to enable circularity estimation */
+
     /* For multi scale dot detection.
      *For single scale paths,
      * scales[0] is also used to scale up filter sizes if set. */
@@ -241,6 +243,7 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"log_as", required_argument, NULL, 'a'},
         {"fit_as", required_argument, NULL, 'A'},
         {"csv",    no_argument, NULL, 'c'},
+        {"circularity", no_argument, NULL, 'C'},
         {"logfile", required_argument, NULL, 'w'},
         {"out", required_argument, NULL, 'O'},
         {"log_ls", required_argument, NULL, 'L'},
@@ -262,7 +265,7 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"ni",     required_argument, NULL, '6'},
         {NULL, 0, NULL, 0}};
     int ch;
-    while((ch = getopt_long(argc, argv, "1:3:4:5:6:L:a:A:cF:hi:l:L:m:n:N:op:r:s:v:w:", longopts, NULL)) != -1)
+    while((ch = getopt_long(argc, argv, "1:3:4:5:6:L:a:A:cCF:hi:l:L:m:n:N:op:r:s:v:w:", longopts, NULL)) != -1)
     {
         switch(ch){
         case '1':
@@ -288,6 +291,9 @@ static void argparsing(int argc, char ** argv, opts * s)
             break;
         case 'c':
             s->write_csv = 1;
+            break;
+        case 'C':
+            s->circularity = 1;
             break;
         case 'F':
             s->fitting = 1;
@@ -462,6 +468,34 @@ static void argparsing(int argc, char ** argv, opts * s)
 
     s->optpos = optind;
     return;
+}
+
+static ftab_t * append_circularity(opts * s, ftab_t * T, float * I,
+                                   size_t M, size_t N, size_t P)
+{
+    printf("append_circularity is still on the TODO list!\n");
+    /* 1. Extract the start coordinates */
+    int xcol = ftab_get_col(T, "x");
+    int ycol = ftab_get_col(T, "y");
+    int zcol = ftab_get_col(T, "z");
+
+    assert(xcol >= 0);
+    assert(ycol >= 0);
+    assert(zcol >= 0);
+
+    double * X = calloc(3*T->nrow, sizeof(double));
+    assert(X != NULL);
+
+    for(size_t kk = 0; kk < T->nrow; kk++)
+    {
+        float * row = T->T + kk*T->ncol;
+        X[3*kk+0] = row[xcol];
+        X[3*kk+1] = row[ycol];
+        X[3*kk+2] = row[zcol];
+    }
+
+    free(X);
+    return T;
 }
 
 static ftab_t * append_fitting(opts * s, ftab_t * T, float * I,
@@ -853,6 +887,10 @@ void detect_dots(opts * s, char * inFile)
     /* Discard unwanted dots before the computationally demanding fitting */
     ftab_head(T, s->ndots);
 
+    if(s->circularity)
+    {
+        T = append_circularity(s, T, A, M, N, P);
+    }
 
     if(s->fitting)
     {
