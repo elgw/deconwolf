@@ -4307,3 +4307,24 @@ fim_interp3_trilinear(const float * restrict A,
             + (1.0-wy)*(wx*A[x0 + (y0+1)*M + (z0+1)*M*N]
                         + (1.0-wx)*A[x0+1 + (y0+1)*M + (z0+1)*M*N]));
 }
+
+
+float
+fim_dot_lateral_circularity(const float * ,
+                            size_t M, size_t N, size_t P,
+                            double x, double y, double z,
+                            double sigma)
+{
+#if 0
+    double cxx = gsl_stats_correlation(const double data1[], const size_t stride1,
+                                       const double data2[], const size_t stride2,
+                                       const size_t n);
+    double cxy = gsl_stats_correlation(const double data1[], const size_t stride1,
+                                       const double data2[], const size_t stride2,
+                                       const size_t n);
+    double cxy = gsl_stats_correlation(const double data1[], const size_t stride1,
+                                       const double data2[], const size_t stride2,
+                                       const size_t n);
+    #endif
+    return 0;
+}

@@ -3,6 +3,15 @@
 ## 0.4.4
 - Fixed issues when using `--psigma` with low values.
 
+- Fixed that `--dog_ls` and `--dog_as` works for `dw dots`.
+
+- Parts of the function in dw can be built into a library using the
+  `src/CMAkeLists.txt` file. This is still experimental and to be
+  documented.
+
+- Fixed: `dw dots` erroneously reported the same sub pixel values for
+  both the x and y component.
+
 ## 0.4.3
 - Fixed [issue #70](https://github.com/elgw/deconwolf/issues/70) which
   affected windows builds only.
