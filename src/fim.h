@@ -507,3 +507,32 @@ float
 fim_interp3_linear(const float *,
                    size_t M, size_t N, size_t P,
                          double x, double y, double z);
+
+/* Estimate the circularity of a dot
+ *
+ * The correlation matrix of the pixels around (x,y,z) is measured
+ * and the smallest divided by the largest eigenvalue is returned,
+ * i.e. a number in the range [0, 1].
+ *
+ * sigma: Approximate size (Gaussian) of the spot.
+ *
+ * A value of 1 means that the dot is perfectly symmetric while a
+ * value of 0 would be returned for linear structures etc.
+ *
+ * The pixel values are weighted by a circular mask of radius
+ * of approximately 2*sigma.
+ *
+ * The z values is rounded to the nearest integer (until it is shown
+ * that it is much better to interpolate).
+ *
+ * The values of the pixels of interest will be normalized to the
+ * range [0, 1] prior to calculations.
+ *
+ * Results will not be accurate close the image borders.
+ */
+
+float
+fim_dot_lateral_circularity(const float * ,
+                            size_t M, size_t N, size_t P,
+                            double x, double y, double z,
+                            double sigma);
