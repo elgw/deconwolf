@@ -16,7 +16,7 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 option (ENABLE_GPU "Enable GPU/OpenCL" OFF)
 
-add_library( dwip SHARED
+add_library( deconwolf SHARED
   fim.c
   fim_tiff.c
   ftab.c
@@ -27,7 +27,7 @@ add_library( dwip SHARED
   tiling.c
 )
 
-set(DWIP_PUBLIC_HEADERS
+set(DECONWOLF_PUBLIC_HEADERS
   "dw_util.h"
   "fim.h"
   "fim_tiff.h"
@@ -40,9 +40,9 @@ set(DWIP_PUBLIC_HEADERS
 # kdtree
 #
 add_subdirectory("kdtree/")
-target_include_directories(dwip PUBLIC "kdtree/include/")
-target_link_directories(dwip PUBLIC "kdtree/")
-target_link_libraries(dwip kdtree)
+target_include_directories(deconwolf PUBLIC "kdtree/include/")
+target_link_directories(deconwolf PUBLIC "kdtree/")
+target_link_libraries(deconwolf kdtree)
 
 
 #
@@ -52,7 +52,7 @@ target_link_libraries(dwip kdtree)
 find_package(OpenMP)
 if(OpenMP_C_FOUND)
   message("Found OpenMP")
-  target_link_libraries(dwip OpenMP::OpenMP_C)
+  target_link_libraries(deconwolf OpenMP::OpenMP_C)
 else()
   message("OpenMP not found automatically, trying manual")
 
@@ -65,8 +65,8 @@ else()
 endif()
 
 
-set_target_properties( dwip PROPERTIES
-PUBLIC_HEADER "${DWIP_PUBLIC_HEADERS}")
+set_target_properties( deconwolf PROPERTIES
+PUBLIC_HEADER "${DECONWOLF_PUBLIC_HEADERS}")
 
-INSTALL(TARGETS dwip
-  PUBLIC_HEADER DESTINATION include/dwip)
+INSTALL(TARGETS deconwolf
+  PUBLIC_HEADER DESTINATION include/deconwolf)

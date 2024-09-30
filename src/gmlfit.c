@@ -3,7 +3,7 @@
 // #define gmlfit_debug
 
 
-static const int nFeatures = 10;
+static const int nFeatures = 11;
 
 /* Precision for the patch representation */
 typedef float pfloat; // 32-bit
@@ -37,8 +37,53 @@ enum features {
     f_sxy = 6, /* Lateral sigma */
     f_sz = 7, /* Axial sigma */
     f_status = 8, /* 0=converged */
-    f_error = 9 /* \sum -Log Likelihood over the local ROI */
+    f_error = 9, /* \sum -Log Likelihood over the local ROI */
+    f_correlation = 10 /* Pearson correlation */
 };
+
+float float_mean_lp(const float * X, const size_t n)
+{
+    double s = 0;
+    for(size_t kk = 0; kk < n; kk++)
+    {
+        s += X[kk];
+    }
+    return (float) (s / (double) n);
+}
+
+/* Pearson correlation value
+ * lp stands for low precisions since
+ * the implementation is naiive, although carried out using
+ * double precision internally
+ */
+static float
+correlation_lp(const float * X, const float * Y, size_t n)
+{
+
+    double mx = float_mean_lp(X, n);
+    double my = float_mean_lp(Y, n);
+
+    double sx = 0;
+    for(size_t kk = 0; kk < n; kk++)
+    {
+        sx += pow(X[kk]-mx, 2.0);
+    }
+
+    double sy = 0;
+    for(size_t kk = 0; kk < n; kk++)
+    {
+        sy += pow(Y[kk]-my, 2.0);
+    }
+
+    double corr = 0;
+    for(size_t kk = 0; kk < n ; kk++)
+    {
+        corr += ((double) X[kk]-mx)*((double) Y[kk]-my);
+    }
+    corr = corr / sqrt( sx*sy );
+    return (float) corr;
+}
+
 
 /** Multi variate gaussian model evaluated at (0,0,0)
  * for a diagonal covariance matrix. Here specified by
@@ -123,6 +168,71 @@ get_roi(pfloat * restrict W,
 }
 
 
+/* Return the correlation between the spot and the image data
+ */
+float correlate_spot(const gsl_vector * v, optParams * params)
+{
+    const pfloat * restrict R = params->R; /* Image data */
+    const size_t M = params->M;
+    const size_t N = params->N;
+    const size_t P = params->P;
+
+    float * Spt = calloc(M*N*P, sizeof(float));
+    assert(Spt != NULL);
+
+    /* 0: background */
+    /* 1: multiple before Gaussian */
+    double mx = gsl_vector_get(v, OPTIDX_X);
+    double my = gsl_vector_get(v, OPTIDX_Y);
+    double sxy = gsl_vector_get(v, OPTIDX_S_XY);
+
+    double mz = 0;
+    double sz = 0;
+    if(P > 1)
+    {
+        mz = gsl_vector_get(v, OPTIDX_Z);
+        sz = gsl_vector_get(v, OPTIDX_S_Z);
+    }
+
+    double G0 = mvnpdf0(sxy, sz);
+    assert(isnan(G0) == 0);
+    /* Special handling for the 2D case */
+    double sz_div = sz;
+    if(P == 1)
+    {
+        sz_div = 1;
+    }
+
+    // Wanted:
+    // Test if there is any practical difference
+    // using powf, logf, expf
+
+
+    for(size_t pp = 0; pp < P; pp++)
+    {
+        double z = (double) pp - (P-1)/2;
+        for (size_t nn = 0; nn < N; nn++)
+        {
+            double y = (double) nn - (N-1)/2;
+            for(size_t mm = 0; mm < M; mm++)
+            {
+                double x = (double) mm - (M-1)/2;
+
+                /* Gaussian value */
+                double G = G0*exp( - 0.5*(
+                                         pow( (x-mx)/sxy, 2)
+                                       + pow( (y-my)/sxy, 2)
+                                       + pow( (z-mz)/sz_div, 2) ) );
+                /* Full model */
+                double Model = gsl_vector_get(v, OPTIDX_BG)
+                    + gsl_vector_get(v, OPTIDX_NPHOT)*G;
+                Spt[pp*M*N + nn*M + mm] = Model;
+            }
+        }
+    }
+
+    return correlation_lp(Spt, R, M*N*P);
+}
 
 double error_fun(const gsl_vector * v, void * _params)
 {
@@ -352,7 +462,9 @@ localize_dot(const pfloat * restrict V,
     * 0.01 is faster but leads to worse results.
     * 0.5 is slower but results are not better.
     */
-    const gsl_multimin_fdfminimizer_type * T = gsl_multimin_fdfminimizer_vector_bfgs2;
+    const gsl_multimin_fdfminimizer_type * T
+        = gsl_multimin_fdfminimizer_vector_bfgs2;
+
     gsl_multimin_fdfminimizer *s;
     if(P > 1){
         s = gsl_multimin_fdfminimizer_alloc (T, 7);
@@ -433,7 +545,7 @@ localize_dot(const pfloat * restrict V,
     F[f_G0] = F[f_G]*mvnpdf0(F[f_sxy], F[f_sz]);
     F[f_status] = status;
     F[f_error] = gsl_multimin_fdfminimizer_minimum(s);
-
+    F[f_correlation] = correlate_spot(x, &par);
     gsl_vector_free(x);
     gsl_multimin_fdfminimizer_free(s);
 

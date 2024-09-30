@@ -470,32 +470,53 @@ static void argparsing(int argc, char ** argv, opts * s)
     return;
 }
 
-static ftab_t * append_circularity(opts * s, ftab_t * T, float * I,
-                                   size_t M, size_t N, size_t P)
+static ftab_t *
+append_circularity(opts * s, ftab_t * T, const float * restrict I,
+                   size_t M, size_t N, size_t P)
 {
-    printf("append_circularity is still on the TODO list!\n");
-    /* 1. Extract the start coordinates */
-    int xcol = ftab_get_col(T, "x");
-    int ycol = ftab_get_col(T, "y");
-    int zcol = ftab_get_col(T, "z");
+    int xcol = ftab_get_col(T, "f_x");
+    int ycol = ftab_get_col(T, "f_y");
+    int zcol = ftab_get_col(T, "f_z");
+    int sigma_col = ftab_get_col(T, "f_sigma_lateral");
+    if(xcol < 0)
+    {
+        printf("Error: no sub pixel locations available for circularity estimates\n");
+        return T;
+    }
 
     assert(xcol >= 0);
     assert(ycol >= 0);
     assert(zcol >= 0);
 
-    double * X = calloc(3*T->nrow, sizeof(double));
-    assert(X != NULL);
+    ftab_t * TC = ftab_new(1);
+    ftab_set_colname(TC, 0, "lat_circularity");
+    free(TC->T);
+    TC->nrow = T->nrow;
+    TC->T = calloc(T->nrow, sizeof(float));
+    assert(TC->T != NULL);
 
+    #pragma omp parallel for
     for(size_t kk = 0; kk < T->nrow; kk++)
     {
         float * row = T->T + kk*T->ncol;
-        X[3*kk+0] = row[xcol];
-        X[3*kk+1] = row[ycol];
-        X[3*kk+2] = row[zcol];
+        double x = row[xcol];
+        double y = row[ycol];
+        double z = row[zcol];
+        double sigma = row[sigma_col];
+        TC->T[kk] = fim_dot_lateral_circularity(I,
+                                                M, N, P,
+                                                x,y,z,
+                                                sigma);
     }
 
-    free(X);
-    return T;
+
+    ftab_t * TT = ftab_concatenate_columns(T, TC);
+
+    ftab_free(T);
+    ftab_free(TC);
+
+
+    return TT;
 }
 
 static ftab_t * append_fitting(opts * s, ftab_t * T, float * I,
@@ -584,7 +605,7 @@ static ftab_t * append_fitting(opts * s, ftab_t * T, float * I,
     }
 
     printf("Concatenating tables\n");
-    ftab_t * TF = ftab_new(10);
+    ftab_t * TF = ftab_new(11);
     free(TF->T);
     ftab_set_colname(TF, 0, "f_bg");
     ftab_set_colname(TF, 1, "f_signal_count");
@@ -596,9 +617,10 @@ static ftab_t * append_fitting(opts * s, ftab_t * T, float * I,
     ftab_set_colname(TF, 7, "f_sigma_axial");
     ftab_set_colname(TF, 8, "f_status");
     ftab_set_colname(TF, 9, "f_error");
+    ftab_set_colname(TF, 10, "f_corr");
     TF->nrow = T->nrow;
     TF->nrow_alloc=T->nrow;
-    assert(TF->ncol == 10);
+    assert(TF->ncol == 11);
     TF->T = calloc(TF->nrow*TF->ncol, sizeof(float));
     assert(TF->T != NULL);
     for(size_t kk = 0; kk< TF->nrow*TF->ncol; kk++)
@@ -635,7 +657,7 @@ static ftab_t * append_fitting(opts * s, ftab_t * T, float * I,
     return TT;
 
 
- fail1: ;
+fail1: ;
     return T;
 }
 
@@ -887,15 +909,16 @@ void detect_dots(opts * s, char * inFile)
     /* Discard unwanted dots before the computationally demanding fitting */
     ftab_head(T, s->ndots);
 
-    if(s->circularity)
-    {
-        T = append_circularity(s, T, A, M, N, P);
-    }
-
     if(s->fitting)
     {
         T = append_fitting(s, T,
                            A, M, N, P);
+    }
+
+    /* Will use sub pixel locations if fitting was performed */
+    if(s->circularity)
+    {
+        T = append_circularity(s, T, A, M, N, P);
     }
 
     free(A);
