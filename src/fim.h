@@ -477,6 +477,12 @@ float * fim_LoG_S(const float * V, size_t M, size_t N, size_t P,
 float * fim_LoG_S2(const float * V0, const size_t M, const size_t N, const size_t P,
                    const float sigmaxy, const float sigmaz);
 
+/* Determinant of Hessian filter for spot detection */
+float *
+fim_DoH(const float * V,
+        const size_t M, const size_t N, const size_t P,
+        const float sigmaxy, const float sigmaz);
+
 /* Simple interface to write 2D or 3D images without any meta data */
 int fimo_tiff_write(const fimo * Im, const char * fName);
 

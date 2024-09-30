@@ -2,13 +2,24 @@ CC=gcc -std=gnu99
 
 CFLAGS=-Wall -Wextra
 
+ASAN?=0
+ifeq ($(ASAN),1)
+CFLAGS+=-g3 -fanalyzer -fno-inline -fstack-protector-all -fsanitize=address -fno-omit-frame-pointer
+endif
+
+
 DEBUG?=0
 ifeq ($(DEBUG),1)
-CFLAGS+=-g3 -fanalyzer -fno-inline -fstack-protector-all -fsanitize=address -fno-omit-frame-pointer
-else
+CFLAGS+=-g3 -fno-inline -fstack-protector-all -fno-omit-frame-pointer
+endif
+
+ifeq ($(DEBUG),0)
+ifeq ($(ASAN),0)
 CFLAGS+=-O3
 LDFLAGS+=-flto
 endif
+endif
+
 
 LDFLAGS+=-lm
 
