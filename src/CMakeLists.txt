@@ -64,9 +64,19 @@ else()
 
 endif()
 
+set(CMAKE_INSTALL_PREFIX "")
+# use the LIBDIR variable
+include("GNUInstallDirs")
+message("CMAKE_INSTALL_FULL_LIBDIR")
+message(${CMAKE_INSTALL_FULL_LIBDIR})
+message("CMAKE_INSTALL_PREFIX")
+# message(${CMAKE_INSTALL_PREFIX})
+
+
 
 set_target_properties( deconwolf PROPERTIES
 PUBLIC_HEADER "${DECONWOLF_PUBLIC_HEADERS}")
 
 INSTALL(TARGETS deconwolf
-  PUBLIC_HEADER DESTINATION include/deconwolf)
+  PUBLIC_HEADER DESTINATION include/deconwolf
+LIBRARY DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR})
