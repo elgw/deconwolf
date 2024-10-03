@@ -1,8 +1,14 @@
 # This file is to create a library out of some of the functions
 # in dw.
-# You might want to append the install directory to
-# /etc/ld.so.conf
-# and then run ldconfig
+# mkdir build
+# cd build
+# cmake .. -DCMAKE_INSTALL_PREFIX="/"
+# sudo make install
+#
+# Using some other install prefix,
+# you might want to add the path to the file
+# `/etc/ld.so.conf`
+# and then run `ldconfig`
 
 cmake_minimum_required(VERSION 3.9 FATAL_ERROR)
 project(libdw LANGUAGES C)
@@ -64,19 +70,13 @@ else()
 
 endif()
 
-set(CMAKE_INSTALL_PREFIX "")
-# use the LIBDIR variable
+
 include("GNUInstallDirs")
-message("CMAKE_INSTALL_FULL_LIBDIR")
-message(${CMAKE_INSTALL_FULL_LIBDIR})
-message("CMAKE_INSTALL_PREFIX")
-# message(${CMAKE_INSTALL_PREFIX})
-
-
 
 set_target_properties( deconwolf PROPERTIES
 PUBLIC_HEADER "${DECONWOLF_PUBLIC_HEADERS}")
 
 INSTALL(TARGETS deconwolf
-  PUBLIC_HEADER DESTINATION include/deconwolf
-LIBRARY DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR})
+  PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}/deconwolf"
+  LIBRARY DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR}
+  )
