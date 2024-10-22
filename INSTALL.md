@@ -113,6 +113,7 @@ To build, make sure you use the Homebrew-installed version of gcc, in my case gc
 
 ```shell
 mkdir builddir
+cd builddir
 CC=gcc-14 CXX=g++-14 cmake ..
 CC=gcc-14 CXX=g++-14 cmake --build .
 make install
