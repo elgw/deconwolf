@@ -31,7 +31,7 @@ Born-Wolf model.
 This should be set big enough so that the PSF cone
 isn't cropped at the first and last slice of the PSF.
 
-**\nslice P**
+**\--nslice P**
 :  Set output size to N x N x P [pixels].
 P has to be an odd number. Please not that P should be at
 least (2Z-1) where Z is the number of slices in the image
