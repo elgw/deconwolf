@@ -123,10 +123,11 @@ fimo * fimo_partial(const fimo *, int dim, float sigma);
 
 /* Features for 2D image classification
  * the input image should be 2D.
- * Uses similar features a Ilastic
+ * Uses similar features as Ilastic
  * Returns one row per pixel
  */
-ftab_t * fim_features_2d(const fimo *);
+ftab_t *
+fim_features_2d(const fimo *);
 
 /* Return a I->P long vector with the integral
  * gradient magnitude per slice in I */
@@ -136,6 +137,21 @@ float * fim_focus_gm(const fimo * image, float sigma);
 size_t fimo_nel(fimo * );
 /* Sum of elements */
 float fimo_sum(fimo * );
+
+fimo * fimo_maxproj(const fimo * Im);
+
+/* A[kk] += B[kk] */
+void fimo_add(fimo * A, const fimo * B);
+
+/* Simple interface to write 2D or 3D images without any meta data */
+int fimo_tiff_write(const fimo * Im, const char * fName);
+
+/* Simple interface to read 2D or 3D tiff image without metadata */
+fimo * fimo_tiff_read(const char * file);
+
+/* Insert into B into A, with upper left corner at x0, y0 */
+void fimo_blit_2D(fimo * A, const fimo * B, size_t x0, size_t y0);
+
 
 /*
  * API not using fimo
@@ -149,7 +165,7 @@ float fim_sum(const float * restrict A, size_t N);
 /* Standard deviation, normalizing by (N-1) */
 float fim_std(const float * V, size_t N);
 
-fimo * fimo_maxproj(const fimo * Im);
+
 
 float * fim_maxproj(const float * A, size_t M, size_t N, size_t P);
 
@@ -177,8 +193,6 @@ void fim_add(float * restrict A,
              const float * restrict B,
              size_t N);
 
-/* A[kk] += B[kk] */
-void fimo_add(fimo * A, const fimo * B);
 
 void fim_invert(float * restrict A, const size_t N);
 
@@ -457,7 +471,10 @@ int fim_convn1(float * restrict V, size_t M, size_t N, size_t P,
 
 
 /* Gaussian smoothing, normalized at edges */
-void fim_gsmooth(float * restrict V, size_t M, size_t N, size_t P, float sigma);
+void
+fim_gsmooth(float * restrict V,
+            size_t M, size_t N, size_t P,
+            float sigma);
 
 /** Gaussian smoothing, normalized at edges, separate values for
  * lateral and axial filter */
@@ -483,12 +500,6 @@ fim_DoH(const float * V,
         const size_t M, const size_t N, const size_t P,
         const float sigmaxy, const float sigmaz);
 
-/* Simple interface to write 2D or 3D images without any meta data */
-int fimo_tiff_write(const fimo * Im, const char * fName);
-
-
-/* Insert into B into A, with upper left corner at x0, y0 */
-void fimo_blit_2D(fimo * A, const fimo * B, size_t x0, size_t y0);
 
 /**  Anscombe transform and inverse.
  *

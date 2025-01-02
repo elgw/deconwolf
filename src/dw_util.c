@@ -276,7 +276,7 @@ size_t get_peakMemoryKB(void)
 #endif
 
 
-float dw_read_scaling(char * file)
+float dw_read_scaling(const char * file)
 {
     float scaling = 1.0;
     char * logfile = malloc(strlen(file)+32);

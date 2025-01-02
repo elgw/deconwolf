@@ -116,6 +116,11 @@ add_executable(dw
   target_link_directories(dw PUBLIC "src/kdtree/")
   target_link_libraries(dw kdtree)
 
+  #
+  # trafo
+  #
+  #add_subdirectory("src/trafo")
+  #target_link_libraries(dw trafo)
 
   #
   # Parse version number from src/dw_version.h
