@@ -20,6 +20,7 @@ LDFLAGS+=-flto
 endif
 endif
 
+FORCE: ;
 
 LDFLAGS+=-lm
 
@@ -62,7 +63,8 @@ dw_render: $(dw_render_files)
 
 ## Note: prf_* and qsort comes from pixel_random_forest repo
 
-dw_nuclei_files=dw_nuclei.c fim.o ftab.o fim_tiff.o prf_forest.o qsort.o prf_tree.o prf_util.o
+dw_nuclei_files=dw_nuclei.c fim.o ftab.o fim_tiff.o dw_util.o \
+trafo/libtrafo.a fft.o
 
 dw_nuclei: $(dw_nuclei_files)
 	$(CC) $(CFLAGS) -DSTANDALONE $(dw_nuclei_files) $(LDFLAGS) -o dw_nuclei
@@ -104,3 +106,6 @@ li:
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $<
+
+trafo/libtrafo.a: FORCE
+	make -C trafo libtrafo.a

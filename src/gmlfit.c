@@ -208,6 +208,9 @@ float correlate_spot(const gsl_vector * v, optParams * params)
     // using powf, logf, expf
 
 
+    float * use = calloc(M*N*P, sizeof(float));
+    assert(use != NULL);
+
     for(size_t pp = 0; pp < P; pp++)
     {
         double z = (double) pp - (P-1)/2;
@@ -219,19 +222,42 @@ float correlate_spot(const gsl_vector * v, optParams * params)
                 double x = (double) mm - (M-1)/2;
 
                 /* Gaussian value */
-                double G = G0*exp( - 0.5*(
-                                         pow( (x-mx)/sxy, 2)
-                                       + pow( (y-my)/sxy, 2)
-                                       + pow( (z-mz)/sz_div, 2) ) );
+                double gr = - 0.5*(
+                    pow( (x-mx)/sxy, 2)
+                    + pow( (y-my)/sxy, 2)
+                    + pow( (z-mz)/sz_div, 2) );
+
+                double G = G0*exp( gr );
                 /* Full model */
                 double Model = gsl_vector_get(v, OPTIDX_BG)
                     + gsl_vector_get(v, OPTIDX_NPHOT)*G;
                 Spt[pp*M*N + nn*M + mm] = Model;
+                if(gr > -3.5)
+                {
+                    use[pp*M*N + nn*M + mm] = 1;
+                }
             }
         }
     }
 
-    return correlation_lp(Spt, R, M*N*P);
+    /* Subselect relevant pixels not too far away from the centre
+     * The use array is overwritten by the pixel values that we want.
+     */
+    size_t writepos = 0;
+    for(size_t kk = 0; kk < M*N*P; kk++)
+    {
+        if(use[kk])
+        {
+            Spt[writepos] = Spt[kk];
+            use[writepos] = R[kk];
+            writepos++;
+        }
+    }
+    // printf("using %zu / %zu pixels\n", writepos, M*N*P);
+    float corr = correlation_lp(Spt, use, writepos);
+
+    free(use);
+    return corr;
 }
 
 double error_fun(const gsl_vector * v, void * _params)

@@ -17,6 +17,8 @@
 #include "fim_tiff.h"
 #include "fim.h"
 
+typedef int64_t i64;
+
 /* see man 3 tifflib
  *
  * From:
@@ -1062,18 +1064,6 @@ int fim_tiff_get_size(const char * fname,
     return 0;
 }
 
-fimo * fimo_tiff_read(const char * fName)
-{
-    int64_t M, N, P;
-    float * V = fim_tiff_read(fName, NULL, &M, &N, &P, 0);
-    fimo * I = malloc(sizeof(fimo));
-    assert(I != NULL);
-    I->V = V;
-    I->M = M;
-    I->N = N;
-    I->P = P;
-    return I;
-}
 
 float * fim_tiff_read(const char * fName,
                       ttags * T,

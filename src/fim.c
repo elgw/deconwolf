@@ -33,6 +33,7 @@
 #include "fim.h"
 
 typedef uint64_t u64;
+typedef int64_t i64;
 
 static int fim_verbose = 0;
 
@@ -4016,6 +4017,25 @@ ftab_t * fim_features_2d(const fimo * fI)
     }
     return T;
 }
+
+fimo * fimo_tiff_read(const char * file)
+{
+    i64 M, N, P;
+
+    float * V = fim_tiff_read(file, NULL, &M, &N, &P, 0);
+    if(V == NULL)
+    {
+        return NULL;
+    }
+    fimo * I = calloc(1, sizeof(fimo));
+    assert(I != NULL);
+    I->V = V;
+    I->M = M;
+    I->N = N;
+    I->P = P;
+    return I;
+}
+
 
 void fim_features_2d_ut()
 {

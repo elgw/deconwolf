@@ -19,7 +19,13 @@
 /* Floating point-only table stored in row-major format.
 */
 
+#define FTAB_VERSION_MAJOR 0
+#define FTAB_VERSION_MINOR 1
+#define FTAB_VERSION_PATCH 0
+
 #include <stdint.h>
+#include <stdio.h>
+
 
 /* row-major table */
 typedef struct {
@@ -34,20 +40,23 @@ typedef struct {
  * Set column names with ftab_set_colname */
 ftab_t * ftab_new(int ncol);
 
-/* Create a new table from raw data. The data has to be in row major format */
-ftab_t * ftab_new_from_data(int nrow, int ncol, const float * data);
-
 /* Load a TSV file. The first line is interpreted as
  * containing the column names. Everything else is interpreted
  * as float values.
  */
 ftab_t * ftab_from_tsv(const char * fname);
 
+ftab_t * ftab_from_csv(const char * fname);
+
 /* Write tsv file do disk */
 int ftab_write_tsv(const ftab_t * T, const char * fname);
 
 /* Write tsv file do disk */
 int ftab_write_csv(const ftab_t * T, const char * fname);
+
+/* Write tsv file do disk */
+int ftab_write_csv(const ftab_t * T, const char * fname);
+
 
 
 /** Print table to file
@@ -73,8 +82,6 @@ void ftab_insert(ftab_t * T, float * row);
  * multiple columns have the same name. */
 int ftab_get_col(const ftab_t * T, const char * name);
 
-/* Some unit tests */
-int ftab_ut(void);
 
 /** @brief Set the data for one column.
  * @param T: table to receive data
@@ -91,11 +98,14 @@ int ftab_set_coldata(ftab_t * T, int col, const float * data);
 */
 ftab_t * ftab_concatenate_columns(const ftab_t * L, const ftab_t * R);
 
-/* Subselect rows where row_selector > 0 */
-void ftab_subselect_rows(ftab_t * T, const uint8_t * row_selector);
+/** @brief : Concatenate two tables into a new table */
+ftab_t * ftab_concatenate_rows(const ftab_t * Top, const ftab_t * Down);
+
+/** @brief make a deep copy */
+ftab_t * ftab_copy(const ftab_t *);
 
 /* Keep n head rows */
 void ftab_head(ftab_t * T, int64_t n);
 
-/* Concatenate two tables vertically with T on the top and B on the bottom */
-ftab_t * ftab_concatenate_rows(const ftab_t * T, const ftab_t * B);
+/* Run some unit tests */
+int ftab_ut(void);

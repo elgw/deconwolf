@@ -14,11 +14,13 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "ftab.h"
+
 #include <assert.h>
 #include <inttypes.h>
 #define _USE_MATH_DEFINES
 #include <math.h>
-#include <stdio.h>
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -26,17 +28,75 @@
 #ifndef WINDOWS
 #include <unistd.h>
 #endif
-#include "dw_util.h"
 
 
-#include "ftab.h"
+/* Count the number of newlines in a file */
+static size_t count_newlines(const char * fname)
+{
+    FILE * fid = fopen(fname, "r");
+    assert(fid != NULL);
+    size_t N = 0;
+    int c = EOF;
+    while( (c = fgetc(fid) ) != EOF )
+    {
+        if( c == '\n')
+        {
+            N++;
+        }
+    }
+    fclose(fid);
+    return N;
+}
 
-typedef uint8_t u8;
-typedef uint64_t u64;
+static void
+trim_whitespace(char * str)
+{
+    //printf("trimming '%s'\n", str);
+    assert(str != NULL);
+    size_t n = strlen(str);
+    size_t first = 0;
+    size_t last = n;
+    if(n == 0)
+    {
+        return;
+    }
 
-/* Forward declarations for non exported functions */
-static int parse_floats(char * l, float * row, int nval);
-static size_t count_newlines(const char * fname);
+    // Look for whitespaces from the beginning
+    char * start = str;
+    while(*start != '\0')
+    {
+        if(*start == ' ')
+        {
+            first++;
+            start++;
+        } else {
+            break;
+        }
+    }
+
+    // Look for whitespaces from the end
+    char * end = str+n-1;
+    while(end != str)
+    {
+        if(*end == ' ')
+        {
+            last--;
+            end--;
+        } else {
+            break;
+        }
+    }
+
+    // copy from first to last
+    //printf("first=%zu last=%zu\n", first, last);
+    size_t wpos = 0;
+    for(size_t kk = first; kk < last; kk++)
+    {
+        str[wpos++] = str[kk];
+    }
+    str[wpos] = '\0';
+    return;
+}
 
 void ftab_head(ftab_t * T, int64_t n)
 {
@@ -73,27 +133,6 @@ void ftab_free(ftab_t * T)
 
     free(T);
     return;
-}
-
-ftab_t * ftab_copy(const ftab_t * T)
-{
-    ftab_t * C = calloc(1, sizeof(ftab_t));
-    assert(C != NULL);
-    C->nrow = T->nrow;
-    C->ncol = T->ncol;
-    C->nrow_alloc = C->nrow;
-    C->T = calloc(C->nrow*C->ncol, sizeof(float));
-    memcpy(C->T, T->T, C->nrow*C->ncol*sizeof(float));
-    C->colnames = calloc(C->ncol, sizeof(char*));
-    assert(T->colnames != NULL);
-    for(u64 kk = 0; kk < C->ncol; kk++)
-    {
-        if(T->colnames[kk] != NULL)
-        {
-            C->colnames[kk] = strdup(T->colnames[kk]);
-        }
-    }
-    return C;
 }
 
 int ftab_write_tsv(const ftab_t * T, const char * fname)
@@ -163,8 +202,14 @@ int ftab_print(FILE * fid, const ftab_t * T, const char * sep)
 
 ftab_t * ftab_new(int ncol)
 {
+    if(ncol < 1)
+    {
+        fprintf(stderr, "ftab_new requires at least 1 column\n");
+        return NULL;
+    }
     ftab_t * T = calloc(1, sizeof(ftab_t));
     assert(T != NULL);
+    T->nrow = 0;
     T->ncol = ncol;
     T->nrow_alloc = 1024;
     T->T = calloc(T->ncol*T->nrow_alloc, sizeof(float));
@@ -172,28 +217,10 @@ ftab_t * ftab_new(int ncol)
     return T;
 }
 
-ftab_t *
-ftab_new_from_data(int nrow, int ncol, const float * data)
-{
-    ftab_t * T = calloc(1, sizeof(ftab_t));
-    if(T == NULL)
-    {
-        return T;
-    }
-    T->ncol = ncol;
-    T->nrow = nrow;
-    T->nrow_alloc = T->nrow;
-    T->T = calloc(nrow*ncol, sizeof(float));
-    if(T->T == NULL)
-    {
-        free(T);
-        return NULL;
-    }
-    memcpy(T->T, data, nrow*ncol*sizeof(float));
-    return T;
-}
-
-static int parse_col_names(ftab_t * T, const char * _line)
+static int
+parse_col_names(ftab_t * T,
+                const char * _line,
+                const char * dlm)
 {
     /* Figure out how many columns there are */
     if(strlen(_line) == 0)
@@ -205,7 +232,7 @@ static int parse_col_names(ftab_t * T, const char * _line)
     int ncol = 1;
     for(size_t kk = 0; kk<strlen(line); kk++)
     {
-        if(line[kk] == '\t')
+        if(line[kk] == dlm[0])
         {
             ncol++;
         }
@@ -213,16 +240,16 @@ static int parse_col_names(ftab_t * T, const char * _line)
     T->ncol = ncol;
 
     /* Allocate memory */
-    T->colnames = malloc(ncol*sizeof(char*));
+    T->colnames = calloc(ncol, sizeof(char*));
     assert(T->colnames != NULL);
 
     /* Set columns */
-    char * f = strtok(line, "\t");
+    char * f = strtok(line, dlm);
     assert(f != NULL); /* we already know that strlen > 0 */
     T->colnames[0] = strdup(f);
     for(int kk = 1; kk<ncol; kk++)
     {
-        f = strtok(NULL, "\t");
+        f = strtok(NULL, dlm);
         if(strlen(f) > 0)
         {
             if(f[strlen(f)-1] == '\n')
@@ -230,7 +257,9 @@ static int parse_col_names(ftab_t * T, const char * _line)
                 f[strlen(f)-1] = '\0';
             }
         }
+        assert(f != NULL);
         T->colnames[kk] = strdup(f);
+        trim_whitespace(T->colnames[kk]);
     }
 
     if(0){
@@ -268,7 +297,38 @@ int ftab_get_col(const ftab_t * T, const char * name)
     return ret;
 }
 
-ftab_t * ftab_from_tsv(const char * fname)
+static int
+parse_floats(char * l,
+             float * row,
+             int nval,
+             const char * dlm)
+{
+    char * f = strtok(l, dlm);
+    if(f == NULL)
+    {
+        return 0;
+    }
+//    printf("0/%d: %s\n", nval, f);
+    row[0] = atof(f);
+    for(int kk = 1; kk<nval; kk++)
+    {
+        f = strtok(NULL, dlm);
+        //      printf("%d: %s\n", kk, f);
+        if(f == NULL)
+        {
+            return 0;
+        }
+        row[kk] = atof(f);
+    }
+
+    //   exit(EXIT_FAILURE);
+    return 1;
+}
+
+
+static ftab_t *
+ftab_from_dlm(const char * fname,
+              const char * dlm)
 {
     FILE * fid = fopen(fname, "r");
     if(fid == NULL)
@@ -291,14 +351,14 @@ ftab_t * ftab_from_tsv(const char * fname)
         return NULL;
     }
 
-    int ncols = parse_col_names(T, line);
+    int ncols = parse_col_names(T, line, dlm);
 
     // printf("%zu columns\n", T->ncol);
     size_t nrows = count_newlines(fname)+1;
     // printf("at most %zu lines\n", nrows);
 
     // Allocate memory
-    T->T = malloc(nrows*ncols*sizeof(float));
+    T->T = calloc(nrows*ncols, sizeof(float));
     assert(T->T != NULL);
     T->ncol = ncols;
     T->nrow_alloc = nrows;
@@ -312,13 +372,24 @@ ftab_t * ftab_from_tsv(const char * fname)
         {
             continue;
         }
-        row += parse_floats(line, T->T + row*T->ncol, T->ncol);
+        row += parse_floats(line, T->T + row*T->ncol, T->ncol, dlm);
     }
     T->nrow = row;
     //printf("Returning a %zux%zu table\n", T->nrow, T->ncol);
     free(line);
     fclose(fid);
     return T;
+}
+
+
+ftab_t * ftab_from_csv(const char * fname)
+{
+    return ftab_from_dlm(fname, ",");
+}
+
+ftab_t * ftab_from_tsv(const char * fname)
+{
+    return ftab_from_dlm(fname, "\t");
 }
 
 typedef struct{
@@ -354,7 +425,7 @@ void ftab_sort(ftab_t * T, int col)
         fprintf(stderr, "ftab_sort: Can't use column %d for sorting\n", col);
         exit(EXIT_FAILURE);
     }
-    ftab_sort_pair * P = malloc(T->nrow*sizeof(ftab_sort_pair));
+    ftab_sort_pair * P = calloc(T->nrow, sizeof(ftab_sort_pair));
     assert(P != NULL);
     /* Extract values from col %d and sort */
 
@@ -368,7 +439,7 @@ void ftab_sort(ftab_t * T, int col)
     qsort(P, T->nrow,
           sizeof(ftab_sort_pair),
           ftab_sort_pair_cmp);
-    float * T2 = malloc(T->ncol*T->nrow_alloc*sizeof(float));
+    float * T2 = calloc(T->ncol*T->nrow_alloc, sizeof(float));
     assert(T2 != NULL);
     for(size_t kk = 0; kk< T->nrow; kk++)
     {
@@ -398,58 +469,12 @@ void ftab_insert(ftab_t * T, float * row)
     T->nrow++;
 }
 
-/* Count the number of newlines in a file */
-static size_t count_newlines(const char * fname)
-{
-    FILE * fid = fopen(fname, "r");
-    assert(fid != NULL);
-    size_t N = 0;
-    int c = EOF;
-    while( (c = fgetc(fid) ) != EOF )
-    {
-        if( c == '\n')
-        {
-            N++;
-        }
-    }
-    fclose(fid);
-    return N;
-}
 
 
-static int parse_floats(char * l, float * row, int nval)
-{
-    char * f = strtok(l, "\t");
-    if(f == NULL)
-    {
-        return 0;
-    }
-//    printf("0/%d: %s\n", nval, f);
-    row[0] = atof(f);
-    for(int kk = 1; kk<nval; kk++)
-    {
-        f = strtok(NULL, "\t");
-        //      printf("%d: %s\n", kk, f);
-        if(f == NULL)
-        {
-            return 0;
-        }
-        row[kk] = atof(f);
-    }
-
-    if(0){
-        for(int kk = 0; kk<nval; kk++)
-        {
-            printf("%f ", row[kk]);
-        }
-        printf("\n");
-    }
-    //   exit(EXIT_FAILURE);
-    return 1;
-}
 
 void ftab_set_colname(ftab_t * T, int col, const char * name)
 {
+    assert(name != NULL);
     // TODO check that only valid chars are used
     if(col < 0 || col >= (int) T->ncol)
     { return; }
@@ -468,7 +493,7 @@ void ftab_set_colname(ftab_t * T, int col, const char * name)
     return;
 }
 
-int ftab_ut()
+int ftab_ut(void)
 {
     ftab_t * T = ftab_new(4);
     assert(T != NULL);
@@ -484,7 +509,7 @@ int ftab_ut()
     ftab_print(stdout, T, "\t");
 
     /* Save and read */
-    char * fname = malloc(1024);
+    char * fname = calloc(1024, 1);
     assert(fname != NULL);
 
 
@@ -555,6 +580,8 @@ ftab_t * ftab_concatenate_columns(const ftab_t * L , const ftab_t * R)
     size_t ncol = L->ncol + R->ncol;
 
     ftab_t * T = ftab_new(ncol);
+    assert(T != NULL);
+
     for(size_t kk = 0; kk < L->ncol; kk++)
     {
         ftab_set_colname(T, kk, L->colnames[kk]);
@@ -589,73 +616,4 @@ ftab_t * ftab_concatenate_columns(const ftab_t * L , const ftab_t * R)
     }
 
     return T;
-}
-
-
-void
-ftab_subselect_rows(ftab_t * tab, const u8 * selection)
-{
-    u64 nsel = 0;
-    for(u64 kk = 0; kk < tab->nrow; kk++)
-    {
-        if(selection[kk] > 0)
-        {
-            if(kk != nsel)
-            {
-                memcpy(tab->T + nsel*tab->ncol,
-                       tab->T + kk*tab->ncol,
-                       tab->ncol*sizeof(float));
-            }
-            nsel++;
-        }
-    }
-    tab->nrow = nsel;
-    return;
-}
-
-ftab_t *
-ftab_concatenate_rows(const ftab_t * Top, const ftab_t * Down)
-{
-
-    if(Top == NULL && Down == NULL)
-    {
-        return NULL;
-    }
-    if(Top == NULL)
-    {
-        return ftab_copy(Down);
-    }
-    if(Down == NULL)
-    {
-        return ftab_copy(Top);
-    }
-
-    if(Top->ncol != Down->ncol)
-    {
-        fprintf(stderr,
-                "ftab concatenate_rows: error: Tables does "
-                "not have the same number of columns\n");
-        return NULL;
-    }
-    // TODO: Check column names
-
-    ftab_t * concat = calloc(1, sizeof(ftab_t));
-    concat->ncol = Top->ncol;
-    concat->nrow = Top->nrow + Down->nrow;
-    concat->nrow_alloc = concat->nrow;
-    concat->T = calloc(concat->nrow*concat->ncol, sizeof(float));
-    if(concat->T == NULL)
-    {
-        free(concat);
-        return NULL;
-    }
-    memcpy(concat->T,
-           Top->T,
-           Top->nrow*Top->ncol*sizeof(float));
-    memcpy(concat->T+Top->nrow*Top->ncol,
-           Down->T,
-           Down->nrow*Down->ncol*sizeof(float));
-
-    // TODO: Set column names
-    return concat;
 }
