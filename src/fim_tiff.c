@@ -450,7 +450,7 @@ void readFloat(TIFF * tfile, float * V,
 {
     // Number of elements per strip
     size_t nes = ssize/sizeof(float);
-    float * buf = malloc(ssize);
+    float * buf = calloc(ssize, sizeof(float));
     assert(buf != NULL);
 
     for(int64_t dd=0; dd<ndirs; dd++) {
@@ -487,11 +487,14 @@ float raw_file_single_max(const char * rName, const size_t N)
     //  printf("Getting max value from %s\n", rName);
     size_t buf_size = 1024*1024;
     float  max = -INFINITY;
-    float * buf = malloc(buf_size*sizeof(float));
+    float * buf = calloc(buf_size, sizeof(float));
+    assert(buf != NULL);
     FILE * fid = fopen(rName, "r");
     if(fid == NULL)
     {
         printf("ERROR: unable to open %s\n", rName);
+        free(buf);
+        return -1;
     }
     size_t nread = 0;
     //  printf("N = %zu\n", N);
@@ -1700,6 +1703,7 @@ int fim_tiff_maxproj(const char * in, const char * out)
     {
         printf("Can't process %s\n", in);
         printf("Error: %s\n", errStr);
+        free(errStr);
         return -1;
     }
 
@@ -1898,6 +1902,7 @@ int fim_tiff_extract_slice(const char * in, const char * out, int slice)
     {
         printf("Can't process %s\n", in);
         printf("Error: %s\n", errStr);
+        free(errStr);
         return -1;
     }
 

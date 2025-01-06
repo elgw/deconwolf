@@ -2547,7 +2547,7 @@ ftab_t * fim_lmax_multiscale(float ** II, float * scales, size_t nscales,
          * is a local maxima in the 4D neighbourhood
          * we skip the border pixels
          **/
-        float * strel = malloc(27*sizeof(float));
+        float * strel = calloc(27,sizeof(float));
         assert(strel != NULL);
         for(int kk = 0; kk<27; kk++)
         {
@@ -2557,9 +2557,12 @@ ftab_t * fim_lmax_multiscale(float ** II, float * scales, size_t nscales,
 
         /* For each scale, save the local max */
         float * local_max = calloc(nscales, sizeof(float));
+        assert(local_max != NULL);
         /* Indicator if the central pixel is the largest for the given scale */
         int * is_local_max = calloc(nscales, sizeof(int));
+        assert(is_local_max != NULL);
         int * is_scale_max = calloc(nscales, sizeof(int));
+        assert(is_scale_max != NULL);
 
 #pragma omp for
         for(size_t pp = 1; pp < P-1; pp++)
@@ -2633,6 +2636,7 @@ ftab_t * fim_lmax_multiscale(float ** II, float * scales, size_t nscales,
         free(strel);
         free(row);
         free(log_values);
+        free(is_scale_max);
     }
     return T;
 }
@@ -3521,7 +3525,7 @@ fim_DoH(const float * V0,
         fimo_free(l2);
 
         /* Compute DoH (still shifted) */
-#pragma omp paralell for
+#pragma omp parallel for
         for(size_t kk = 0; kk < M*N; kk++)
         {
             sGL->V[kk] = sGL->V[kk]*sLG->V[kk] - pow(sDD->V[kk], 2.0);
@@ -3540,6 +3544,7 @@ fim_DoH(const float * V0,
 
     if(P > 1)
     {
+        printf("3D DOH not implemented. %f\n", sigmaz);
         assert(0);
     }
 
@@ -3758,7 +3763,8 @@ fimo * fim_shiftdim2(const fimo * restrict I)
             {
                 for(size_t mm = bm; mm< bm_end_c; mm++)
                 {
-                    S[nn + mm*M] = V[mm + nn*M];
+                    assert(nn + mm*N < M*N);
+                    S[nn + mm*N] = V[mm + nn*M];
                 }
             }
         }
@@ -3775,7 +3781,7 @@ fimo * fim_shiftdim(const fimo * restrict I)
     const size_t P = I->P;
 
     /* Output image */
-    fimo * O = malloc(sizeof(fimo));
+    fimo * O = calloc(1, sizeof(fimo));
     assert(O != NULL);
     O->V = fim_malloc(M*N*P*sizeof(float));
 
@@ -4387,6 +4393,8 @@ fim_dot_lateral_circularity(const float * I,
                             double x, double y, double z,
                             double sigma)
 {
+    assert(sigma > 0);
+    assert(I != NULL);
     // Check z-coordinate
     const int zi = round(z);
     if(zi < 0)
@@ -4403,8 +4411,9 @@ fim_dot_lateral_circularity(const float * I,
 
     const double radius = 1.75*sigma;
 
-    const int s = round(2.0*sigma) + 1;
+    const int s = (int) ( (2.0*sigma) + 1.0 );
     const int n = 2*s + 1;
+    assert(n > 0);
 
     float * X = calloc(n*n, sizeof(float));
     assert(X != NULL);
@@ -4498,7 +4507,9 @@ static void fim_covariance_lp_ut()
 {
     size_t n = 11;
     float * X = calloc(n, sizeof(float));
+    assert(X != NULL);
     float * Y = calloc(n, sizeof(float));
+    assert(Y != NULL);
     for(size_t kk = 0; kk < n; kk++)
     {
         X[kk] = (double) rand() / (double) RAND_MAX;

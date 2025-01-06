@@ -83,8 +83,10 @@ ftab_t * ftab_copy(const ftab_t * T)
     C->ncol = T->ncol;
     C->nrow_alloc = C->nrow;
     C->T = calloc(C->nrow*C->ncol, sizeof(float));
+    assert(C->T != NULL);
     memcpy(C->T, T->T, C->nrow*C->ncol*sizeof(float));
     C->colnames = calloc(C->ncol, sizeof(char*));
+    assert(C->colnames != NULL);
     assert(T->colnames != NULL);
     for(u64 kk = 0; kk < C->ncol; kk++)
     {
@@ -640,6 +642,7 @@ ftab_concatenate_rows(const ftab_t * Top, const ftab_t * Down)
     // TODO: Check column names
 
     ftab_t * concat = calloc(1, sizeof(ftab_t));
+    assert(concat != NULL);
     concat->ncol = Top->ncol;
     concat->nrow = Top->nrow + Down->nrow;
     concat->nrow_alloc = concat->nrow;

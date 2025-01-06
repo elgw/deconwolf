@@ -64,7 +64,7 @@ dw_render: $(dw_render_files)
 ## Note: prf_* and qsort comes from pixel_random_forest repo
 
 dw_nuclei_files=dw_nuclei.c fim.o ftab.o fim_tiff.o dw_util.o \
-trafo/libtrafo.a fft.o
+trafo/libtrafo.a fft.o dw_png.o
 
 dw_nuclei: $(dw_nuclei_files)
 	$(CC) $(CFLAGS) -DSTANDALONE $(dw_nuclei_files) $(LDFLAGS) -o dw_nuclei

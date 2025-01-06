@@ -242,6 +242,7 @@ size_t get_peakMemoryKB(void)
         {
             if(strncmp(line, "VmPeak", 6) == 0)
             {
+                free(peakline);
                 peakline = strdup(line);
             }
         }
