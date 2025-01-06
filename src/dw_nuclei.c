@@ -6,8 +6,7 @@
 #include <getopt.h>
 #include <stdint.h>
 
-#include <png.h>
-#include <zlib.h>
+
 #include <omp.h>
 
 #include "fim.h"
@@ -15,6 +14,7 @@
 #include "dw_util.h"
 #include "dw_version.h"
 #include "trafo/src/trafo.h"
+#include "dw_png.h"
 
 /* Suggested command line interface:
  * dw_nuclei --fit model.name [more options] file1.tif annotations1. tif file2.tif annotations2.tif ...
@@ -130,48 +130,9 @@ int fimo_to_png(fimo * I, const char * outname)
         fprintf(stderr, "fimo_to_png: ERROR: can only write 2D images\n");
         return EXIT_FAILURE;
     }
-    FILE * fid = fopen(outname, "w");
-    if(fid == NULL)
-    {
-        fprintf(stderr, "Unable to open %s for writing\n", outname);
-        return EXIT_FAILURE;
-    }
 
-    png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING,
-                                              NULL, NULL, NULL);
-    if(png == NULL)
-    {
-        fprintf(stderr, "png_create_write_struct failed\n");
-        fclose(fid);
-        return EXIT_FAILURE;
-    }
-
-    png_infop info = png_create_info_struct(png);
-    if(info == NULL)
-    {
-        fprintf(stderr, "png_create_info_struct failed\n");
-        fclose(fid);
-        return EXIT_FAILURE;
-    }
-
-    png_init_io(png, fid);
-
-    png_set_IHDR(
-                 png,
-                 info,
-                 I->M, I->N,
-                 8,
-                 PNG_COLOR_TYPE_RGBA,
-                 PNG_INTERLACE_NONE,
-                 PNG_COMPRESSION_TYPE_DEFAULT,
-                 PNG_FILTER_TYPE_DEFAULT
-                 );
     uint8_t * img_data = calloc(4*I->M*I->N*3, sizeof(uint8_t));
-    uint8_t ** row_pointers = calloc(I->M, sizeof(uint8_t*));
-    for(u64 kk = 0; kk < I->M; kk++)
-    {
-        row_pointers[kk] = img_data+4*kk*I->N;
-    }
+    assert(img_data != NULL);
 
     float imax = fim_max(I->V, I->M*I->N);
     for(u64 kk = 0; kk < I->M*I->N; kk++)
@@ -188,14 +149,11 @@ int fimo_to_png(fimo * I, const char * outname)
         img_data[4*kk+3] = 255; // Alpha
     }
 
-    png_write_info(png, info);
-    png_write_image(png, row_pointers);
-    png_write_end(png, NULL);
-    png_destroy_write_struct(&png, &info);
-    fclose(fid);
+
+    int status = rgba_to_png(img_data, I->M, I->N, outname);
     free(img_data);
-    free(row_pointers);
-    return EXIT_SUCCESS;
+
+    return status;
 }
 
 double * double_from_float(const float * source, size_t n)
@@ -216,59 +174,44 @@ double * double_from_float(const float * source, size_t n)
  */
 fimo * fim_png_read_green_red(const char * fname)
 {
-    fimo * F = NULL;
 
-    png_image image;
-    memset(&image, 0, sizeof(image));
-    image.version = PNG_IMAGE_VERSION;
-    if(png_image_begin_read_from_file(&image, fname))
+    printf("Reading %s\n", fname); fflush(stdout);
+
+    u32 height, width;
+    u8 * png_data = rgba_from_png(fname, &width, &height);
+    if(png_data == NULL)
     {
-        png_bytep buffer;
-        image.format = PNG_FORMAT_RGB;
-        buffer = malloc(PNG_IMAGE_SIZE(image));
-
-        if(buffer == NULL)
-        {
-            fprintf(stderr, "Unable to allocate memory for the image buffer\n");
-            exit(EXIT_FAILURE);
-        }
-        if(png_image_finish_read(&image, NULL, buffer, 0, NULL))
-        {
-            size_t M = image.width;
-            size_t N = image.height;
-
-            F = calloc(1, sizeof(fimo));
-            assert(F != NULL);
-            F->M = M;
-            F->N = N;
-            F->P = 1;
-            F->V = calloc(M*N, sizeof(float));
-            assert(F->V != NULL);
-            printf("Reading %s\n", fname); fflush(stdout);
-            size_t nfg = 0;
-            size_t nbg = 0;
-            for(size_t kk = 0; kk<M*N; kk++)
-            {
-                F->V[kk] = 0;
-                if(buffer[3*kk+1] > buffer[3*kk+0])
-                {
-                    F->V[kk] = 1;
-                    nfg++;
-                }
-                if(buffer[3*kk+1] < buffer[3*kk+0])
-                {
-                    F->V[kk] = 2;
-                    nbg++;
-                }
-            }
-            printf("Found %zu foreground (green->2) and %zu background (red->1) pixels\n",
-                   nfg, nbg);
-        }
-
-        free(buffer);
+        return NULL;
     }
 
-    png_image_free(&image);
+    fimo * F = NULL;
+    F = calloc(1, sizeof(fimo));
+    assert(F != NULL);
+    F->M = height;
+    F->N = width;
+    F->P = 1;
+    F->V = calloc(F->M*F->N, sizeof(float));
+    assert(F->V != NULL);
+
+    size_t nfg = 0;
+    size_t nbg = 0;
+    for(size_t kk = 0; kk<F->M*F->N; kk++)
+    {
+        F->V[kk] = 0;
+        if(png_data[3*kk+1] > png_data[3*kk+0])
+        {
+            F->V[kk] = 1;
+            nfg++;
+        }
+        if(png_data[3*kk+1] < png_data[3*kk+0])
+        {
+            F->V[kk] = 2;
+            nbg++;
+        }
+    }
+    printf("Found %zu foreground (green->2) and %zu background (red->1) pixels\n",
+           nfg, nbg);
+
     return F;
 }
 
@@ -928,7 +871,31 @@ fit(opts * s, int argc, char ** argv)
 static void
 labels_to_png(u32 * label, u32 M, u32 N, const char * name_out)
 {
-    // rgba_to_png
+    u8 * pixels = calloc(M*N*4, sizeof(u8));
+    for(u64 kk = 0; kk < M*N; kk++)
+    {
+
+
+        switch(label[kk])
+        {
+        case 1:
+            pixels[4*kk] = 255;
+            pixels[4*kk+3] = 255;
+            break;
+        case 2:
+            pixels[4*kk+1] = 255;
+            pixels[4*kk+3] = 255;
+
+            break;
+        default:
+            ;
+        }
+    }
+    if(rgba_to_png(pixels, M, N, name_out))
+    {
+        fprintf(stderr, "Failed to write to %s\n", name_out);
+    }
+    free(pixels);
     return;
 }
 
@@ -950,6 +917,10 @@ classify(opts * s, int argc, char ** argv)
 
         /* Read raw image and reduce it to 2D*/
         fimo * image = get_reduction(s, name_image);
+        if(image == NULL)
+        {
+            continue;
+        }
         /* Extract features */
         ftab_t * image_features = fim_features_2d(image);
         u32 M = image->M;
@@ -957,20 +928,21 @@ classify(opts * s, int argc, char ** argv)
         fimo_free(image);
 
         double * image_features8 = calloc(image_features->nrow*image_features->ncol,
-                                        sizeof(double));
+                                          sizeof(double));
         assert(image_features8 != NULL);
         for(u64 kk = 0; kk < image_features->nrow*image_features->ncol; kk++)
         {
             image_features8[kk] = image_features->T[kk];
         }
-        u64 nsample = image_features->ncol;
+        u64 nsample = image_features->nrow;
+        assert(nsample == M*N);
         ftab_free(image_features);
         u32 * class = trafo_predict(RF, NULL, image_features8, nsample);
         free(image_features8);
 
         // Write to disk ...
-        char * name_out = calloc(strlen(name_image) + 16);
-        sprintf(name_out, "%s.predict.png");
+        char * name_out = calloc(strlen(name_image)+16, 1);
+        sprintf(name_out, "%s.predict.png", name_image);
         labels_to_png(class, M, N, name_out);
 
         free(name_out);
@@ -996,6 +968,7 @@ init(opts * s, int argc, char ** argv)
     {
         const char * image = argv[kk];
         char * out = calloc(strlen(image)+16, 1);
+        assert(out != NULL);
         sprintf(out, "%s.a.png", image);
         printf("%s -> %s\n", image, out);
         i64 M, N, P;
@@ -1006,6 +979,7 @@ init(opts * s, int argc, char ** argv)
         fimo_free(I);
         fimo_to_png(Iz, out);
         fimo_free(Iz);
+        free(out);
     }
     return EXIT_SUCCESS;
 }
