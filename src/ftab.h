@@ -17,17 +17,48 @@
  */
 
 /* Floating point-only table stored in row-major format.
-*/
+ * Original repository: github.com/elgw/ftab/
+ *
+ * The uggly:
+ *
+ * - Missing values will be parsed as 0
+ * - Always interprets the first line as a header
+ *
+ *
+ * TODO
+ *
+ * Use strtof instead of atof
+ * Possibly support writing using %a for exactness
+ * Decide what to do about missing values
+ * Handle NAN and Inf
+ * Parsing header or not option.
+ * Option to ignoring comment lines starting with #
+ *
+ *
+ * CHANGELOG
+ *
+ * 0.1.1 : switched from strtok to strsep to handle also empty values
+ * 0.1.2 : added ftab_compare to compare two tables.
+ */
+
+#define FTAB_VERSION_MAJOR 0
+#define FTAB_VERSION_MINOR 1
+#define FTAB_VERSION_PATCH 2
 
 #include <stdint.h>
+#include <stdio.h>
+
 
 /* row-major table */
 typedef struct {
+    /* Pointer to the table data. Please note that the address can change between calls to the API */
     float * T;
+    /* Number of rows */
     size_t nrow;
+    /* Number of columns */
     size_t ncol;
     size_t nrow_alloc; /* To know if we need to extend the size */
-    char ** colnames; /* Name of columns can be NULL*/
+    char ** colnames; /* Name of columns can be NULL. Also the pointer can be NULL */
 } ftab_t;
 
 /* Create a new table with a fixed number of columns
@@ -37,11 +68,14 @@ ftab_t * ftab_new(int ncol);
 /* Create a new table from raw data. The data has to be in row major format */
 ftab_t * ftab_new_from_data(int nrow, int ncol, const float * data);
 
+
 /* Load a TSV file. The first line is interpreted as
  * containing the column names. Everything else is interpreted
  * as float values.
  */
 ftab_t * ftab_from_tsv(const char * fname);
+
+ftab_t * ftab_from_csv(const char * fname);
 
 /* Write tsv file do disk */
 int ftab_write_tsv(const ftab_t * T, const char * fname);
@@ -49,6 +83,8 @@ int ftab_write_tsv(const ftab_t * T, const char * fname);
 /* Write tsv file do disk */
 int ftab_write_csv(const ftab_t * T, const char * fname);
 
+/* Write tsv file do disk */
+int ftab_write_csv(const ftab_t * T, const char * fname);
 
 /** Print table to file
  * @param[in] fid An open FILE to write to
@@ -65,7 +101,7 @@ void ftab_set_colname(ftab_t *, int col, const char * name);
 /* Free a ftab and all associated data */
 void ftab_free(ftab_t * T);
 
-/* Append a row. Dynamically grows the table if needed. */
+/* Append a single row. */
 void ftab_insert(ftab_t * T, float * row);
 
 /* Get the index of a certain column name
@@ -73,8 +109,6 @@ void ftab_insert(ftab_t * T, float * row);
  * multiple columns have the same name. */
 int ftab_get_col(const ftab_t * T, const char * name);
 
-/* Some unit tests */
-int ftab_ut(void);
 
 /** @brief Set the data for one column.
  * @param T: table to receive data
@@ -91,11 +125,30 @@ int ftab_set_coldata(ftab_t * T, int col, const float * data);
 */
 ftab_t * ftab_concatenate_columns(const ftab_t * L, const ftab_t * R);
 
+/* Concatenate two tables vertically with T on the top and B on the bottom */
+ftab_t * ftab_concatenate_rows(const ftab_t * T, const ftab_t * B);
+
 /* Subselect rows where row_selector > 0 */
 void ftab_subselect_rows(ftab_t * T, const uint8_t * row_selector);
 
 /* Keep n head rows */
 void ftab_head(ftab_t * T, int64_t n);
 
-/* Concatenate two tables vertically with T on the top and B on the bottom */
-ftab_t * ftab_concatenate_rows(const ftab_t * T, const ftab_t * B);
+/* Subselect rows where row_selector > 0
+ * The row_selector array needs to have as many elements as there are rows.
+ * The table is modified.
+ */
+void ftab_subselect_rows(ftab_t * T, const uint8_t * row_selector);
+
+/** Create a deep copy */
+ftab_t * ftab_copy(const ftab_t * T);
+
+/* Compare two tables. Returns 0 if the are equal returns a positive
+* number if either or both pointer are null or if the tables are
+* different
+* Column names are also compared
+*/
+int ftab_compare(const ftab_t *, const ftab_t * );
+
+/* Run some unit tests */
+int ftab_ut(int argc, char ** argv);

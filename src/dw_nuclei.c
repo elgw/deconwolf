@@ -131,7 +131,7 @@ int fimo_to_png(fimo * I, const char * outname)
         return EXIT_FAILURE;
     }
 
-    uint8_t * img_data = calloc(4*I->M*I->N*3, sizeof(uint8_t));
+    uint8_t * img_data = calloc(3*I->M*I->N*3, sizeof(uint8_t));
     assert(img_data != NULL);
 
     float imax = fim_max(I->V, I->M*I->N);
@@ -143,14 +143,13 @@ int fimo_to_png(fimo * I, const char * outname)
         {
             v8 = 255;
         }
-        img_data[4*kk] = v8; // Red
-        img_data[4*kk+1] = v8; // Green
-        img_data[4*kk+2] = v8; // Blue
-        img_data[4*kk+3] = 255; // Alpha
+        img_data[3*kk] = v8; // Red
+        img_data[3*kk+1] = v8; // Green
+        img_data[3*kk+2] = v8; // Blue
     }
 
 
-    int status = rgba_to_png(img_data, I->M, I->N, outname);
+    int status = rgb_to_png(img_data, I->M, I->N, outname);
     free(img_data);
 
     return status;
@@ -174,11 +173,10 @@ double * double_from_float(const float * source, size_t n)
  */
 fimo * fim_png_read_green_red(const char * fname)
 {
-
     printf("Reading %s\n", fname); fflush(stdout);
 
     u32 height, width;
-    u8 * png_data = rgba_from_png(fname, &width, &height);
+    u8 * png_data = rgb_from_png(fname, &width, &height);
     if(png_data == NULL)
     {
         return NULL;
@@ -203,7 +201,7 @@ fimo * fim_png_read_green_red(const char * fname)
             F->V[kk] = 1;
             nfg++;
         }
-        if(png_data[3*kk+1] < png_data[3*kk+0])
+        if(png_data[3*kk+0] > png_data[3*kk+1])
         {
             F->V[kk] = 2;
             nbg++;
@@ -723,9 +721,11 @@ random_forest_pipeline(opts * s, int argc, char ** argv)
 }
 
 static ftab_t *
-read_png_labels(const char * name_image)
+read_png_labels(const char * name_image, u32 * height, u32 *width)
 {
     fimo * anno = fim_png_read_green_red(name_image);
+    *height = anno->M;
+    *width = anno->N;
     assert(anno->P == 1);
     if(anno == NULL)
     {
@@ -743,6 +743,15 @@ read_png_labels(const char * name_image)
 static int
 fit(opts * s, int argc, char ** argv)
 {
+    if(s->overwrite == 0)
+    {
+        if(dw_isfile(s->modelfile))
+        {
+            printf("%s does already exist (--overwrite not specified)\n",
+                   s->modelfile);
+            return EXIT_FAILURE;
+        }
+    }
     int nimages = (argc - s->optpos);
     if( nimages == 0)
     {
@@ -768,7 +777,8 @@ fit(opts * s, int argc, char ** argv)
         }
         printf("Processing %s (%s)\n", name_image, name_annotation);
 
-        ftab_t * image_labels = read_png_labels(name_annotation);
+        u32 height, width;
+        ftab_t * image_labels = read_png_labels(name_annotation, &height, &width);
         free(name_annotation);
         if(image_labels == NULL)
         {
@@ -777,6 +787,13 @@ fit(opts * s, int argc, char ** argv)
 
         /* Read raw image and reduce it to 2D*/
         fimo * image = get_reduction(s, name_image);
+        if(image->M != height)
+        {
+            printf("Error: PNG and TIF image dimensions mismatch\n");
+            exit(EXIT_FAILURE);
+
+
+        }
         /* Extract features */
         ftab_t * image_features = fim_features_2d(image);
         fimo_free(image);
@@ -868,30 +885,30 @@ fit(opts * s, int argc, char ** argv)
 
     return EXIT_SUCCESS;
 }
+
+/* 1-> Green
+*  2->Red
+*/
 static void
 labels_to_png(u32 * label, u32 M, u32 N, const char * name_out)
 {
-    u8 * pixels = calloc(M*N*4, sizeof(u8));
+    u8 * pixels = calloc(M*N*3, sizeof(u8));
     for(u64 kk = 0; kk < M*N; kk++)
     {
-
-
         switch(label[kk])
         {
         case 1:
-            pixels[4*kk] = 255;
-            pixels[4*kk+3] = 255;
+            pixels[3*kk+1] = 255;
             break;
         case 2:
-            pixels[4*kk+1] = 255;
-            pixels[4*kk+3] = 255;
-
+            pixels[3*kk+0] = 255;
             break;
         default:
+            break;
             ;
         }
     }
-    if(rgba_to_png(pixels, M, N, name_out))
+    if(rgb_to_png(pixels, N, M, name_out))
     {
         fprintf(stderr, "Failed to write to %s\n", name_out);
     }
@@ -914,7 +931,14 @@ classify(opts * s, int argc, char ** argv)
     for(int kk = s->optpos; kk < argc; kk++)
     {
         const char * name_image = argv[kk];
-
+        char * name_out = calloc(strlen(name_image)+16, 1);
+        sprintf(name_out, "%s.predict.png", name_image);
+        if(s->overwrite == 0 && dw_isfile(name_out))
+        {
+            printf("%s does already exist (--overwrite not used)\n", name_out);
+            free(name_out);
+            continue;
+        }
         /* Read raw image and reduce it to 2D*/
         fimo * image = get_reduction(s, name_image);
         if(image == NULL)
@@ -941,8 +965,6 @@ classify(opts * s, int argc, char ** argv)
         free(image_features8);
 
         // Write to disk ...
-        char * name_out = calloc(strlen(name_image)+16, 1);
-        sprintf(name_out, "%s.predict.png", name_image);
         labels_to_png(class, M, N, name_out);
 
         free(name_out);
@@ -968,9 +990,16 @@ init(opts * s, int argc, char ** argv)
     {
         const char * image = argv[kk];
         char * out = calloc(strlen(image)+16, 1);
+
         assert(out != NULL);
         sprintf(out, "%s.a.png", image);
         printf("%s -> %s\n", image, out);
+        if(s->overwrite == 0 && dw_isfile(out) == 1)
+        {
+            printf("%s does already exist (--overwrite not specified)\n", out);
+            free(out);
+            continue;
+        }
         i64 M, N, P;
         fim_tiff_get_size(image, &M, &N, &P);
         printf("%lu x %lu\n", M, N);

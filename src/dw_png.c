@@ -14,7 +14,7 @@ typedef uint8_t u8;
 
 
 int
-rgba_to_png(const uint8_t * pixels,
+rgb_to_png(const uint8_t * pixels,
             u32 height, u32 width,
             const char * filename)
 {
@@ -51,19 +51,20 @@ rgba_to_png(const uint8_t * pixels,
     png_set_IHDR(
         png,
         info,
-        height, width,
+        width, height,
         8,
-        PNG_COLOR_TYPE_RGBA,
+        PNG_COLOR_TYPE_RGB,
         PNG_INTERLACE_NONE,
         PNG_COMPRESSION_TYPE_DEFAULT,
         PNG_FILTER_TYPE_DEFAULT
         );
 
+    printf("Writing with width=%u, height=%u\n", width, height);
     const uint8_t ** row_pointers = calloc(height, sizeof(uint8_t*));
     assert(row_pointers != NULL);
     for(u64 kk = 0; kk < height; kk++)
     {
-        row_pointers[kk] = pixels + 4*kk*width;
+        row_pointers[kk] = &pixels[3*kk*width];
     }
 
     png_write_info(png, info);
@@ -78,7 +79,7 @@ rgba_to_png(const uint8_t * pixels,
 
 
 uint8_t *
-rgba_from_png(const char * filename,
+rgb_from_png(const char * filename,
               uint32_t * height, uint32_t * width)
 {
     png_image image;
@@ -108,4 +109,26 @@ rgba_from_png(const char * filename,
 
     png_image_free(&image);
     return buffer;
+}
+
+int dw_png_ut(int argc, char ** argv)
+{
+    if(argc < 3)
+    {
+        printf("Usage:\n");
+        printf("%s input.png output.png\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
+    u32 width, height;
+    u8 * pixels = rgb_from_png(argv[1], &height, &width);
+    if(pixels == NULL)
+    {
+        printf("Unable to read %s\n", argv[1]);
+        exit(EXIT_FAILURE);
+    }
+    printf("Input dimensions: %u (height) x %u (width)\n",
+           height, width);
+    rgb_to_png(pixels, height, width, argv[2]);
+    free(pixels);
+    return EXIT_SUCCESS;
 }
