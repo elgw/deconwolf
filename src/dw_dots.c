@@ -474,6 +474,10 @@ static ftab_t *
 append_circularity(opts * s, ftab_t * T, const float * restrict I,
                    size_t M, size_t N, size_t P)
 {
+    if(s->verbose > 2)
+    {
+        printf("append_circularity()\n");
+    }
     int xcol = ftab_get_col(T, "f_x");
     int ycol = ftab_get_col(T, "f_y");
     int zcol = ftab_get_col(T, "f_z");
@@ -816,6 +820,7 @@ void detect_dots(opts * s, char * inFile)
          *
          */
         float ** LoG = calloc(s->nscale, sizeof(float**));
+        assert(LoG != NULL);
         for(int ss = 0; ss < s->nscale; ss++)
         {
             float scaling = s->scales[ss];

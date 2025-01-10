@@ -14,6 +14,19 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <unistd.h>
+#include <assert.h>
+#include <fftw3.h>
+#include <inttypes.h>
+#define _USE_MATH_DEFINES
+#include <math.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <string.h>
+#include <stdint.h>
+
+
 #include "fim_tiff.h"
 #include "fim.h"
 

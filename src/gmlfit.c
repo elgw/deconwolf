@@ -255,7 +255,7 @@ float correlate_spot(const gsl_vector * v, optParams * params)
     }
     // printf("using %zu / %zu pixels\n", writepos, M*N*P);
     float corr = correlation_lp(Spt, use, writepos);
-
+    free(Spt);
     free(use);
     return corr;
 }

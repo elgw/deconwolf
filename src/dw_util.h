@@ -40,6 +40,9 @@
 #include <unistd.h>
 #endif
 
+#include <string.h>
+
+
 #define tictoc struct timespec tictoc_start, tictoc_end;
 #define tic dw_gettime(&tictoc_start);
 #define toc(X) dw_gettime(&tictoc_end); printf(#X); printf(" %f s\n", timespec_diff(&tictoc_end, &tictoc_start)); fflush(stdout);

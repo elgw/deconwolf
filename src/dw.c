@@ -14,6 +14,7 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <unistd.h>
 #include "dw.h"
 
 /* GLOBALS */
@@ -25,6 +26,7 @@ FILE * logfile = NULL;
 dw_iterator_t * dw_iterator_new(const dw_opts * s)
 {
     dw_iterator_t * it = calloc(1, sizeof(dw_iterator_t));
+    assert(it != NULL);
     it->error = 1;
     it->lasterror = 1;
     it->itertype = s->iter_type;
@@ -2046,7 +2048,10 @@ void flatfieldCorrection(dw_opts * s, float * im, int64_t M, int64_t N, int64_t 
 
 static void prefilter(dw_opts * s,
                float * im, int64_t M, int64_t N, int64_t P,
-               float * psf, int64_t pM, int64_t pN, int64_t pP)
+                      __attribute__((unused)) float * psf,
+                      __attribute__((unused)) int64_t pM,
+                      __attribute__((unused)) int64_t pN,
+                      __attribute__((unused)) int64_t pP)
 {
 
     if(s->psigma<= 0)

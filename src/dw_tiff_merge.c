@@ -1,3 +1,12 @@
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <getopt.h>
+#include <string.h>
+
+#include "fim_tiff.h"
+#include "dw_util.h"
+
 #include "dw_tiff_merge.h"
 
 typedef struct {

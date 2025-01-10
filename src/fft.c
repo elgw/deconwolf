@@ -21,8 +21,10 @@
 #include <fftw3.h>
 #include <string.h>
 #include <errno.h>
+#include <math.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+
 #include "fim.h"
 #include "dw_util.h"
 

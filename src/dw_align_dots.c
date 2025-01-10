@@ -1,10 +1,11 @@
 #include "kdtree.h"
 #include <assert.h>
 #include <getopt.h>
+#include <math.h>
 #include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
-
+#include <string.h>
 #include "ftab.h"
 #include "dw_version.h"
 #include "dw_util.h"
