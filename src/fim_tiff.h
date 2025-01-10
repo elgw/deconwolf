@@ -26,16 +26,6 @@
  */
 
 
-#include <assert.h>
-#include <fftw3.h>
-#include <inttypes.h>
-#define _USE_MATH_DEFINES
-#include <math.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <string.h>
-#include <stdint.h>
 #include <tiffio.h>
 
 #include "fim.h"

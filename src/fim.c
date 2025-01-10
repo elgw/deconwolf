@@ -2665,6 +2665,11 @@ static int lmax_2d(const float * I, size_t stride)
 
 ftab_t * fim_lmax_2d(const float * I, size_t M, size_t N, size_t P)
 {
+    if(P != 1)
+    {
+        printf("Warning: fim_lmax_2d called with a 3D image\n"
+               "Will only use the first plane\n");
+    }
     ftab_t * T = ftab_new(4);
     ftab_set_colname(T, 0, "x");
     ftab_set_colname(T, 1, "y");
@@ -3887,7 +3892,7 @@ ftab_t * fim_features_2d(const fimo * fI)
     int nsigma = 1;
     int f_per_s = 7; /* Features per sigma */
     int nfeatures = nsigma*f_per_s;
-    printf("Will produce %d features\n", nfeatures);
+    //printf("Will produce %d features\n", nfeatures);
     ftab_t * T = malloc(sizeof(ftab_t));
     assert(T != NULL);
     T->nrow = fI->M*fI->N;
@@ -3914,7 +3919,7 @@ ftab_t * fim_features_2d(const fimo * fI)
     for(int ss = 0; ss<nsigma; ss++)
     {
         float sigma = sigmas[ss];
-        printf("%f ", sigma); fflush(stdout);
+        //printf("%f ", sigma); fflush(stdout);
 
         fimo * G = fimo_copy(fI);
 
@@ -4573,7 +4578,12 @@ void fim_dot_lateral_circularity_ut()
     rewind(fid);
     float * G2 = calloc(nb/sizeof(float), sizeof(float));
     size_t nread = fread(G2, nb/sizeof(float), sizeof(float), fid);
-    assert(nread == nb/sizeof(float));
+
+    if(nread != nb/sizeof(float))
+    {
+        printf("Error reading G.f32\n");
+        exit(EXIT_FAILURE);
+    }
     size_t side = sqrt(nb/sizeof(float));
     circ = fim_dot_lateral_circularity(G2, side, side, 1,
                                        ((double) side - 1.0) /2,

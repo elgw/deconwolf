@@ -1,6 +1,18 @@
+#include <assert.h>
+#include <getopt.h>
+#include <math.h>
+#include <omp.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "fim.h"
+#include "fim_tiff.h"
+#include "dw_version.h"
+
 #include "dw_imshift.h"
 
-#include <omp.h>
+
 
 typedef struct{
     int overwrite;
@@ -166,7 +178,8 @@ int dw_imshift(int argc, char ** argv)
         exit(1);
     }
 
-    outFile = malloc(strlen(inFile) + 20);
+    outFile = calloc(strlen(inFile) + 20, 1);
+    assert(outFile != NULL);
 
     char * dname = dw_dirname(inFile);
     char * fname = dw_basename(inFile);

@@ -1,3 +1,14 @@
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <getopt.h>
+
+#include "fim.h"
+#include "fim_tiff.h"
+#include "dw_version.h"
+
+
 #include "dw_maxproj.h"
 
 #define MODE_MAX 0

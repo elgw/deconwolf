@@ -38,6 +38,11 @@ ifeq ($(SANITIZE),1)
 CFLAGS+=-fsanitize=address -static-libasan
 endif
 
+ANALYZE?=0
+ifeq ($(ANALYZE),1)
+CFLAGS+=-fanalyzer
+endif
+
 # FFT Backend, pick __one__
 FFTW3=1
 MKL?=0

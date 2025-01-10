@@ -369,7 +369,8 @@ void tiling_put_tile_raw(tiling * T, int tid, const char * fname, float * restri
   }
 
   size_t buf_size = M*sizeof(float);
-  float * buf = malloc(buf_size);
+  float * buf = calloc(buf_size, 1);
+  assert(buf != NULL);
 
   for(int64_t cc = t->xpos[4]; cc <= t->xpos[5]; cc++)
   {

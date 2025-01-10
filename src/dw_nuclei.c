@@ -1,5 +1,7 @@
 #include "dw_nuclei.h"
 
+#include <assert.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,9 +18,8 @@
 #include "trafo/src/trafo.h"
 #include "dw_png.h"
 
-/* Suggested command line interface:
- * dw_nuclei --fit model.name [more options] file1.tif annotations1. tif file2.tif annotations2.tif ...
- * dw_nuclei --classify model.name [more options] file1.tif file2.tif ...
+/* Wanted:
+ * Option to apply background correction (multiplicative).
  *
  */
 
@@ -63,11 +64,6 @@ typedef struct{
     reduction_type redu;
 } opts;
 
-static opts * opts_new();
-static void opts_free(opts * s);
-static void opts_print(FILE * f, opts * s);
-static void usage(__attribute__((unused)) int argc, char ** argv);
-static void argparsing(int argc, char ** argv, opts * s);
 
 static opts * opts_new()
 {
@@ -92,6 +88,7 @@ static opts * opts_new()
 static void opts_print(FILE * f, opts * s)
 {
     fprintf(f, "Overwrite: %d\n", s->overwrite);
+
     fprintf(f, "3D->2D reduction: ");
     switch(s->redu)
     {
@@ -105,7 +102,11 @@ static void opts_print(FILE * f, opts * s)
         fprintf(f, "Mean projection\n");
         break;
     }
-    fprintf(f, "Number of trees: %d\n", s->ntree);
+    if(s->purpose == NUC_FIT)
+    {
+        fprintf(f, "Number of trees: %d\n", s->ntree);
+    }
+    return;
 }
 
 
@@ -218,55 +219,50 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
     printf("This module can produce a random forest classifier based on\n"
            "annotated images and classify non-annotated images\n"
            "\n");
-    printf("usage: %s [<options>] --aimage input.tif --alabel labels.png file1.tif ... \n", argv[0]);
+    printf("To create png images (.a.png) for drawing annotations:\n");
+    printf("usage: %s [<options>] --init file1.tif ... \n", argv[0]);
+    printf("Create a classifier based on annotated images:\n");
+    printf("usage: %s [<options>] --fit my_model.trf file1.tif ... \n", argv[0]);
+    printf("Predict/classify images:\n");
+    printf("usage: %s [<options>] --predict my_model.trf file1.tif ... \n", argv[0]);
     printf("\n");
     printf("Options:\n");
-    printf(" --aimage file.tif\n\t input image\n");
-    printf(" --alabel file.png\n\t "
-           "Corresponding annotation where nuclei is marked green, background is marked red\n");
-
-    printf("--init\n\t"
-           "png images for drawing annotations\n");
+    printf(" --init\n\t"
+           "create png images for drawing annotations\n");
     printf(" --fit model.trf\n\t"
            "Fit a model to the supplied training images\n");
+    printf(" --predict model.trf\n\t"
+           "Predict/classify images");
+    printf(" --rmax\n\t"
+           "use max projection over z as 3D->2D reduction\n");
+    printf(" --rfocus\n\t"
+           "use the plane most in focus as 3D->2D reduction\n");
+    printf(" --rmean\n\t"
+           "use the mean value over z as 3D->2D reduction\n");
     printf(" --overwrite\n\t Overwrite existing files\n");
-    printf(" --loop\n\t Enter training loop\n");
     printf(" --help\n\t Show this message\n");
 }
 
 static void argparsing(int argc, char ** argv, opts * s)
 {
     struct option longopts[] = {
-        {"alabel", required_argument, NULL, 'a'},
-        {"aimage", required_argument, NULL, 'b'},
-        {"file", required_argument, NULL, 'f'},
-        {"fit", required_argument, NULL, 'F'},
-        {"help", no_argument, NULL, 'h'},
-        {"image", required_argument, NULL, 'i'},
         {"init", no_argument, NULL, 'I'},
-        {"loop", no_argument, NULL, 'l'},
-        {"overwrite", no_argument, NULL, 'o'},
-        {"out",     required_argument, NULL, 'p'},
+        {"fit", required_argument, NULL, 'F'},
         {"predict", required_argument, NULL, 'P'},
+
+        {"help", no_argument, NULL, 'h'},
+        {"overwrite", no_argument, NULL, 'o'},
+
         {"threads", required_argument, NULL, 't'},
         {"verbose", required_argument, NULL, 'v'},
+        {"rmax", no_argument, NULL, '1'},
+        {"rfocus", no_argument, NULL, '2'},
+        {"rmean", no_argument, NULL, '3'},
         {NULL, 0, NULL, 0}};
     int ch;
-    while((ch = getopt_long(argc, argv, "a:b:F:hi:Iop:P:r:v:", longopts, NULL)) != -1)
+    while((ch = getopt_long(argc, argv, "IF:P:hot:v:123", longopts, NULL)) != -1)
     {
         switch(ch){
-        case 'a':
-            free(s->anno_label);
-            s->anno_label = strdup(optarg);
-            break;
-        case 'b':
-            free(s->anno_image);
-            s->anno_image = strdup(optarg);
-            break;
-        case 'f':
-            free(s->image);
-            s->image = strdup(optarg);
-            break;
         case 'F':
             free(s->modelfile);
             s->modelfile = strdup(optarg);
@@ -275,34 +271,32 @@ static void argparsing(int argc, char ** argv, opts * s)
         case 'I':
             s->purpose = NUC_INIT;
             break;
-        case 'l':
-            s->train_loop = 1;
-            break;
-        case 'o':
-            s->overwrite = 1;
-            break;
-        case 'p':
-            free(s->out);
-            s->out = strdup(optarg);
-            break;
         case 'P':
             s->purpose = NUC_CLASSIFY;
             free(s->modelfile);
             s->modelfile = strdup(optarg);
             break;
+        case 'o':
+            s->overwrite = 1;
+            break;
         case 'h':
             usage(argc, argv);
             exit(0);
-            break;
-        case 'i':
-            free(s->image);
-            s->image = strdup(optarg);
             break;
         case 't':
             s->nthreads = atoi(optarg);
             break;
         case 'v':
             s->verbose = atoi(optarg);
+            break;
+        case '1':
+            s->redu = REDU_MAX;
+            break;
+        case '2':
+            s->redu = REDU_FOCUS;
+            break;
+        case '3':
+            s->redu = REDU_MEAN;
             break;
         }
     }
@@ -418,8 +412,7 @@ get_reduction(opts * s, const char * file)
     float scaling = dw_read_scaling(file);
     if(s->verbose > 0)
     {
-        printf("Scaling by %f\n", 1.0/scaling);
-        fflush(stdout);
+        printf("Scaling image by %f\n", 1.0/scaling);
     }
     fim_mult_scalar(I, M*N*P, 1.0/scaling);
 
@@ -908,7 +901,7 @@ labels_to_png(u32 * label, u32 M, u32 N, const char * name_out)
             ;
         }
     }
-    if(rgb_to_png(pixels, N, M, name_out))
+    if(rgb_to_png(pixels, M, N, name_out))
     {
         fprintf(stderr, "Failed to write to %s\n", name_out);
     }
@@ -985,6 +978,11 @@ int main(int argc, char ** argv)
 static int
 init(opts * s, int argc, char ** argv)
 {
+    if(s->optpos >= argc)
+    {
+        printf("No files given\n");
+        return EXIT_FAILURE;
+    }
     // For each image: Load, create max projection, save as PNG
     for(int kk = s->optpos; kk < argc; kk++)
     {
@@ -1002,12 +1000,15 @@ init(opts * s, int argc, char ** argv)
         }
         i64 M, N, P;
         fim_tiff_get_size(image, &M, &N, &P);
-        printf("%lu x %lu\n", M, N);
-        fimo * I = fimo_tiff_read(image);
-        fimo * Iz = fimo_maxproj(I);
-        fimo_free(I);
-        fimo_to_png(Iz, out);
-        fimo_free(Iz);
+        // printf("%lu x %lu\n", M, N);
+
+        fimo * Ir = get_reduction(s, image);
+        //fimo * I = fimo_tiff_read(image);
+        //fimo * Iz = fimo_maxproj(I);
+
+        //fimo_free(I);
+        fimo_to_png(Ir, out);
+        fimo_free(Ir);
         free(out);
     }
     return EXIT_SUCCESS;
@@ -1027,6 +1028,11 @@ dw_nuclei(int argc, char ** argv)
 #ifdef _OPENMP
     omp_set_num_threads(s->nthreads);
 #endif
+
+    if(s->verbose > 0)
+    {
+        opts_print(stdout, s);
+    }
 
     switch(s->purpose)
     {
