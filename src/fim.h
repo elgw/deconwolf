@@ -138,7 +138,11 @@ size_t fimo_nel(const fimo * );
 /* Sum of elements */
 float fimo_sum(const fimo * );
 
+/* Max projection over Z */
 fimo * fimo_maxproj(const fimo * Im);
+
+/* Sum projection over Z */
+fimo * fimo_sumproj(const fimo * Im);
 
 /* A[kk] += B[kk] */
 void fimo_add(fimo * A, const fimo * B);

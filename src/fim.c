@@ -2520,6 +2520,24 @@ fimo * fimo_maxproj(const fimo * F)
     return M;
 }
 
+fimo * fimo_sumproj(const fimo * F)
+{
+    if(F->P == 1)
+    {
+        return fimo_copy(F);
+    }
+    fimo * P = fimo_zeros(F->M, F->N, 1);
+    for(size_t pp = 0; pp < F->P; pp++)
+    {
+        float * plane = F->V + F->M*F->N*pp;
+        for(size_t kk = 0 ; kk < fimo_nel(P); kk++)
+        {
+            P->V[kk] += plane[kk];
+        }
+    }
+    return P;
+}
+
 float * fim_maxproj(const float * V, size_t M, size_t N, size_t P)
 {
     /* Initialize to first plane */
