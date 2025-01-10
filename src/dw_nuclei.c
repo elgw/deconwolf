@@ -8,7 +8,6 @@
 #include <getopt.h>
 #include <stdint.h>
 
-
 #include <omp.h>
 
 #include "fim.h"
@@ -17,11 +16,6 @@
 #include "dw_version.h"
 #include "trafo/src/trafo.h"
 #include "dw_png.h"
-
-/* Wanted:
- * Option to apply background correction (multiplicative).
- *
- */
 
 typedef uint32_t u32;
 typedef uint64_t u64;
@@ -62,6 +56,9 @@ typedef struct{
     purpose_type purpose;
     char * modelfile;
     reduction_type redu;
+
+    char * bg; // image file name for background correction
+    fimo * bg_model;
 } opts;
 
 
@@ -82,6 +79,7 @@ static opts * opts_new()
     s->train_loop = 0;
     s->redu = REDU_FOCUS;
     s->purpose = NUC_UNSET;
+    fimo_free(s->bg_model);
     return s;
 }
 
@@ -121,6 +119,7 @@ static void opts_free(opts * s)
     free(s->anno_image);
     free(s->anno_label);
     free(s->modelfile);
+    free(s->bg);
     free(s);
 }
 
@@ -239,6 +238,8 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
            "use the plane most in focus as 3D->2D reduction\n");
     printf(" --rmean\n\t"
            "use the mean value over z as 3D->2D reduction\n");
+    printf(" --bg\n\t"
+           "specify a background model used for vignetting correction\n");
     printf(" --overwrite\n\t Overwrite existing files\n");
     printf(" --help\n\t Show this message\n");
 }
@@ -258,9 +259,10 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"rmax", no_argument, NULL, '1'},
         {"rfocus", no_argument, NULL, '2'},
         {"rmean", no_argument, NULL, '3'},
+        {"bg", required_argument, NULL, 'b'},
         {NULL, 0, NULL, 0}};
     int ch;
-    while((ch = getopt_long(argc, argv, "IF:P:hot:v:123", longopts, NULL)) != -1)
+    while((ch = getopt_long(argc, argv, "IF:P:hot:v:123b", longopts, NULL)) != -1)
     {
         switch(ch){
         case 'F':
@@ -297,6 +299,10 @@ static void argparsing(int argc, char ** argv, opts * s)
             break;
         case '3':
             s->redu = REDU_MEAN;
+            break;
+        case 'b':
+            free(s->bg);
+            s->bg = strdup(optarg);
             break;
         }
     }
@@ -416,12 +422,22 @@ get_reduction(opts * s, const char * file)
     }
     fim_mult_scalar(I, M*N*P, 1.0/scaling);
 
+
     if(s->redu == REDU_MAX)
     {
         float * maxI = fim_maxproj(I, M, N, P);
         free(I);
         fimo * result = fim_image_from_array(maxI, M, N, 1);
         free(maxI);
+        if(s->bg_model != NULL)
+        {
+            printf("Applying background model\n");
+            if(fimo_div_image(result, s->bg_model))
+            {
+                printf("Background correction failed\n");
+            }
+        }
+
         return result;
     }
 
@@ -450,6 +466,10 @@ get_reduction(opts * s, const char * file)
             printf("Returning slice %d\n", slice); fflush(stdout);
         }
         free(gm);
+        if(s->bg_model != NULL)
+        {
+            fimo_div_image(result, s->bg_model);
+        }
         return result;
     }
 
@@ -1014,6 +1034,31 @@ init(opts * s, int argc, char ** argv)
     return EXIT_SUCCESS;
 }
 
+static void
+load_background(opts * s)
+{
+    if(s->bg == NULL)
+    {
+        return;
+    }
+    s->bg_model = fimo_tiff_read(s->bg);
+    if(s->bg_model == NULL)
+    {
+        printf("ERROR: Unable to load a background model from %s\n", s->bg);
+        return;
+    }
+    if(s->bg_model->P != 1)
+    {
+        printf("ERROR: The background image is not 2D\n");
+        return;
+    }
+    float max = fimo_max(s->bg_model);
+    if(max != 1.0)
+    {
+        fimo_mult_scalar(s->bg_model, 1.0/max);
+    }
+    return;
+}
 
 int
 dw_nuclei(int argc, char ** argv)
@@ -1034,6 +1079,8 @@ dw_nuclei(int argc, char ** argv)
         opts_print(stdout, s);
     }
 
+    load_background(s);
+
     switch(s->purpose)
     {
     case NUC_INIT:
@@ -1050,29 +1097,8 @@ dw_nuclei(int argc, char ** argv)
     }
 
     /* Old stuff to be removed */
-    if(s->purpose == NUC_UNSET)
-    {
-        if(s->anno_image == NULL)
-        {
-            printf("No --aimage specified, can't continue\n");
-            goto done;
-        }
+    // random_forest_pipeline(s, argc, argv);
 
-        if(s->anno_label == NULL)
-        {
-            printf("No --alabel image specified.\n");
-            printf("Please create one and run again.\n");
-            goto done;
-        }
-
-        if(s->verbose > 1)
-        {
-            opts_print(stdout, s);
-        }
-
-        random_forest_pipeline(s, argc, argv);
-    }
- done:
     opts_free(s);
     return status;
 }

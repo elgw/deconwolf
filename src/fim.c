@@ -475,6 +475,10 @@ float fim_max(const float * restrict A, size_t N)
     return amax;
 }
 
+float fimo_max(const fimo * A)
+{
+    return fim_max(A->V, fimo_nel(A));
+}
 
 void fim_stats(const float * A, const size_t N)
 {
@@ -694,6 +698,121 @@ void fim_mult_scalar(float * restrict I, size_t N, float x)
     return;
 }
 
+void fimo_mult_scalar(fimo * A, float x)
+{
+    fim_mult_scalar(A->V, fimo_nel(A), x);
+}
+
+int fimo_mult_image(fimo * A, const fimo * B)
+{
+    int mode = 0;
+    if(A->M != B->M)
+    {
+        return -1;
+    }
+    if(A->N != B->N)
+    {
+        return -1;
+    }
+    if(A->P > 1)
+    {
+        if(B->P == 1)
+        {
+            mode = 1;
+        }
+        if(B->P == A->P)
+        {
+            mode = 2;
+        }
+    }
+
+    // per plane
+    if(mode == 1)
+    {
+#pragma omp parallel for
+        for(size_t pp = 0; pp < A->P; pp++)
+        {
+            float * P = A->V + pp*A->M*A->N;
+            for(size_t kk = 0; kk < fimo_nel(B); kk++)
+            {
+                P[kk] *= B->V[kk];
+            }
+        }
+        return 0;
+    }
+
+    // same number of elements
+    if(mode == 2)
+    {
+#pragma omp parallel for
+        for(size_t kk = 0; kk < fimo_nel(A); kk++)
+        {
+            A->V[kk] *= B->V[kk];
+        }
+        return 0;
+    }
+    return -1;
+}
+
+int fimo_div_image(fimo * A, const fimo * B)
+{
+    int mode = 0;
+    if(A->M != B->M)
+    {
+        return -1;
+    }
+    if(A->N != B->N)
+    {
+        return -1;
+    }
+    if(A->P == 1)
+    {
+        if(B->P == 1)
+        {
+            mode = 2;
+        }
+    }
+    if(A->P > 1)
+    {
+        if(B->P == 1)
+        {
+            mode = 1;
+        }
+        if(B->P == A->P)
+        {
+            mode = 2;
+        }
+    }
+
+    // per plane
+    if(mode == 1)
+    {
+#pragma omp parallel for
+        for(size_t pp = 0; pp < A->P; pp++)
+        {
+            float * P = A->V + pp*A->M*A->N;
+            for(size_t kk = 0; kk < fimo_nel(B); kk++)
+            {
+                P[kk] /= B->V[kk];
+            }
+        }
+        return 0;
+    }
+
+    // same number of elements
+    if(mode == 2)
+    {
+#pragma omp parallel for
+        for(size_t kk = 0; kk < fimo_nel(A); kk++)
+        {
+            A->V[kk] /= B->V[kk];
+        }
+        return 0;
+    }
+    return -1;
+}
+
+
 void fim_project_positive(float * I, size_t N)
 {
 #pragma omp parallel for shared(I)
@@ -774,12 +893,12 @@ fimo * fimo_zeros(const size_t M, const size_t N, const size_t P)
     return F;
 }
 
-size_t fimo_nel(fimo * F)
+size_t fimo_nel(const fimo * F)
 {
     return F->M*F->N*F->P;
 }
 
-float fimo_sum(fimo * F)
+float fimo_sum(const fimo * F)
 {
     return fim_sum(F->V, fimo_nel(F));
 }
@@ -2097,6 +2216,12 @@ void fim_gsmooth(float * restrict V,
                  float sigma)
 {
     fim_gsmooth_aniso(V, M, N, P, sigma, sigma);
+}
+
+void fimo_gsmooth(fimo * I, float sigma)
+{
+    fim_gsmooth(I->V, I->M, I->N, I->P, sigma);
+    return;
 }
 
 static void cumsum_array(float * A, size_t N, size_t stride)
