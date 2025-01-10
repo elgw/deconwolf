@@ -134,9 +134,9 @@ fim_features_2d(const fimo *);
 float * fim_focus_gm(const fimo * image, float sigma);
 
 /* Number of elements */
-size_t fimo_nel(fimo * );
+size_t fimo_nel(const fimo * );
 /* Sum of elements */
-float fimo_sum(fimo * );
+float fimo_sum(const fimo * );
 
 fimo * fimo_maxproj(const fimo * Im);
 
@@ -152,6 +152,8 @@ fimo * fimo_tiff_read(const char * file);
 /* Insert into B into A, with upper left corner at x0, y0 */
 void fimo_blit_2D(fimo * A, const fimo * B, size_t x0, size_t y0);
 
+/* Return the max pixel value */
+float fimo_max(const fimo * A);
 
 /*
  * API not using fimo
@@ -332,6 +334,8 @@ void shift_vector_float_buf(float * restrict V, // data
 /* Multiply a float array of size N by x */
 void fim_mult_scalar(float * restrict fim, size_t N, float x);
 
+void fimo_mult_scalar(fimo * A, float x);
+
 /* Add a constant value to all pixels */
 void fim_add_scalar(float * restrict fim, size_t N, float x);
 
@@ -469,12 +473,25 @@ int fim_convn1(float * restrict V, size_t M, size_t N, size_t P,
                const float * K, size_t nK,
                int dim, const int normalized);
 
+/* A = A * B pointwise
+ * Returns non-null if the operation can not be performed.
+ *
+ * if A and B have the same size, the operation is pointwise
+ *
+ * If A id 3D and B is 2D, A(:,:,kk) = A(:,:,kk)*b
+ */
+int fimo_mult_image(fimo * A, const fimo * B);
+
+int fimo_div_image(fimo * A, const fimo * B);
+
 
 /* Gaussian smoothing, normalized at edges */
 void
 fim_gsmooth(float * restrict V,
             size_t M, size_t N, size_t P,
             float sigma);
+
+void fimo_gsmooth(fimo * I, float sigma);
 
 /** Gaussian smoothing, normalized at edges, separate values for
  * lateral and axial filter */
