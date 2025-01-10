@@ -40,6 +40,16 @@ opts_free(opts * s)
 
 static void usage(const char * progname)
 {
+    printf(
+        "%s estimates the vignetting by averaging the image content over several images\n"
+        "this can work well for any channel when the number of images is high enough.\n"
+        "after averaging the resulting image is smoothed by a Gaussian kernel\n",
+        progname);
+    printf(
+        "   The images can be either 2D or 3D. In case of 3D images they are averaged\n"
+        "along the Z-axis to produce a 2D image. The output is always a 2D tif image\n"
+        "which is not normalized.\n");
+    printf("\n");
     printf("Usage:\n");
     printf("%s [OPTIONS] --out bg.tif file1.tif file2.tif ...\n", progname);
     printf("\n");
@@ -118,14 +128,16 @@ dw_background(int argc, char ** argv)
 
     printf("Reading %s\n", argv[s->optpos]);
     fimo * I = fimo_tiff_read(argv[s->optpos]);
-    fimo * bg = fimo_maxproj(I);
+    fimo * bg = fimo_sumproj(I);
+
+
     fimo_free(I);
 
     for(int kk = s->optpos+1; kk < argc; kk++)
     {
         printf("Reading %s\n", argv[kk]);
         fimo * I = fimo_tiff_read(argv[kk]);
-        fimo * P = fimo_maxproj(I);
+        fimo * P = fimo_sumproj(I);
         fimo_free(I);
         fimo_add(bg, P);
         fimo_free(P);
