@@ -1,21 +1,20 @@
 #include "dw_nuclei.h"
 
 #include <assert.h>
+#include <getopt.h>
 #include <math.h>
+#include <omp.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <getopt.h>
-#include <stdint.h>
 
-#include <omp.h>
-
-#include "fim.h"
-#include "fim_tiff.h"
+#include "dw_png.h"
 #include "dw_util.h"
 #include "dw_version.h"
+#include "fim.h"
+#include "fim_tiff.h"
 #include "trafo/src/trafo.h"
-#include "dw_png.h"
 
 typedef uint32_t u32;
 typedef uint64_t u64;
@@ -57,7 +56,7 @@ typedef struct{
     char * modelfile;
     reduction_type redu;
 
-    char * bg; // image file name for background correction
+    char * bg; // file name of background model image
     fimo * bg_model;
 } opts;
 
@@ -167,18 +166,22 @@ double * double_from_float(const float * source, size_t n)
     return target;
 }
 
-/* Read png image, when more green that red, set to 1, when more red
- * than green set to 2. Everything else set to 0.
+/* Read png image and decode colors to class IDs
+ * unset -> 0
+ * red -> 1
+ * green -> 2
+ * blue -> 3
+ *
+ * For reference:
  * http://www.libpng.org/pub/png/libpng-manual.txt
  */
-fimo * fim_png_read_green_red(const char * fname)
+fimo * fim_png_decode(const char * fname)
 {
-    printf("Reading %s\n", fname); fflush(stdout);
-
     u32 height, width;
     u8 * png_data = rgb_from_png(fname, &width, &height);
     if(png_data == NULL)
     {
+        fprintf(stderr, "Error reading %s\n", fname); fflush(stdout);
         return NULL;
     }
 
@@ -195,16 +198,23 @@ fimo * fim_png_read_green_red(const char * fname)
     size_t nbg = 0;
     for(size_t kk = 0; kk<F->M*F->N; kk++)
     {
-        F->V[kk] = 0;
-        if(png_data[3*kk+1] > png_data[3*kk+0])
+        F->V[kk] = -1;
+        u8 r = png_data[3*kk+0];
+        u8 g = png_data[3*kk+1];
+        u8 b = png_data[3*kk+2];
+        if(r > g && r > b)
         {
-            F->V[kk] = 1;
+            F->V[kk] = 0;
             nfg++;
         }
-        if(png_data[3*kk+0] > png_data[3*kk+1])
+        if(g > r && g > b)
+        {
+            F->V[kk] = 1;
+            nbg++;
+        }
+        if(b > r && b > g)
         {
             F->V[kk] = 2;
-            nbg++;
         }
     }
     printf("Found %zu foreground (green->2) and %zu background (red->1) pixels\n",
@@ -327,56 +337,6 @@ float * transpose(const float * X, size_t M, size_t N)
     return Y;
 }
 
-/* Return a newly allocated array AA = [A ; B] */
-static float *
-cm_append_column(float * A, size_t nrow, size_t ncol, const float * B)
-{
-    float * AA = malloc(nrow*(ncol+1)*sizeof(float));
-    assert(AA != NULL);
-    memcpy(AA, A,
-           nrow*ncol*sizeof(float));
-    memcpy(AA+nrow*ncol, B, nrow*sizeof(float));
-    return AA;
-}
-
-/* A: Input table data
- * V:  Binary indicator if elements should be included
- */
-
-static float *
-subset_cm(const float * A,
-          const float * V,
-          const size_t nrow, const size_t ncol,
-          size_t * nrow_out, size_t * ncol_out)
-{
-    /* Count how many of the rows to use */
-    size_t rows = 0;
-    for(size_t kk = 0; kk<nrow; kk++)
-    {
-        V[kk] > 0 ? rows++ : 0;
-    }
-
-    if(rows == 0)
-    {
-        *nrow_out = 0;
-        *ncol_out = 0;
-        return NULL;
-    }
-
-    float * S = malloc(rows*ncol*sizeof(float));
-    assert(S != NULL);
-    size_t writepos = 0;
-    for(size_t cc = 0; cc<ncol; cc++)
-    {
-        for(size_t rr = 0; rr<nrow; rr++)
-        {
-            V[rr] > 0 ? S[writepos++] = A[cc*nrow + rr] : 0;
-        }
-    }
-    *nrow_out = rows;
-    *ncol_out = ncol;
-    return S;
-}
 
 static int
 float_arg_max(const float * v, size_t N)
@@ -394,6 +354,7 @@ float_arg_max(const float * v, size_t N)
     return argmax;
 }
 
+/* A reduction is a mapping from 3D to 2D */
 static fimo *
 get_reduction(opts * s, const char * file)
 {
@@ -484,259 +445,49 @@ get_reduction(opts * s, const char * file)
     return NULL;
 }
 
-void
-segment_image_rf(opts * s, trf * F, char * file)
+
+
+/* 1-> Green
+ *  2->Red
+ */
+static void
+labels_to_png(u32 * label, u32 M, u32 N, const char * name_out)
 {
-    if(!dw_isfile(file))
+    u8 * pixels = calloc(M*N*3, sizeof(u8));
+    for(u64 kk = 0; kk < M*N; kk++)
     {
-        printf("%s does not exist\n", file);
-        return;
-    }
-    char * outfile = calloc(strlen(file) + 32, 1);
-    assert(outfile != NULL);
-    sprintf(outfile, "%s.mask.tif", file);
-    printf("%s -> %s", file, outfile);
-    if(dw_isfile(outfile) && s->overwrite == 0)
-    {
-        printf(" File exist. Skipping\n");
-        return;
-    }
-    printf("\n");
-
-    /* Read the image */
-    fimo * redu = get_reduction(s, file);
-    assert(redu != NULL);
-    printf("1\n"); fflush(stdout);
-    /* Extract features */
-    ftab_t * features = fim_features_2d(redu);
-    assert(features != NULL);
-    printf("2\n"); fflush(stdout);
-    /* Transpose to column-major */
-    float * features_cm = transpose(features->T,
-                                    features->nrow, features->ncol);
-
-    double * features_cm_double = double_from_float(features_cm, features->nrow*features->ncol);
-    free(features_cm);
-
-    printf("3\n"); fflush(stdout);
-    /* Classify */
-    u32 * class = trafo_predict(F, features_cm_double, NULL, redu->M);
-
-    ftab_free(features);
-    free(features_cm_double);
-    printf("4\n"); fflush(stdout);
-    float * result = calloc(redu->M*redu->N, sizeof(float));
-    assert(result != NULL);
-    for(size_t kk = 0; kk < (size_t) (redu->M*redu->N); kk++)
-    {
-        if(class[kk] == 2)
+        switch(label[kk])
         {
-            result[kk] = 0;
-        } else {
-            result[kk] = 1;
+        case 0:
+            pixels[3*kk+0] = 255;
+            break;
+        case 1:
+            pixels[3*kk+1] = 255;
+            break;
+        case 2:
+            pixels[3*kk+2] = 255;
+            break;
+        default:
+            pixels[3*kk+0] = 255;
+            pixels[3*kk+1] = 255;
+            pixels[3*kk+2] = 255;
+            break;
+            ;
         }
     }
-    printf("5\n"); fflush(stdout);
-    int fill_holes = 1;
-    float max_hole_size = pow(25, 2);
-    if(fill_holes)
+    if(rgb_to_png(pixels, M, N, name_out))
     {
-        printf("Filling holes up to %.1f pixels large\n", max_hole_size);
-        float * result2 = fim_fill_holes(result, redu->M, redu->N, max_hole_size);
-        free(result);
-        result = result2;
+        fprintf(stderr, "Failed to write to %s\n", name_out);
     }
-
-    /* remove debris */
-    int remove_small = 1;
-    /* something like everything < 1/4 of the expected
-     *  might make sense */
-    float min_size = pow(40, 2);
-    printf("Removing objects with < %.1f pixels\n", min_size-1);
-    if(remove_small)
-    {
-        float * result2 = fim_remove_small(result, redu->M, redu->N, min_size);
-        free(result);
-        result = result2;
-    }
-
-    /* TODO: split large? */
-
-    /* TODO: export properties to tsv */
-
-    /* label */
-    int * L = fim_conncomp6(result, redu->M, redu->N);
-    for(size_t kk = 0; kk<(size_t) (redu->M*redu->N); kk++)
-    {
-        result[kk] = L[kk];
-    }
-    free(L);
-
-    fim_tiff_write_noscale(outfile, result, NULL,
-                           redu->M, redu->N, 1);
-    fimo_free(redu);
+    free(pixels);
     return;
 }
 
-/* The loop is a feedback loop with the user  */
-trf *
-loop_training_data(opts * s, const float * features_cm,
-                   const size_t n_sample, const size_t n_feature)
-{
-
-    trf * F = NULL;
-    int done = 0;
-    while(done == 0)
-    {
-        if(F != NULL)
-        {
-            trafo_free(F);
-        }
-
-        /* Read annotated image -> labels*/
-        fimo * anno = fim_png_read_green_red(s->anno_label);
-        assert(anno != NULL);
-        size_t n_pixel = anno->M*anno->N;
-        /* Select only annotated positions and convert to u32 */
-        u32 * selected_labels = calloc(n_pixel, sizeof(u32));
-        assert(selected_labels != NULL);
-
-        size_t n_label = 0;
-        for(size_t kk = 0; kk < anno->M*anno->N; kk++)
-        {
-            if(anno->V[kk] > 0)
-            {
-                selected_labels[n_label] = anno->V[kk];
-            }
-        }
-
-        fimo_free(anno);
-
-
-        /* Extract the data where anno->V > 0 to a separate array */
-        size_t ncol_train = 0;
-        size_t nrow_train = 0;
-        float * features_cm_train = subset_cm(features_cm,
-                                              anno->V,
-                                              n_sample, n_feature+1,
-                                              &nrow_train, &ncol_train);
-
-        assert(n_label == nrow_train);
-
-        double * features_cm_train_double = double_from_float(features_cm_train,
-                                                              nrow_train*ncol_train);
-        free(features_cm_train);
-
-        /* Train classifier */
-        trafo_settings tconf = {0};
-        printf("TODO: THIS IS WRONG\n"); fflush(stdout);
-        tconf.label = selected_labels;
-        tconf.F_col_major = features_cm_train_double;
-        tconf.n_feature = ncol_train;
-        tconf.n_sample = nrow_train;
-        tconf.n_tree = 200;
-
-        F = trafo_fit(&tconf);
-
-        if(F == NULL)
-        {
-            printf("dw_nuclei: Failed to train the random forest\n");
-            exit(EXIT_FAILURE);
-        }
-
-        printf("Validating the training data\n");
-        u32 * class = trafo_predict(F, features_cm_train_double, NULL, nrow_train);
-
-        size_t ncorrect = 0;
-        for(size_t kk = 0; kk<nrow_train; kk++)
-        {
-            if(class[kk] == selected_labels[kk])
-            {
-                ncorrect++;
-            }
-        }
-        printf("%zu / %zu training pixels correctly classified\n",
-               ncorrect, nrow_train);
-        free(class);
-
-        /* Now apply it to all pixels */
-
-        double * features_cm_double =
-            double_from_float(features_cm, n_feature*n_sample);
-
-        class = trafo_predict(F, features_cm_double, NULL, anno->M);
-
-        float * result = malloc(anno->M*anno->N*sizeof(float));
-        assert(result != NULL);
-        for(size_t kk = 0; kk < anno->M*anno->N; kk++)
-        {
-            if(class[kk] == 2)
-            {
-                result[kk] = 0;
-            } else {
-                result[kk] = 1;
-            }
-        }
-
-        if(s->train_loop)
-        {
-            printf("Writing to training_classification.tif\n");
-            fim_tiff_write_noscale("training_classification.tif", result, NULL,
-                                   anno->M, anno->N, 1);
-            printf("Please inspect the image.\n");
-            printf("Satisfied? type y<enter>\n");
-            printf("Else, modify %s and press <enter> to try again\n",
-                   s->anno_label);
-            int ret = fgetc(stdin);
-            if(ret == 'y')
-            {
-                done = 1;
-            } else {
-                printf("Trying again\n");
-            }
-        } else {
-            done = 1;
-        }
-
-        fimo_free(anno);
-        free(result);
-    }
-
-    return F;
-}
-
-void
-random_forest_pipeline(opts * s, int argc, char ** argv)
-{
-
-    /* Read raw image */
-    fimo * anno_raw = get_reduction(s, s->anno_image);
-
-    /* Extract features */
-    ftab_t * features = fim_features_2d(anno_raw);
-
-    /* Transpose to column-major */
-    float * features_cm = transpose(features->T,
-                                    features->nrow, features->ncol);
-
-    trf * F = loop_training_data(s,
-                                 features_cm,
-                                 features->nrow, features->ncol);
-
-    for(size_t kk = s->optpos; kk < (size_t) argc; kk++)
-    {
-        segment_image_rf(s, F, argv[kk]);
-    }
-
-    trafo_free(F);
-
-    return;
-}
 
 static ftab_t *
 read_png_labels(const char * name_image, u32 * height, u32 *width)
 {
-    fimo * anno = fim_png_read_green_red(name_image);
+    fimo * anno = fim_png_decode(name_image);
     *height = anno->M;
     *width = anno->N;
     assert(anno->P == 1);
@@ -765,6 +516,18 @@ fit(opts * s, int argc, char ** argv)
             return EXIT_FAILURE;
         }
     }
+
+    char * logfile = calloc(strlen(s->modelfile) + 16, 1);
+    assert(logfile != NULL);
+    sprintf(logfile, "%s.log.txt", s->modelfile);
+    FILE * log = fopen(logfile, "w");
+    for(int kk = 0; kk < argc; kk++)
+    {
+        fprintf(log, "%s ", argv[kk]);
+    }
+    fprintf(log, "\n");
+    fim_tiff_set_log(log);
+
     int nimages = (argc - s->optpos);
     if( nimages == 0)
     {
@@ -800,15 +563,14 @@ fit(opts * s, int argc, char ** argv)
 
         /* Read raw image and reduce it to 2D*/
         fimo * image = get_reduction(s, name_image);
-        if(image->M != height)
+        if(image->M != width && image->N != height)
         {
             printf("Error: PNG and TIF image dimensions mismatch\n");
             exit(EXIT_FAILURE);
-
-
         }
         /* Extract features */
         ftab_t * image_features = fim_features_2d(image);
+        // TODO: Collect features names (or get the in some other way)
         fimo_free(image);
 
         assert(image_features->nrow == image_labels->nrow);
@@ -817,7 +579,7 @@ fit(opts * s, int argc, char ** argv)
         u8 * labeled_pixels = calloc(image_features->nrow, sizeof(u8));
         for(size_t kk = 0; kk < image_features->nrow; kk++)
         {
-            image_labels->T[kk] > 0 ? labeled_pixels[kk] = 1 : 0;
+            image_labels->T[kk] > -1 ? labeled_pixels[kk] = 1 : 0;
         }
         ftab_subselect_rows(image_labels, labeled_pixels);
         ftab_subselect_rows(image_features, labeled_pixels);
@@ -850,6 +612,7 @@ fit(opts * s, int argc, char ** argv)
     ftab_free(fit_labels);
     for(u64 kk = 0; kk < fit_features->nrow*fit_features->ncol; kk++)
     {
+        // TODO: Print feature names
         fit_features8[kk] = fit_features->T[kk];
     }
     u64 nfeature = fit_features->ncol;
@@ -868,12 +631,21 @@ fit(opts * s, int argc, char ** argv)
 
     trf * F = trafo_fit(&tconf);
 
-
-
     if(F == NULL)
     {
         printf("dw_nuclei: Failed to train the random forest\n");
         exit(EXIT_FAILURE);
+    }
+
+    if(s->verbose > 0)
+    {
+        double * fimp = trafo_importance(F);
+        printf("Feature importance\n");
+        for(u32 kk = 0; kk < nfeature; kk++)
+        {
+            printf("%d : %f\n", kk+1, fimp[kk]);
+        }
+        free(fimp);
     }
 
     printf("Validating the training data\n");
@@ -896,38 +668,11 @@ fit(opts * s, int argc, char ** argv)
     trafo_save(F, s->modelfile);
     trafo_free(F);
 
+    fim_tiff_set_log(stdout);
+    fclose(log);
     return EXIT_SUCCESS;
 }
 
-/* 1-> Green
-*  2->Red
-*/
-static void
-labels_to_png(u32 * label, u32 M, u32 N, const char * name_out)
-{
-    u8 * pixels = calloc(M*N*3, sizeof(u8));
-    for(u64 kk = 0; kk < M*N; kk++)
-    {
-        switch(label[kk])
-        {
-        case 1:
-            pixels[3*kk+1] = 255;
-            break;
-        case 2:
-            pixels[3*kk+0] = 255;
-            break;
-        default:
-            break;
-            ;
-        }
-    }
-    if(rgb_to_png(pixels, M, N, name_out))
-    {
-        fprintf(stderr, "Failed to write to %s\n", name_out);
-    }
-    free(pixels);
-    return;
-}
 
 static int
 classify(opts * s, int argc, char ** argv)
@@ -988,12 +733,6 @@ classify(opts * s, int argc, char ** argv)
     return EXIT_SUCCESS;
 }
 
-#ifdef STANDALONE
-int main(int argc, char ** argv)
-{
-    return dw_nuclei(argc, argv);
-}
-#endif
 
 static int
 init(opts * s, int argc, char ** argv)
@@ -1034,30 +773,27 @@ init(opts * s, int argc, char ** argv)
     return EXIT_SUCCESS;
 }
 
-static void
+static int
 load_background(opts * s)
 {
-    if(s->bg == NULL)
-    {
-        return;
-    }
+
     s->bg_model = fimo_tiff_read(s->bg);
     if(s->bg_model == NULL)
     {
         printf("ERROR: Unable to load a background model from %s\n", s->bg);
-        return;
+        return 1;
     }
     if(s->bg_model->P != 1)
     {
         printf("ERROR: The background image is not 2D\n");
-        return;
+        return 1;
     }
     float max = fimo_max(s->bg_model);
     if(max != 1.0)
     {
         fimo_mult_scalar(s->bg_model, 1.0/max);
     }
-    return;
+    return 0;
 }
 
 int
@@ -1065,6 +801,8 @@ dw_nuclei(int argc, char ** argv)
 {
 
     fim_tiff_init();
+    FILE * out = fopen("/dev/null", "w");
+    fim_tiff_set_log(out);
     opts * s = opts_new();
     int status = EXIT_SUCCESS;
 
@@ -1079,7 +817,15 @@ dw_nuclei(int argc, char ** argv)
         opts_print(stdout, s);
     }
 
-    load_background(s);
+    if(s->bg != NULL)
+    {
+        if(load_background(s))
+        {
+            printf("Unable to use file %s for background correction\n", s->bg);
+            opts_free(s);
+            return EXIT_FAILURE;
+        }
+    }
 
     switch(s->purpose)
     {
@@ -1096,9 +842,13 @@ dw_nuclei(int argc, char ** argv)
         ;
     }
 
-    /* Old stuff to be removed */
-    // random_forest_pipeline(s, argc, argv);
-
     opts_free(s);
     return status;
 }
+
+#ifdef STANDALONE
+int main(int argc, char ** argv)
+{
+    return dw_nuclei(argc, argv);
+}
+#endif

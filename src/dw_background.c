@@ -40,15 +40,19 @@ opts_free(opts * s)
 
 static void usage(const char * progname)
 {
+    opts * defaults = opts_new();
     printf(
-        "%s estimates the vignetting by averaging the image content over several images\n"
-        "this can work well for any channel when the number of images is high enough.\n"
-        "after averaging the resulting image is smoothed by a Gaussian kernel\n",
-        progname);
-    printf(
-        "   The images can be either 2D or 3D. In case of 3D images they are averaged\n"
-        "along the Z-axis to produce a 2D image. The output is always a 2D tif image\n"
-        "which is not normalized.\n");
+           "%s can be used to estimate vignetting.\n"
+           "\n"
+           "It calculates the average image intensity over several images, which can\n"
+           "be either 2D or 3D. In case of 3D images they are averaged\n"
+           "along the Z-axis to produce a 2D image. After averaging a Gaussian low pass\n"
+           "filter is applied.\n"
+           "The output is always a 2D tif image which is not normalized in any way.\n"
+           "The approach can work well even for images with biological content, given that the\n"
+           "number of images is high.\n",
+           progname);
+
     printf("\n");
     printf("Usage:\n");
     printf("%s [OPTIONS] --out bg.tif file1.tif file2.tif ...\n", progname);
@@ -59,7 +63,8 @@ static void usage(const char * progname)
     printf(" --verbose n\n\t"
            "set verbosity level to n\n");
     printf(" --sigma s\n\t"
-           "set the sigma value of the Gaussian smoothing kernel\n");
+           "set the sigma value of the Gaussian smoothing kernel (default: %.1f [pixels])\n", defaults->sigma);
+    opts_free(defaults);
     return;
 }
 
@@ -129,14 +134,19 @@ dw_background(int argc, char ** argv)
     printf("Reading %s\n", argv[s->optpos]);
     fimo * I = fimo_tiff_read(argv[s->optpos]);
     fimo * bg = fimo_sumproj(I);
-
-
     fimo_free(I);
 
     for(int kk = s->optpos+1; kk < argc; kk++)
     {
         printf("Reading %s\n", argv[kk]);
         fimo * I = fimo_tiff_read(argv[kk]);
+        if(I->M != bg->M || I->N != bg->M)
+        {
+            printf("%s dimensions %lu x %lu does not match previous: %lu x %lu\n"
+                   "   ignoring this file\n", argv[kk], I->M, I->N, bg->M, bg->N);
+            fimo_free(I);
+            continue;
+        }
         fimo * P = fimo_sumproj(I);
         fimo_free(I);
         fimo_add(bg, P);

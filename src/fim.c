@@ -2673,6 +2673,7 @@ ftab_t * fim_lmax_multiscale(float ** II, float * scales, size_t nscales,
     for(size_t kk = 0; kk<nscales; kk++)
     {
         char * cname = calloc(128, 1);
+        assert(cname != NULL);
         sprintf(cname, "LoG_%f", scales[kk]);
         ftab_set_colname(T, 5+kk, cname);
         free(cname);
@@ -2845,7 +2846,7 @@ ftab_t * fim_lmax_2d(const float * I, size_t M, size_t N, size_t P)
             }
         }
     }
-
+    free(strel);
     return T;
 }
 
@@ -3020,6 +3021,7 @@ float fim_histogram_percentile(const fim_histogram_t * H, const float p)
 
 float fim_histogram_otsu(fim_histogram_t * H)
 {
+    assert(H != NULL);
     double level = otsu(H->C, H->nbin);
     double slevel = H->left + level/(pow(2,16)-1)*(H->right-H->left);
     return (float) slevel;
@@ -3030,6 +3032,7 @@ float * fim_otsu(float * Im, size_t M, size_t N)
     //float mean = fim_sum(Im, M*N)/( (float) M*N);
     //printf("Mean=%f\n", mean);
     fim_histogram_t * H = fim_histogram(Im, M*N);
+    assert(H != NULL);
     float th = fim_histogram_otsu(H);
     //    printf("Threshold = %f\n", th);
     fim_histogram_free(H);

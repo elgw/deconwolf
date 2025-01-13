@@ -83,7 +83,9 @@ void ttags_free(ttags **);
 /* Initialization, sets the output file to stdout */
 void fim_tiff_init(void);
 
-/* Redirect all output here */
+/* Redirect all output here, both messages from tif_tiff as well as
+ * warnings and errors from libtiff */
+
 void fim_tiff_set_log(FILE * fp);
 
 /* Write to disk, if scaling <= 0 : automatic scaling will be used. Else the provided value. */
