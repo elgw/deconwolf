@@ -149,6 +149,7 @@ void dw_iterator_free(dw_iterator_t * it)
 dw_opts * dw_opts_new(void)
 {
     dw_opts * s = calloc(1, sizeof(dw_opts));
+    assert(s != NULL);
     s->nThreads_FFT = dw_get_threads();
     s->nThreads_OMP = s->nThreads_FFT;
 
@@ -574,25 +575,27 @@ void dw_fprint_info(FILE * f, dw_opts * s)
     return;
 }
 
-static void getCmdLine(int argc, char ** argv, dw_opts * s)
+static void
+getCmdLine(int argc, char ** argv, dw_opts * s)
 {
     // Copy the command line to s->commandline
-    int lcmd=0;
+    size_t lcmd = 2;
     for(int kk = 0; kk<argc; kk++)
     {
-        lcmd += strlen(argv[kk]);
+        lcmd += strlen(argv[kk]) + 4;
     }
-    lcmd += argc+2;
-    s->commandline = malloc(lcmd);
 
-    int pos = 0;
+    s->commandline = calloc(lcmd, 1);
+    assert(s->commandline != NULL);
+    snprintf(s->commandline, lcmd, "%s", "");
+
     for(int kk = 0; kk<argc; kk++)
     {
-        sprintf(s->commandline+pos, "%s ", argv[kk]);
-        pos += strlen(argv[kk])+1;
+        size_t pos = strlen(s->commandline);
+        snprintf(s->commandline+pos, lcmd, "'%s' ", argv[kk]);
     }
-    s->commandline[pos-1] = '\0';
-    //  printf("argc: %d cmd: '%s'\n", argc, s->commandline);
+
+    return;
 }
 
 

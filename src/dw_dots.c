@@ -855,6 +855,12 @@ void detect_dots(opts * s, char * inFile)
         free(LoG);
     }
 
+    if(T == NULL)
+    {
+        printf("Unable to continue, table could not be read\n");
+        exit(EXIT_FAILURE);
+    }
+
     if(s->verbose > 1)
     {
         printf("Found %zu points\n", T->nrow);
