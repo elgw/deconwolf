@@ -7,12 +7,14 @@ double timespec_diff(struct timespec* end, struct timespec * start)
     return elapsed;
 }
 
-/* Assumes that the unit will be kb in /proc/self/status
+/* On Linux:
+ * Reads /proc/self/status and assumes that the unit will be kb
  *
  * VmHWM = Peak Resident Set Size (peak RSS) i.e. how much physical memory
  *
  * VmPeak = peak Virtual Memory Size (peak VMZ) i.e. how much that is
  * allocated, although possibly never used.
+ *
  *
  */
 

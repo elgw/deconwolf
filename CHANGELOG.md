@@ -9,11 +9,14 @@
 
 - Fixed: memory leak in `fft_block_of_ones`.
 
+- Reporting physical peak memory usage (VmHWM) besides the virtual
+  peak memory usage (VmPeak).
+
 - Parts of the function in dw can be built into a library using the
   `src/CMAkeLists.txt` file. This is still experimental and to be
   documented.
 
-- Almost clean under `-fanalyzer`, at least when `-DNDEBUG` is not used.
+- Almost clean under `-fanalyzer`, at least when `NDEBUG` is not defined.
 
 - Clean under `-fsantize=address` both with and without
   tiling. When `--gpu` is used the results are not clean, partly due to [VkFFT issues 194](https://github.com/DTolm/VkFFT/issues/194).

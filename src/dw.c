@@ -1034,17 +1034,6 @@ void fsetzeros(const char * fname, size_t N)
     free(buffer);
 }
 
-
-void fprint_peakMemory(FILE * fout)
-{
-    size_t pm = get_peakMemoryKB();
-
-    if(fout == NULL) fout = stdout;
-    fprintf(fout, "peakMemory: %zu kiB\n", pm);
-
-    return;
-}
-
 void benchmark_write(dw_opts * s, int iter, double fMSE,
                      const float * x0, // current guess of work size
                      const int64_t M, const int64_t N, const int64_t P,
@@ -1933,7 +1922,7 @@ void timings()
 
 void dw_unittests()
 {
-    fprint_peakMemory(NULL);
+    fprint_peak_memory(stdout);
     timings();
 
     //fim_ut();
@@ -2002,7 +1991,7 @@ void dcw_init_log(dw_opts * s)
 
 void dcw_close_log(dw_opts * s)
 {
-    fprint_peakMemory(s->log);
+    fprint_peak_memory(s->log);
     show_time(s->log);
     fclose(s->log);
 }
@@ -2414,7 +2403,7 @@ int dw_run(dw_opts * s)
     dcw_close_log(s);
 
     if(s->verbosity > 1)
-    { fprint_peakMemory(NULL); }
+    { fprint_peak_memory(stdout); }
 
     if(s->verbosity > 0)
     { printf("Done!\n"); }
