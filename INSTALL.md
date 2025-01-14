@@ -93,6 +93,32 @@ brew install fftw
 brew install gsl
 ```
 
+## macOS Sonoma, Apple Silicon
+
+For building you will need XCode from the App Store and [brew](https://brew.sh/).
+
+Then set up XCode and install the required packages:
+``` shell
+xcode-select --install
+brew install cmake
+brew install gcc
+brew install pkg-config
+brew install libomp
+brew install libtiff
+brew install fftw
+brew install gsl
+```
+
+To build, make sure you use the Homebrew-installed version of gcc, in my case gcc-14:
+
+```shell
+mkdir builddir
+cd builddir
+CC=gcc-14 CXX=g++-14 cmake ..
+CC=gcc-14 CXX=g++-14 cmake --build .
+make install
+```
+
 ## Windows 10/11
 Deconwolf can be built several different ways under Windows:
 1. Using WSL, then follow the instructions for Ubuntu. Most likely there will be a
