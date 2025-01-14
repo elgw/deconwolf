@@ -96,7 +96,7 @@ void clu_exit_error(cl_int err,
     const char * err_cl = clGetErrorString(err);
     printf("   OpenCl error=%s\n", err_cl);
 
-    #ifndef VKFFT_BACKEND
+#ifndef VKFFT_BACKEND
     if(clfft)
     {
         if(strcmp(err_cl, "CL_UNKNOWN_ERROR") == 0)
@@ -262,14 +262,14 @@ fimcl_t * fimcl_new(clu_env_t * clu, fimcl_type type,
     }
 
 
-        Y->buf_size_nf = fimcl_ncx(Y)*2;
+    Y->buf_size_nf = fimcl_ncx(Y)*2;
 
-        Y->buf = clCreateBuffer(clu->context,
-                                CL_MEM_READ_WRITE,
-                                Y->buf_size_nf*sizeof(float),
-                                NULL, &ret );
-        clu->nb_allocated += Y->buf_size_nf*sizeof(float);
-        clu->n_alloc++;
+    Y->buf = clCreateBuffer(clu->context,
+                            CL_MEM_READ_WRITE,
+                            Y->buf_size_nf*sizeof(float),
+                            NULL, &ret );
+    clu->nb_allocated += Y->buf_size_nf*sizeof(float);
+    clu->n_alloc++;
 
     check_CL(ret);
 
@@ -366,7 +366,7 @@ static fimcl_t * _fimcl_convolve(fimcl_t * X, fimcl_t * Y, int mode, int conj)
 
     if(X->clu->verbose > 1)
     {
-        printf("fimcl_convolve\n");
+        printf("fimcl_convolve mode=%d, conj=%d\n", mode, conj);
     }
 
     if(X->type == fimcl_hermitian && Y->type == fimcl_hermitian)
@@ -519,6 +519,11 @@ void fimcl_complex_mul(fimcl_t * X, fimcl_t * Y, fimcl_t * Z, int conj)
 {
     assert(X->type == fimcl_hermitian);
     assert(Y->type == fimcl_hermitian);
+
+    if(X->clu->verbose > 1)
+    {
+        printf("fimcl_complex_mul, conj=%d\n", conj);
+    }
 
     cl_kernel kernel = X->clu->kern_mul.kernel;
     if(conj == 1)
@@ -799,6 +804,11 @@ void fimcl_complex_mul_inplace(fimcl_t * X, fimcl_t * Y, int conj)
 {
     assert(X->type == fimcl_hermitian);
     assert(Y->type == fimcl_hermitian);
+
+    if(X->clu->verbose > 1)
+    {
+        printf("fimcl_complex_mul_inplace, conj=%d\n", conj);
+    }
 
     cl_kernel kernel = X->clu->kern_mul_inplace.kernel;
     if(conj == 1)
@@ -1228,11 +1238,11 @@ static char * read_program(const char * fname, size_t * size)
 
 /** Callback from clCreateContext */
 void cl_crash_fun (
-    const char *errinfo,
-    __attribute__((unused)) const void *private_info,
-    __attribute__((unused)) size_t cb,
-    __attribute__((unused)) void *user_data
-    )
+                   const char *errinfo,
+                   __attribute__((unused)) const void *private_info,
+                   __attribute__((unused)) size_t cb,
+                   __attribute__((unused)) void *user_data
+                   )
 {
     printf("On no... bad new from OpenCL:\n");
     printf("errinfo: %s\n", errinfo);
@@ -1599,6 +1609,12 @@ void clu_prepare_kernels(clu_env_t * clu,
         FILE* kernelCache;
         uint64_t str_len;
         kernelCache = fopen(vkfft_cache_file_name, "rb");
+        if(kernelCache == NULL)
+        {
+            fprintf(stderr, "Unable to load %s\n", vkfft_cache_file_name);
+            configuration.loadApplicationString = 0;
+            goto skipLoadApplicationFromString;
+        }
         fseek(kernelCache, 0, SEEK_END);
         str_len = ftell(kernelCache);
         fseek(kernelCache, 0, SEEK_SET);
@@ -1614,7 +1630,16 @@ void clu_prepare_kernels(clu_env_t * clu,
             exit(EXIT_FAILURE);
         }
         fclose(kernelCache);
+    skipLoadApplicationFromString:
+        ;
     }
+    if(clu->verbose > 1)
+    {
+        printf("VkFFT configuration:\n");
+        printf("loadApplicationFromString: %d\n", configuration.loadApplicationFromString);
+        printf("saveApplicationToString: %d\n", configuration.saveApplicationToString);
+    }
+
     VkFFTResult resFFT = initializeVkFFT(&clu->vkfft_app, configuration);
     if(resFFT != 0)
     {
@@ -1634,15 +1659,24 @@ void clu_prepare_kernels(clu_env_t * clu,
                 "was not enough memory on the GPU\n");
         exit(EXIT_FAILURE);
     }
+    if(clu->verbose > 1)
+    {
+        printf("VkFFT was initialized\n");
+    }
     if (configuration.loadApplicationFromString) {
         free(configuration.loadApplicationString);
     }
     if (configuration.saveApplicationToString) {
         FILE* kernelCache;
         kernelCache = fopen(vkfft_cache_file_name, "wb");
-        fwrite(clu->vkfft_app.saveApplicationString,
-               clu->vkfft_app.applicationStringSize, 1, kernelCache);
-        fclose(kernelCache);
+        if(kernelCache == NULL)
+        {
+            fprintf(stderr, "Unable to open %s for writing\n", vkfft_cache_file_name);
+        } else {
+            fwrite(clu->vkfft_app.saveApplicationString,
+                   clu->vkfft_app.applicationStringSize, 1, kernelCache);
+            fclose(kernelCache);
+        }
     }
     dw_gettime(&t1);
     if(clu->verbose > 2)
@@ -1867,10 +1901,10 @@ cl_uint clu_wait_for_event(cl_event clev, size_t ns)
     while(status != CL_COMPLETE)
     {
         // TODO: Bussy waiting on windows ...
-        #ifndef WINDOWS
+#ifndef WINDOWS
         nanosleep(&sleep_req,
                   &sleep_rem);
-        #endif
+#endif
         ret = clGetEventInfo(clev,
                              CL_EVENT_COMMAND_EXECUTION_STATUS,
                              param_value_size,
@@ -2356,8 +2390,8 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
     struct timespec tstart, tend, t0, t1;
 
     if(timers){
-    printf("\n");
-    dw_gettime(&tstart);
+        printf("\n");
+        dw_gettime(&tstart);
     }
 
     /* Number of voxels to process per work item
@@ -2414,7 +2448,7 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
 
     if(timers){
         dw_gettime(&t1);
-    printf("Create buffer: %f \n", timespec_diff(&t1, &t0));
+        printf("Create buffer: %f \n", timespec_diff(&t1, &t0));
     }
 
     check_CL( clSetKernelArg(kernel,
@@ -2446,8 +2480,8 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
     fimcl_sync(forward);
     if(timers)
     {
-    dw_gettime(&t1);
-    printf("Reduce: %f \n", timespec_diff(&t1, &t0));
+        dw_gettime(&t1);
+        printf("Reduce: %f \n", timespec_diff(&t1, &t0));
     }
 
     /* Download the result */
@@ -2465,8 +2499,8 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
     clFinish(forward->clu->command_queue);
     if(timers)
     {
-    dw_gettime(&t1);
-    printf("Download: %f \n", timespec_diff(&t1, &t0));
+        dw_gettime(&t1);
+        printf("Download: %f \n", timespec_diff(&t1, &t0));
     }
 
     if(timers){dw_gettime(&t0);}
@@ -2474,8 +2508,8 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
 
     if(timers)
     {
-    dw_gettime(&t1);
-    printf("Release buffer: %f \n", timespec_diff(&t1, &t0));
+        dw_gettime(&t1);
+        printf("Release buffer: %f \n", timespec_diff(&t1, &t0));
     }
 
     float sum_gpu = 0;
@@ -2488,8 +2522,8 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
 
     if(timers)
     {
-    dw_gettime(&tend);
-    printf("Total: %f \n", timespec_diff(&tend, &tstart));
+        dw_gettime(&tend);
+        printf("Total: %f \n", timespec_diff(&tend, &tstart));
     }
 
     return sum_gpu / (float) (image->M*image->N*image->P);
