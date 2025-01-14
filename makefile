@@ -35,7 +35,7 @@ endif
 
 SANITIZE?=0
 ifeq ($(SANITIZE),1)
-CFLAGS+=-fsanitize=address -static-libasan
+CFLAGS+=-fsanitize=address -static-libasan -fno-omit-frame-pointer
 endif
 
 ANALYZE?=0

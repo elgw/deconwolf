@@ -2,8 +2,8 @@ CC=gcc -std=gnu99
 
 CFLAGS=-Wall -Wextra
 
-ASAN?=0
-ifeq ($(ASAN),1)
+FANA?=0
+ifeq ($(FANA),1)
 CFLAGS+=-g3 -fanalyzer -fno-inline -fstack-protector-all -fsanitize=address -fno-omit-frame-pointer
 endif
 

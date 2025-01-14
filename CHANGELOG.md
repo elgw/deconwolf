@@ -1,15 +1,34 @@
 # CHANGELOG
 
 ## 0.4.4
+
 - Fixed issues when using `--psigma` with low values.
 
-- Fixed that `--dog_ls` and `--dog_as` works for `dw dots`.
+- Fixed: Issue #38: 'use quoting when saving the command line to the log files'
+- More verbose using `--verbose 2` and above.
+
+- Fixed: memory leak in `fft_block_of_ones`.
 
 - Parts of the function in dw can be built into a library using the
   `src/CMAkeLists.txt` file. This is still experimental and to be
   documented.
 
-- Fixed: `dw dots` erroneously reported the same sub pixel values for
+- Almost clean under `-fanalyzer`, at least when `-DNDEBUG` is not used.
+
+- Clean under `-fsantize=address` both with and without
+  tiling. When `--gpu` is used the results are not clean, partly due to [VkFFT issues 194](https://github.com/DTolm/VkFFT/issues/194).
+
+- Updates to `dw nuclei` module:
+  - Still very experimental.
+  - Uses the random forest implementation in
+    [trafo](https://github.com/elgw/trafo).
+  - Supports 3 classes, instead of 2 (use red, green and blue in the
+    annotated images).
+  - New command line interface.
+
+- Updates to `dw dots`:
+  - Fixed that `--dog_ls` and `--dog_as` works for `dw dots`.
+  - Fixed: erroneously reported the same sub pixel values for
   both the x and y component.
 
 ## 0.4.3

@@ -433,6 +433,7 @@ fimcl_t * fimcl_convolve(fimcl_t * X, fimcl_t * Y, int mode)
 {
     return _fimcl_convolve(X, Y, mode, 0);
 }
+
 fimcl_t * fimcl_convolve_conj(fimcl_t * X, fimcl_t * Y, int mode)
 {
     return _fimcl_convolve(X, Y, mode, 1);
@@ -460,7 +461,7 @@ void fimcl_preprocess(fimcl_t * fft_image, fimcl_t * fft_PSF, float value)
     printf("fimcl_preprocess, value = %f\n", value);
 
     assert(fft_PSF->M == fft_image->M);
-    cl_kernel kernel = fft_image->clu->kern_preprocess_image.kernel;
+    cl_kernel kernel = fft_image->clu->kern_preprocess_image->kernel;
 
     /* Set sizes */
     size_t localWorkSize; /* Use largest possible */
@@ -525,10 +526,10 @@ void fimcl_complex_mul(fimcl_t * X, fimcl_t * Y, fimcl_t * Z, int conj)
         printf("fimcl_complex_mul, conj=%d\n", conj);
     }
 
-    cl_kernel kernel = X->clu->kern_mul.kernel;
+    cl_kernel kernel = X->clu->kern_mul->kernel;
     if(conj == 1)
     {
-        kernel = X->clu->kern_mul_conj.kernel;
+        kernel = X->clu->kern_mul_conj->kernel;
     }
 
 
@@ -583,10 +584,10 @@ void fimcl_complex_mul_old(fimcl_t * X, fimcl_t * Y, fimcl_t * Z, int conj)
     size_t global_work_offset[] = {0, 0, 0};
     size_t local_work_size[] = {1,1,1};
 
-    cl_kernel kernel = X->clu->kern_mul.kernel;
+    cl_kernel kernel = X->clu->kern_mul->kernel;
     if(conj == 1)
     {
-        kernel = X->clu->kern_mul_conj.kernel;
+        kernel = X->clu->kern_mul_conj->kernel;
     }
 
     size_t cMNP = fimcl_ncx(X);
@@ -633,7 +634,7 @@ void fimcl_real_mul_inplace(fimcl_t * X, fimcl_t * Y)
     assert(X->P == Y->P);
 
 
-    cl_kernel kernel = X->clu->kern_real_mul_inplace.kernel;
+    cl_kernel kernel = X->clu->kern_real_mul_inplace->kernel;
 
     /* Set sizes */
     size_t localWorkSize; /* Use largest possible */
@@ -689,7 +690,7 @@ void fimcl_shb_update(fimcl_t * P, fimcl_t * X, fimcl_t * XP, float alpha)
         //       exit(EXIT_FAILURE);
     }
 
-    cl_kernel kernel = X->clu->kern_shb_update.kernel;
+    cl_kernel kernel = X->clu->kern_shb_update->kernel;
 
     /* Set sizes */
     size_t localWorkSize; /* Use largest possible */
@@ -751,7 +752,7 @@ void fimcl_shb_update(fimcl_t * P, fimcl_t * X, fimcl_t * XP, float alpha)
 void fimcl_positivity(fimcl_t * X, float val)
 {
     assert(X != NULL);
-    cl_kernel kernel = X->clu->kern_real_positivity.kernel;
+    cl_kernel kernel = X->clu->kern_real_positivity->kernel;
 
     /* Set sizes */
     size_t localWorkSize; /* Use largest possible */
@@ -810,10 +811,10 @@ void fimcl_complex_mul_inplace(fimcl_t * X, fimcl_t * Y, int conj)
         printf("fimcl_complex_mul_inplace, conj=%d\n", conj);
     }
 
-    cl_kernel kernel = X->clu->kern_mul_inplace.kernel;
+    cl_kernel kernel = X->clu->kern_mul_inplace->kernel;
     if(conj == 1)
     {
-        kernel = X->clu->kern_mul_conj_inplace.kernel;
+        kernel = X->clu->kern_mul_conj_inplace->kernel;
     }
 
     /* Set sizes */
@@ -1413,7 +1414,7 @@ void clu_prepare_kernels(clu_env_t * clu,
     sprintf(argstring, "-D cMNP=%zu",
             M_r2h(wM)*wN*wP);
     clu->kern_mul =
-        *clu_kernel_newa(clu,
+        clu_kernel_newa(clu,
                          NULL, //"cl_complex_mul.c",
                          (const char *) cl_complex_mul,
                          cl_complex_mul_len,
@@ -1421,28 +1422,28 @@ void clu_prepare_kernels(clu_env_t * clu,
                          argstring);
 
     clu->kern_mul_conj =
-        *clu_kernel_newa(clu,
+        clu_kernel_newa(clu,
                          NULL, //"cl_complex_mul_conj.c",
                          (const char *) cl_complex_mul_conj,
                          cl_complex_mul_conj_len,
                          "cl_complex_mul_conj",
                          argstring);
     clu->kern_mul_inplace =
-        *clu_kernel_newa(clu,
+        clu_kernel_newa(clu,
                          NULL,
                          (const char *) cl_complex_mul_inplace,
                          cl_complex_mul_inplace_len,
                          "cl_complex_mul_inplace",
                          argstring);
     clu->kern_mul_conj_inplace =
-        *clu_kernel_newa(clu,
+        clu_kernel_newa(clu,
                          NULL,
                          (const char *) cl_complex_mul_conj_inplace,
                          cl_complex_mul_conj_inplace_len,
                          "cl_complex_mul_conj_inplace",
                          argstring);
     clu->kern_preprocess_image =
-        * clu_kernel_newa(clu,
+         clu_kernel_newa(clu,
                           NULL,
                           (const char *) src_kernels_cl_preprocess_image_c,
                           src_kernels_cl_preprocess_image_c_len,
@@ -1452,21 +1453,21 @@ void clu_prepare_kernels(clu_env_t * clu,
     /* Kernels for real float */
     sprintf(argstring, "-D wMNP=%zu", padsize(wM)*wN*wP);
     clu->kern_real_mul_inplace =
-        * clu_kernel_newa(clu,
+         clu_kernel_newa(clu,
                           NULL,
                           (const char *) src_kernels_cl_real_mul_inplace_c,
                           src_kernels_cl_real_mul_inplace_c_len,
                           "cl_real_mul_inplace",
                           argstring);
     clu->kern_real_positivity =
-        * clu_kernel_newa(clu,
+         clu_kernel_newa(clu,
                           NULL,
                           (const char *) src_kernels_cl_positivity_c,
                           src_kernels_cl_positivity_c_len,
                           "cl_positivity",
                           argstring);
     clu->kern_shb_update =
-        * clu_kernel_newa(clu,
+         clu_kernel_newa(clu,
                           NULL,
                           (const char *) src_kernels_cl_shb_update_c,
                           src_kernels_cl_shb_update_c_len,
@@ -1699,6 +1700,10 @@ void clu_destroy(clu_env_t * clu)
     }
 
 #ifdef VKFFT
+    if(clu->verbose > 1)
+    {
+        printf("Clearing up VkFFT\n");
+    }
     deleteVkFFT(&clu->vkfft_app);
 #else
     /* Release clFFT library. */
@@ -1728,20 +1733,31 @@ void clu_destroy(clu_env_t * clu)
     check_CL(clFlush(clu->command_queue));
     /* For complex data */
     clu_kernel_destroy(clu->kern_mul);
+    clu->kern_mul = NULL;
     clu_kernel_destroy(clu->kern_mul_conj);
+    clu->kern_mul_conj = NULL;
     clu_kernel_destroy(clu->kern_mul_inplace);
+    clu->kern_mul_inplace = NULL;
     clu_kernel_destroy(clu->kern_mul_conj_inplace);
+    clu->kern_mul_conj_inplace = NULL;
     /* For real data */
 
     clu_kernel_destroy(clu->kern_real_mul_inplace);
+    clu->kern_real_mul_inplace = NULL;
     clu_kernel_destroy(clu->kern_real_positivity);
+    clu->kern_real_positivity = NULL;
 
     clu_kernel_destroy(clu->kern_shb_update);
+    clu->kern_shb_update = NULL;
+
     clu_kernel_destroy(clu->kern_preprocess_image);
+    clu->kern_preprocess_image = NULL;
 
-    clu_kernel_destroy(*clu->idiv_kernel);
+    clu_kernel_destroy(clu->idiv_kernel);
+    clu->idiv_kernel = NULL;
 
-    clu_kernel_destroy(*clu->update_y_kernel);
+    clu_kernel_destroy(clu->update_y_kernel);
+    clu->update_y_kernel = NULL;
 
     check_CL(clFinish(clu->command_queue));
     check_CL(clReleaseCommandQueue(clu->command_queue) );
@@ -1866,11 +1882,17 @@ clu_kernel_t * clu_kernel_newa(clu_env_t * env,
 }
 
 
-void clu_kernel_destroy(clu_kernel_t kern)
+void clu_kernel_destroy(clu_kernel_t * kern)
 {
-    check_CL( clReleaseKernel(kern.kernel));
-    check_CL( clReleaseProgram(kern.program));
-    //printf("1 clReleaseProgram\n");
+    if(kern == NULL)
+    {
+        fprintf(stderr, "Warning: Calling clu_kernel_destroy(NULL)\n");
+        return;
+    }
+    check_CL( clReleaseKernel(kern->kernel));
+    check_CL( clReleaseProgram(kern->program));
+    free(kern);
+
     return;
 }
 
