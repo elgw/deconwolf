@@ -288,7 +288,7 @@ int sparse_preprocess_cli(int argc, char ** argv)
 
     if(conf->verbose > 1)
     {
-        printf("Peak memory: %lu KB\n", get_peakMemoryKB());
+        fprint_peak_memory(stdout);
     }
 
     sparse_settings_free(conf);

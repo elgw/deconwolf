@@ -81,9 +81,31 @@ int dw_isfile(const char * fname);
 /* Difference between two timepoints */
 float timespec_diff(struct timespec* end, struct timespec * start);
 
-/* Get peak memory usage, works on Linux and MacOS
-* returns 0 under windows */
-size_t get_peakMemoryKB(void);
+/* On Linux:
+ * Reads /proc/self/status and assumes that the unit will be kb
+ *
+ * physical:
+ * VmHWM = Peak Resident Set Size (peak RSS) i.e. how much physical memory
+ * virtual:
+ * VmPeak = peak Virtual Memory Size (peak VMZ) i.e. how much that is
+ * allocated, although possibly never used.
+ *
+ * On MACOS:
+ * physical = r_usage.ru_maxrss
+ * virtual: set to 0
+ *
+ * On Windows: TODO
+ * physical: 0
+ * virtual: 0
+ * Returns non 0
+ *
+ * Returns 0 on success.
+ */
+
+int get_peakMemoryKB(size_t * physical, size_t * virtual);
+
+/* Print a line about peak memory usage to a file */
+void fprint_peak_memory(FILE * fid);
 
 /* Read the scaling of file from the .log.txt file if exists */
 float dw_read_scaling(const char * file);

@@ -176,17 +176,26 @@ If you are a windows developer and reading this, please help us out
 to make the build process smoother!
 
 ## FreeBSD
-- Use `gmake`, not `make`.
+Differences to linux: `gmake`, not `make`, `pkgconf` not
+`pkg-config`.
+
+Not tested with GPU support. The default compiler is
+clang which will not understand all of the GCC directives (expect a
+few compilation warnings).
 
 Packages:
 ``` shell
 pkg install git
 pkg install gmake
 pkg install fftw3
+pkg install fftw3-float
 pkg install tiff
 pkg install gsl
-pkg install sudo
+pkg install pkgconf
+pkg install cmake
 ```
+
+Then proceed as under linux.
 
 ## CentOS
 Tested on CentOS Linux Release 7.8.2009 (Core).

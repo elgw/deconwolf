@@ -996,8 +996,7 @@ int dw_dots(int argc, char ** argv)
 
     if(s->verbose > 1)
     {
-        printf("Peak memory usage: %zu kB\n",
-               get_peakMemoryKB());
+        fprint_peak_memory(stdout);
     }
 
     opts_free(s);
