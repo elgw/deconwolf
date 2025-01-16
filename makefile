@@ -406,7 +406,8 @@ gmlfit.o \
 dw_align_dots.o \
 dw_nuclei.o \
 dw_png.o \
-quickselect.o
+quickselect.o \
+dw_background.o
 
 #dw_nuclei.o
 
