@@ -1351,6 +1351,9 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
 #ifdef dw_module_psf_sted
     printf("   psf-STED   PSFs for 3D STED\n");
 #endif
+#ifdef dw_module_nuclei
+    printf("   nuclei     pixel classifier\n");
+#endif
     printf("\n");
     printf("see: %s [command] --help\n", argv[0]);
     printf("\n");
