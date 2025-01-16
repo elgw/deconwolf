@@ -77,6 +77,7 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 add_executable(dw
   src/deconwolf.c
   src/dw.c
+  src/dw_background.c
   src/dw_dots.c
   src/dw_imshift.c
   src/dw_maxproj.c

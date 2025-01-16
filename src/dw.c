@@ -1340,19 +1340,22 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
     printf("\n");
 
     printf("Additional commands with separate help sections:\n");
-    printf("   maxproj    maximum Z-projections\n");
-    printf("   merge      merge individual slices to volume\n");
+    printf("   maxproj      maximum Z-projections\n");
+    printf("   merge        merge individual slices to volume\n");
 #ifdef dw_module_dots
-    printf("   dots       detect dots\n");
+    printf("   dots         detect dots with sub pixel precision\n");
 #endif
 #ifdef dw_module_psf
-    printf("   psf        generate PSFs for Widefield and Confocal\n");
+    printf("   psf          generate PSFs for Widefield and Confocal\n");
 #endif
 #ifdef dw_module_psf_sted
-    printf("   psf-STED   PSFs for 3D STED\n");
+    printf("   psf-STED     PSFs for 3D STED\n");
 #endif
 #ifdef dw_module_nuclei
-    printf("   nuclei     pixel classifier\n");
+    printf("   nuclei       pixel classifier\n");
+#endif
+#ifdef dw_module_background
+    printf("   background   vignetting/background estimation\n");
 #endif
     printf("\n");
     printf("see: %s [command] --help\n", argv[0]);
