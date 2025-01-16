@@ -1637,8 +1637,8 @@ void clu_prepare_kernels(clu_env_t * clu,
     if(clu->verbose > 1)
     {
         printf("VkFFT configuration:\n");
-        printf("loadApplicationFromString: %d\n", configuration.loadApplicationFromString);
-        printf("saveApplicationToString: %d\n", configuration.saveApplicationToString);
+        printf("loadApplicationFromString: %lu\n", configuration.loadApplicationFromString);
+        printf("saveApplicationToString: %lu\n", configuration.saveApplicationToString);
     }
 
     VkFFTResult resFFT = initializeVkFFT(&clu->vkfft_app, configuration);

@@ -76,7 +76,7 @@ static opts * opts_new()
     s->anno_label = NULL;
     s->ntree = 50;
     s->train_loop = 0;
-    s->redu = REDU_FOCUS;
+    s->redu = REDU_MAX;
     s->purpose = NUC_UNSET;
     fimo_free(s->bg_model);
     return s;
@@ -133,15 +133,16 @@ int fimo_to_png(fimo * I, const char * outname)
     uint8_t * img_data = calloc(3*I->M*I->N*3, sizeof(uint8_t));
     assert(img_data != NULL);
 
-    float imax = fim_max(I->V, I->M*I->N);
+    // TODO Expose the percentile as a commandline option
+    float imax = fimo_percentile(I, 99.9);
+    float imin = fimo_percentile(I, 1.0);
     for(u64 kk = 0; kk < I->M*I->N; kk++)
     {
-        float v = I->V[kk]/imax*255.0;
-        u8 v8 = (u8) round(v);
-        if(v > 255)
-        {
-            v8 = 255;
-        }
+        float v = (I->V[kk] - imin)/(imax - imin)*255.0;
+        v < 0 ? v = 0 : 0;
+        v > 255 ? v = 255 : 0;
+        u8 v8 = (u8) v;
+
         img_data[3*kk] = v8; // Red
         img_data[3*kk+1] = v8; // Green
         img_data[3*kk+2] = v8; // Blue

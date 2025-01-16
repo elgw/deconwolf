@@ -161,6 +161,14 @@ FORCE: ;
 src/kdtree/libkdtree.a: FORCE
 	$(MAKE) -C $(@D) libkdtree.a
 
+#
+# trafo
+#
+
+dw_LIBRARIES+=-Lsrc/trafo/ -ltrafo
+src/trafo/libktrafo.a: FORCE
+	$(MAKE) -C $(@D) libtrafo.a
+
 
 #
 # Math library
@@ -316,13 +324,16 @@ CFLAGS += -fopenmp
 endif
 endif
 
+##
+## libPNG
+##
+dw_LIBRARIES += `pkg-config libpng --libs`
+CFLAGS += `pkg-config libpng --cflags`
 
 
 ##
 ## GPU VKFFT + OpenCL
 ##
-
-
 
 ifeq ($(VKFFT), 1)
 $(info -- Including VkFFT)
@@ -392,7 +403,11 @@ dw_psf_sted.o \
 sparse_preprocess.o \
 sparse_preprocess_cli.o \
 gmlfit.o \
-dw_align_dots.o
+dw_align_dots.o \
+dw_nuclei.o \
+dw_png.o \
+quickselect.o
+
 #dw_nuclei.o
 
 dwbw_OBJECTS = fim.o \

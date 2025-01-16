@@ -168,6 +168,14 @@ float fim_mean(const float * restrict A, size_t N);
 float fim_max(const float * restrict A, size_t N);
 float fim_sum(const float * restrict A, size_t N);
 
+/* Returns the value at the prct percentile where 0 <= prct <= 100
+ * using quickselect */
+float fim_percentile(const float * restrict A, size_t N, float prct);
+
+/* Returns the value at the prct percentile where 0 <= prct <= 100
+ * using quickselect */
+float fimo_percentile(fimo * A, float prct);
+
 /* Standard deviation, normalizing by (N-1) */
 float fim_std(const float * V, size_t N);
 
@@ -495,7 +503,7 @@ fim_gsmooth(float * restrict V,
             size_t M, size_t N, size_t P,
             float sigma);
 
-void fimo_gsmooth(fimo * I, float sigma);
+void fimo_gsmooth(fimo * V, float sigma);
 
 /** Gaussian smoothing, normalized at edges, separate values for
  * lateral and axial filter */

@@ -46,6 +46,8 @@
 #include "dw_tiff_merge.h"
 #include "dw_imshift.h"
 #include "dw_version.h"
+#include "dw_nuclei.h"
+
 /* Uncomment to include, requires linking with libpng and libz
  * can be build separately by the makefile in the src folder
  */

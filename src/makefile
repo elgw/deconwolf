@@ -40,6 +40,11 @@ LDFLAGS+=`pkg-config libtiff-4 --libs`
 CFLAGS += `pkg-config fftw3 fftw3f --cflags`
 LDFLAGS += `pkg-config fftw3 fftw3f --libs` -lfftw3_omp -lfftw3f_omp
 
+# PNG
+CFLAGS += `pkg-config libpng --cflags`
+LDFLAGS += `pkg-config libpng --libs`
+
+
 # OpenMP
 CFLAGS+=-fopenmp
 
@@ -64,12 +69,12 @@ dw_render: $(dw_render_files)
 ## Note: prf_* and qsort comes from pixel_random_forest repo
 
 dw_nuclei_files=dw_nuclei.c fim.o ftab.o fim_tiff.o dw_util.o \
-trafo/libtrafo.a fft.o dw_png.o
+trafo/libtrafo.a fft.o dw_png.o quickselect.o
 
 dw_nuclei: $(dw_nuclei_files)
 	$(CC) $(CFLAGS) -DSTANDALONE $(dw_nuclei_files) $(LDFLAGS) -o dw_nuclei
 
-dw_bg_files=dw_background.c fim.o ftab.o fim_tiff.o dw_util.o \
+dw_bg_files=dw_background.c fim.o ftab.o fim_tiff.o dw_util.o quickselect.o \
 fft.o
 
 dw_background: $(dw_bg_files)
@@ -92,7 +97,7 @@ dw_psf_sted: $(spsf_files)
 	$(CC) $(CFLAGS) -DSTANDALONE $(spsf_files) $(LDFLAGS) -o dw_psf_sted
 
 # Test the float image module
-fim_ut_files=fim_ut.o fim.o dw_util.o ftab.o fft.o fim_tiff.o
+fim_ut_files=fim_ut.o fim.o dw_util.o ftab.o fft.o fim_tiff.o quickselect.o
 fim_ut: $(fim_ut_files)
 	$(CC)  $(CFLAGS) $(fim_ut_files) $(LDFLAGS) -o fim_ut
 

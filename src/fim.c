@@ -26,11 +26,13 @@
 #include <stdint.h>
 #include <time.h>
 
+
 #ifdef __linux__
 #include <sys/mman.h>
 #endif
 
 #include "fim.h"
+#include "quickselect.h"
 
 typedef uint64_t u64;
 typedef int64_t i64;
@@ -487,6 +489,17 @@ void fim_stats(const float * A, const size_t N)
            fim_mean(A, N),
            fim_max(A, N));
     return;
+}
+
+float fim_percentile(const float * A, size_t N, float prct)
+{
+    size_t k = (size_t) (prct / 100.0 * ((double) N));
+    return qselect_f32(A, N, k);
+}
+
+float fimo_percentile(fimo * A, float prct)
+{
+    return fim_percentile(A->V, fimo_nel(A), prct);
 }
 
 float fim_mse(float * A, float * B, size_t N)
