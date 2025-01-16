@@ -77,12 +77,15 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 add_executable(dw
   src/deconwolf.c
   src/dw.c
+  src/dw_background.c
   src/dw_dots.c
   src/dw_imshift.c
   src/dw_maxproj.c
+  src/dw_nuclei.c
   src/dw_psf.c
   src/dw_psf_sted.c
   src/dw_tiff_merge.c
+  src/dw_png.c
   src/dw_util.c
   src/fim.c
   src/fim_tiff.c
@@ -95,6 +98,7 @@ add_executable(dw
   src/gmlfit.c
   src/sparse_preprocess.c
   src/sparse_preprocess_cli.c
+  src/quickselect.c
   src/dw_align_dots.c)
 
   add_executable(dw_bw
@@ -119,8 +123,8 @@ add_executable(dw
   #
   # trafo
   #
-  #add_subdirectory("src/trafo")
-  #target_link_libraries(dw trafo)
+  add_subdirectory("src/trafo")
+  target_link_libraries(dw trafo)
 
   #
   # Parse version number from src/dw_version.h
@@ -288,6 +292,18 @@ add_executable(dw
 
   endif()
 
+  #
+  # LibPNG
+  #
+
+  include(FindPNG)
+  if(PNG_FOUND)
+    message("Found libPNG")
+    target_link_libraries(dw ${PNG_LIBRARIES})
+    target_include_directories(dw PRIVATE ${PNG_INCLUDE_DIRS})
+  else()
+    message("libPNG not found")
+  endif()
 
 
 
