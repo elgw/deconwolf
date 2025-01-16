@@ -76,7 +76,7 @@ static opts * opts_new()
     s->anno_label = NULL;
     s->ntree = 50;
     s->train_loop = 0;
-    s->redu = REDU_FOCUS;
+    s->redu = REDU_MAX;
     s->purpose = NUC_UNSET;
     fimo_free(s->bg_model);
     return s;
@@ -133,7 +133,9 @@ int fimo_to_png(fimo * I, const char * outname)
     uint8_t * img_data = calloc(3*I->M*I->N*3, sizeof(uint8_t));
     assert(img_data != NULL);
 
+    // TODO: Use percentiles
     float imax = fim_max(I->V, I->M*I->N);
+
     for(u64 kk = 0; kk < I->M*I->N; kk++)
     {
         float v = I->V[kk]/imax*255.0;
@@ -194,8 +196,9 @@ fimo * fim_png_decode(const char * fname)
     F->V = calloc(F->M*F->N, sizeof(float));
     assert(F->V != NULL);
 
-    size_t nfg = 0;
-    size_t nbg = 0;
+    size_t nR = 0;
+    size_t nG = 0;
+    size_t nB = 0;
     for(size_t kk = 0; kk<F->M*F->N; kk++)
     {
         F->V[kk] = -1;
@@ -205,20 +208,21 @@ fimo * fim_png_decode(const char * fname)
         if(r > g && r > b)
         {
             F->V[kk] = 0;
-            nfg++;
+            nR++;
         }
         if(g > r && g > b)
         {
             F->V[kk] = 1;
-            nbg++;
+            nG++;
         }
         if(b > r && b > g)
         {
             F->V[kk] = 2;
+            nB++;
         }
     }
-    printf("Found %zu foreground (green->2) and %zu background (red->1) pixels\n",
-           nfg, nbg);
+    printf("Pixel composition\n\tRed: %zu\n\tGreen: %zu\n\tBlue: %zu\n",
+           nR, nG, nB);
 
     return F;
 }
@@ -627,9 +631,17 @@ fit(opts * s, int argc, char ** argv)
     tconf.F_row_major = fit_features8;
     tconf.n_feature = nfeature; // ncol_train;
     tconf.n_sample = nsample; // nrow_train;
-    tconf.n_tree = 200;
+    tconf.n_tree = 201;
+    tconf.entropy = 1;
+    tconf.min_samples_leaf = cbrt(nsample);
 
     trf * F = trafo_fit(&tconf);
+
+    if(s->verbose > 0)
+    {
+        trafo_print(stdout, F);
+    }
+    trafo_print(log, F);
 
     if(F == NULL)
     {
@@ -742,6 +754,7 @@ init(opts * s, int argc, char ** argv)
         printf("No files given\n");
         return EXIT_FAILURE;
     }
+
     // For each image: Load, create max projection, save as PNG
     for(int kk = s->optpos; kk < argc; kk++)
     {
@@ -839,7 +852,8 @@ dw_nuclei(int argc, char ** argv)
         status = classify(s, argc, argv);
         break;
     default:
-        ;
+        printf("No command given, use --init, --fit or --predict\n");
+        break;
     }
 
     opts_free(s);
