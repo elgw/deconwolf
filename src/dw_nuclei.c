@@ -342,21 +342,6 @@ float * transpose(const float * X, size_t M, size_t N)
 }
 
 
-static int
-float_arg_max(const float * v, size_t N)
-{
-    float max = v[0];
-    int argmax = 0;
-    for(size_t kk = 0; kk<N; kk++)
-    {
-        if(v[kk] > max)
-        {
-            max = v[kk];
-            argmax = kk;
-        }
-    }
-    return argmax;
-}
 
 /* A reduction is a mapping from 3D to 2D */
 static fimo *
