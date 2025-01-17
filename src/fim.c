@@ -4024,11 +4024,114 @@ float * fim_focus_gm(const fimo * I, float sigma)
 {
     float * gm = malloc(I->P*sizeof(float));
     assert(gm != NULL);
+
+    /* Since the gpartial functions are parallel per plane we can
+     * loop over the planes in parallel here instead
+     */
+#pragma omp parallel for
     for(size_t kk = 0; kk<I->P; kk++)
     {
         gm[kk] = total_gm(I->V + kk*I->M*I->N, I->M, I->N, sigma);
     }
     return gm;
+}
+
+float * fim_auto_zcrop(const float * V,
+                       const size_t M, const size_t N, const size_t P,
+                       const size_t newP)
+{
+    fimo * fV = calloc(1, sizeof(fimo));
+    assert(fV != NULL);
+    fV->V = (float*) V;
+    fV->M = M;
+    fV->N = N;
+    fV->P = P;
+    float * focus = fim_focus_gm(fV, 3);
+    int slice = float_arg_max(focus, P);
+    free(focus);
+    int first = slice - (newP-1)/2;
+    first < 0 ? first = 0 : 0;
+    int last = first + newP - 1;
+    if(last <= (int) P)
+    {
+        last = last - (last - P) -1;
+        first = last - newP;
+    }
+    free(fV);
+    float * IZ = fim_malloc(M*N*newP*sizeof(float));
+    if(IZ == NULL)
+    {
+        fprintf(stderr, "Failed to allocate memory in fim_auto_zcrop\n");
+        return NULL;
+    }
+
+    for(int kk = 0; kk < newP; kk++)
+    {
+        memcpy(IZ + kk*M*N,
+               V + (first+kk)*M*N,
+               M*N*sizeof(float));
+    }
+    return IZ;
+}
+
+float * fim_zcrop(const float * V,
+                  const size_t M, const size_t N, const size_t P,
+                  const size_t zcrop)
+{
+    if(2*zcrop >= P)
+    {
+        fprintf(stderr, "Impossible zcrop value passed to fim_zcrop\n");
+        return NULL;
+    }
+    size_t newP = P - 2*zcrop;
+    float * IZ = fim_malloc(M*N*newP*sizeof(float));
+    if(IZ == NULL)
+    {
+        fprintf(stderr, "Failed to allocate memory in fim_zcrop\n");
+        return NULL;
+    }
+
+    for(int kk = 0; kk < P-2*zcrop; kk++)
+    {
+        memcpy(IZ + kk*M*N,
+               V + (kk+zcrop)*M*N,
+               M*N*sizeof(float));
+    }
+    return IZ;
+}
+
+fimo * fimo_get_plane(const fimo * A, int plane)
+{
+    if(plane < 0)
+    {
+        printf("fimo_get_plane: Can't extract plane %d\n", plane);
+        return NULL;
+    }
+    if(plane >= A->P)
+    {
+        printf("fimo_get_plane: Can't extract plane %d from an image with %d planes\n",
+               plane, (int) A->P);
+        return NULL;
+    }
+    float * P = fim_malloc(A->M*A->N*sizeof(float));
+    if(P == NULL)
+    {
+        return NULL;
+    }
+    memcpy(P,
+           A->V + plane*A->M*A->N,
+           A->M*A->N*sizeof(float));
+    fimo * Z = calloc(1, sizeof(fimo));
+    if(Z == NULL)
+    {
+        free(P);
+        return NULL;
+    }
+    Z->V = P;
+    Z->M = A->M;
+    Z->N = A->N;
+    Z->P = 1;
+    return Z;
 }
 
 ftab_t * fim_features_2d(const fimo * fI)

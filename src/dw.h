@@ -175,6 +175,9 @@ struct _dw_opts{
     int outFormat; // 16 (=16 bit int) or 32 (=32 bit float)
     float scaling; // fixed scaling for 16 bit output, automatic scaling is used if this value <= 0
 
+    int auto_zcrop; // Set to > 0 for an attempt to automatically crop out the middle planes of the image
+    int zcrop; // How many planes to remove from top and bottom
+
     /* sigma of Gaussian used for pre filtering of the image and the PSF
      * this was found beneficial a paper by Van Kempen
      *  https://doi.org/10.1046/j.1365-2818.1997.d01-629.x

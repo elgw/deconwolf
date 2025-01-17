@@ -140,3 +140,6 @@ int getline(char **lineptr, size_t *n, FILE *stream);
 
 float abbe_res_xy(float lambda, float NA);
 float abbe_res_z(float lambda, float NA);
+
+int64_t
+float_arg_max(const float * v, size_t N);

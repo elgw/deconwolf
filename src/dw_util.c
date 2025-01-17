@@ -444,3 +444,19 @@ float abbe_res_z(float lambda, float NA)
 {
     return 2.0*lambda / pow(NA, 2.0);
 }
+
+int64_t
+float_arg_max(const float * v, size_t N)
+{
+    float max = v[0];
+    int64_t argmax = 0;
+    for(size_t kk = 0; kk<N; kk++)
+    {
+        if(v[kk] > max)
+        {
+            max = v[kk];
+            argmax = kk;
+        }
+    }
+    return argmax;
+}

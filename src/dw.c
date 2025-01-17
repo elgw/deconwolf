@@ -486,9 +486,9 @@ void dw_fprint_info(FILE * f, dw_opts * s)
 
     if(f != stdout)
     {
-        #ifndef WINDOWS
+#ifndef WINDOWS
         fprintf(f, "PID: %d\n",  (int) getpid());
-        #endif
+#endif
     }
 
     if(f != stdout)
@@ -635,6 +635,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         { "version",   no_argument,       NULL, 'v' },
         { "overwrite", no_argument,       NULL, 'w' },
         { "xyfactor",  required_argument, NULL, 'x' },
+        { "az",        required_argument, NULL, 'A' },
         { "bq",        required_argument, NULL,  'B' },
         { "flatfield", required_argument, NULL,  'C' },
         { "fulldump",  no_argument,       NULL,  'D' },
@@ -651,6 +652,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         { "nopos",     no_argument,       NULL,  'P' },
         { "psigma",    required_argument, NULL,  'Q' },
         { "expe1",     no_argument,       NULL,  'X' },
+        { "cz",        required_argument, NULL,  'Z' },
         { NULL,           0,                 NULL,   0   }
     };
 
@@ -660,7 +662,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     int prefix_set = 0;
     int use_gpu = 0;
     while((ch = getopt_long(argc, argv,
-                            "12345679ab:c:f:Gghil:m:n:o:p:q:s:tvwx:B:C:DFI:L:MOR:S:TPQ:X:",
+                            "12345679ab:c:f:Gghil:m:n:o:p:q:s:tvwx:A:B:C:DFI:L:MOR:S:TPQ:X:Z:",
                             longopts, NULL)) != -1)
     {
         switch(ch) {
@@ -693,6 +695,9 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             break;
         case 'a':
             s->fftw3_planning = FFTW_ESTIMATE;
+            break;
+        case 'A':
+            s->auto_zcrop = atoi(optarg);
             break;
         case 'b':
             s->bg = atof(optarg);
@@ -881,7 +886,11 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         case 'X':
             s->experimental1 = 1;
             break;
+        case 'Z':
+            s->zcrop = atoi(optarg);
+            break;
         default:
+            fprintf(stderr, "dw got an unknown command line argument. Exiting!\n");
             exit(EXIT_FAILURE);
         }
     }
@@ -892,17 +901,43 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         s->offset = 0;
     }
 
+    if(s->zcrop < 0)
+    {
+        fprintf(stderr,
+                "the zcrop value (--cz) can not be negative\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if(s->zcrop > 0)
+    {
+        if(s->auto_zcrop > 0)
+        {
+            fprintf(stderr, "zcrop and auto_zcrop can not be combined\n");
+            exit(EXIT_FAILURE);
+        }
+        if(s->tiling_maxSize > 0)
+        {
+            fprintf(stderr, "zcrop can not be combined with tiling\n");
+        }
+    }
+
+    if( (s->auto_zcrop > 0) && (s->tiling_maxSize > 0))
+    {
+        fprintf(stderr, "auto_zcrop can not be combined with tiling\n");
+        exit(EXIT_FAILURE);
+    }
+
     if(use_gpu)
     {
-        #ifdef OPENCL
+#ifdef OPENCL
         if(s->method == DW_METHOD_SHB)
         {
             s->method = DW_METHOD_SHBCL2;
             s->fun = &deconvolve_shb_cl2;
         }
-        #else
+#else
         printf("WARNING: dw was not compiled with GPU support\n");
-        #endif
+#endif
     }
 
     /* Take care of the positional arguments */
@@ -1302,6 +1337,15 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
            "Pre filter the image with a Gaussian filter of sigma=s while Anscombe "
            "transformed\n");
 
+    printf(" --cz n\n\t"
+           "remove n zplanes from the top and bottom of the image.\n\t"
+           "has no effect when tiling is used\n");
+
+    printf(" --az n\n\t"
+           "Automatically crop the image to n z-planes. The plane with the largest\n\t"
+           "will be placed in the centre.\n\t"
+           "has no effect when tiling is used\n");
+
     printf(" --bq Q\n\t Set border handling to \n\t"
            "0 'none' i.e. periodic\n\t"
            "1 'compromise', or\n\t"
@@ -1317,8 +1361,8 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
            "int) and disable scaling\n");
     printf(" --bg l\n\t Set background level, l\n");
     printf(" --offset l\n\t"
-           "Set a positive offset that will be added to the image during\n"
-           "processing and remove before saving to disk. Can help to mitigate\n"
+           "Set a positive offset that will be added to the image during\n\t"
+           "processing and remove before saving to disk. Can help to mitigate\n\t"
            "some of the detector noise (non-Poissonian)\n");
     printf(" --flatfield image.tif\n\t"
            " Use a flat field correction image. Deconwolf will divide each plane of the\n\t"
@@ -1335,7 +1379,7 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
     printf("--start_lp\n\t"
            "Use a low passed version of the input image as the initial guess.n");
     printf(" --noplan\n\t Don't use any planning optimization for fftw3\n");
-    printf(" --no-inplace\n\t Disable in-place FFTs (for fftw3), uses more "
+    printf(" --no-inplace\n\t Disable in-place FFTs (for fftw3), uses more\n\t"
            "memory but could potentially be faster for some problem sizes.\n");
     printf("\n");
 
@@ -1845,7 +1889,7 @@ void timings()
     tictoc
         int64_t M = 1024, N = 1024, P = 50;
 
-    #ifndef WINDOWS
+#ifndef WINDOWS
     tic
         usleep(1000);
     toc(usleep_1000)
@@ -1883,8 +1927,8 @@ void timings()
         fim_flipall(V, A, M, N, P);
     toc(fim_flipall)
 
-    // ---
-    tic
+        // ---
+        tic
         float e1 = getError_ref(V, A, M, N, P, M, N, P);
     toc(getError_ref)
         V[0]+= e1;
@@ -1985,8 +2029,8 @@ void dcw_init_log(dw_opts * s)
     {
         fprintf(stderr, "Unable to open %s for writing\n", s->logFile);
         fprintf(stderr,
-            "Please check that you have permissions to write to the folder\n"
-            "and that the drive is not full\n");
+                "Please check that you have permissions to write to the folder\n"
+                "and that the drive is not full\n");
         exit(EXIT_FAILURE);
     }
     assert(s->log != NULL);
@@ -2045,7 +2089,7 @@ void flatfieldCorrection(dw_opts * s, float * im, int64_t M, int64_t N, int64_t 
 
 
 static void prefilter(dw_opts * s,
-               float * im, int64_t M, int64_t N, int64_t P,
+                      float * im, int64_t M, int64_t N, int64_t P,
                       __attribute__((unused)) float * psf,
                       __attribute__((unused)) int64_t pM,
                       __attribute__((unused)) int64_t pN,
@@ -2156,6 +2200,7 @@ int dw_run(dw_opts * s)
                M, N, P);
     }
 
+
     int tiling = 0;
     if(s->tiling_maxSize > 0 && (M > s->tiling_maxSize || N > s->tiling_maxSize))
     {
@@ -2192,6 +2237,56 @@ int dw_run(dw_opts * s)
             }
             printf("Done reading\n"); fflush(stdout);
         }
+
+        if(s->auto_zcrop > 0)
+        {
+            if(s->verbosity > 0)
+            {
+                printf("Cropping the image to %" PRId64 " x %" PRId64 " x %d\n",
+                       M, N, s->auto_zcrop);
+            }
+            float * zim = fim_auto_zcrop(im, M, N, P, s->auto_zcrop);
+            if(zim == NULL)
+            {
+                fprintf(stderr,
+                        "Automatic cropping failed\n");
+                exit(EXIT_FAILURE);
+            }
+            fim_free(im);
+            im = zim;
+            P = s->auto_zcrop;
+
+        }
+
+        if(s->zcrop > 0)
+        {
+            if(2*s->zcrop > P)
+            {
+                fprintf(stderr, "Impossible to remove 2x%d planes from an image with %zu planes\n",
+                        s->zcrop, P);
+            }
+            if(s->verbosity > 0)
+            {
+                printf("Removing %d planes from the top and bottom of the image\n",
+                       s->zcrop);
+            }
+            float * zim = fim_zcrop(im, M, N, P, (size_t )s->zcrop);
+            if(zim == NULL)
+            {
+                fprintf(stderr,
+                        "Automatic cropping failed\n");
+                exit(EXIT_FAILURE);
+            }
+            fim_free(im);
+            im = zim;
+            P = P - 2*s->zcrop;
+            if(s->verbosity > 0)
+            {
+                printf("New image size: [%" PRId64 "x %" PRId64 "x %" PRId64 "]\n",
+                       M, N, P);
+            }
+        }
+
 
         if(fim_min(im, M*N*P) < 0)
         {

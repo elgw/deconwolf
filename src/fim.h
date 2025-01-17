@@ -147,6 +147,9 @@ fimo * fimo_sumproj(const fimo * Im);
 /* A[kk] += B[kk] */
 void fimo_add(fimo * A, const fimo * B);
 
+/* Extract a single z-plane from A and return as a new image */
+fimo * fimo_get_plane(const fimo * A, int plane);
+
 /* Simple interface to write 2D or 3D images without any meta data */
 int fimo_tiff_write(const fimo * Im, const char * fName);
 
@@ -291,6 +294,17 @@ float * fim_copy(const float * restrict V, const size_t N);
 /* Allocate and return an array of N floats */
 float * fim_zeros(const size_t N);
 
+/* Crop out newP slices from V, using gradient magnitude to find the
+ * center of the new image */
+float * fim_auto_zcrop(const float * V,
+                       const size_t M, const size_t N, const size_t P,
+                       const size_t newP);
+
+/* Create a new image of size MxNx(P-2*zcrop) by copying V
+ * and discarding the first and last zcrop slices */
+float * fim_zcrop(const float * V,
+                  const size_t M, const size_t N, const size_t P,
+                  const size_t zcrop);
 
 /* Allocate and return an array of N floats sets to a constant value */
 float * fim_constant(const size_t N, const float value);
