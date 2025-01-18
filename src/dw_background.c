@@ -24,7 +24,7 @@ typedef struct {
 static opts *
 opts_new(void)
 {
-    opts * s = calloc(sizeof(opts), 1);
+    opts * s = calloc(1, sizeof(opts));
     assert(s != NULL);
     s->sigma = 100;
     return s;
