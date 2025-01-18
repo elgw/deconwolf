@@ -839,7 +839,7 @@ void detect_dots(opts * s, char * inFile)
 
             float s2 = scaling*scaling;
 #pragma omp parallel for
-            for(size_t kk = 0; kk < M*N*P; kk++)
+            for(size_t kk = 0; kk < (int64_t) M*N*P; kk++)
             {
                 LoG[ss][kk] *= s2;
             }

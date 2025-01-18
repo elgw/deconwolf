@@ -18,6 +18,8 @@
 DESTDIR?=/usr/local/bin
 DEBUG?=0
 
+.DEFAULT_GOAL := all
+
 UNAME_S := $(shell uname -s)
 $(info Host type: $(UNAME_S))
 
@@ -151,14 +153,15 @@ endif
 dw_LIBRARIES=
 dwbw_LIBRARIES=
 
+# .PHONY: kdtree trafo
+
+## TODO: Check this part NONFUNCTIONAL
+
 #
 # kd tree
 #
 dw_LIBRARIES+=-Lsrc/kdtree/ -lkdtree
-
-FORCE: ;
-
-src/kdtree/libkdtree.a: FORCE
+src/kdtree/libkdtree.a:
 	$(MAKE) -C $(@D) libkdtree.a
 
 #
@@ -166,7 +169,7 @@ src/kdtree/libkdtree.a: FORCE
 #
 
 dw_LIBRARIES+=-Lsrc/trafo/ -ltrafo
-src/trafo/libktrafo.a: FORCE
+src/trafo/libktrafo.a:
 	$(MAKE) -C $(@D) libtrafo.a
 
 

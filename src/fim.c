@@ -4065,7 +4065,7 @@ float * fim_auto_zcrop(const float * V,
         return NULL;
     }
 
-    for(int kk = 0; kk < newP; kk++)
+    for(size_t kk = 0; kk < newP; kk++)
     {
         memcpy(IZ + kk*M*N,
                V + (first+kk)*M*N,
@@ -4091,7 +4091,7 @@ float * fim_zcrop(const float * V,
         return NULL;
     }
 
-    for(int kk = 0; kk < P-2*zcrop; kk++)
+    for(size_t kk = 0; kk < newP; kk++)
     {
         memcpy(IZ + kk*M*N,
                V + (kk+zcrop)*M*N,
@@ -4107,7 +4107,7 @@ fimo * fimo_get_plane(const fimo * A, int plane)
         printf("fimo_get_plane: Can't extract plane %d\n", plane);
         return NULL;
     }
-    if(plane >= A->P)
+    if(plane >= (int) A->P)
     {
         printf("fimo_get_plane: Can't extract plane %d from an image with %d planes\n",
                plane, (int) A->P);
