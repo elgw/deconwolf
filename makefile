@@ -1,19 +1,12 @@
 # Note: Please use cmake to build deconwolf
-#       the makefile is only for testing
+#       this makefile is only for testing
+#       on a specific machine or two
 #
 # -- Normal build:
 # make -B
 #
-# -- With GPU acceleration
-# make kernels
-# make -B VKFFT=1
-#
-# To build with debug flags and no OpenMP
-# make DEBUG=1 OMP=0 DEBUG=1
-#
-# There is also ...
-# -D_FORTIFY_SOURCE=2
-# -D_FORTIFY_SOURCE=3
+# -- If OpenCL is not available, or to exclude it
+# make OPENCL=0
 
 DESTDIR?=/usr/local/bin
 DEBUG?=0
@@ -153,25 +146,23 @@ endif
 dw_LIBRARIES=
 dwbw_LIBRARIES=
 
-# .PHONY: kdtree trafo
-
-## TODO: Check this part NONFUNCTIONAL
-
 #
 # kd tree
 #
 dw_LIBRARIES+=-Lsrc/kdtree/ -lkdtree
-src/kdtree/libkdtree.a:
-	$(MAKE) -C $(@D) libkdtree.a
+kdtree:
+	$(MAKE) -C src/kdtree/ libkdtree.a
 
 #
 # trafo
 #
 
 dw_LIBRARIES+=-Lsrc/trafo/ -ltrafo
-src/trafo/libktrafo.a:
-	$(MAKE) -C $(@D) libtrafo.a
+trafo:
+	$(MAKE) -C src/trafo libtrafo.a
 
+
+.PHONY: trafo kdtree
 
 #
 # Math library
@@ -412,8 +403,6 @@ dw_png.o \
 quickselect.o \
 dw_background.o
 
-#dw_nuclei.o
-
 dwbw_OBJECTS = fim.o \
 fim_tiff.o \
 dw_bwpsf.o \
@@ -425,9 +414,9 @@ ftab.o
 
 $(info Everything looks ok)
 
-all: $(dw) $(dwbw)
+all: trafo kdtree $(dw) $(dwbw)
 
-$(dw): $(dw_OBJECTS)
+$(dw): $(dw_OBJECTS) $(dw_DEPENDS)
 	$(CC) $(CFLAGS) -o $@ $^ $(dw_LIBRARIES)
 
 $(dwbw): $(dwbw_OBJECTS)
