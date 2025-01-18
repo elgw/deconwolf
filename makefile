@@ -355,6 +355,7 @@ CFLAGS+=$(shell $(PKGCONF) OpenCL --cflags)
 dw_LIBRARIES+=$(shell $(PKGCONF) OpenCL --libs)
 else
 $(error ERROR: Could not find OpenCL)
+$(info INFO: Either install it or try building with OPENCL=0)
 endif
 endif
 dw_OBJECTS+=method_shb_cl.o method_shb_cl2.o cl_util.o
