@@ -124,6 +124,8 @@ add_executable(dw
   # trafo
   #
   add_subdirectory("src/trafo")
+  target_include_directories(dw PUBLIC "src/trafo/src/")
+  target_link_directories(dw PUBLIC "src/trafo/")
   target_link_libraries(dw trafo)
 
   #
