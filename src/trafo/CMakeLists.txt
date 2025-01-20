@@ -85,29 +85,6 @@ if(OpenMP_C_FOUND)
 endif()
 
 #
-# Only export symbols explicitly marked for export.
-#
-# This should work with gcc/linux and could probably be adjusted for
-# other compiler/os as well.
-#
-
-include(CheckCSourceCompiles)
-check_c_source_compiles(
-  "
-        #include <stdlib.h>
-        static void f(void) __attribute__ ((visibility(\"hidden\")));
-        int main(void) {return 0;}
-    "
-  HAVE___ATTRIBUTE__VISIBILITY_HIDDEN
-)
-
-if(HAVE___ATTRIBUTE__VISIBILITY_HIDDEN)
-  # target_compile_options(trafo PRIVATE -DHAVE___ATTRIBUTE__VISIBILITY_HIDDEN -fvisibility=hidden)
-  target_compile_options(trafo PRIVATE -DHAVE___ATTRIBUTE__VISIBILITY_HIDDEN)
-  set_target_properties(trafo PROPERTIES C_VISIBILITY_PRESET hidden)
-endif()
-
-#
 # Link time optimization
 #
 
