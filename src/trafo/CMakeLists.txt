@@ -21,7 +21,7 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 set( CMAKE_INSTALL_PREFIX
   /usr )
 
-add_library(trafo SHARED
+add_library(trafo
   src/entropy.c
   src/ftab.c
   src/gini.c
@@ -29,11 +29,6 @@ add_library(trafo SHARED
   src/trafo.c
   src/trafo_util.c
   src/qsort.c)
-
-
-set(TRAFO_PUBLIC_HEADERS
-  "src/trafo.h"
-)
 
 add_executable(trafo_cli
   src/entropy.c
@@ -101,9 +96,6 @@ else()
 endif()
 
 include("GNUInstallDirs")
-
-set_target_properties( trafo PROPERTIES
-  PUBLIC_HEADER "${TRAFO_PUBLIC_HEADERS}")
 
 INSTALL(TARGETS trafo
   PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}"
