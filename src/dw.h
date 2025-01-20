@@ -46,7 +46,9 @@
 #include "dw_tiff_merge.h"
 #include "dw_imshift.h"
 #include "dw_version.h"
+#ifndef WINDOWS
 #include "dw_nuclei.h"
+#endif
 #include "dw_background.h"
 
 /* Uncomment to include, requires linking with libpng and libz
