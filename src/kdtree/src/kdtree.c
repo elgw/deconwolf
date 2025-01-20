@@ -339,7 +339,7 @@ kdtree_new(const double * X,
 
     if(max_leaf_size < 1)
     {
-        printf("kdtree_new: invalid bin size\n");
+        printf("kdtree_new: invalid bin size, use for example 10\n");
         return NULL;
     }
 
@@ -473,15 +473,6 @@ int within_bounds(const kdtree_node_t * node, const double * Q, const double r)
         //     node->xmin, node->xmax, node->ymin, node->ymax);
         return 1;
     }
-}
-
-static inline double min(double a, double b)
-{
-    if(a<b)
-    {
-        return a;
-    }
-    return b;
 }
 
 static int bounds_overlap_ball_raw(const double * bbx,
@@ -852,6 +843,7 @@ static double _kdtree_kde(const kdtree_t * T,
         for(size_t kk = 0; kk < node->n_points; kk++)
         {
             double d2 = eudist_sq(X + kk*XID_STRIDE, Q);
+            // Possibly check r2 criteria here
             kde += gaussian(d2, sigma22);
         }
         return kde;
