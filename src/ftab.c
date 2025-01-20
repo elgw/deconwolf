@@ -34,7 +34,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 
 // https://unixpapa.com/incnote/string.html
-char * strsep(char **sp, char *sep)
+static char * strsep(char **sp, char *sep)
 {
     char *p, *s;
     if (sp == NULL || *sp == NULL || **sp == '\0') return(NULL);
@@ -58,7 +58,8 @@ char * strsep(char **sp, char *sep)
 // if typedef doesn't exist (msvc, blah)
 typedef intptr_t ssize_t;
 
-ssize_t getline(char **lineptr, size_t *n, FILE *stream) {
+static ssize_t
+getline(char **lineptr, size_t *n, FILE *stream) {
     size_t pos;
     int c;
 
