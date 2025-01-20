@@ -13,8 +13,10 @@
  *    You should have received a copy of the GNU General Public License
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
+#ifndef WINDOWS
 #include <unistd.h>
+#endif
+
 #include <assert.h>
 #include <fftw3.h>
 #include <inttypes.h>
