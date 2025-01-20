@@ -5,6 +5,10 @@ project(trafo
 
 set (CMAKE_C_STANDARD 11)
 
+if(WIN32)
+  add_definitions(-DWINDOWS)
+endif()
+
 #
 # Default build type is RELEASE
 #
@@ -55,6 +59,19 @@ if(MATH_LIBRARY)
   target_link_libraries(trafo ${MATH_LIBRARY})
   target_link_libraries(trafo_cli ${MATH_LIBRARY})
 endif()
+
+#
+# Getopt
+#
+if(WIN32)
+  find_library(GETOPT_LIBRARY getopt)
+  message("getopt found at: ${GETOPT_LIBRARY}")
+  target_link_libraries(trafo_cli ${GETOPT_LIBRARY})
+  SET(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} ${GETOPT_LIBRARY}")
+  find_path(GETOPT_INCLUDE_DIR getopt.h)
+  target_include_directories(trafo_cli PRIVATE GETOPT_INCLUDE_DIR)
+endif()
+
 
 #
 # OpenMP

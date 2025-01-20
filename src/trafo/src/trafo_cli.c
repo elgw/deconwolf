@@ -14,6 +14,17 @@
 typedef uint32_t u32;
 typedef double f64;
 
+static void
+dw_gettime(struct timespec * t)
+{
+#ifdef WINDOWS
+    timespec_get(t, TIME_UTC); // since C11
+#else
+    clock_gettime(CLOCK_REALTIME, t);
+#endif
+    return;
+}
+
 
 static int is_csv_file_name(const char * name)
 {
@@ -35,7 +46,7 @@ double * read_raw(const char * file, size_t N, size_t M)
 {
     printf("Reading %s\n", file);
     printf("N = %zu, M = %zu\n", N, M);
-    FILE * f = fopen(file, "r");
+    FILE * f = fopen(file, "rb");
     if(f == NULL)
     {
         printf("Can't open %s\n", file);
@@ -475,9 +486,9 @@ void predict_file(trafo_cli_settings * conf)
 
     struct timespec t0, t1;
 
-    clock_gettime(CLOCK_REALTIME, &t0);
+    dw_gettime(&t0);
     u32 * P = trafo_predict(T, NULL, F, n_sample);
-    clock_gettime(CLOCK_REALTIME, &t1);
+    dw_gettime(&t1);
     if(conf->verbose > 1)
     {
         printf("trafo: Prediction took %.6f s\n",
@@ -809,9 +820,9 @@ void train_file(trafo_cli_settings * conf)
     struct timespec t0, t1;
     size_t mem0, mem1, mem_tmp;
     get_peakMemoryKB(&mem_tmp, &mem0);
-    clock_gettime(CLOCK_REALTIME, &t0);
+    dw_gettime(&t0);
     trf * T = trafo_fit(&Tconf);
-    clock_gettime(CLOCK_REALTIME, &t1);
+    dw_gettime(&t1);
     get_peakMemoryKB(&mem_tmp, &mem1);
     if(conf->verbose > 1)
     {
@@ -857,6 +868,7 @@ int main(int argc, char ** argv)
 {
 #ifndef NDEBUG
     printf("Compiled with DEBUG asserts. Speed is compromised.\n\n");
+    printf("sizeof(size_t) == %zu\n", sizeof(size_t));
 #endif
 
 

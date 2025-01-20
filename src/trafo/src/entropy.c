@@ -1,6 +1,8 @@
 #include "entropy.h"
 #include <math.h>
-
+#ifndef M_PI
+#define M_PI       3.14159265358979323846
+#endif
 
 /* Return log(n!) using Stirling's formula with the peculiar behavior
  * that log_p(0) returns 0. For small values the function is exact.

@@ -30,9 +30,18 @@
  *
  **/
 
+/* To do: enable support for building for float */
+#ifdef TRAFO_FLOAT32
+#define C(x) x##f
+#define fpnumber float
+#else
+#define C(x) x
+#define fpnumber double
+#endif
+
 typedef struct {
-    const double * F_col_major;
-    const double * F_row_major;
+    const fpnumber * F_col_major;
+    const fpnumber * F_row_major;
     const uint32_t * label;
     uint32_t n_tree;
     uint32_t n_sample;
@@ -86,9 +95,9 @@ void trafo_free(trf * T);
  * Could return NULL on failure.
  **/
 uint32_t * trafo_predict(trf * T,
-                       const double * X_cm,
-                       const double * X_rm,
-                       size_t n_point);
+                       const fpnumber * X_cm,
+                       const fpnumber * X_rm,
+                       uint64_t n_point);
 
 /* Print out a summary of the settings */
 void
@@ -110,7 +119,7 @@ trafo_print(FILE * fid, const trf * s);
  *
  * The caller is responsible for freeing the returned memory
  */
-double *
+fpnumber *
 trafo_importance(trf * T);
 
 
