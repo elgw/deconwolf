@@ -21,7 +21,7 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 set( CMAKE_INSTALL_PREFIX
   /usr )
 
-add_library(trafo
+add_library(trafo SHARED
   src/entropy.c
   src/ftab.c
   src/gini.c
@@ -53,6 +53,26 @@ find_library(MATH_LIBRARY m)
 if(MATH_LIBRARY)
   target_link_libraries(trafo ${MATH_LIBRARY})
   target_link_libraries(trafo_cli ${MATH_LIBRARY})
+endif()
+
+
+include(CheckCSourceCompiles)
+check_c_source_compiles(
+  "
+        #include <stdlib.h>
+        static void f(void) __attribute__ ((visibility(\"hidden\")));
+        int main(void) {return 0;}
+    "
+  HAVE___ATTRIBUTE__VISIBILITY_HIDDEN
+)
+
+if(HAVE___ATTRIBUTE__VISIBILITY_HIDDEN)
+  target_compile_options(trafo PUBLIC -DHAVE___ATTRIBUTE__VISIBILITY_HIDDEN -fvisibility=hidden)
+  #target_compile_options(trafo PRIVATE -DHAVE___ATTRIBUTE__VISIBILITY_HIDDEN)
+  set_target_properties(trafo PROPERTIES C_VISIBILITY_PRESET hidden)
+  message(" HAVE___ATTRIBUTE__VISIBILITY_HIDDEN ")
+else()
+  message("NO  HAVE___ATTRIBUTE__VISIBILITY_HIDDEN ")
 endif()
 
 #
