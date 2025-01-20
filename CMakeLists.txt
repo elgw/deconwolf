@@ -110,7 +110,8 @@ add_executable(dw
     src/fim_tiff.c
     src/li.c
     src/ftab.c
-    src/lanczos.c)
+    src/lanczos.c
+    src/qselect.c)
 
   #
   # kdtree
