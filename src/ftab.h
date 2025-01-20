@@ -39,11 +39,12 @@
  *
  * 0.1.1 : switched from strtok to strsep to handle also empty values
  * 0.1.2 : added ftab_compare to compare two tables.
+ * 0.1.3 : build on windows with clang (added missing functions)
  */
 
 #define FTAB_VERSION_MAJOR 0
 #define FTAB_VERSION_MINOR 1
-#define FTAB_VERSION_PATCH 2
+#define FTAB_VERSION_PATCH 3
 
 #include <stdint.h>
 #include <stdio.h>
