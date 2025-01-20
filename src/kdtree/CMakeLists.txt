@@ -16,3 +16,6 @@ add_library( kdtree src/kdtree.c src/pqheap.c src/quickselect.c )
 target_include_directories(kdtree PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+
+set_target_properties(kdtree PROPERTIES PUBLIC_HEADER "include/kdtree.h")
+INSTALL(TARGETS kdtree)
