@@ -5,7 +5,9 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#ifndef WINDOWS
 #include <unistd.h>
+#endif
 #include <omp.h>
 
 /* Optimization opportunity:

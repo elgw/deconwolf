@@ -29,7 +29,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef QUICKSELECT_F32
+#ifndef QUICKSELECT_F64
 #define QUICKSELECT_F32
+#endif
+#endif
 
 #ifdef QUICKSELECT_F32
 typedef float etype;
@@ -51,21 +55,21 @@ typedef double etype;
 #error "quickselect precision not defined, use -DQUICKSELECT_FP32 or -DQUICKSELECT_FP64"
 #endif
 
-#define max(x,y) (x>y ? x : y)
-#define min(x,y) (x<y ? x : y)
+#define qs_max(x,y) (x>y ? x : y)
+#define qs_min(x,y) (x<y ? x : y)
 
 static etype
 med3(etype a, etype b, etype c)
 {
-    return max(min(a,b),min(c,max(a,b)));
+    return qs_max(qs_min(a,b),qs_min(c,qs_max(a,b)));
 }
 
 static etype
 med5(etype a, etype b, etype c, etype d, etype e)
 {
-    etype f=max(min(a,b),min(c,d)); // discards lowest from first 4
-    etype g=min(max(a,b),max(c,d)); // discards biggest from first 4
-    return max(min(e,f),min(g,max(e,f))); /* median of 3 elements */
+    etype f=qs_max(qs_min(a,b),qs_min(c,d)); // discards lowest from first 4
+    etype g=qs_min(qs_max(a,b),qs_max(c,d)); // discards biggest from first 4
+    return qs_max(qs_min(e,f),qs_min(g,qs_max(e,f))); /* median of 3 elements */
 }
 
 static void
@@ -183,10 +187,6 @@ partition(etype * restrict X, const size_t n,
     return;
 }
 
-
-#define max(x,y) (x>y ? x : y)
-#define min(x,y) (x<y ? x : y)
-
 static etype
 _quickselect(etype * restrict X, const size_t N, const size_t s,
              const int use_pb, etype ** restrict PB)
@@ -205,9 +205,9 @@ _quickselect(etype * restrict X, const size_t N, const size_t s,
     {
         if(s == 0)
         {
-            return min(X[0], X[1]);
+            return qs_min(X[0], X[1]);
         } else {
-            return max(X[0], X[1]);
+            return qs_max(X[0], X[1]);
         }
     }
 
@@ -215,13 +215,13 @@ _quickselect(etype * restrict X, const size_t N, const size_t s,
     {
         if(s == 0)
         {
-            return min(min(X[0], X[1]), X[2]);
+            return qs_min(qs_min(X[0], X[1]), X[2]);
         }
         if(s == 1)
         {
             return med3(X[0], X[1], X[2]);
         }
-        return max(max(X[0], X[1]), X[2]);
+        return qs_max(qs_max(X[0], X[1]), X[2]);
     }
 
     etype pivot;

@@ -32,12 +32,18 @@
   the default is for double precision. For single precision compile
   with -DQUICKSELECT_F32
 
-  Original repository id: arch/24/03/11 (private)
+  Original repository id: https://github.com/elgw/quickselect
+  based on arch/24/03/11 (private)
+
+  CHANGELOG
+
+  1.0.1 renames min and max macros to qs_min and qs_max since min and
+  max are already defined on some compilers/standard libraries.
 */
 
 #define ELGW_QS_VERSION_MAJOR 1
 #define ELGW_QS_VERSION_MINOR 0
-#define ELGW_QS_VERSION_PATCH 0
+#define ELGW_QS_VERSION_PATCH 1
 
 /** @brief quickselect
  * @param X the data points
