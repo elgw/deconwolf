@@ -74,14 +74,14 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 #
 # Add source files
 #
-add_executable(dw
+
+  set(dw_SOURCES
   src/deconwolf.c
   src/dw.c
   src/dw_background.c
   src/dw_dots.c
   src/dw_imshift.c
   src/dw_maxproj.c
-  src/dw_nuclei.c
   src/dw_psf.c
   src/dw_psf_sted.c
   src/dw_tiff_merge.c
@@ -113,6 +113,12 @@ add_executable(dw
     src/lanczos.c
     src/quickselect.c)
 
+  if(UNIX)
+    set(dw_SOURCES ${dw_SOURCES} src/dw_nuclei.c)
+  endif()
+
+  add_executable(dw ${dw_SOURCES})
+
   #
   # kdtree
   #
@@ -129,9 +135,11 @@ add_executable(dw
     target_include_directories(dw PUBLIC "src/trafo/src/")
     target_link_directories(dw PUBLIC "src/trafo/")
     target_link_libraries(dw trafo)
+
   elseif(WIN32)
 
   endif()
+
 
 
   #
