@@ -1907,14 +1907,17 @@ cl_uint clu_wait_for_event(cl_event clev, size_t ns)
     struct timespec sleep_rem = {};
     cl_uint status = CL_QUEUED;
 
-    /* No sleeping at all if it is already done */
+    /* No sleeping at all if it is already done
+     * TODO: Rethink this part, see
+     * https://registry.khronos.org/OpenCL/sdk/3.0/docs/man/html/clGetEventInfo.html
+     */
     ret = clGetEventInfo(clev,
                          CL_EVENT_COMMAND_EXECUTION_STATUS,
                          param_value_size,
                          &status,
                          &param_value_size_ret);
 
-    if(status == CL_COMPLETE || ret != CL_SUCCESS)
+    if(status == CL_COMPLETE || ret == CL_SUCCESS)
     {
         return ret;
     }
