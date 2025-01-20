@@ -30,6 +30,10 @@
  *
  **/
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* To do: enable support for building for float */
 #ifdef TRAFO_FLOAT32
 #define C(x) x##f
@@ -134,3 +138,7 @@ trafo_load(const char * filename);
 /* Run some unit tests */
 int
 trafo_ut(void);
+
+#ifdef __cplusplus
+}
+#endif
