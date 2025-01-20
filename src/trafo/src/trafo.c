@@ -17,16 +17,6 @@
 #include "trafo.h"
 #include "trafo_util.h"
 
-/* Compile with -fvisibility=hidden
-* then only functions decorated with this macro will be visible
-* in the .so file, check with
-* nm libtrafo.so | grep ' T '
-*/
-#if HAVE___ATTRIBUTE__VISIBILITY_HIDDEN
-#define FOR_EXPORT __attribute__ ((visibility("default")))
-#else
-#define FOR_EXPORT
-#endif
 
 static void
 dw_gettime(struct timespec * t)
@@ -471,7 +461,7 @@ recurse_tree(sortbox * B,
     return;
 }
 
-FOR_EXPORT void
+ void
 trafo_free(trf * s)
 {
     if(s == NULL)
@@ -492,7 +482,7 @@ trafo_free(trf * s)
     return;
 }
 
-FOR_EXPORT void
+ void
 trafo_print(FILE * fid, const trf * s)
 {
     int got_features = 0;
@@ -596,7 +586,7 @@ trafo_check(trf * s)
    provided the function will print out the number of correctly
    predicted points. */
 
-FOR_EXPORT u32 *
+ u32 *
 trafo_predict(trf * s,
               const f64 * X_cm,
               const f64 * X_rm,
@@ -685,7 +675,7 @@ trafo_predict(trf * s,
 }
 
 
-FOR_EXPORT trf *
+ trf *
 trafo_fit(trafo_settings * conf)
 {
     trf * s = calloc(1, sizeof(trf));
@@ -840,7 +830,7 @@ test_transpose_f64(void)
     return 0;
 }
 
-FOR_EXPORT int
+ int
 trafo_ut(void)
 {
     test_transpose_f64();
@@ -925,7 +915,7 @@ static int ttable_from_file(ttable * T, FILE * fid)
     return 0;
 }
 
-FOR_EXPORT int
+ int
 trafo_save(trf * F,
                const char * filename)
 {
@@ -970,7 +960,7 @@ trafo_save(trf * F,
     return -1;
 }
 
-FOR_EXPORT trf *
+ trf *
 trafo_load(const char * filename)
 {
     FILE * fid = fopen(filename, "rb");
@@ -1039,7 +1029,7 @@ trafo_load(const char * filename)
 }
 
 
-FOR_EXPORT double *
+ double *
 trafo_importance(trf * F)
 {
     if(F == NULL)
