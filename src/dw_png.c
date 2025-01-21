@@ -22,7 +22,7 @@ rgb_to_png(const u8 * pixels,
     assert(pixels != NULL);
     assert(width*height > 0);
 
-    FILE * fid = fopen(filename, "w");
+    FILE * fid = fopen(filename, "wb");
     if(fid == NULL)
     {
         fprintf(stderr, "Unable to open %s for writing\n", filename);

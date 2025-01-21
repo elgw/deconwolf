@@ -246,7 +246,7 @@ float * tiling_get_tile_raw(tiling * T, const int tid, const char * fName)
 {
 //  printf("Reading tile from %s\n", fName);
   tile * t = T->tiles[tid];
-  FILE * fid = fopen(fName, "r");
+  FILE * fid = fopen(fName, "rb");
   if(fid == NULL)
   {
     printf("ERROR: Can't read %s\n", fName);
@@ -361,7 +361,7 @@ void tiling_put_tile_raw(tiling * T, int tid, const char * fname, float * restri
   int64_t n = t->xsize[1];
 
 //  printf("Opening %s for r/w\n", fname); fflush(stdout);
-  FILE * fid = fopen(fname, "r+");
+  FILE * fid = fopen(fname, "rb+");
   if(fid == NULL)
   {
     printf("ERROR: Failed to open %s\n", fname);
