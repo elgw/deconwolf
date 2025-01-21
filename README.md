@@ -1,4 +1,4 @@
-**deconwolf**[^9] is a software for 3-D deconvolution of fluorescent
+deconwolf[^1] is a software for 3-D deconvolution of fluorescent
 wide-field images, showcased at
 [deconwolf.fht.org/](https://deconwolf.fht.org/). To get started,
 please see the [documentation at
