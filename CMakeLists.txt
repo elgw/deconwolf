@@ -334,9 +334,9 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
   include(GNUInstallDirs)
   install(TARGETS dw)
   install(TARGETS dw_bw)
-  install(FILES "${CMAKE_SOURCE_DIR}/doc/dw.1"
+  install(FILES "${CMAKE_SOURCE_DIR}/doc/man/dw.1"
     DESTINATION "${CMAKE_INSTALL_MANDIR}/man1/" )
-  install(FILES "${CMAKE_SOURCE_DIR}/doc/dw_bw.1"
+  install(FILES "${CMAKE_SOURCE_DIR}/doc/man/dw_bw.1"
     DESTINATION "${CMAKE_INSTALL_MANDIR}/man1/" )
 
 

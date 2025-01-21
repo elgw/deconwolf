@@ -4829,7 +4829,7 @@ void fim_dot_lateral_circularity_ut()
 
     free(G);
 
-    FILE * fid = fopen("G.f32", "r");
+    FILE * fid = fopen("G.f32", "rb");
     if(fid == NULL)
     {
         return;
