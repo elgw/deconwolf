@@ -1,0 +1,395 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Installation notes &mdash; deconwolf 0.4.4 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=90733dfc"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Deconvolution: Usage guide" href="usage.html" />
+    <link rel="prev" title="Getting started" href="start.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            deconwolf
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="start.html">Getting started</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Installation notes</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#general-requirements-on-linux-unix">General requirements on Linux/Unix</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#normal-build-procedure-with-cmake">Normal build procedure with CMake</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#without-gpu-acceleration">Without GPU acceleration:</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#machine-specific-optimizations">Machine specific optimizations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#system-wide-installation">System wide installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#gpu-acceleration-via-opencl">GPU Acceleration via OpenCL</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#platform-specific-hints">Platform specific hints</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#macos-big-sur">macOS Big Sur</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#windows-10-11">Windows 10/11</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#freebsd-14-4">FreeBSD 14.4</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#centos">CentOS</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ubuntu-16-04">Ubuntu 16.04</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ubuntu-22-04">Ubuntu 22.04</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ubuntu-23-04">Ubuntu 23.04</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#arch-manjaro">Arch/ Manjaro</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#rapsberry-pi-64-bit-debian-bookworm">Rapsberry PI (64-bit Debian bookworm)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#fedora-20">Fedora 20</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#replacing-standard-dependencies">Replacing standard dependencies</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#mkl">MKL</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="usage.html">Deconvolution: Usage guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="spots.html">Spot detection and measurements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="shifts.html">Spot-based image alignment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="segmentation.html">Ilastic-like segmentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="history.html">Version History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="license.html">GNU General Public License</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">deconwolf</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Installation notes</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/install.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="installation-notes">
+<h1>Installation notes<a class="headerlink" href="#installation-notes" title="Link to this heading"></a></h1>
+<section id="general-requirements-on-linux-unix">
+<h2>General requirements on Linux/Unix<a class="headerlink" href="#general-requirements-on-linux-unix" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>A compiler, tested with <a class="reference external" href="https://gcc.gnu.org/">gcc</a> and
+<a class="reference external" href="https://clang.llvm.org/">clang</a>.</p></li>
+<li><p>openmp, typically bundled with the compiler.</p></li>
+<li><p><a class="reference external" href="https://cmake.org/">cmake</a></p></li>
+</ul>
+<p>A package manager to get the dependencies which are:
+-  <a class="reference external" href="https://www.fftw.org/">fftw3</a>
+-  <a class="reference external" href="https://libtiff.gitlab.io/libtiff/">libtiff</a>
+-  <a class="reference external" href="https://www.gnu.org/software/gsl/">GSL - GNU Scientific Library</a>
+-  <a class="reference external" href="http://libpng.org/pub/png/libpng.html">libpng</a></p>
+</section>
+<section id="normal-build-procedure-with-cmake">
+<h2>Normal build procedure with CMake<a class="headerlink" href="#normal-build-procedure-with-cmake" title="Link to this heading"></a></h2>
+<p>To build:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>mkdir<span class="w"> </span>builddir
+<span class="nb">cd</span><span class="w"> </span>builddir
+cmake<span class="w"> </span>..
+cmake<span class="w"> </span>--build<span class="w"> </span>.
+</pre></div>
+</div>
+</section>
+<section id="without-gpu-acceleration">
+<h2>Without GPU acceleration:<a class="headerlink" href="#without-gpu-acceleration" title="Link to this heading"></a></h2>
+<p>By default <strong>dw</strong> will be compiled with OpenCL/GPU support enabled (if
+depencencies are found). If that does not work for you, turn that
+option off explicitly by passing <code class="docutils literal notranslate"><span class="pre">-DENABLE_GPU=OFF</span></code> to <strong>cmake</strong>, i.e. use:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>mkdir<span class="w"> </span>builddir
+<span class="nb">cd</span><span class="w"> </span>builddir
+cmake<span class="w"> </span>-DENABLE_GPU<span class="o">=</span>OFF<span class="w"> </span>..
+cmake<span class="w"> </span>--build<span class="w"> </span>.
+</pre></div>
+</div>
+</section>
+<section id="machine-specific-optimizations">
+<h2>Machine specific optimizations<a class="headerlink" href="#machine-specific-optimizations" title="Link to this heading"></a></h2>
+<p>To enable optimizations for your particular machine, pass the option
+<code class="docutils literal notranslate"><span class="pre">-DENABLE_NATIVE_OPTIMIZATION=ON</span></code>. Doing that might create binaries
+that run faster on your machine. However it might not be possible to run
+the same binaries on another machine.</p>
+</section>
+<section id="system-wide-installation">
+<h2>System wide installation<a class="headerlink" href="#system-wide-installation" title="Link to this heading"></a></h2>
+<p>A direct install (files will be copied to default paths), use:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>sudo<span class="w"> </span>make<span class="w"> </span>install
+</pre></div>
+</div>
+<p>To use the system package manager is probably the better way since it
+offers a cleaner way to uninstall:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>mkdir<span class="w"> </span>builddir
+<span class="nb">cd</span><span class="w"> </span>builddir
+cmake<span class="w"> </span>..
+cpack<span class="w"> </span>-G<span class="w"> </span>DEB<span class="w"> </span><span class="c1"># see cpack --help for other types</span>
+sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>./deconwolf-0.3.8-Linux.deb<span class="w"> </span><span class="c1"># on Ubuntu</span>
+</pre></div>
+</div>
+</section>
+<section id="gpu-acceleration-via-opencl">
+<h2>GPU Acceleration via OpenCL<a class="headerlink" href="#gpu-acceleration-via-opencl" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>If you have more than one OpenCL device, please use the
+<code class="docutils literal notranslate"><span class="pre">--cldevice</span>&#160;&#160; <span class="pre">n</span></code> argument to tell deconwolf which device to use.
+The devices are ordered with 0 being the first. If available use the
+command <code class="docutils literal notranslate"><span class="pre">clinfo</span></code> to list the OpenCL devices available on your
+system.</p></li>
+<li><p>Under WSL2 and with the current version of pocl it does not seem to
+work, see <a class="reference external" href="https://github.com/elgw/deconwolf/issues/56">issue
+#56</a>. Hopefully it
+can work in the future.</p></li>
+<li><p>If cmake can’t find OpenCL and you are on a cluster, check out:
+[<a class="reference external" href="https://github.com/elgw/deconwolf/issues/55#issuecomment-2137579066">https://github.com/elgw/deconwolf/issues/55#issuecomment-2137579066</a>]</p></li>
+</ul>
+</section>
+<section id="platform-specific-hints">
+<h2>Platform specific hints<a class="headerlink" href="#platform-specific-hints" title="Link to this heading"></a></h2>
+<section id="macos-big-sur">
+<h3>macOS Big Sur<a class="headerlink" href="#macos-big-sur" title="Link to this heading"></a></h3>
+<p>For building you will need XCode from the App Store and
+<a class="reference external" href="https://brew.sh/">brew</a>.</p>
+<p>Then set up XCode and install the required packages:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>xcode-select<span class="w"> </span>--install
+brew<span class="w"> </span>install<span class="w"> </span>libopenmpt<span class="w"> </span><span class="c1"># Not sure if this is needed</span>
+brew<span class="w"> </span>install<span class="w"> </span>libomp
+brew<span class="w"> </span>install<span class="w"> </span>libtiff
+brew<span class="w"> </span>install<span class="w"> </span>fftw
+brew<span class="w"> </span>install<span class="w"> </span>gsl
+</pre></div>
+</div>
+</section>
+<section id="windows-10-11">
+<h3>Windows 10/11<a class="headerlink" href="#windows-10-11" title="Link to this heading"></a></h3>
+<p>Deconwolf can be built several different ways under Windows: 1. Using
+WSL, then follow the instructions for Ubuntu. Most likely there will be
+a <a class="reference external" href="https://www.phoronix.com/scan.php?page=article&amp;item=wsl-wsl2-tr3970x&amp;num=1">performance
+penalty</a>,
+and it will not be possible to enable GPU acceleration, see <a class="reference external" href="https://github.com/elgw/deconwolf/issues/56">issue
+#56</a>. 2.
+<a class="reference external" href="https://www.msys2.org/">msys2</a> or
+<a class="reference external" href="https://www.cygwin.com/">cygwin</a>, however those options will be
+slower since OpenMP will be using an pthreads emulation on top of
+windows threads. It might be possible to get OpenCL working. 3. As a
+native windows program. This is the preferred way since it should work
+with OpenCL without any problems..</p>
+<p>To build native windows programs, at least the following software is
+required:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://git-scm.com/download">git</a></p></li>
+<li><p><a class="reference external" href="https://cmake.org/download/">cmake</a></p></li>
+<li><p>Visual studio with clang.</p></li>
+<li><p><a class="reference external" href="https://github.com/microsoft/vcpkg?tab=readme-ov-file#quick-start-windows">vcpkg</a></p></li>
+</ul>
+<p>The dependencies can get retrieved by vcpkg:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/microsoft/vcpkg
+.<span class="se">\v</span>cpkg<span class="se">\b</span>ootstrap-vcpkg.bat
+.<span class="se">\v</span>cpkg<span class="se">\v</span>cpkg.exe<span class="w"> </span>install<span class="w"> </span>fftw3<span class="o">[</span>threads<span class="o">]</span>
+.<span class="se">\v</span>cpkg<span class="se">\v</span>cpkg.exe<span class="w"> </span>install<span class="w"> </span>tiff
+.<span class="se">\v</span>cpkg<span class="se">\v</span>cpkg.exe<span class="w"> </span>install<span class="w"> </span>gsl
+.<span class="se">\v</span>cpkg<span class="se">\v</span>cpkg.exe<span class="w"> </span>install<span class="w"> </span>opencl
+.<span class="se">\v</span>cpkg<span class="se">\v</span>cpkg.exe<span class="w"> </span>install<span class="w"> </span>getopt
+.<span class="se">\v</span>cpkg<span class="se">\v</span>cpkg<span class="w"> </span>integrate<span class="w"> </span>install
+</pre></div>
+</div>
+<p>Please note the value of the <code class="docutils literal notranslate"><span class="pre">CMAKE_TOOLCHAIN_FILE</span></code> as it will be used
+later.</p>
+<p>A visual studio project can be created by</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>deconwolf
+mkdir<span class="w"> </span>build
+<span class="nb">cd</span><span class="w"> </span>build
+cmake<span class="w"> </span><span class="s2">&quot;-DCMAKE_TOOLCHAIN_FILE=C:/YOUR/OWN/PATH/vcpkg/scripts/buildsystems/vcpkg.cmake&quot;</span><span class="w"> </span>-T<span class="w"> </span>ClangCL<span class="w"> </span>-A<span class="w"> </span>x64<span class="w"> </span>../
+</pre></div>
+</div>
+<p>Important: Please use the correct path to <code class="docutils literal notranslate"><span class="pre">vcpkg.cmake</span></code>.</p>
+<p>Open the visual studio solution and oo to Linker-&gt;Input-&gt;Additional
+dependencies and add:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>libomp.lib
+</pre></div>
+</div>
+<p>Change the build type from debug to release and compile.</p>
+<p>If you are a windows developer and reading this, please help us out to
+make the build process smoother!</p>
+</section>
+<section id="freebsd-14-4">
+<h3>FreeBSD 14.4<a class="headerlink" href="#freebsd-14-4" title="Link to this heading"></a></h3>
+<p>Not tested with GPU support.</p>
+<p>Differences to linux: <cite>gmake</cite>, not <cite>make</cite>, <cite>pkgconf</cite> not
+<cite>pkg-config</cite>. The default compiler is clang which will not understand
+all of the GCC directives (expect a few compilation warnings).</p>
+<p>Packages:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>pkg<span class="w"> </span>install<span class="w"> </span>git
+pkg<span class="w"> </span>install<span class="w"> </span>gmake
+pkg<span class="w"> </span>install<span class="w"> </span>fftw3
+pkg<span class="w"> </span>install<span class="w"> </span>fftw3-float
+pkg<span class="w"> </span>install<span class="w"> </span>tiff
+pkg<span class="w"> </span>install<span class="w"> </span>gsl
+pkg<span class="w"> </span>install<span class="w"> </span>pkgconf
+pkg<span class="w"> </span>install<span class="w"> </span>cmake
+</pre></div>
+</div>
+<p>Then proceed as under linux with CMake.</p>
+</section>
+<section id="centos">
+<h3>CentOS<a class="headerlink" href="#centos" title="Link to this heading"></a></h3>
+<p>Tested on CentOS Linux Release 7.8.2009 (Core).</p>
+<p>Dependencies:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>sudo<span class="w"> </span>yum<span class="w"> </span>install<span class="w"> </span>gcc<span class="w"> </span>gsl-devel<span class="w"> </span>libtiff-devel<span class="w"> </span>fftw-devel
+</pre></div>
+</div>
+</section>
+<section id="ubuntu-16-04">
+<h3>Ubuntu 16.04<a class="headerlink" href="#ubuntu-16-04" title="Link to this heading"></a></h3>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>sudo<span class="w"> </span>apt-get<span class="w"> </span>update
+sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>gcc
+sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>pkg-config
+sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>libfftw3-single3
+sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>libfftw3-dev
+sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>openmp
+sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>libtiff-dev<span class="w"> </span><span class="c1"># only difference to 20.04</span>
+sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>libgsl-dev
+sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>libomp-dev
+sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>libpng-dev
+</pre></div>
+</div>
+</section>
+<section id="ubuntu-22-04">
+<h3>Ubuntu 22.04<a class="headerlink" href="#ubuntu-22-04" title="Link to this heading"></a></h3>
+<p>First install the required packages:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>sudo<span class="w"> </span>apt-get<span class="w"> </span>update
+sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>cmake<span class="w">               </span><span class="se">\</span>
+<span class="w"> </span>pkg-config<span class="w">          </span><span class="se">\</span>
+<span class="w"> </span>gcc<span class="w">                 </span><span class="se">\</span>
+<span class="w"> </span>libfftw3-single3<span class="w">    </span><span class="se">\</span>
+<span class="w"> </span>libfftw3-dev<span class="w">        </span><span class="se">\</span>
+<span class="w"> </span>libgsl-dev<span class="w">          </span><span class="se">\</span>
+<span class="w"> </span>libomp-dev<span class="w">          </span><span class="se">\</span>
+<span class="w"> </span>libpng-dev<span class="w">          </span><span class="se">\</span>
+<span class="w"> </span>libtiff-dev
+</pre></div>
+</div>
+</section>
+<section id="ubuntu-23-04">
+<h3>Ubuntu 23.04<a class="headerlink" href="#ubuntu-23-04" title="Link to this heading"></a></h3>
+<p>Same as Ubuntu 22.04. Possibly also</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>apt-get<span class="w"> </span>install<span class="w"> </span>opencl-headers
+</pre></div>
+</div>
+</section>
+<section id="arch-manjaro">
+<h3>Arch/ Manjaro<a class="headerlink" href="#arch-manjaro" title="Link to this heading"></a></h3>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span><span class="c1"># remember to update system</span>
+sudo<span class="w"> </span>pacman<span class="w"> </span>-Suuyy
+<span class="c1"># install dependencies</span>
+sudo<span class="w"> </span>pacman<span class="w"> </span>-S<span class="w"> </span>fftw<span class="w"> </span>gsl<span class="w"> </span>openmp<span class="w"> </span>libtiff
+</pre></div>
+</div>
+</section>
+<section id="rapsberry-pi-64-bit-debian-bookworm">
+<h3>Rapsberry PI (64-bit Debian bookworm)<a class="headerlink" href="#rapsberry-pi-64-bit-debian-bookworm" title="Link to this heading"></a></h3>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>sudo<span class="w"> </span>apt-get<span class="w"> </span>update
+sudo<span class="w"> </span>apt-get<span class="w"> </span>upgrade
+sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>libfftw3-dev<span class="w"> </span><span class="se">\</span>
+libtiff-dev<span class="w"> </span><span class="se">\</span>
+libgsl-dev
+</pre></div>
+</div>
+</section>
+<section id="fedora-20">
+<h3>Fedora 20<a class="headerlink" href="#fedora-20" title="Link to this heading"></a></h3>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>sudo<span class="w"> </span>dnf<span class="w"> </span>install<span class="w"> </span>cmake<span class="w"> </span>fftw-devel<span class="w"> </span>gsl-devel<span class="w"> </span>libtiff-devel
+</pre></div>
+</div>
+</section>
+</section>
+<section id="replacing-standard-dependencies">
+<h2>Replacing standard dependencies<a class="headerlink" href="#replacing-standard-dependencies" title="Link to this heading"></a></h2>
+<section id="mkl">
+<h3>MKL<a class="headerlink" href="#mkl" title="Link to this heading"></a></h3>
+<p>FFTW3 is the default FFT backend for deconwolf but it is also possible
+to use Intel MKL. At some point it was possible to choose MKL via</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>intel-mkl
+make<span class="w"> </span><span class="nv">MKL</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>-B
+</pre></div>
+</div>
+<p>To set the number of threads, set the environmental variable
+<code class="docutils literal notranslate"><span class="pre">MKL_NUM_THREADS</span></code>, for example:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">MKL_NUM_THREADS</span><span class="o">=</span><span class="m">8</span>
+dw<span class="w"> </span>...
+</pre></div>
+</div>
+<p>If you are interested in using MKL please open a new issue.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="start.html" class="btn btn-neutral float-left" title="Getting started" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="usage.html" class="btn btn-neutral float-right" title="Deconvolution: Usage guide" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023-2024, Erik Wernersson.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

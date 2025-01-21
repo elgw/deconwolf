@@ -1,0 +1,600 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Version History &mdash; deconwolf 0.4.4 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=90733dfc"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="GNU General Public License" href="license.html" />
+    <link rel="prev" title="Ilastic-like segmentation" href="segmentation.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            deconwolf
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="start.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage.html">Deconvolution: Usage guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="spots.html">Spot detection and measurements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="shifts.html">Spot-based image alignment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="segmentation.html">Ilastic-like segmentation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Version History</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#id1">0.4.4</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id2">0.4.3</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#section-2">0.4.2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#section-3">0.4.1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#section-4">0.4.0</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#older">Older</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#section-5">0.3.9</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#section-6">0.3.8</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#section-7">0.3.7</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#section-8">0.3.6</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#section-9">0.3.5</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#section-10">0.3.4</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#section-11">0.3.3</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#section-13">0.3.1</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#section-14">0.3.0</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id15">0.2.9</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id16">0.2.8</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#section-15">0.2.7</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#section-16">0.2.6</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#section-17">0.2.5</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#section-18">0.2.4</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#section-19">0.2.3</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#section-20">0.2.2</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#section-21">0.1.1</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#section-22">0.1.0</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#section-23">0.0.26</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#section-24">0.0.25</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#section-25">0.0.24</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#section-26">0.0.23</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#section-27">0.0.22</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#section-28">0.0.21</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#section-29">0.0.20</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#section-30">0.0.19</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#section-31">0.0.18</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#section-32">0.0.17</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="license.html">GNU General Public License</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">deconwolf</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Version History</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/history.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="version-history">
+<h1>Version History<a class="headerlink" href="#version-history" title="Link to this heading"></a></h1>
+<section id="id1">
+<h2>0.4.4<a class="headerlink" href="#id1" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Fixes issue <a class="reference external" href="https://github.com/elgw/deconwolf/issues/80">#80</a>. Thanks to <a class="reference external" href="https://github.com/WisdomUfondu">WisdomUfondu</a>.</p></li>
+<li><p>Switched to rst/sphinx documentation from markdown.</p></li>
+<li><p>Fixed issues when using <code class="docutils literal notranslate"><span class="pre">--psigma</span></code> with low values.</p></li>
+<li><p>Fixed: Issue #38: ‘use quoting when saving the command line to the log files’</p></li>
+<li><p>More verbose using <code class="docutils literal notranslate"><span class="pre">--verbose</span> <span class="pre">2</span></code> and above.</p></li>
+<li><p>Fixed: memory leak in <code class="docutils literal notranslate"><span class="pre">fft_block_of_ones</span></code>.</p></li>
+<li><p>Reporting physical peak memory usage (VmHWM) besides the virtual
+peak memory usage (VmPeak).</p></li>
+<li><p>Parts of the function in dw can be built into a library using the
+<code class="docutils literal notranslate"><span class="pre">src/CMAkeLists.txt</span></code> file. This is still experimental and to be
+documented.</p></li>
+<li><p>Almost clean under <code class="docutils literal notranslate"><span class="pre">-fanalyzer</span></code>, at least when <code class="docutils literal notranslate"><span class="pre">NDEBUG</span></code> is not defined.</p></li>
+<li><p>Clean under <code class="docutils literal notranslate"><span class="pre">-fsantize=address</span></code> both with and without
+tiling. When <code class="docutils literal notranslate"><span class="pre">--gpu</span></code> is used the results are not clean, partly due to <a class="reference external" href="https://github.com/DTolm/VkFFT/issues/194">VkFFT issues 194</a>.</p></li>
+</ul>
+<p>Updates to <code class="docutils literal notranslate"><span class="pre">dw</span> <span class="pre">nuclei</span></code>:</p>
+<ul class="simple">
+<li><p>Still very experimental.</p></li>
+<li><p>Uses the random forest implementation in <a class="reference external" href="https://github.com/elgw/trafo">trafo</a></p></li>
+<li><p>Supports 3 classes, instead of 2 (use red, green and blue in the annotated images).</p></li>
+<li><p>New command line interface.</p></li>
+</ul>
+<p>Updates to <code class="docutils literal notranslate"><span class="pre">dw</span> <span class="pre">dots</span></code>:</p>
+<ul class="simple">
+<li><p>Fixed that <code class="docutils literal notranslate"><span class="pre">--dog_ls</span></code> and <code class="docutils literal notranslate"><span class="pre">--dog_as</span></code> works for <code class="docutils literal notranslate"><span class="pre">dw</span> <span class="pre">dots</span></code>.</p></li>
+<li><p>Fixed: erroneously reported the same sub pixel values for both the x and y component.</p></li>
+</ul>
+<p>Windows specific updates:</p>
+<ul class="simple">
+<li><p>Added ‘b’ to <code class="docutils literal notranslate"><span class="pre">fopen</span></code> calls in many places where that caused problems.</p></li>
+</ul>
+</section>
+<section id="id2">
+<h2>0.4.3<a class="headerlink" href="#id2" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Fixed <a class="reference external" href="https://github.com/elgw/deconwolf/issues/70">issue #70</a>
+which affected windows builds only.</p></li>
+<li><p>Dw will now give a error message if the log file can’t be opened
+instead of quietly crashing.</p></li>
+<li><p>Disabled some debug code that caused dw to write the file
+(<code class="docutils literal notranslate"><span class="pre">one.tif</span></code>) every time that is was run. It has been doing so since
+version 0.4.1.</p></li>
+</ul>
+</section>
+<section id="section-2">
+<span id="id3"></span><h2>0.4.2<a class="headerlink" href="#section-2" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>VkFFT upgraded from v1.3.3 to v1.3.4.</p></li>
+<li><p>Fixed an issue preventing anything than <code class="docutils literal notranslate"><span class="pre">--bq</span> <span class="pre">0</span></code> to be used on
+Windows (one array was not properly initialized to 0).</p></li>
+</ul>
+</section>
+<section id="section-3">
+<span id="id4"></span><h2>0.4.1<a class="headerlink" href="#section-3" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Fixes the GPU memory leak reported in <a class="reference external" href="https://github.com/elgw/deconwolf/issues/62">issue
+#62</a>.</p></li>
+</ul>
+</section>
+<section id="section-4">
+<span id="id5"></span><h2>0.4.0<a class="headerlink" href="#section-4" title="Link to this heading"></a></h2>
+<p><strong>TLDR</strong> New features and bug fixes. Update if you are on version 0.3.7
+or below.</p>
+<ul class="simple">
+<li><p>Added pre-generated header files under <code class="docutils literal notranslate"><span class="pre">/src/kernels/</span></code> so that
+<code class="docutils literal notranslate"><span class="pre">make</span> <span class="pre">kernels</span></code> is not needed during the build process. Solves
+<a class="reference external" href="https://github.com/elgw/deconwolf/issues/55">issue #55</a></p></li>
+</ul>
+<p>Updates to <code class="docutils literal notranslate"><span class="pre">dw</span> <span class="pre">dots</span></code>: - Updated LoG filter and maxima finding routine
+gives a speedup &gt; 2x. - Setting the filter sizes based on the optical
+parameters, assuming diffraction limited dots. - Addition: Can fit dots
+using a 3D Gaussian while minimizing the <span class="math notranslate nohighlight">\(-\log\)</span> likelihood
+assuming Poissonian noise. For this purpose the
+Broyden-Fletcher-Goldfarb-Shanno algoritm (bfgs2 in GSL) is used.</p>
+</section>
+<section id="older">
+<h2>Older<a class="headerlink" href="#older" title="Link to this heading"></a></h2>
+<section id="section-5">
+<span id="id6"></span><h3>0.3.9<a class="headerlink" href="#section-5" title="Link to this heading"></a></h3>
+<ul>
+<li><p>Added the <strong>–offset</strong> option. This will add an offset to the image
+before the deconvolution start, which will be removed before saving
+the result to disk. Initial tests suggests that this can reduce the
+effect of detector noise (non-Poisson) by decreasing the relative
+weight of pixels with low values. See some numerical tests below, on
+the microtubules image:</p>
+<figure class="align-default" id="id35">
+<img alt="iterations vs mse" src="_images/20240422.png" />
+<figcaption>
+<p><span class="caption-text">iterations vs mse</span><a class="headerlink" href="#id35" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>The default value is set to 5 which should be safe in most
+situations, but it is suggested that it is set to the standard
+deviation of the detector noise. To revert to the old behaviour, use
+<strong>–offset 0</strong>.</p>
+</li>
+<li><p>Removed the <strong>–relax</strong> option since it made no sense.</p></li>
+<li><p>Reverted the default start guess to flat, like it was before v 0.3.8.
+The <strong>–start_lp</strong> still seems to produce better images but takes a
+little too long to initialize for being a default method. Might still
+be the default in future version when there is a GPU implementation.</p></li>
+</ul>
+</section>
+<section id="section-6">
+<span id="id7"></span><h3>0.3.8<a class="headerlink" href="#section-6" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Fixed crashes when trying to read a non tif file.</p></li>
+<li><p>For systems with multiple GPUs or OpenCL compatible devices it is now
+possible to select which to use with <strong>–cldevice</strong>. To figure out
+which that are available it is simplest to use <code class="docutils literal notranslate"><span class="pre">clinfo</span></code>.
+Alternatively call dw with <strong>–verbose 2</strong> or above.</p></li>
+<li><p>Removed depreciated makefile for freebsd as it is no longer needed.</p></li>
+<li><p>Removed anything related to meson as it is no longer needed.</p></li>
+<li><p>Using the <code class="docutils literal notranslate"><span class="pre">PRI*</span></code> macros from <code class="docutils literal notranslate"><span class="pre">inttype.h</span></code>, especially <code class="docutils literal notranslate"><span class="pre">PRIu64</span></code>
+for <code class="docutils literal notranslate"><span class="pre">uint64_t</span></code> and <code class="docutils literal notranslate"><span class="pre">PRId64</span></code> for <code class="docutils literal notranslate"><span class="pre">int64_t</span></code> to get rid of some
+warnings under MacOS.</p></li>
+<li><p>Changed the initial guess for all methods. It is now set to be a low
+pass filtered version of the input image. Experiments suggests that
+this was better than the previous approach where a flat image was
+used. To use the previous default, please use <strong>–start_flat</strong>.</p></li>
+<li><p>Added the option to start from the input image with the flag
+<strong>–start_id</strong>. This might be a good option when only a few iterations
+are used since but can lead to more shot noise.</p></li>
+<li><p>Added a noise filter for the input image which can be enabled with
+<strong>–psigma s</strong>, where s controls the filter shape. This is implemented
+as follows: 1) the Anscombe transform is applied 2) the transformed
+image is filtered with a isotropic Gaussian kernel with sigma=s. 3)
+The inverse transform is applied. Using this with moderate values of
+s leads to better results on synthetic images. For example on the
+microtubules image the best results were achieved with <strong>–psigma
+0.7</strong>. A value of 0 is the same as not using the filter.</p></li>
+</ul>
+<p>Results when testing on the microtubules image shown below.</p>
+<figure class="align-default" id="id36">
+<img alt="iterations vs mse" src="_images/20240419.png" />
+<figcaption>
+<p><span class="caption-text">iterations vs mse</span><a class="headerlink" href="#id36" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+<section id="section-7">
+<span id="id8"></span><h3>0.3.7<a class="headerlink" href="#section-7" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Deconwolf compiles as a native windows program using clang. So far
+the binaries are only smoke tested since the main target is linux.</p></li>
+<li><p><strong>dw_bw</strong> use OpenMP and does not rely on pthreads any more (for
+portability reasons).</p></li>
+<li><p>Removed the AVE and EVE methods since they don’t add anything over
+SHB.</p></li>
+<li><p>Added a <code class="docutils literal notranslate"><span class="pre">CMakeList.txt</span></code> for building with cmake.</p></li>
+<li><p>Added <code class="docutils literal notranslate"><span class="pre">--gpu</span></code> which at the moment is equivalent to
+<code class="docutils literal notranslate"><span class="pre">--method</span> <span class="pre">shbcl2</span></code> but a little more mnemonic.</p></li>
+<li><p>Added the <code class="docutils literal notranslate"><span class="pre">--periodic</span></code> option which turns on periodic boundary
+conditions, i.e. is equivalent to <code class="docutils literal notranslate"><span class="pre">--bq</span> <span class="pre">0</span></code>.</p></li>
+</ul>
+</section>
+<section id="section-8">
+<span id="id9"></span><h3>0.3.6<a class="headerlink" href="#section-8" title="Link to this heading"></a></h3>
+<ul>
+<li><p>The GPU code path uses in-place transformations as much as possible
+to save a little on the memory usage.</p></li>
+<li><p>Switched to <a class="reference external" href="https://github.com/DTolm/VkFFT">VkFFT</a> (v1.3.3) as
+the default FFT backend on the GPU. Unless a big regression is found,
+the clFFT code path will most likely not be maintained in future
+versions and be removed.</p>
+<p>To build with GPU acceleration use:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">make</span> <span class="n">kernels</span>
+<span class="n">make</span> <span class="o">-</span><span class="n">B</span> <span class="n">VKFFT</span><span class="o">=</span><span class="mi">1</span>
+</pre></div>
+</div>
+<p>As before, you need also to choose <code class="docutils literal notranslate"><span class="pre">--method</span> <span class="pre">shbcl2</span></code> to use it over
+the CPU implementation.</p>
+<p>Initial tests show a speed up of about 10-30% depending on the image
+size. As a bonus VkFFT will process any sizes while clFFT simply
+refuse to process the tricky ones.</p>
+</li>
+<li><p>Identified that <code class="docutils literal notranslate"><span class="pre">cl_idiv_kernel.c</span></code> took a substantial amount of the
+iteration time and rewrote it.</p></li>
+<li><p>Removed the “CUDA” backend since it does not make sense any more.</p></li>
+<li><p>Checks that the min value of the image &gt; 0. Aborts if not.</p></li>
+<li><p>Checks that the max value of the image &gt;= 1. Aborts if not.</p></li>
+</ul>
+</section>
+<section id="section-9">
+<span id="id10"></span><h3>0.3.5<a class="headerlink" href="#section-9" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>dw maxproj</strong> There were problems reading the output in MATLAB.
+Updated so that the output image will be written as a single strip.</p></li>
+</ul>
+</section>
+<section id="section-10">
+<span id="id11"></span><h3>0.3.4<a class="headerlink" href="#section-10" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Minor bug fixes which gives a clean build with <code class="docutils literal notranslate"><span class="pre">-fanalyzer</span></code>.</p></li>
+</ul>
+</section>
+<section id="section-11">
+<span id="id12"></span><h3>0.3.3<a class="headerlink" href="#section-11" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Writing pixel size to output file also when tiling is used.</p></li>
+</ul>
+<p id="section-12">0.3.2
+–</p>
+<ul class="simple">
+<li><p>Tested on raspberry pi 4 using 64-bit bookworm.</p></li>
+<li><p>Found a bug in <code class="docutils literal notranslate"><span class="pre">fft.c</span></code> where <code class="docutils literal notranslate"><span class="pre">memcpy</span></code> was used wrongly (replaced
+by <code class="docutils literal notranslate"><span class="pre">memmove</span></code>). Strangely that bug never manifested under
+Ubuntu/x86_64.</p></li>
+<li><p>Added <strong>fim_realloc</strong> for aligned reallocs. This function could be
+branched depending on the OS since there are platform specific
+aligned reallocation functions.</p></li>
+<li><p>Header files: Using <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">once</span></code> instead of the
+<code class="docutils literal notranslate"><span class="pre">#ifndef</span> <span class="pre">file_h_</span></code> pattern.</p></li>
+</ul>
+</section>
+<section id="section-13">
+<span id="id13"></span><h3>0.3.1<a class="headerlink" href="#section-13" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Introduced <strong>fim_malloc</strong> for all allocations that might benefit from
+a stricter alignment than malloc provides by default. Tested with
+<code class="docutils literal notranslate"><span class="pre">MADV_HUGEPAGE</span></code> for the allocations but the results are
+inconclusive (but it uses more RAM when enabled). Cleared all uses of
+<code class="docutils literal notranslate"><span class="pre">fftw_free</span></code> and <code class="docutils literal notranslate"><span class="pre">fftw_malloc</span></code>.</p></li>
+</ul>
+</section>
+<section id="section-14">
+<span id="id14"></span><h3>0.3.0<a class="headerlink" href="#section-14" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Respects the NO_COLOR environmental variable in accord with
+<a class="reference external" href="https://no-color.org/">https://no-color.org/</a>.</p></li>
+<li><p>Fixed correct capping of pixel values when <strong>–scaling</strong> is used.</p></li>
+</ul>
+</section>
+<section id="id15">
+<h3>0.2.9<a class="headerlink" href="#id15" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Added the command line option <strong>–scaling</strong> for setting bypassing the
+automatic image scaling in 16-bit output mode.</p></li>
+</ul>
+</section>
+<section id="id16">
+<h3>0.2.8<a class="headerlink" href="#id16" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Switched from <code class="docutils literal notranslate"><span class="pre">fftw3f_threads</span></code> to <code class="docutils literal notranslate"><span class="pre">fftw3f_omp</span></code>. This reduced the
+run time by about 10% on a Intel i7-6700K. Can be reverted by
+commenting in/out the corresponding lines in the makefile.</p></li>
+<li><p>Cleaned up the output of <code class="docutils literal notranslate"><span class="pre">dw</span> <span class="pre">--version</span></code></p></li>
+</ul>
+</section>
+<section id="section-15">
+<span id="id17"></span><h3>0.2.7<a class="headerlink" href="#section-15" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Converted a few minor code paths to execute in parallel by OpenMP
+directives.</p></li>
+</ul>
+</section>
+<section id="section-16">
+<span id="id18"></span><h3>0.2.6<a class="headerlink" href="#section-16" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Using ISO 8601 in log files, e.g., <code class="docutils literal notranslate"><span class="pre">2023-02-14T11:14:14</span></code>.</p></li>
+</ul>
+</section>
+<section id="section-17">
+<span id="id19"></span><h3>0.2.5<a class="headerlink" href="#section-17" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Added the <strong>–xyz</strong> option to <strong>dw maxproj</strong>, for creating max
+projections along the three axes and collecting them on a single 2D
+image.</p></li>
+</ul>
+</section>
+<section id="section-18">
+<span id="id20"></span><h3>0.2.4<a class="headerlink" href="#section-18" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>dw –help</strong> now shows the additional commands/modules available.</p></li>
+<li><p>Reading 16-bit tif files with <strong>TIFFReadEncodedStrip</strong> instead of
+<strong>TIFFReadRawStrip</strong>. Some programs saves tiff files in other ways :)</p></li>
+<li><p>Added the command psf-STED for 3D STED PSFs. Use at your own risk.</p></li>
+<li><p>Building with meson is temporarily broken and to be fixed.</p></li>
+<li><p>Fixed dw chashing when combining –method rl with –iterdump</p></li>
+<li><p>Setting the background level automatically to min(image) unless
+specified with <strong>–bg</strong>.</p></li>
+</ul>
+</section>
+<section id="section-19">
+<span id="id21"></span><h3>0.2.3<a class="headerlink" href="#section-19" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Fixed some errors introduced in v 0.2.2, especially the <strong>dw
+maxproj</strong> was broken.</p></li>
+<li><p>added the subcommand <strong>dw merge</strong>. To be used to merge single
+z-planes into a 3D volume.</p></li>
+</ul>
+</section>
+<section id="section-20">
+<span id="id22"></span><h3>0.2.2<a class="headerlink" href="#section-20" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Can deconvolve using clFFT, when compiled with <strong>OPENCL=1</strong> two new
+methods appear, <strong>–method shbcl</strong> and <strong>–shbcl2</strong>, the first using
+clFFT only for the Fourier transforms, the latter using OpenCL for
+the whole deconvolution procedure. Uses quite much GPU memory which
+is something to improve upon in future version, possibly by switching
+to vkFFT.</p></li>
+</ul>
+</section>
+<section id="section-21">
+<span id="id23"></span><h3>0.1.1<a class="headerlink" href="#section-21" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Added experimental <strong>dw imshift</strong> for shifting images, also shift
+estimation using normalized cross correlation with <strong>dw imshift –ref
+file.tif</strong>. Might be extended to basic tiling etc.</p></li>
+</ul>
+</section>
+<section id="section-22">
+<span id="id24"></span><h3>0.1.0<a class="headerlink" href="#section-22" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Implements the ‘Scaled Heavy Ball’. More memory efficient than eve
+and about the same speed and image quality. Might become the default
+method.</p></li>
+<li><p>Reorganization of code with one file per deconvolution method, RL is
+now separated to an own file which improves readability.</p></li>
+<li><p>The <strong>–method</strong> argument can be used to switch between several
+methods, see <strong>–help</strong> or the man page.</p></li>
+<li><p>Showing Idivergence after each iteration, switch back to MSE with
+<strong>–mse</strong></p></li>
+<li><p>Cleaned up the text written to the terminal, notably any warnings
+from libtiff now go to the log file.</p></li>
+<li><p>OMP is set to use as many cores as FFTW.</p></li>
+<li><p>Added OMP directives to a few more loops.</p></li>
+<li><p>Using static OMP schedule.</p></li>
+<li><p>Introduces the <strong>–tsv</strong> argument to save information per iteration to
+a separate tsv file for easier plotting and analysis.</p></li>
+<li><p>Three different stopping criteria: Relative error (default) Fixed
+number of iterations or at an absolute error.</p></li>
+</ul>
+</section>
+<section id="section-23">
+<span id="id25"></span><h3>0.0.26<a class="headerlink" href="#section-23" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>dw maxproj</strong> works with file that are not in the current folder.</p></li>
+<li><p>Fixed <strong>–iterdump</strong> not always working.</p></li>
+</ul>
+</section>
+<section id="section-24">
+<span id="id26"></span><h3>0.0.25<a class="headerlink" href="#section-24" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Builds with cuFFT on Linux, use <code class="docutils literal notranslate"><span class="pre">make</span> <span class="pre">CUFFT=1</span> <span class="pre">-B</span></code>, requires a CUDA
+compatible GPU and of course the cuFFT library installed.</p></li>
+</ul>
+</section>
+<section id="section-25">
+<span id="id27"></span><h3>0.0.24<a class="headerlink" href="#section-25" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Tested on CentOS, install both with make and meson.</p></li>
+<li><p>Fixed a memory leak with the <strong>–tilesize</strong> option causing crashed
+sometimes.</p></li>
+</ul>
+</section>
+<section id="section-26">
+<span id="id28"></span><h3>0.0.23<a class="headerlink" href="#section-26" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Added ‘meson.build’ files in order for deconwolf to be built by <a class="reference external" href="https://mesonbuild.com/">The
+Meson Build system</a>, tested to work on
+both Ubuntu 21.10 and MacOS (on x86_64 hardware).</p></li>
+<li><p>Added a small test image under <code class="docutils literal notranslate"><span class="pre">demo/</span></code> together with a <strong>makefile</strong>
+to deconvolve it.</p></li>
+<li><p>Added <a class="reference external" href="PSEUDOCODE.md">pseudo code</a> for the binaries hoping to
+planning to replace this by a properly typeset and more detailed
+document.</p></li>
+<li><p>Aborting if the number of threads is set &lt; 1.</p></li>
+<li><p>The algorithm is still unchanged since v 0.0.20.</p></li>
+</ul>
+</section>
+<section id="section-27">
+<span id="id29"></span><h3>0.0.22<a class="headerlink" href="#section-27" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Fixed double free-bug in tiling mode.</p></li>
+</ul>
+</section>
+<section id="section-28">
+<span id="id30"></span><h3>0.0.21<a class="headerlink" href="#section-28" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Updated documentation and man-pages based on markdown files for
+easier updating.</p></li>
+<li><p>Provides <code class="docutils literal notranslate"><span class="pre">makefile-freebsd</span></code> for building on FreeBSD 13.0</p></li>
+<li><p>Changed behavior when too few input arguments are given to only give
+a two-line message.</p></li>
+</ul>
+</section>
+<section id="section-29">
+<span id="id31"></span><h3>0.0.20<a class="headerlink" href="#section-29" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Changing acceleration technique to use ‘Exponential Vector
+Extrapolation’ (EVE) described in Biggs PhD thesis. Deconvolved
+images get higher MSE but much lower I-div.</p></li>
+<li><p>‘–xyfactor 0’ does not crash dw anymore.</p></li>
+<li><p>Frees the PSF as soon as not needed to save some memory.</p></li>
+<li><p>Changing the behavior of the progress dots to appear more linear in
+time</p></li>
+<li><p>Changing the non-negative condition to strictly positive in order for
+pixel not to get stuck at 0.</p></li>
+<li><p>Adding the option to turn off Biggs acceleration, i.e. run normal
+Richardson-Lucy with –biggs 0.</p></li>
+<li><p>Will load PSFs that don’t have an odd number of pixels in each
+dimension however that is not recommended.</p></li>
+<li><p>Can be built against Intel MKL (<code class="docutils literal notranslate"><span class="pre">make</span> <span class="pre">MKL=1</span> <span class="pre">...</span></code>), consider that an
+experimental option. 14 percent faster on a small test image, varied
+results on larger images.</p></li>
+</ul>
+</section>
+<section id="section-30">
+<span id="id32"></span><h3>0.0.19<a class="headerlink" href="#section-30" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Using lanczos5 instead of lanczos3 for the PSF generation. As a
+result GSL_EROUND is not raised for the test cases.</p></li>
+<li><p>Faster PSF generation, using more symmetries.</p></li>
+<li><p>dw_bw can now use more than one thread (wrongly disabled in v
+0.0.18).</p></li>
+</ul>
+</section>
+<section id="section-31">
+<span id="id33"></span><h3>0.0.18<a class="headerlink" href="#section-31" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Provided install instructions for Windows 10.</p></li>
+<li><p>Fixed some mismatching fftwf_malloc/fftwf_free where they were mixed
+up with malloc/free causing crashes on Windows.</p></li>
+<li><p>Added an experimental src/CMakeLists.txt that can be used when
+building with cmake. It is also possible to cross compile for Windows
+on Linux although it takes some effort to collect the DLL files for
+the dependencies.</p></li>
+</ul>
+</section>
+<section id="section-32">
+<span id="id34"></span><h3>0.0.17<a class="headerlink" href="#section-32" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Fixed some bugs in the PSF generation code that did affect the
+accuracy of the pixels in the PSF.</p></li>
+<li><p>Stared to use GSL for numerical integration. It remains to change the
+double integral over x-y into something more dynamic.</p></li>
+</ul>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="segmentation.html" class="btn btn-neutral float-left" title="Ilastic-like segmentation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="license.html" class="btn btn-neutral float-right" title="GNU General Public License" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023-2024, Erik Wernersson.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

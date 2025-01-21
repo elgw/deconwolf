@@ -1,0 +1,243 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spot detection and measurements &mdash; deconwolf 0.4.4 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=90733dfc"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Spot-based image alignment" href="shifts.html" />
+    <link rel="prev" title="Deconvolution: Usage guide" href="usage.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            deconwolf
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="start.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage.html">Deconvolution: Usage guide</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Spot detection and measurements</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#spot-size">Spot size</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#dot-candidates">Dot candidates</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#fitting-dots">Fitting dots</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#measurements">Measurements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#alternative-software">Alternative software</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="shifts.html">Spot-based image alignment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="segmentation.html">Ilastic-like segmentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="history.html">Version History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="license.html">GNU General Public License</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">deconwolf</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Spot detection and measurements</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/spots.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="spot-detection-and-measurements">
+<h1>Spot detection and measurements<a class="headerlink" href="#spot-detection-and-measurements" title="Link to this heading"></a></h1>
+<p>Deconwolf includes a few option to detect diffraction limited dots (or
+spots, or signals) via the module <cite>dw dots</cite>. This documentation gives
+and overview of what the program does. Please see the man page for up
+to date usage and exact command line arguments.</p>
+<p>A tiny light emitter on a microscope slide will be seen as a blurry
+spot under a microscope. The optical parameters decide how small it
+can be. If it is as small as possible it will be denotes as a
+<em>diffraction limited spot</em>.</p>
+<p>The dot extraction pipeline consists of:</p>
+<ol class="arabic simple">
+<li><p>Detection spot candidates, using DoG or just by intensity combined
+with a local maxima finder. A big part of this is selecting a
+suitable filter to use.</p></li>
+<li><p>Sub pixel localization using 3D gaussian blobs as a template.</p></li>
+<li><p>Extra measurements. Most of the features that are measured are
+side-results of the fitting routine.</p></li>
+<li><p>Exports to disk.</p></li>
+<li><p>Filtering. This step is up to you to implement in you favorite
+programming language.</p></li>
+</ol>
+<section id="spot-size">
+<h2>Spot size<a class="headerlink" href="#spot-size" title="Link to this heading"></a></h2>
+<p>For wide field microscopy the optical parameters gives the spot
+size. The Abbe resolution provides the full width half max (fwhm) in
+the lateral plane (l) and along the axial direction (a). If
+<span class="math notranslate nohighlight">\(\Delta x\)</span> is the axial pixel sizes and <span class="math notranslate nohighlight">\(\Delta z\)</span> is the
+lateral pixel size, then:</p>
+<div class="math notranslate nohighlight">
+\[ \begin{align}\begin{aligned}\mbox{fwhm}_l = \frac{1}{\Delta x}\frac{\lambda}{2\mbox{NA}}\\\mbox{fwhm}_a = \frac{1}{\Delta z}\frac{2\lambda}{(\mbox{NA})^2}\end{aligned}\end{align} \]</div>
+<p>And the equivalent size of a Gaussian bell is:</p>
+<div class="math notranslate nohighlight">
+\[ \begin{align}\begin{aligned}\sigma_{l} = \frac{fwhm_{l}}{2 \sqrt{2 \log(2)}}\\\sigma_{a} = \frac{fwhm_{a}}{2 \sqrt{2 \log(2)}}\end{aligned}\end{align} \]</div>
+<p>which is used for the fitting. For the LoG filter the optimal size is
+given by:</p>
+<div class="math notranslate nohighlight">
+\[ \begin{align}\begin{aligned}\sigma_{l, LoG} = \sigma_l \sqrt{2}\\\sigma_{a, LoG} = \sigma_a \sqrt{2}\end{aligned}\end{align} \]</div>
+<p>These values are calculated automatically by <cite>dw dots</cite> if the relevant
+optical parameters are supplied. Alternatively they can also be set
+manually.</p>
+</section>
+<section id="dot-candidates">
+<h2>Dot candidates<a class="headerlink" href="#dot-candidates" title="Link to this heading"></a></h2>
+<p>In an fictional world where optics is perfect and there are no noise
+sources, we could use the pixel values (after deconvolution) as direct
+measurements on the number of photons.</p>
+<p>In practice one could detect dots before deconvolution or after
+deconvolution. If the images are not deconvolved, or only lightly
+deconvolved there will be blur left in the image (due to the PSF). In
+that case the pixel values are not very good estimators of the signal
+brightness.</p>
+<p>A common proxy for signal strength is the Laplacian of Gaussian (LoG)
+feature. Intuitively the features is calculated by the difference
+between what is in the centre of the filter (signal) to what is in the
+surrounding pixels (background). I.e., it is a measure of the
+elevation of the spot relative to the surroundings.</p>
+<p>If there is a spot with a size that somewhat matches the LoG filter it
+can be located as an extrema in the LoG filtered image.</p>
+<p>Please note that spot finding method LoG+M will detect spots of any
+size (although with decreasing amplitude as the spots size deviates
+from the design size) and that it will also pick up noise and non-dot
+structures in the image. Hence it is more or less mandatory to filter
+the candidate spots by a few image features later on.</p>
+</section>
+<section id="fitting-dots">
+<h2>Fitting dots<a class="headerlink" href="#fitting-dots" title="Link to this heading"></a></h2>
+<p>Fitting is performed using a multivariate Gaussian as the model,
+restricting the shape to covariance matrices of the form:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\Sigma = \begin{pmatrix}
+\sigma_l^2 &amp; 0 &amp; 0 \\
+0 &amp; \sigma_l^2 &amp; 0 \\
+0 &amp; 0 &amp; \sigma_a^2
+\end{pmatrix}\end{split}\]</div>
+<p>The spot model is written as:</p>
+<div class="math notranslate nohighlight">
+\[M(x) = c_0 + c_1G(x ; \mu, \Sigma)\]</div>
+<p>If we collect all the parameters that we optimize over into
+<span class="math notranslate nohighlight">\(\Theta\)</span>, then we have:</p>
+<div class="math notranslate nohighlight">
+\[\Theta = \mathop{\mathrm{arg\,min}}\nolimits -\sum \left(I(x)\log M(x) - M(x) \right)\]</div>
+<p>Using the assumption of Poisson noise only.</p>
+</section>
+<section id="measurements">
+<h2>Measurements<a class="headerlink" href="#measurements" title="Link to this heading"></a></h2>
+<p>The possible column in the output are as follows:</p>
+<ul class="simple">
+<li><p><em>x</em>, <em>y</em>, <em>z</em> the coordinates of the spot before fitting. Note that
+this is 0-indexed and given in the units of pixels.</p></li>
+<li><p><em>value</em> the filter value, i.e. the <em>LoG</em> value or the pixel value
+depending on what feature that was used to identify the dot
+candidates.</p></li>
+<li><p><em>use</em> A simple (stupid) classification of each dot to say if it is
+relevant or not. This is based on an Otsu threshold on the <cite>log(value)</cite></p></li>
+<li><p><em>lat_circularity</em> the largest over the smallest eigenvalue of the
+covariance matrix of the local pixels.</p></li>
+</ul>
+<p>Properties returned from the fitting routine:</p>
+<ul class="simple">
+<li><p><em>f_bg</em> the background level of the spot.</p></li>
+<li><p><em>f_signal_count</em> the total number of photons in the spot (assuming a
+quantum efficiency of 1).</p></li>
+<li><p><em>f_peak_signal</em> the largest value of the fitted spot (note: can be
+higher than the maximum pixel value).</p></li>
+<li><p><em>f_x</em>, <em>f_y</em>, <em>f_z</em> the fitted sup pixel location of the spot.</p></li>
+<li><p><em>f_sigma_lateral</em>, <em>f_sigma_axial</em> the size, i.e., the estimated
+sigma value for the gaussian in the lateral plane and along the
+axial direction.</p></li>
+<li><p><em>f_status</em> the status value returned from the fitting function.</p></li>
+<li><p><em>f_error</em> <span class="math notranslate nohighlight">\(-log(p)\)</span> of the spot.</p></li>
+<li><p><em>f_corr</em> the correlation between the pixel values and the fitted
+model. This information is really useful to reject spot candidates
+that are found on line- and edge- like structures in images.</p></li>
+</ul>
+</section>
+<section id="alternative-software">
+<h2>Alternative software<a class="headerlink" href="#alternative-software" title="Link to this heading"></a></h2>
+<p>Please provide a link and short description of good alternatives and
+they will be put here. BigFish, etc.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="usage.html" class="btn btn-neutral float-left" title="Deconvolution: Usage guide" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="shifts.html" class="btn btn-neutral float-right" title="Spot-based image alignment" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023-2024, Erik Wernersson.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
