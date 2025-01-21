@@ -16,8 +16,8 @@ DEBUG?=0
 UNAME_S := $(shell uname -s)
 $(info Host type: $(UNAME_S))
 
-dw = bin/dw
-dwbw = bin/dw_bw
+dw = dw
+dwbw = dw_bw
 
 CFLAGS += -std=gnu11 -Wall -Wextra
 
@@ -428,6 +428,8 @@ $(dwbw): $(dwbw_OBJECTS)
 
 clean:
 	rm -f *.o
+	rm -f dw
+	rm -f dw_bw
 
 # the kernels are mostly included by cl_util.c some in method_shb_cl*
 # TODO: this is a silly list
@@ -465,12 +467,12 @@ kernels:
 
 install:
 	# Binaries
-	cp bin/dw_bw $(DESTDIR)/dw_bw
-	cp bin/dw $(DESTDIR)/dw
+	cp dw_bw $(DESTDIR)/dw_bw
+	cp dw $(DESTDIR)/dw
 	# Man pages
-	cp doc/dw.1 $(MANPATH)/dw.1
-	cp doc/dw.1 $(MANPATH)/deconwolf.1
-	cp doc/dw_bw.1 $(MANPATH)/dw_bw.1
+	cp doc/man/dw.1 $(MANPATH)/dw.1
+	cp doc/man/dw.1 $(MANPATH)/deconwolf.1
+	cp doc/man/dw_bw.1 $(MANPATH)/dw_bw.1
 
 
 uninstall:
