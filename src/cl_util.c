@@ -1221,7 +1221,7 @@ void clu_print_device_info(FILE * fid, cl_device_id dev_id)
 
 static char * read_program(const char * fname, size_t * size)
 {
-    FILE * fid = fopen(fname, "r");
+    FILE * fid = fopen(fname, "rb");
     if (!fid) {
         fprintf(stderr, "Failed to load kernel from %s.\n", fname);
         exit(EXIT_FAILURE);

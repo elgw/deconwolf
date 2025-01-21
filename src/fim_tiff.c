@@ -504,7 +504,7 @@ float raw_file_single_max(const char * rName, const size_t N)
     float  max = -INFINITY;
     float * buf = calloc(buf_size, sizeof(float));
     assert(buf != NULL);
-    FILE * fid = fopen(rName, "r");
+    FILE * fid = fopen(rName, "rb");
     if(fid == NULL)
     {
         printf("ERROR: unable to open %s\n", rName);
@@ -553,7 +553,7 @@ void uint16toraw(TIFF * tfile, const char * ofile,
     assert(buf != NULL);
     float * wbuf = calloc(ssize/sizeof(uint16_t), sizeof(float));
     assert(wbuf != NULL);
-    FILE * fout = fopen(ofile, "w");
+    FILE * fout = fopen(ofile, "wb");
     assert(fout != NULL);
 
     for(int64_t dd=0; dd<ndirs; dd++) {
@@ -584,7 +584,7 @@ void floattoraw(TIFF * tfile, const char * ofile,
     assert(buf != NULL);
     float * wbuf = calloc(ssize/sizeof(float), sizeof(float));
     assert(wbuf != NULL);
-    FILE * fout = fopen(ofile, "w");
+    FILE * fout = fopen(ofile, "wb");
     assert(fout != NULL);
 
 
@@ -777,7 +777,7 @@ int fim_tiff_from_raw(const char * fName, // Name of tiff file to be written
     }
     //  printf("Max value of file: %f\n", rawmax);
 
-    FILE * rf = fopen(rName, "r");
+    FILE * rf = fopen(rName, "rb");
     if(rf == NULL)
     {
         fprintf(stderr, "fim_tiff ERROR: Failed to open %s for writing\n", rName);
