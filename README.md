@@ -1,8 +1,12 @@
 deconwolf[^1] is a software for 3-D deconvolution of fluorescent
-wide-field images, showcased at
-[deconwolf.fht.org/](https://deconwolf.fht.org/). To get started,
-please see the [documentation at
-elgw.github.io/deconwolf/](https://elgw.github.io/deconwolf/).
+wide-field images.
+
+To get started, please see the [documentation](https://elgw.github.io/deconwolf/).
+
+Pre compiled binaries/installers can be found in the [releases page](https://github.com/elgw/deconwolf/releases).
+
+A few showcases can be found at
+[deconwolf.fht.org/](https://deconwolf.fht.org/).
 
 
 [^1]: E. Wernersson et al. "Deconwolf enables high-performance
