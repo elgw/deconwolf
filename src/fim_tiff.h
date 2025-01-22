@@ -26,16 +26,6 @@
  */
 
 
-#include <assert.h>
-#include <fftw3.h>
-#include <inttypes.h>
-#define _USE_MATH_DEFINES
-#include <math.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <string.h>
-#include <stdint.h>
 #include <tiffio.h>
 
 #include "fim.h"
@@ -93,7 +83,9 @@ void ttags_free(ttags **);
 /* Initialization, sets the output file to stdout */
 void fim_tiff_init(void);
 
-/* Redirect all output here */
+/* Redirect all output here, both messages from tif_tiff as well as
+ * warnings and errors from libtiff */
+
 void fim_tiff_set_log(FILE * fp);
 
 /* Write to disk, if scaling <= 0 : automatic scaling will be used. Else the provided value. */
@@ -153,6 +145,8 @@ float * fim_tiff_read(const char * fName,
                       ttags * T,
                       int64_t * M0, int64_t * N0, int64_t * P0,
                       int verbosity);
+
+
 
 /** @breif Read a sub region of a 3D stack as float array
  * set sub to 1

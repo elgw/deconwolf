@@ -16,9 +16,10 @@ static void fimcl_to_tiff(fimcl_t * I_gpu, char * filename)
     fim_free(I);
 }
 
-static fimcl_t  * fft_block_of_ones(clu_env_t * clu,
-                                    const int64_t M, const int64_t N, const int64_t P,
-                                    const int64_t wM, const int64_t wN, const int64_t wP)
+static fimcl_t  *
+fft_block_of_ones(clu_env_t * clu,
+                  const int64_t M, const int64_t N, const int64_t P,
+                  const int64_t wM, const int64_t wN, const int64_t wP)
 {
     /* Return the fft of an image that is 1 in MNP and 0 outside
      * M, N, P is the dimension of the microscopic image
@@ -38,6 +39,7 @@ static fimcl_t  * fft_block_of_ones(clu_env_t * clu,
     }
 
     fimcl_t * gOne = fimcl_new(clu, fimcl_real, one, wM, wN, wP);
+    fim_free(one);
 #if use_inplace_clfft
     fimcl_fft_inplace(gOne);
     fimcl_t * gfOne = gOne;
@@ -56,9 +58,13 @@ fimcl_t * create_initial_W(clu_env_t * clu,
 {
 
     here();
-    fimcl_t * fft_block_ones_gpu = fft_block_of_ones(clu, M, N, P, wM, wN, wP);
+    fimcl_t * fft_block_ones_gpu =
+        fft_block_of_ones(clu, M, N, P, wM, wN, wP);
     here();
-    fimcl_t * W_pre_gpu = fimcl_convolve_conj(fft_block_ones_gpu, fft_PSF_gpu, CLU_KEEP_2ND);
+    fimcl_t * W_pre_gpu =
+        fimcl_convolve_conj(fft_block_ones_gpu,
+                            fft_PSF_gpu,
+                            CLU_KEEP_2ND);
     fft_block_ones_gpu = NULL; // freed already
     here();
 
@@ -558,9 +564,10 @@ float * deconvolve_shb_cl2(float * restrict im,
     here();
     if(W_gpu != NULL) {
         fimcl_free(W_gpu);
+        W_gpu = NULL;
     }
 
-    W_gpu = NULL;
+
     if(s->verbosity > 0) {
         printf("\n");
     }

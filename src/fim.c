@@ -14,7 +14,28 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
+#include <inttypes.h>
+#include <fftw3.h>
+#define _USE_MATH_DEFINES
+#include <math.h>
+#include <omp.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+#include <time.h>
+
+
+#ifdef __linux__
+#include <sys/mman.h>
+#endif
+
 #include "fim.h"
+#include "quickselect.h"
+
+typedef uint64_t u64;
+typedef int64_t i64;
 
 static int fim_verbose = 0;
 
@@ -456,6 +477,10 @@ float fim_max(const float * restrict A, size_t N)
     return amax;
 }
 
+float fimo_max(const fimo * A)
+{
+    return fim_max(A->V, fimo_nel(A));
+}
 
 void fim_stats(const float * A, const size_t N)
 {
@@ -464,6 +489,17 @@ void fim_stats(const float * A, const size_t N)
            fim_mean(A, N),
            fim_max(A, N));
     return;
+}
+
+float fim_percentile(const float * A, size_t N, float prct)
+{
+    size_t k = (size_t) (prct / 100.0 * ((double) N));
+    return qselect_f32(A, N, k);
+}
+
+float fimo_percentile(fimo * A, float prct)
+{
+    return fim_percentile(A->V, fimo_nel(A), prct);
 }
 
 float fim_mse(float * A, float * B, size_t N)
@@ -675,6 +711,121 @@ void fim_mult_scalar(float * restrict I, size_t N, float x)
     return;
 }
 
+void fimo_mult_scalar(fimo * A, float x)
+{
+    fim_mult_scalar(A->V, fimo_nel(A), x);
+}
+
+int fimo_mult_image(fimo * A, const fimo * B)
+{
+    int mode = 0;
+    if(A->M != B->M)
+    {
+        return -1;
+    }
+    if(A->N != B->N)
+    {
+        return -1;
+    }
+    if(A->P > 1)
+    {
+        if(B->P == 1)
+        {
+            mode = 1;
+        }
+        if(B->P == A->P)
+        {
+            mode = 2;
+        }
+    }
+
+    // per plane
+    if(mode == 1)
+    {
+#pragma omp parallel for
+        for(size_t pp = 0; pp < A->P; pp++)
+        {
+            float * P = A->V + pp*A->M*A->N;
+            for(size_t kk = 0; kk < fimo_nel(B); kk++)
+            {
+                P[kk] *= B->V[kk];
+            }
+        }
+        return 0;
+    }
+
+    // same number of elements
+    if(mode == 2)
+    {
+#pragma omp parallel for
+        for(size_t kk = 0; kk < fimo_nel(A); kk++)
+        {
+            A->V[kk] *= B->V[kk];
+        }
+        return 0;
+    }
+    return -1;
+}
+
+int fimo_div_image(fimo * A, const fimo * B)
+{
+    int mode = 0;
+    if(A->M != B->M)
+    {
+        return -1;
+    }
+    if(A->N != B->N)
+    {
+        return -1;
+    }
+    if(A->P == 1)
+    {
+        if(B->P == 1)
+        {
+            mode = 2;
+        }
+    }
+    if(A->P > 1)
+    {
+        if(B->P == 1)
+        {
+            mode = 1;
+        }
+        if(B->P == A->P)
+        {
+            mode = 2;
+        }
+    }
+
+    // per plane
+    if(mode == 1)
+    {
+#pragma omp parallel for
+        for(size_t pp = 0; pp < A->P; pp++)
+        {
+            float * P = A->V + pp*A->M*A->N;
+            for(size_t kk = 0; kk < fimo_nel(B); kk++)
+            {
+                P[kk] /= B->V[kk];
+            }
+        }
+        return 0;
+    }
+
+    // same number of elements
+    if(mode == 2)
+    {
+#pragma omp parallel for
+        for(size_t kk = 0; kk < fimo_nel(A); kk++)
+        {
+            A->V[kk] /= B->V[kk];
+        }
+        return 0;
+    }
+    return -1;
+}
+
+
 void fim_project_positive(float * I, size_t N)
 {
 #pragma omp parallel for shared(I)
@@ -755,12 +906,12 @@ fimo * fimo_zeros(const size_t M, const size_t N, const size_t P)
     return F;
 }
 
-size_t fimo_nel(fimo * F)
+size_t fimo_nel(const fimo * F)
 {
     return F->M*F->N*F->P;
 }
 
-float fimo_sum(fimo * F)
+float fimo_sum(const fimo * F)
 {
     return fim_sum(F->V, fimo_nel(F));
 }
@@ -1771,6 +1922,7 @@ void fim_conv1_vector(float * restrict V, const int stride, float * restrict W,
         Walloc = 1;
     }
 
+
     const size_t k2 = (nKu-1)/2;
 
     size_t bpos = 0;
@@ -1807,17 +1959,19 @@ void fim_conv1_vector(float * restrict V, const int stride, float * restrict W,
     if(nKu <= nV)
     {
         /* Crossing the first edge */
-        for(size_t vv = 0;vv<k2; vv++)
+        for(size_t vv = 0; vv<k2; vv++)
         {
             double acc0 = 0;
             double kacc = 0;
-            for(size_t kk = k2-vv; kk<nKu; kk++)
+            for(size_t kk = k2-vv; kk < nKu; kk++)
             {
+
                 assert((vv-k2+kk) < nV);
                 acc0 = acc0 + K[kk]*V[(vv-k2+kk)*stride];
 
                 kacc += K[kk];
             }
+
             if(normalized)
             {
                 W[bpos++] = acc0/kacc;
@@ -1896,10 +2050,16 @@ static float * gaussian_kernel(float sigma, size_t * nK)
 
     float s2 = pow(sigma, 2);
     float k0 = 1.0/sigma/sqrt(2.0*M_PI);
+    double sum = 0;
     for(int kk = 0; kk<N; kk++)
     {
         float x = (float) kk - mid;
         K[kk] = k0*exp(-0.5*pow(x,2)/s2);
+        sum+=K[kk];
+    }
+    for(int kk = 0; kk<N; kk++)
+    {
+        K[kk] /= sum;
     }
 
     nK[0] = N;
@@ -2063,9 +2223,18 @@ void fim_gsmooth_aniso(float * restrict V,
     return;
 }
 
-void fim_gsmooth(float * restrict V, size_t M, size_t N, size_t P, float sigma)
+/* Isotropic smoothing with Gaussian filter */
+void fim_gsmooth(float * restrict V,
+                 size_t M, size_t N, size_t P,
+                 float sigma)
 {
     fim_gsmooth_aniso(V, M, N, P, sigma, sigma);
+}
+
+void fimo_gsmooth(fimo * I, float sigma)
+{
+    fim_gsmooth(I->V, I->M, I->N, I->P, sigma);
+    return;
 }
 
 static void cumsum_array(float * A, size_t N, size_t stride)
@@ -2364,6 +2533,24 @@ fimo * fimo_maxproj(const fimo * F)
     return M;
 }
 
+fimo * fimo_sumproj(const fimo * F)
+{
+    if(F->P == 1)
+    {
+        return fimo_copy(F);
+    }
+    fimo * P = fimo_zeros(F->M, F->N, 1);
+    for(size_t pp = 0; pp < F->P; pp++)
+    {
+        float * plane = F->V + F->M*F->N*pp;
+        for(size_t kk = 0 ; kk < fimo_nel(P); kk++)
+        {
+            P->V[kk] += plane[kk];
+        }
+    }
+    return P;
+}
+
 float * fim_maxproj(const float * V, size_t M, size_t N, size_t P)
 {
     /* Initialize to first plane */
@@ -2499,6 +2686,7 @@ ftab_t * fim_lmax_multiscale(float ** II, float * scales, size_t nscales,
     for(size_t kk = 0; kk<nscales; kk++)
     {
         char * cname = calloc(128, 1);
+        assert(cname != NULL);
         sprintf(cname, "LoG_%f", scales[kk]);
         ftab_set_colname(T, 5+kk, cname);
         free(cname);
@@ -2516,7 +2704,7 @@ ftab_t * fim_lmax_multiscale(float ** II, float * scales, size_t nscales,
          * is a local maxima in the 4D neighbourhood
          * we skip the border pixels
          **/
-        float * strel = malloc(27*sizeof(float));
+        float * strel = calloc(27,sizeof(float));
         assert(strel != NULL);
         for(int kk = 0; kk<27; kk++)
         {
@@ -2526,9 +2714,12 @@ ftab_t * fim_lmax_multiscale(float ** II, float * scales, size_t nscales,
 
         /* For each scale, save the local max */
         float * local_max = calloc(nscales, sizeof(float));
+        assert(local_max != NULL);
         /* Indicator if the central pixel is the largest for the given scale */
         int * is_local_max = calloc(nscales, sizeof(int));
+        assert(is_local_max != NULL);
         int * is_scale_max = calloc(nscales, sizeof(int));
+        assert(is_scale_max != NULL);
 
 #pragma omp for
         for(size_t pp = 1; pp < P-1; pp++)
@@ -2602,6 +2793,7 @@ ftab_t * fim_lmax_multiscale(float ** II, float * scales, size_t nscales,
         free(strel);
         free(row);
         free(log_values);
+        free(is_scale_max);
     }
     return T;
 }
@@ -2630,6 +2822,11 @@ static int lmax_2d(const float * I, size_t stride)
 
 ftab_t * fim_lmax_2d(const float * I, size_t M, size_t N, size_t P)
 {
+    if(P != 1)
+    {
+        printf("Warning: fim_lmax_2d called with a 3D image\n"
+               "Will only use the first plane\n");
+    }
     ftab_t * T = ftab_new(4);
     ftab_set_colname(T, 0, "x");
     ftab_set_colname(T, 1, "y");
@@ -2662,7 +2859,7 @@ ftab_t * fim_lmax_2d(const float * I, size_t M, size_t N, size_t P)
             }
         }
     }
-
+    free(strel);
     return T;
 }
 
@@ -2837,6 +3034,7 @@ float fim_histogram_percentile(const fim_histogram_t * H, const float p)
 
 float fim_histogram_otsu(fim_histogram_t * H)
 {
+    assert(H != NULL);
     double level = otsu(H->C, H->nbin);
     double slevel = H->left + level/(pow(2,16)-1)*(H->right-H->left);
     return (float) slevel;
@@ -2847,6 +3045,7 @@ float * fim_otsu(float * Im, size_t M, size_t N)
     //float mean = fim_sum(Im, M*N)/( (float) M*N);
     //printf("Mean=%f\n", mean);
     fim_histogram_t * H = fim_histogram(Im, M*N);
+    assert(H != NULL);
     float th = fim_histogram_otsu(H);
     //    printf("Threshold = %f\n", th);
     fim_histogram_free(H);
@@ -3098,8 +3297,10 @@ int * fim_conncomp6(const float * im, size_t M, size_t N)
     return lab;
 }
 
-int fim_convn1(float * restrict V, size_t M, size_t N, size_t P,
-               const float * K, size_t nK,
+/* 1D convolution along 1 dimension in a 3D image */
+int fim_convn1(float * restrict V,
+               size_t M, size_t N, size_t P, // image size
+               const float * K, size_t nK, // Kernel
                int dim, const int normalized)
 {
     if(dim < 0 || dim > 2)
@@ -3145,7 +3346,6 @@ int fim_convn1(float * restrict V, size_t M, size_t N, size_t P,
 #pragma omp for
             for(size_t nn = 0; nn<N; nn++)
             {
-
                 for(size_t mm = 0; mm<M; mm++)
                 {
                     fim_conv1_vector(V+mm+M*nn, M*N, buff, P, K, nK, normalized);
@@ -3291,8 +3491,10 @@ float * fim_LoG_S(const float * V0, const size_t M, const size_t N, const size_t
     return uLoG;
 }
 
-float * fim_LoG_S2(const float * V0, const size_t M, const size_t N, const size_t P,
-                   const float sigmaxy, const float sigmaz)
+float *
+fim_LoG_S2(const float * V0,
+           const size_t M, const size_t N, const size_t P,
+           const float sigmaxy, const float sigmaz)
 {
 
     fim_boundary_condition bc = FIM_BC_SYMMETRIC_MIRROR;
@@ -3353,23 +3555,24 @@ float * fim_LoG_S2(const float * V0, const size_t M, const size_t N, const size_
         return pLoG;
     }
 
-    /* Axial filters */
-    fimo * aG = NULL;
-    fimo * a2 = NULL;
-
-    {
-        size_t naG = 0;
-        size_t na2 = 0;
-        float * _aG = gaussian_kernel(sigmaz,  &naG);
-        aG = fim_wrap_array(_aG, naG, 1, 1);
-        float * _a2 = gaussian_kernel_d2(sigmaz,  &na2);
-        flip_sign(_a2, na2);
-        a2 = fim_wrap_array(_a2, na2, 1, 1);
-    }
-
     /* 3D */
     if(P > 1)
     {
+        /* Axial filters */
+        fimo * aG = NULL;
+        fimo * a2 = NULL;
+
+        {
+            size_t naG = 0;
+            size_t na2 = 0;
+            float * _aG = gaussian_kernel(sigmaz,  &naG);
+            aG = fim_wrap_array(_aG, naG, 1, 1);
+            float * _a2 = gaussian_kernel_d2(sigmaz,  &na2);
+            flip_sign(_a2, na2);
+            a2 = fim_wrap_array(_a2, na2, 1, 1);
+        }
+
+
         /** First dimension -> GII, LII */
         fimo * GII = fim_image_from_array(V0, M, N, P);
         fimo_conv1_x(GII, lG, bc);
@@ -3428,6 +3631,89 @@ float * fim_LoG_S2(const float * V0, const size_t M, const size_t N, const size_
     return NULL; // We should not reach this
 }
 
+/* Determinant of Hessian for 2D or 3D images */
+float *
+fim_DoH(const float * V0,
+        const size_t M, const size_t N, const size_t P,
+        const float sigmaxy, const float sigmaz)
+{
+    fim_boundary_condition bc = FIM_BC_SYMMETRIC_MIRROR;
+
+    /* Set up filters for the lateral dimensions */
+    fimo * lG = NULL; /* Gaussian */
+    fimo * l1 = NULL; /* First derivative */
+    fimo * l2 = NULL; /* 2nd derivative */
+    {
+        size_t nlG = 0;
+        float * _lG = gaussian_kernel(sigmaxy, &nlG);
+        assert(nlG > 0);
+        lG = fim_wrap_array(_lG, nlG, 1, 1);
+
+        size_t nl1;
+        float * _l1 = gaussian_kernel_d1(sigmaxy, &nl1);
+        l1 = fim_wrap_array(_l1, nl1, 1, 1);
+
+        size_t nl2;
+        float * _l2 = gaussian_kernel_d2(sigmaxy, &nl2);
+        assert(nl2 > 0);
+        l2 = fim_wrap_array(_l2, nl2, 1, 1);
+    }
+
+    if(P == 1)
+    {
+        fimo * GI = fim_image_from_array(V0, M, N, P);
+        fimo_conv1_x(GI, lG, bc);
+
+        fimo * DI = fim_image_from_array(V0, M, N, P);
+        fimo_conv1_x(DI, l1, bc);
+
+        fimo * LI = fim_image_from_array(V0, M, N, P);
+        fimo_conv1_x(LI, l2, bc);
+
+        /* Shifted one dimension */
+        fimo * sGL = fim_shiftdim(GI);
+        fimo_free(GI);
+        fimo_conv1_x(sGL, l2, bc);
+
+        fimo * sDD = fim_shiftdim(DI);
+        fimo_free(DI);
+        fimo_conv1_x(sDD, l1, bc);
+
+        fimo * sLG = fim_shiftdim(LI);
+        fimo_free(LI);
+        fimo_conv1_x(sLG, lG, bc);
+
+        /* Free kernels */
+        fimo_free(lG);
+        fimo_free(l1);
+        fimo_free(l2);
+
+        /* Compute DoH (still shifted) */
+#pragma omp parallel for
+        for(size_t kk = 0; kk < M*N; kk++)
+        {
+            sGL->V[kk] = sGL->V[kk]*sLG->V[kk] - pow(sDD->V[kk], 2.0);
+        }
+        fimo_free(sLG);
+        fimo_free(sDD);
+
+        /* Shift back */
+        fimo * _DoH = fim_shiftdim(sGL);
+        fimo_free(sGL);
+        float * DoH = _DoH->V;
+        _DoH->V = NULL;
+        fimo_free(_DoH);
+        return DoH;
+    }
+
+    if(P > 1)
+    {
+        printf("3D DOH not implemented. %f\n", sigmaz);
+        assert(0);
+    }
+
+    return NULL;
+}
 
 /* Parital derivative in dimension dim */
 fimo * fimo_partial(const fimo * F, const int dim, const float sigma)
@@ -3641,7 +3927,8 @@ fimo * fim_shiftdim2(const fimo * restrict I)
             {
                 for(size_t mm = bm; mm< bm_end_c; mm++)
                 {
-                    S[nn + mm*M] = V[mm + nn*M];
+                    assert(nn + mm*N < M*N);
+                    S[nn + mm*N] = V[mm + nn*M];
                 }
             }
         }
@@ -3658,7 +3945,7 @@ fimo * fim_shiftdim(const fimo * restrict I)
     const size_t P = I->P;
 
     /* Output image */
-    fimo * O = malloc(sizeof(fimo));
+    fimo * O = calloc(1, sizeof(fimo));
     assert(O != NULL);
     O->V = fim_malloc(M*N*P*sizeof(float));
 
@@ -3737,11 +4024,114 @@ float * fim_focus_gm(const fimo * I, float sigma)
 {
     float * gm = malloc(I->P*sizeof(float));
     assert(gm != NULL);
+
+    /* Since the gpartial functions are parallel per plane we can
+     * loop over the planes in parallel here instead
+     */
+#pragma omp parallel for
     for(size_t kk = 0; kk<I->P; kk++)
     {
         gm[kk] = total_gm(I->V + kk*I->M*I->N, I->M, I->N, sigma);
     }
     return gm;
+}
+
+float * fim_auto_zcrop(const float * V,
+                       const size_t M, const size_t N, const size_t P,
+                       const size_t newP)
+{
+    fimo * fV = calloc(1, sizeof(fimo));
+    assert(fV != NULL);
+    fV->V = (float*) V;
+    fV->M = M;
+    fV->N = N;
+    fV->P = P;
+    float * focus = fim_focus_gm(fV, 3);
+    int slice = float_arg_max(focus, P);
+    free(focus);
+    int first = slice - (newP-1)/2;
+    first < 0 ? first = 0 : 0;
+    int last = first + newP - 1;
+    if(last <= (int) P)
+    {
+        last = last - (last - P) -1;
+        first = last - newP;
+    }
+    free(fV);
+    float * IZ = fim_malloc(M*N*newP*sizeof(float));
+    if(IZ == NULL)
+    {
+        fprintf(stderr, "Failed to allocate memory in fim_auto_zcrop\n");
+        return NULL;
+    }
+
+    for(size_t kk = 0; kk < newP; kk++)
+    {
+        memcpy(IZ + kk*M*N,
+               V + (first+kk)*M*N,
+               M*N*sizeof(float));
+    }
+    return IZ;
+}
+
+float * fim_zcrop(const float * V,
+                  const size_t M, const size_t N, const size_t P,
+                  const size_t zcrop)
+{
+    if(2*zcrop >= P)
+    {
+        fprintf(stderr, "Impossible zcrop value passed to fim_zcrop\n");
+        return NULL;
+    }
+    size_t newP = P - 2*zcrop;
+    float * IZ = fim_malloc(M*N*newP*sizeof(float));
+    if(IZ == NULL)
+    {
+        fprintf(stderr, "Failed to allocate memory in fim_zcrop\n");
+        return NULL;
+    }
+
+    for(size_t kk = 0; kk < newP; kk++)
+    {
+        memcpy(IZ + kk*M*N,
+               V + (kk+zcrop)*M*N,
+               M*N*sizeof(float));
+    }
+    return IZ;
+}
+
+fimo * fimo_get_plane(const fimo * A, int plane)
+{
+    if(plane < 0)
+    {
+        printf("fimo_get_plane: Can't extract plane %d\n", plane);
+        return NULL;
+    }
+    if(plane >= (int) A->P)
+    {
+        printf("fimo_get_plane: Can't extract plane %d from an image with %d planes\n",
+               plane, (int) A->P);
+        return NULL;
+    }
+    float * P = fim_malloc(A->M*A->N*sizeof(float));
+    if(P == NULL)
+    {
+        return NULL;
+    }
+    memcpy(P,
+           A->V + plane*A->M*A->N,
+           A->M*A->N*sizeof(float));
+    fimo * Z = calloc(1, sizeof(fimo));
+    if(Z == NULL)
+    {
+        free(P);
+        return NULL;
+    }
+    Z->V = P;
+    Z->M = A->M;
+    Z->N = A->N;
+    Z->P = 1;
+    return Z;
 }
 
 ftab_t * fim_features_2d(const fimo * fI)
@@ -3764,7 +4154,7 @@ ftab_t * fim_features_2d(const fimo * fI)
     int nsigma = 1;
     int f_per_s = 7; /* Features per sigma */
     int nfeatures = nsigma*f_per_s;
-    printf("Will produce %d features\n", nfeatures);
+    //printf("Will produce %d features\n", nfeatures);
     ftab_t * T = malloc(sizeof(ftab_t));
     assert(T != NULL);
     T->nrow = fI->M*fI->N;
@@ -3791,7 +4181,7 @@ ftab_t * fim_features_2d(const fimo * fI)
     for(int ss = 0; ss<nsigma; ss++)
     {
         float sigma = sigmas[ss];
-        printf("%f ", sigma); fflush(stdout);
+        //printf("%f ", sigma); fflush(stdout);
 
         fimo * G = fimo_copy(fI);
 
@@ -3900,6 +4290,25 @@ ftab_t * fim_features_2d(const fimo * fI)
     }
     return T;
 }
+
+fimo * fimo_tiff_read(const char * file)
+{
+    i64 M, N, P;
+
+    float * V = fim_tiff_read(file, NULL, &M, &N, &P, 0);
+    if(V == NULL)
+    {
+        return NULL;
+    }
+    fimo * I = calloc(1, sizeof(fimo));
+    assert(I != NULL);
+    I->V = V;
+    I->M = M;
+    I->N = N;
+    I->P = P;
+    return I;
+}
+
 
 void fim_features_2d_ut()
 {
@@ -4127,60 +4536,6 @@ void fim_conv1_ut(fim_boundary_condition bc)
     return;
 }
 
-void fim_ut()
-{
-    fim_conv1_ut(FIM_BC_SYMMETRIC_MIRROR);
-    fim_conv1_ut(FIM_BC_ZEROS);
-    fim_conv1_ut(FIM_BC_VALID);
-    fim_conv1_ut(FIM_BC_PERIODIC);
-    fim_conv1_ut(FIM_BC_WEIGHTED);
-    fim_argmax_max_ut();
-    fim_min_ut();
-    fim_max_ut();
-    fim_LoG_ut();
-    fim_features_2d_ut();
-    fim_conv1_vector_ut();
-    fim_conncomp6_ut();
-    exit(EXIT_SUCCESS);
-    fim_otsu_ut();
-    exit(EXIT_SUCCESS);
-    fim_flipall_ut();
-    shift_vector_ut();
-    size_t N = 0;
-    float sigma = 1;
-    float * K = gaussian_kernel(sigma, &N);
-    assert(N>0);
-    printf("gaussian_kernel, sigma=%f\n", sigma);
-    show_vec(K, N);
-    fim_free(K);
-    sigma = 0.5;
-    K = gaussian_kernel(sigma, &N);
-    printf("gaussian_kernel, sigma=%f\n", sigma);
-    show_vec(K, N);
-
-    int nV = 10;
-    float * V = fim_malloc(nV*sizeof(float));
-    assert(V != NULL);
-    for(int kk = 0; kk<nV; kk++)
-    {
-        V[kk] = kk;
-    }
-    printf("V=");
-    show_vec(V, nV);
-    fim_conv1_vector(V, 1, NULL, nV, K, N, 1);
-    printf("V*K = ");
-    show_vec(V, nV);
-
-    fim_free(V);
-    fim_free(K);
-
-    fim_cumsum_ut();
-    fim_local_sum_ut();
-    //exit(EXIT_FAILURE);
-    myfftw_start(1, 1, stdout);
-    fim_xcorr2_ut();
-    myfftw_stop();
-}
 
 fimo * fimo_transpose(const fimo * restrict A)
 {
@@ -4234,4 +4589,344 @@ void fimo_blit_2D(fimo * A, const fimo * B, size_t x0, size_t y0)
     }
 
     return;
+}
+
+
+float
+fim_interp3_trilinear(const float * restrict A,
+                      const size_t M, const size_t N, const size_t P,
+                      const float x, const float y, const float z)
+{
+
+    /* We would like to calculate
+     * A[x + M*y + N*z] by linear interpolation.
+     * For that we need 8 points from A
+     */
+
+
+    if(x < 0 || x > (M - 1)
+       || y < 0 || y > (N - 1)
+       || z < 0 || z > (P - 1))
+    {
+        return 0;
+    }
+
+    int x0 = x;
+    float wx = 1.0 - ( x-(float) x0 );
+    int y0 = y;
+    float wy = 1.0 - ( y-(float) y0 );
+    int z0 = z;
+    float wz = 1.0 - ( z- (float) z0 );
+
+    return wz*(
+        wy*(
+            wx*A[x0 + y0*M + z0*M*N]
+            + (1.0-wx)*A[x0+1 + y0*M + z0*M*N])
+        +(1.0-wy)*(wx*A[x0 + (y0+1)*M + z0*M*N] +
+                   (1.0-wx)*A[x0+1 + (y0+1)*M + z0*M*N]))
+        + (1.0-wz)*(
+            wy*(
+                wx*A[x0 + y0*M + (z0+1)*M*N]
+                + (1.0-wx)*A[x0+1 + y0*M + (z0+1)*M*N])
+            + (1.0-wy)*(wx*A[x0 + (y0+1)*M + (z0+1)*M*N]
+                        + (1.0-wx)*A[x0+1 + (y0+1)*M + (z0+1)*M*N]));
+}
+
+
+/* Low precision covariance calculation */
+float
+fim_covariance_lp(const float * X, const float * Y, size_t n)
+{
+    assert(X != NULL);
+    assert(Y != NULL);
+    double mx = fim_mean(X, n);
+    double my = mx;
+    if(X != Y)
+    {
+        my = fim_mean(Y, n);
+    }
+    double covar = 0;
+    for(size_t kk = 0; kk < n; kk++)
+    {
+        covar += (X[kk]-mx)*(Y[kk]-my);
+    }
+    covar /= ((double) n - 1.0);
+    return covar;
+}
+
+float
+fim_dot_lateral_circularity(const float * I,
+                            size_t M, size_t N, size_t P,
+                            double x, double y, double z,
+                            double sigma)
+{
+    assert(sigma > 0);
+    assert(I != NULL);
+    // Check z-coordinate
+    const int zi = round(z);
+    if(zi < 0)
+    {
+        return -1;
+    }
+    if((size_t) zi >= P)
+    {
+        return -1;
+    }
+
+    /* Radius of the windowing function */
+    sigma < 1.0 ? sigma = 1.0 : 0;
+
+    const double radius = 1.75*sigma;
+
+    const int s = (int) ( (2.0*sigma) + 1.0 );
+    const int n = 2*s + 1;
+    assert(n > 0);
+
+    float * X = calloc(n*n, sizeof(float));
+    assert(X != NULL);
+
+    float * Y = calloc(n*n, sizeof(float));
+    assert(Y != NULL);
+
+    const int ix = round(x);
+    const int iy = round(y);
+
+    int xlow = ix - s;
+    ix - s < 0 ? xlow = 0 : 0;
+    int xhigh = ix + s;
+    ix + s >= (int) M ? xhigh = M-1 : 0;
+
+    int ylow = iy - s;
+    iy - s < 0 ? ylow = 0 : 0;
+    int yhigh = iy + s;
+    iy + s >= (int) N ? yhigh = N-1 : 0;
+
+    //printf("[%d %d] x [%d %d]\n", xlow, xhigh, ylow, yhigh);
+
+    /* Get the max and min values of the pixels */
+    double minI = 1e99;
+    double maxI = -1e99;
+    for(int yy = ylow; yy <= yhigh; yy++)
+    {
+        for(int xx = xlow; xx <= xhigh; xx++)
+        {
+            double p = I[xx + yy*M + zi*M*N];
+            p > maxI ? maxI = p : 0;
+            p < minI ? minI = p : 0;
+        }
+    }
+    //printf("data in range [%f, %f]\n", minI, maxI);
+
+    if(maxI <= minI)
+    {
+        /* If the pixel data is constant we can't estimate anything */
+        free(X);
+        free(Y);
+        return -1;
+    }
+    assert(maxI > minI);
+    assert( (yhigh-ylow +1)*(xhigh - xlow + 1) <= n*n);
+
+    size_t idx = 0;
+    for(int yy = ylow; yy <= yhigh; yy++)
+    {
+        for(int xx = xlow; xx <= xhigh; xx++)
+        {
+
+            double r = sqrtf(
+                powf( (double) yy - y, 2) + powf( (double) xx - x, 2)
+                );
+            double rw = (radius - r); /* A soft threshold */
+            rw  > 1.0 ? rw = 1 : 0;
+            rw < 0.0 ? rw = 0 : 0;
+
+            // normalized pixel value to [0, 1]
+            double w = rw*(I[xx + yy*M + zi*M*N] - minI)/(maxI-minI);
+            X[idx] = w* ((double) xx - x);
+            Y[idx] = w* ((double) yy - y);
+            if(0)
+            {
+                printf("I[%d, %d]=%f, rw= %f  x=(%f, %f)  %f, %f\n",
+                       xx, yy,
+                       I[xx + yy*M + zi*M*N], rw,
+                       (double) xx - x, (double) yy - y,
+                       X[idx], Y[idx]);
+            }
+            idx++;
+        }
+    }
+
+    double a = fim_covariance_lp(X, X, n*n);
+    double b = fim_covariance_lp(Y, Y, n*n);
+    double c = fim_covariance_lp(X, Y, n*n);
+
+    // printf("cov = [%f %f ; %f %f]\n", a, b, b, c);
+    free(X);
+    free(Y);
+
+    double l1 = (a+b)/2 + sqrt(pow(c, 2)  + pow(a+b,2)/4 - a*b);
+    double l2 = (a+b)/2 - sqrt(pow(c, 2)  + pow(a+b,2)/4 - a*b);
+    //printf("l1=%f, l2 = %f\n", l1, l2);
+    return l2 / l1;
+}
+
+static void fim_covariance_lp_ut()
+{
+    size_t n = 11;
+    float * X = calloc(n, sizeof(float));
+    assert(X != NULL);
+    float * Y = calloc(n, sizeof(float));
+    assert(Y != NULL);
+    for(size_t kk = 0; kk < n; kk++)
+    {
+        X[kk] = (double) rand() / (double) RAND_MAX;
+        Y[kk] = (double) rand() / (double) RAND_MAX;
+    }
+
+
+    for(size_t kk = 0; kk < n; kk++)
+    {
+        if(kk == 0)
+        {
+            printf("X=[");
+        }
+        printf("%f, %f", X[kk], Y[kk]);
+        if( kk+1 == n)
+        {
+            printf("];");
+        }
+        printf("\n");
+    }
+
+    printf("cov = [%f, %f; %f, %f]\n",
+           fim_covariance_lp(X, X, n),
+           fim_covariance_lp(X, Y, n),
+           fim_covariance_lp(Y, X, n),
+           fim_covariance_lp(Y, Y, n));
+
+    free(X);
+    free(Y);
+}
+
+void fim_dot_lateral_circularity_ut()
+{
+    int s = 7;
+    int n = 2*s + 1;
+    float * G = calloc(n*n, sizeof(float));
+    assert(G != NULL);
+    for(int xx = 0; xx < n; xx++)
+    {
+        for(int yy = 0; yy < n; yy++)
+        {
+            float r2 = n-sqrt((xx-s)*(xx-s) + (yy-s)*(yy-s));
+            G[xx + n*yy] = r2;
+        }
+    }
+    double circ = fim_dot_lateral_circularity(G, n, n, 1,
+                                              s, s, 0,
+                                              1.5);
+    printf("circ = %f\n", circ);
+
+    free(G);
+
+    FILE * fid = fopen("G.f32", "rb");
+    if(fid == NULL)
+    {
+        return;
+    }
+    printf("Testing on data in G.f32 which is assumed to be a square shaped 2D image\n");
+    fseek(fid, 0, SEEK_END);
+    size_t nb = ftell(fid);
+    rewind(fid);
+    float * G2 = calloc(nb/sizeof(float), sizeof(float));
+    size_t nread = fread(G2, nb/sizeof(float), sizeof(float), fid);
+
+    if(nread != nb/sizeof(float))
+    {
+        printf("Error reading G.f32\n");
+        exit(EXIT_FAILURE);
+    }
+    size_t side = sqrt(nb/sizeof(float));
+    circ = fim_dot_lateral_circularity(G2, side, side, 1,
+                                       ((double) side - 1.0) /2,
+                                       ((double) side - 1.0) /2,
+                                       0,
+                                       2);
+    free(G2);
+    printf("circ = %f\n", circ);
+    return;
+}
+
+static void fim_DoH_ut(void)
+{
+    size_t M = 128;
+    size_t N = 64;
+    size_t P = 1;
+    float * X = calloc(M*N*P, sizeof(float));
+    assert(X != NULL);
+    float * DoH = fim_DoH(X, M, N, P, 1, 1);
+    printf("DoH[0] = %f\n", DoH[0]);
+    free(X);
+    free(DoH);
+    return;
+}
+
+void fim_ut()
+{
+    fim_DoH_ut();
+    return;
+    fim_covariance_lp_ut();
+    fim_dot_lateral_circularity_ut();
+
+    fim_conv1_ut(FIM_BC_SYMMETRIC_MIRROR);
+    fim_conv1_ut(FIM_BC_ZEROS);
+    fim_conv1_ut(FIM_BC_VALID);
+    fim_conv1_ut(FIM_BC_PERIODIC);
+    fim_conv1_ut(FIM_BC_WEIGHTED);
+    fim_argmax_max_ut();
+    fim_min_ut();
+    fim_max_ut();
+    fim_LoG_ut();
+    fim_features_2d_ut();
+    fim_conv1_vector_ut();
+    fim_conncomp6_ut();
+    exit(EXIT_SUCCESS);
+    fim_otsu_ut();
+    exit(EXIT_SUCCESS);
+    fim_flipall_ut();
+    shift_vector_ut();
+    size_t N = 0;
+    float sigma = 1;
+    float * K = gaussian_kernel(sigma, &N);
+    assert(N>0);
+    printf("gaussian_kernel, sigma=%f\n", sigma);
+    show_vec(K, N);
+    fim_free(K);
+    sigma = 0.5;
+    K = gaussian_kernel(sigma, &N);
+    printf("gaussian_kernel, sigma=%f\n", sigma);
+    show_vec(K, N);
+
+    int nV = 10;
+    float * V = fim_malloc(nV*sizeof(float));
+    assert(V != NULL);
+    for(int kk = 0; kk<nV; kk++)
+    {
+        V[kk] = kk;
+    }
+    printf("V=");
+    show_vec(V, nV);
+    fim_conv1_vector(V, 1, NULL, nV, K, N, 1);
+    printf("V*K = ");
+    show_vec(V, nV);
+
+    fim_free(V);
+    fim_free(K);
+
+    fim_cumsum_ut();
+    fim_local_sum_ut();
+    //exit(EXIT_FAILURE);
+    myfftw_start(1, 1, stdout);
+    fim_xcorr2_ut();
+    myfftw_stop();
 }

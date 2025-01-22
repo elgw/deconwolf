@@ -40,6 +40,9 @@
 #include <unistd.h>
 #endif
 
+#include <string.h>
+
+
 #define tictoc struct timespec tictoc_start, tictoc_end;
 #define tic dw_gettime(&tictoc_start);
 #define toc(X) dw_gettime(&tictoc_end); printf(#X); printf(" %f s\n", timespec_diff(&tictoc_end, &tictoc_start)); fflush(stdout);
@@ -59,7 +62,7 @@ void dw_gettime(struct timespec *);
  */
 int ensuredir(const char * dir);
 
-/* Check if directory exist, do not create if missing
+/* Check if directory exist
  * returns 1 if it exist
  * */
 
@@ -70,18 +73,42 @@ int isdir(const char * dir);
  */
 int dw_get_threads(void);
 
-/* Return 1 if the file exist, else 0 */
-int dw_file_exist(char * fname);
+/* Return 1 if the file exist, else 0
+ * also returns 0 if fname is a folder (some consider that to be a file as well)
+ */
+int dw_isfile(const char * fname);
 
 /* Difference between two timepoints */
 float timespec_diff(struct timespec* end, struct timespec * start);
 
-/* Get peak memory usage, works on Linux and MacOS
-* returns 0 under windows */
-size_t get_peakMemoryKB(void);
+/* On Linux:
+ * Reads /proc/self/status and assumes that the unit will be kb
+ *
+ * physical:
+ * VmHWM = Peak Resident Set Size (peak RSS) i.e. how much physical memory
+ * virtual:
+ * VmPeak = peak Virtual Memory Size (peak VMZ) i.e. how much that is
+ * allocated, although possibly never used.
+ *
+ * On MACOS:
+ * physical = r_usage.ru_maxrss
+ * virtual: set to 0
+ *
+ * On Windows: TODO
+ * physical: 0
+ * virtual: 0
+ * Returns non 0
+ *
+ * Returns 0 on success.
+ */
+
+int get_peakMemoryKB(size_t * physical, size_t * virtual);
+
+/* Print a line about peak memory usage to a file */
+void fprint_peak_memory(FILE * fid);
 
 /* Read the scaling of file from the .log.txt file if exists */
-float dw_read_scaling(char * file);
+float dw_read_scaling(const char * file);
 
 /* Linux : returns dirname() of path.
  * path is not altered and the returned strings has to be freed.
@@ -103,6 +130,8 @@ char * dw_getcwd(char * buf, size_t size);
  * Examples:
  * ("file.tif", "dw") -> "dw_file.tif"
  * ("/dir/file.tif", "dw" -> "/dir/dw_file.tif"
+ * if prefix == NULL or strlen(prefix) = 0
+ * this command is equivalent to strdup
  **/
 char * dw_prefix_file(const char * file, const char * prefix);
 
@@ -113,3 +142,6 @@ int getline(char **lineptr, size_t *n, FILE *stream);
 
 float abbe_res_xy(float lambda, float NA);
 float abbe_res_z(float lambda, float NA);
+
+int64_t
+float_arg_max(const float * v, size_t N);

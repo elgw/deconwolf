@@ -46,6 +46,11 @@
 #include "dw_tiff_merge.h"
 #include "dw_imshift.h"
 #include "dw_version.h"
+#ifndef WINDOWS
+#include "dw_nuclei.h"
+#endif
+#include "dw_background.h"
+
 /* Uncomment to include, requires linking with libpng and libz
  * can be build separately by the makefile in the src folder
  */
@@ -54,6 +59,7 @@
 #include "dw_dots.h"
 #include "dw_psf.h"
 #include "dw_psf_sted.h"
+#include "dw_align_dots.h"
 #endif
 
 #include "fim.h"
@@ -170,6 +176,9 @@ struct _dw_opts{
     int borderQuality;
     int outFormat; // 16 (=16 bit int) or 32 (=32 bit float)
     float scaling; // fixed scaling for 16 bit output, automatic scaling is used if this value <= 0
+
+    int auto_zcrop; // Set to > 0 for an attempt to automatically crop out the middle planes of the image
+    int zcrop; // How many planes to remove from top and bottom
 
     /* sigma of Gaussian used for pre filtering of the image and the PSF
      * this was found beneficial a paper by Van Kempen

@@ -96,7 +96,7 @@ void clu_exit_error(cl_int err,
     const char * err_cl = clGetErrorString(err);
     printf("   OpenCl error=%s\n", err_cl);
 
-    #ifndef VKFFT_BACKEND
+#ifndef VKFFT_BACKEND
     if(clfft)
     {
         if(strcmp(err_cl, "CL_UNKNOWN_ERROR") == 0)
@@ -262,14 +262,14 @@ fimcl_t * fimcl_new(clu_env_t * clu, fimcl_type type,
     }
 
 
-        Y->buf_size_nf = fimcl_ncx(Y)*2;
+    Y->buf_size_nf = fimcl_ncx(Y)*2;
 
-        Y->buf = clCreateBuffer(clu->context,
-                                CL_MEM_READ_WRITE,
-                                Y->buf_size_nf*sizeof(float),
-                                NULL, &ret );
-        clu->nb_allocated += Y->buf_size_nf*sizeof(float);
-        clu->n_alloc++;
+    Y->buf = clCreateBuffer(clu->context,
+                            CL_MEM_READ_WRITE,
+                            Y->buf_size_nf*sizeof(float),
+                            NULL, &ret );
+    clu->nb_allocated += Y->buf_size_nf*sizeof(float);
+    clu->n_alloc++;
 
     check_CL(ret);
 
@@ -366,7 +366,7 @@ static fimcl_t * _fimcl_convolve(fimcl_t * X, fimcl_t * Y, int mode, int conj)
 
     if(X->clu->verbose > 1)
     {
-        printf("fimcl_convolve\n");
+        printf("fimcl_convolve mode=%d, conj=%d\n", mode, conj);
     }
 
     if(X->type == fimcl_hermitian && Y->type == fimcl_hermitian)
@@ -433,6 +433,7 @@ fimcl_t * fimcl_convolve(fimcl_t * X, fimcl_t * Y, int mode)
 {
     return _fimcl_convolve(X, Y, mode, 0);
 }
+
 fimcl_t * fimcl_convolve_conj(fimcl_t * X, fimcl_t * Y, int mode)
 {
     return _fimcl_convolve(X, Y, mode, 1);
@@ -460,7 +461,7 @@ void fimcl_preprocess(fimcl_t * fft_image, fimcl_t * fft_PSF, float value)
     printf("fimcl_preprocess, value = %f\n", value);
 
     assert(fft_PSF->M == fft_image->M);
-    cl_kernel kernel = fft_image->clu->kern_preprocess_image.kernel;
+    cl_kernel kernel = fft_image->clu->kern_preprocess_image->kernel;
 
     /* Set sizes */
     size_t localWorkSize; /* Use largest possible */
@@ -520,10 +521,15 @@ void fimcl_complex_mul(fimcl_t * X, fimcl_t * Y, fimcl_t * Z, int conj)
     assert(X->type == fimcl_hermitian);
     assert(Y->type == fimcl_hermitian);
 
-    cl_kernel kernel = X->clu->kern_mul.kernel;
+    if(X->clu->verbose > 1)
+    {
+        printf("fimcl_complex_mul, conj=%d\n", conj);
+    }
+
+    cl_kernel kernel = X->clu->kern_mul->kernel;
     if(conj == 1)
     {
-        kernel = X->clu->kern_mul_conj.kernel;
+        kernel = X->clu->kern_mul_conj->kernel;
     }
 
 
@@ -578,10 +584,10 @@ void fimcl_complex_mul_old(fimcl_t * X, fimcl_t * Y, fimcl_t * Z, int conj)
     size_t global_work_offset[] = {0, 0, 0};
     size_t local_work_size[] = {1,1,1};
 
-    cl_kernel kernel = X->clu->kern_mul.kernel;
+    cl_kernel kernel = X->clu->kern_mul->kernel;
     if(conj == 1)
     {
-        kernel = X->clu->kern_mul_conj.kernel;
+        kernel = X->clu->kern_mul_conj->kernel;
     }
 
     size_t cMNP = fimcl_ncx(X);
@@ -628,7 +634,7 @@ void fimcl_real_mul_inplace(fimcl_t * X, fimcl_t * Y)
     assert(X->P == Y->P);
 
 
-    cl_kernel kernel = X->clu->kern_real_mul_inplace.kernel;
+    cl_kernel kernel = X->clu->kern_real_mul_inplace->kernel;
 
     /* Set sizes */
     size_t localWorkSize; /* Use largest possible */
@@ -684,7 +690,7 @@ void fimcl_shb_update(fimcl_t * P, fimcl_t * X, fimcl_t * XP, float alpha)
         //       exit(EXIT_FAILURE);
     }
 
-    cl_kernel kernel = X->clu->kern_shb_update.kernel;
+    cl_kernel kernel = X->clu->kern_shb_update->kernel;
 
     /* Set sizes */
     size_t localWorkSize; /* Use largest possible */
@@ -746,7 +752,7 @@ void fimcl_shb_update(fimcl_t * P, fimcl_t * X, fimcl_t * XP, float alpha)
 void fimcl_positivity(fimcl_t * X, float val)
 {
     assert(X != NULL);
-    cl_kernel kernel = X->clu->kern_real_positivity.kernel;
+    cl_kernel kernel = X->clu->kern_real_positivity->kernel;
 
     /* Set sizes */
     size_t localWorkSize; /* Use largest possible */
@@ -800,10 +806,15 @@ void fimcl_complex_mul_inplace(fimcl_t * X, fimcl_t * Y, int conj)
     assert(X->type == fimcl_hermitian);
     assert(Y->type == fimcl_hermitian);
 
-    cl_kernel kernel = X->clu->kern_mul_inplace.kernel;
+    if(X->clu->verbose > 1)
+    {
+        printf("fimcl_complex_mul_inplace, conj=%d\n", conj);
+    }
+
+    cl_kernel kernel = X->clu->kern_mul_inplace->kernel;
     if(conj == 1)
     {
-        kernel = X->clu->kern_mul_conj_inplace.kernel;
+        kernel = X->clu->kern_mul_conj_inplace->kernel;
     }
 
     /* Set sizes */
@@ -1210,7 +1221,7 @@ void clu_print_device_info(FILE * fid, cl_device_id dev_id)
 
 static char * read_program(const char * fname, size_t * size)
 {
-    FILE * fid = fopen(fname, "r");
+    FILE * fid = fopen(fname, "rb");
     if (!fid) {
         fprintf(stderr, "Failed to load kernel from %s.\n", fname);
         exit(EXIT_FAILURE);
@@ -1228,11 +1239,11 @@ static char * read_program(const char * fname, size_t * size)
 
 /** Callback from clCreateContext */
 void cl_crash_fun (
-    const char *errinfo,
-    __attribute__((unused)) const void *private_info,
-    __attribute__((unused)) size_t cb,
-    __attribute__((unused)) void *user_data
-    )
+                   const char *errinfo,
+                   __attribute__((unused)) const void *private_info,
+                   __attribute__((unused)) size_t cb,
+                   __attribute__((unused)) void *user_data
+                   )
 {
     printf("On no... bad new from OpenCL:\n");
     printf("errinfo: %s\n", errinfo);
@@ -1403,7 +1414,7 @@ void clu_prepare_kernels(clu_env_t * clu,
     sprintf(argstring, "-D cMNP=%zu",
             M_r2h(wM)*wN*wP);
     clu->kern_mul =
-        *clu_kernel_newa(clu,
+        clu_kernel_newa(clu,
                          NULL, //"cl_complex_mul.c",
                          (const char *) cl_complex_mul,
                          cl_complex_mul_len,
@@ -1411,28 +1422,28 @@ void clu_prepare_kernels(clu_env_t * clu,
                          argstring);
 
     clu->kern_mul_conj =
-        *clu_kernel_newa(clu,
+        clu_kernel_newa(clu,
                          NULL, //"cl_complex_mul_conj.c",
                          (const char *) cl_complex_mul_conj,
                          cl_complex_mul_conj_len,
                          "cl_complex_mul_conj",
                          argstring);
     clu->kern_mul_inplace =
-        *clu_kernel_newa(clu,
+        clu_kernel_newa(clu,
                          NULL,
                          (const char *) cl_complex_mul_inplace,
                          cl_complex_mul_inplace_len,
                          "cl_complex_mul_inplace",
                          argstring);
     clu->kern_mul_conj_inplace =
-        *clu_kernel_newa(clu,
+        clu_kernel_newa(clu,
                          NULL,
                          (const char *) cl_complex_mul_conj_inplace,
                          cl_complex_mul_conj_inplace_len,
                          "cl_complex_mul_conj_inplace",
                          argstring);
     clu->kern_preprocess_image =
-        * clu_kernel_newa(clu,
+         clu_kernel_newa(clu,
                           NULL,
                           (const char *) src_kernels_cl_preprocess_image_c,
                           src_kernels_cl_preprocess_image_c_len,
@@ -1442,21 +1453,21 @@ void clu_prepare_kernels(clu_env_t * clu,
     /* Kernels for real float */
     sprintf(argstring, "-D wMNP=%zu", padsize(wM)*wN*wP);
     clu->kern_real_mul_inplace =
-        * clu_kernel_newa(clu,
+         clu_kernel_newa(clu,
                           NULL,
                           (const char *) src_kernels_cl_real_mul_inplace_c,
                           src_kernels_cl_real_mul_inplace_c_len,
                           "cl_real_mul_inplace",
                           argstring);
     clu->kern_real_positivity =
-        * clu_kernel_newa(clu,
+         clu_kernel_newa(clu,
                           NULL,
                           (const char *) src_kernels_cl_positivity_c,
                           src_kernels_cl_positivity_c_len,
                           "cl_positivity",
                           argstring);
     clu->kern_shb_update =
-        * clu_kernel_newa(clu,
+         clu_kernel_newa(clu,
                           NULL,
                           (const char *) src_kernels_cl_shb_update_c,
                           src_kernels_cl_shb_update_c_len,
@@ -1556,7 +1567,7 @@ void clu_prepare_kernels(clu_env_t * clu,
     }
 
     int load_vkfft_from_file = 0;
-    if(dw_file_exist(vkfft_cache_file_name))
+    if(dw_isfile(vkfft_cache_file_name))
     {
         load_vkfft_from_file = 1;
     }
@@ -1599,6 +1610,12 @@ void clu_prepare_kernels(clu_env_t * clu,
         FILE* kernelCache;
         uint64_t str_len;
         kernelCache = fopen(vkfft_cache_file_name, "rb");
+        if(kernelCache == NULL)
+        {
+            fprintf(stderr, "Unable to load %s\n", vkfft_cache_file_name);
+            configuration.loadApplicationString = 0;
+            goto skipLoadApplicationFromString;
+        }
         fseek(kernelCache, 0, SEEK_END);
         str_len = ftell(kernelCache);
         fseek(kernelCache, 0, SEEK_SET);
@@ -1614,7 +1631,16 @@ void clu_prepare_kernels(clu_env_t * clu,
             exit(EXIT_FAILURE);
         }
         fclose(kernelCache);
+    skipLoadApplicationFromString:
+        ;
     }
+    if(clu->verbose > 1)
+    {
+        printf("VkFFT configuration:\n");
+        printf("loadApplicationFromString: %lu\n", configuration.loadApplicationFromString);
+        printf("saveApplicationToString: %lu\n", configuration.saveApplicationToString);
+    }
+
     VkFFTResult resFFT = initializeVkFFT(&clu->vkfft_app, configuration);
     if(resFFT != 0)
     {
@@ -1634,15 +1660,24 @@ void clu_prepare_kernels(clu_env_t * clu,
                 "was not enough memory on the GPU\n");
         exit(EXIT_FAILURE);
     }
+    if(clu->verbose > 1)
+    {
+        printf("VkFFT was initialized\n");
+    }
     if (configuration.loadApplicationFromString) {
         free(configuration.loadApplicationString);
     }
     if (configuration.saveApplicationToString) {
         FILE* kernelCache;
         kernelCache = fopen(vkfft_cache_file_name, "wb");
-        fwrite(clu->vkfft_app.saveApplicationString,
-               clu->vkfft_app.applicationStringSize, 1, kernelCache);
-        fclose(kernelCache);
+        if(kernelCache == NULL)
+        {
+            fprintf(stderr, "Unable to open %s for writing\n", vkfft_cache_file_name);
+        } else {
+            fwrite(clu->vkfft_app.saveApplicationString,
+                   clu->vkfft_app.applicationStringSize, 1, kernelCache);
+            fclose(kernelCache);
+        }
     }
     dw_gettime(&t1);
     if(clu->verbose > 2)
@@ -1665,6 +1700,10 @@ void clu_destroy(clu_env_t * clu)
     }
 
 #ifdef VKFFT
+    if(clu->verbose > 1)
+    {
+        printf("Clearing up VkFFT\n");
+    }
     deleteVkFFT(&clu->vkfft_app);
 #else
     /* Release clFFT library. */
@@ -1694,20 +1733,31 @@ void clu_destroy(clu_env_t * clu)
     check_CL(clFlush(clu->command_queue));
     /* For complex data */
     clu_kernel_destroy(clu->kern_mul);
+    clu->kern_mul = NULL;
     clu_kernel_destroy(clu->kern_mul_conj);
+    clu->kern_mul_conj = NULL;
     clu_kernel_destroy(clu->kern_mul_inplace);
+    clu->kern_mul_inplace = NULL;
     clu_kernel_destroy(clu->kern_mul_conj_inplace);
+    clu->kern_mul_conj_inplace = NULL;
     /* For real data */
 
     clu_kernel_destroy(clu->kern_real_mul_inplace);
+    clu->kern_real_mul_inplace = NULL;
     clu_kernel_destroy(clu->kern_real_positivity);
+    clu->kern_real_positivity = NULL;
 
     clu_kernel_destroy(clu->kern_shb_update);
+    clu->kern_shb_update = NULL;
+
     clu_kernel_destroy(clu->kern_preprocess_image);
+    clu->kern_preprocess_image = NULL;
 
-    clu_kernel_destroy(*clu->idiv_kernel);
+    clu_kernel_destroy(clu->idiv_kernel);
+    clu->idiv_kernel = NULL;
 
-    clu_kernel_destroy(*clu->update_y_kernel);
+    clu_kernel_destroy(clu->update_y_kernel);
+    clu->update_y_kernel = NULL;
 
     check_CL(clFinish(clu->command_queue));
     check_CL(clReleaseCommandQueue(clu->command_queue) );
@@ -1832,11 +1882,17 @@ clu_kernel_t * clu_kernel_newa(clu_env_t * env,
 }
 
 
-void clu_kernel_destroy(clu_kernel_t kern)
+void clu_kernel_destroy(clu_kernel_t * kern)
 {
-    check_CL( clReleaseKernel(kern.kernel));
-    check_CL( clReleaseProgram(kern.program));
-    //printf("1 clReleaseProgram\n");
+    if(kern == NULL)
+    {
+        fprintf(stderr, "Warning: Calling clu_kernel_destroy(NULL)\n");
+        return;
+    }
+    check_CL( clReleaseKernel(kern->kernel));
+    check_CL( clReleaseProgram(kern->program));
+    free(kern);
+
     return;
 }
 
@@ -1851,14 +1907,17 @@ cl_uint clu_wait_for_event(cl_event clev, size_t ns)
     struct timespec sleep_rem = {};
     cl_uint status = CL_QUEUED;
 
-    /* No sleeping at all if it is already done */
+    /* No sleeping at all if it is already done
+     * TODO: Rethink this part, see
+     * https://registry.khronos.org/OpenCL/sdk/3.0/docs/man/html/clGetEventInfo.html
+     */
     ret = clGetEventInfo(clev,
                          CL_EVENT_COMMAND_EXECUTION_STATUS,
                          param_value_size,
                          &status,
                          &param_value_size_ret);
 
-    if(status == CL_COMPLETE || ret != CL_SUCCESS)
+    if(status == CL_COMPLETE || ret == CL_SUCCESS)
     {
         return ret;
     }
@@ -1867,10 +1926,10 @@ cl_uint clu_wait_for_event(cl_event clev, size_t ns)
     while(status != CL_COMPLETE)
     {
         // TODO: Bussy waiting on windows ...
-        #ifndef WINDOWS
+#ifndef WINDOWS
         nanosleep(&sleep_req,
                   &sleep_rem);
-        #endif
+#endif
         ret = clGetEventInfo(clev,
                              CL_EVENT_COMMAND_EXECUTION_STATUS,
                              param_value_size,
@@ -2356,8 +2415,8 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
     struct timespec tstart, tend, t0, t1;
 
     if(timers){
-    printf("\n");
-    dw_gettime(&tstart);
+        printf("\n");
+        dw_gettime(&tstart);
     }
 
     /* Number of voxels to process per work item
@@ -2414,7 +2473,7 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
 
     if(timers){
         dw_gettime(&t1);
-    printf("Create buffer: %f \n", timespec_diff(&t1, &t0));
+        printf("Create buffer: %f \n", timespec_diff(&t1, &t0));
     }
 
     check_CL( clSetKernelArg(kernel,
@@ -2446,8 +2505,8 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
     fimcl_sync(forward);
     if(timers)
     {
-    dw_gettime(&t1);
-    printf("Reduce: %f \n", timespec_diff(&t1, &t0));
+        dw_gettime(&t1);
+        printf("Reduce: %f \n", timespec_diff(&t1, &t0));
     }
 
     /* Download the result */
@@ -2465,8 +2524,8 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
     clFinish(forward->clu->command_queue);
     if(timers)
     {
-    dw_gettime(&t1);
-    printf("Download: %f \n", timespec_diff(&t1, &t0));
+        dw_gettime(&t1);
+        printf("Download: %f \n", timespec_diff(&t1, &t0));
     }
 
     if(timers){dw_gettime(&t0);}
@@ -2474,8 +2533,8 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
 
     if(timers)
     {
-    dw_gettime(&t1);
-    printf("Release buffer: %f \n", timespec_diff(&t1, &t0));
+        dw_gettime(&t1);
+        printf("Release buffer: %f \n", timespec_diff(&t1, &t0));
     }
 
     float sum_gpu = 0;
@@ -2488,8 +2547,8 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
 
     if(timers)
     {
-    dw_gettime(&tend);
-    printf("Total: %f \n", timespec_diff(&tend, &tstart));
+        dw_gettime(&tend);
+        printf("Total: %f \n", timespec_diff(&tend, &tstart));
     }
 
     return sum_gpu / (float) (image->M*image->N*image->P);

@@ -14,6 +14,7 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+
 #include "dw_util.h"
 
 #ifdef WINDOWS
@@ -169,14 +170,19 @@ int dw_get_threads(void)
     return nThreads;
 }
 
-int dw_file_exist(char * fname)
+
+int dw_isfile(const char * fname)
 {
 #ifndef WINDOWS
-    if( access( fname, F_OK ) != -1 ) {
-        return 1; // File exist
-    } else {
+    struct stat buf;
+    if(stat(fname, &buf) < 0) {
         return 0;
     }
+
+    if(S_ISDIR(buf.st_mode) != 0) {
+        return 0;
+    }
+    return 1;
 #else
     FILE * fid = fopen(fname, "r");
     if(fid == NULL)
@@ -197,36 +203,37 @@ float timespec_diff(struct timespec* end, struct timespec * start)
 }
 
 #ifdef WINDOWS
-size_t get_peakMemoryKB(void)
+int get_peakMemoryKB(size_t * physical, size_t * virtual)
 {
-    return 0;
+    return 1;
 }
 #else
 
 #ifdef __APPLE__
-size_t get_peakMemoryKB(void)
+int get_peakMemoryKB(size_t * physical, size_t * virtual)
 {
     struct rusage r_usage;
     getrusage(RUSAGE_SELF, &r_usage);
-    return (size_t) round((double) r_usage.ru_maxrss/1024.0);
+    *physical =  r_usage.ru_maxrss/1024.0;
+    *virtual = 0;
+    return 0;
 }
 #endif
 
 #ifndef __APPLE__
-size_t get_peakMemoryKB(void)
+int get_peakMemoryKB(size_t * _VmPeak, size_t * _VmHWM)
 {
-    char * statfile = malloc(100*sizeof(char));
-    assert(statfile != NULL);
-    sprintf(statfile, "/proc/%d/status", getpid());
-    FILE * sf = fopen(statfile, "r");
+    FILE * sf = fopen("/proc/self/status", "r");
     if(sf == NULL)
     {
-        fprintf(stderr, "Failed to open %s\n", statfile);
-        free(statfile);
-        return 0;
+        fprintf(stderr, "Failed to open /proc/self/status\n");
+        return 1;
     }
+    *_VmPeak = 0;
+    *_VmHWM = 0;
 
-    char * peakline = NULL;
+    char * VmPeak = NULL;
+    char * VmHWM = NULL;
 
     char * line = NULL;
     size_t len = 0;
@@ -237,47 +244,63 @@ size_t get_peakMemoryKB(void)
         {
             if(strncmp(line, "VmPeak", 6) == 0)
             {
-                peakline = strdup(line);
+                free(VmPeak);
+                VmPeak = strdup(line);
+            }
+            if(strncmp(line, "VmHWM", 5) == 0)
+            {
+                free(VmHWM);
+                VmHWM = strdup(line);
             }
         }
     }
     free(line);
     fclose(sf);
-    free(statfile);
 
-    if(peakline == NULL)
+    if((VmPeak != NULL) && (strlen(VmPeak) > 11))
     {
-        return 0;
-    }
-    // Parse the line starting with "VmPeak"
-    // Seems like it is always in kB
-    // (reference: fs/proc/task_mmu.c)
-    // actually in kiB i.e., 1024 bytes
-    // since the last three characters are ' kb' we can skip them and parse in between
-    size_t peakMemoryKB = 0;
-    //  printf("peakline: '%s'\n", peakline);
-    if(strlen(peakline) > 11)
-    {
-        peakline[strlen(peakline) -4] = '\0';
+        VmPeak[strlen(VmPeak) - 4] = '\0';
 
         //    printf("peakline: '%s'\n", peakline+7);
-        peakMemoryKB = (size_t) atol(peakline+7);
+        *_VmPeak = (size_t) atol(VmPeak+7);
     }
+    free(VmPeak);
 
-    free(peakline);
-    return peakMemoryKB;
+    if((VmHWM != NULL) && (strlen(VmHWM) > 10))
+    {
+        VmHWM[strlen(VmHWM) - 4] = '\0';
+
+        //    printf("peakline: '%s'\n", peakline+7);
+        *_VmHWM = (size_t) atol(VmHWM+7);
+    }
+    free(VmHWM);
+
+    return 0;
 }
 #endif
 #endif
 
+void fprint_peak_memory(FILE * fid)
+{
+    size_t VmPeak = 0;
+    size_t VmHWM = 0;
+    if(get_peakMemoryKB(&VmPeak, &VmHWM))
+    {
+        fprintf(fid, "Could not figure out the memory usage\n");
+    } else {
+        fprintf(fid, "VmPeak: %zu (kb) VmHWM: %zu (kb)\n", VmPeak, VmHWM);
+    }
+    return;
+}
 
-float dw_read_scaling(char * file)
+
+float dw_read_scaling(const char * file)
 {
     float scaling = 1.0;
     char * logfile = malloc(strlen(file)+32);
     assert(logfile != NULL);
     sprintf(logfile, "%s.log.txt", file);
-    if( ! dw_file_exist(logfile))
+    if( ! dw_isfile(logfile))
     {
         goto leave;
     }
@@ -356,6 +379,17 @@ int getline(char **lineptr, size_t *n, FILE *stream)
 char *
 dw_prefix_file(const char * inFile, const char * prefix)
 {
+    assert(inFile != NULL);
+    if(prefix == NULL)
+    {
+        return strdup(inFile);
+    }
+
+    if(strlen(prefix) == 0)
+    {
+        return strdup(inFile);
+    }
+
 #ifdef WINDOWS
 
     char* drive = calloc(strlen(inFile) + 16, 1);
@@ -420,4 +454,20 @@ float abbe_res_xy(float lambda, float NA)
 float abbe_res_z(float lambda, float NA)
 {
     return 2.0*lambda / pow(NA, 2.0);
+}
+
+int64_t
+float_arg_max(const float * v, size_t N)
+{
+    float max = v[0];
+    int64_t argmax = 0;
+    for(size_t kk = 0; kk<N; kk++)
+    {
+        if(v[kk] > max)
+        {
+            max = v[kk];
+            argmax = kk;
+        }
+    }
+    return argmax;
 }

@@ -1,22 +1,42 @@
+# Note: Please use cmake to build deconwolf
+#       this makefile is only for testing
+#       on a specific machine or two
+#
 # -- Normal build:
 # make -B
 #
-# -- With GPU acceleration
-# make kernels
-# make -B VKFFT=1
-#
-# To build with debug flags and no OpenMP
-# make DEBUG=1 OMP=0 DEBUG=1
+# -- If OpenCL is not available, or to exclude it
+# make OPENCL=0
 
 DESTDIR?=/usr/local/bin
 DEBUG?=0
 
+.DEFAULT_GOAL := all
+
 UNAME_S := $(shell uname -s)
 $(info Host type: $(UNAME_S))
 
-dw = bin/dw
-dwbw = bin/dw_bw
-CFLAGS = -std=gnu11 -Wall -Wextra
+dw = dw
+dwbw = dw_bw
+
+CFLAGS += -std=gnu11 -Wall -Wextra
+
+CFLAGS+=-Isrc/kdtree/include
+
+FORTIFY?=0
+ifeq ($(FORTIFY),1)
+CFLAGS+=-D_FORTIFY_SOURCE=3
+endif
+
+SANITIZE?=0
+ifeq ($(SANITIZE),1)
+CFLAGS+=-fsanitize=address -static-libasan -fno-omit-frame-pointer
+endif
+
+ANALYZE?=0
+ifeq ($(ANALYZE),1)
+CFLAGS+=-fanalyzer
+endif
 
 # FFT Backend, pick __one__
 FFTW3=1
@@ -125,6 +145,24 @@ endif
 
 dw_LIBRARIES=
 dwbw_LIBRARIES=
+
+#
+# kd tree
+#
+dw_LIBRARIES+=-Lsrc/kdtree/ -lkdtree
+kdtree:
+	$(MAKE) -C src/kdtree/ libkdtree.a
+
+#
+# trafo
+#
+
+dw_LIBRARIES+=-Lsrc/trafo/ -ltrafo
+trafo:
+	$(MAKE) -C src/trafo libtrafo.a
+
+
+.PHONY: trafo kdtree
 
 #
 # Math library
@@ -280,13 +318,16 @@ CFLAGS += -fopenmp
 endif
 endif
 
+##
+## libPNG
+##
+dw_LIBRARIES += `pkg-config libpng --libs`
+CFLAGS += `pkg-config libpng --cflags`
 
 
 ##
 ## GPU VKFFT + OpenCL
 ##
-
-
 
 ifeq ($(VKFFT), 1)
 $(info -- Including VkFFT)
@@ -313,6 +354,7 @@ ifeq ($(OPENCL_EXISTS),0)
 CFLAGS+=$(shell $(PKGCONF) OpenCL --cflags)
 dw_LIBRARIES+=$(shell $(PKGCONF) OpenCL --libs)
 else
+$(info Try building with OPENCL=0 ?)
 $(error ERROR: Could not find OpenCL)
 endif
 endif
@@ -355,8 +397,12 @@ dw_tiff_merge.o \
 dw_psf_sted.o \
 sparse_preprocess.o \
 sparse_preprocess_cli.o \
-gmlfit.o
-#dw_nuclei.o
+gmlfit.o \
+dw_align_dots.o \
+dw_nuclei.o \
+dw_png.o \
+quickselect.o \
+dw_background.o
 
 dwbw_OBJECTS = fim.o \
 fim_tiff.o \
@@ -369,9 +415,9 @@ ftab.o
 
 $(info Everything looks ok)
 
-all: $(dw) $(dwbw)
+all: trafo kdtree $(dw) $(dwbw)
 
-$(dw): $(dw_OBJECTS)
+$(dw): $(dw_OBJECTS) $(dw_DEPENDS)
 	$(CC) $(CFLAGS) -o $@ $^ $(dw_LIBRARIES)
 
 $(dwbw): $(dwbw_OBJECTS)
@@ -382,6 +428,8 @@ $(dwbw): $(dwbw_OBJECTS)
 
 clean:
 	rm -f *.o
+	rm -f dw
+	rm -f dw_bw
 
 # the kernels are mostly included by cl_util.c some in method_shb_cl*
 # TODO: this is a silly list
@@ -419,12 +467,12 @@ kernels:
 
 install:
 	# Binaries
-	cp bin/dw_bw $(DESTDIR)/dw_bw
-	cp bin/dw $(DESTDIR)/dw
+	cp dw_bw $(DESTDIR)/dw_bw
+	cp dw $(DESTDIR)/dw
 	# Man pages
-	cp doc/dw.1 $(MANPATH)/dw.1
-	cp doc/dw.1 $(MANPATH)/deconwolf.1
-	cp doc/dw_bw.1 $(MANPATH)/dw_bw.1
+	cp doc/man/dw.1 $(MANPATH)/dw.1
+	cp doc/man/dw.1 $(MANPATH)/deconwolf.1
+	cp doc/man/dw_bw.1 $(MANPATH)/dw_bw.1
 
 
 uninstall:

@@ -14,6 +14,23 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
+#include <fftw3.h>
+#include <getopt.h>
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+
+#include "fim.h"
+#include "ftab.h"
+#include "fim_tiff.h"
+#include "dw_version.h"
+#include "dw_util.h"
+
+
 #include "dw_psf_sted.h"
 
 typedef struct{
@@ -249,7 +266,7 @@ static void argparsing(int argc, char ** argv, opts * s)
 
     if(s->overwrite == 0)
     {
-        if(dw_file_exist(s->outfile))
+        if(dw_isfile(s->outfile))
         {
             printf("%s exists, leaving\n", s->outfile);
             printf("if you don't care, use --overwrite\n");

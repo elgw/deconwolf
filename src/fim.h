@@ -17,29 +17,10 @@
  */
 
 
-#include <assert.h>
-#include <inttypes.h>
-#include <fftw3.h>
-#define _USE_MATH_DEFINES
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdint.h>
-#include <time.h>
-
 #include "fft.h"
 #include "fim_tiff.h"
 #include "ftab.h"
 #include "dw_util.h"
-
-#include <omp.h>
-
-
-#ifdef __linux__
-#include <sys/mman.h>
-#endif
-
 
 /* fim : operations on 3D Floating point IMages
  *
@@ -142,19 +123,44 @@ fimo * fimo_partial(const fimo *, int dim, float sigma);
 
 /* Features for 2D image classification
  * the input image should be 2D.
- * Uses similar features a Ilastic
+ * Uses similar features as Ilastic
  * Returns one row per pixel
  */
-ftab_t * fim_features_2d(const fimo *);
+ftab_t *
+fim_features_2d(const fimo *);
 
 /* Return a I->P long vector with the integral
  * gradient magnitude per slice in I */
 float * fim_focus_gm(const fimo * image, float sigma);
 
 /* Number of elements */
-size_t fimo_nel(fimo * );
+size_t fimo_nel(const fimo * );
 /* Sum of elements */
-float fimo_sum(fimo * );
+float fimo_sum(const fimo * );
+
+/* Max projection over Z */
+fimo * fimo_maxproj(const fimo * Im);
+
+/* Sum projection over Z */
+fimo * fimo_sumproj(const fimo * Im);
+
+/* A[kk] += B[kk] */
+void fimo_add(fimo * A, const fimo * B);
+
+/* Extract a single z-plane from A and return as a new image */
+fimo * fimo_get_plane(const fimo * A, int plane);
+
+/* Simple interface to write 2D or 3D images without any meta data */
+int fimo_tiff_write(const fimo * Im, const char * fName);
+
+/* Simple interface to read 2D or 3D tiff image without metadata */
+fimo * fimo_tiff_read(const char * file);
+
+/* Insert into B into A, with upper left corner at x0, y0 */
+void fimo_blit_2D(fimo * A, const fimo * B, size_t x0, size_t y0);
+
+/* Return the max pixel value */
+float fimo_max(const fimo * A);
 
 /*
  * API not using fimo
@@ -165,10 +171,18 @@ float fim_mean(const float * restrict A, size_t N);
 float fim_max(const float * restrict A, size_t N);
 float fim_sum(const float * restrict A, size_t N);
 
+/* Returns the value at the prct percentile where 0 <= prct <= 100
+ * using quickselect */
+float fim_percentile(const float * restrict A, size_t N, float prct);
+
+/* Returns the value at the prct percentile where 0 <= prct <= 100
+ * using quickselect */
+float fimo_percentile(fimo * A, float prct);
+
 /* Standard deviation, normalizing by (N-1) */
 float fim_std(const float * V, size_t N);
 
-fimo * fimo_maxproj(const fimo * Im);
+
 
 float * fim_maxproj(const float * A, size_t M, size_t N, size_t P);
 
@@ -196,8 +210,6 @@ void fim_add(float * restrict A,
              const float * restrict B,
              size_t N);
 
-/* A[kk] += B[kk] */
-void fimo_add(fimo * A, const fimo * B);
 
 void fim_invert(float * restrict A, const size_t N);
 
@@ -282,6 +294,17 @@ float * fim_copy(const float * restrict V, const size_t N);
 /* Allocate and return an array of N floats */
 float * fim_zeros(const size_t N);
 
+/* Crop out newP slices from V, using gradient magnitude to find the
+ * center of the new image */
+float * fim_auto_zcrop(const float * V,
+                       const size_t M, const size_t N, const size_t P,
+                       const size_t newP);
+
+/* Create a new image of size MxNx(P-2*zcrop) by copying V
+ * and discarding the first and last zcrop slices */
+float * fim_zcrop(const float * V,
+                  const size_t M, const size_t N, const size_t P,
+                  const size_t zcrop);
 
 /* Allocate and return an array of N floats sets to a constant value */
 float * fim_constant(const size_t N, const float value);
@@ -299,17 +322,20 @@ void fim_shift(float * restrict A,
                const float dm, const float dn, const float dp);
 
 
-float * fim_expand(const float * restrict in,
-                   const int64_t pM, const int64_t pN, const int64_t pP,
-                   const int64_t M, const int64_t N, const int64_t P);
 /* "expand an image" by making it larger
  * pM, ... current size
  * M, Nm ... new size
  * */
 
-float fim_mse(float * A, float * B, size_t N);
+float * fim_expand(const float * restrict in,
+                   const int64_t pM, const int64_t pN, const int64_t pP,
+                   const int64_t M, const int64_t N, const int64_t P);
+
+
 /* mean( (A(:)-B(:)).^(1/2) )
  */
+
+float fim_mse(float * A, float * B, size_t N);
 
 void shift_vector(float * restrict V,
                   const int64_t S,
@@ -333,6 +359,8 @@ void shift_vector_float_buf(float * restrict V, // data
 
 /* Multiply a float array of size N by x */
 void fim_mult_scalar(float * restrict fim, size_t N, float x);
+
+void fimo_mult_scalar(fimo * A, float x);
 
 /* Add a constant value to all pixels */
 void fim_add_scalar(float * restrict fim, size_t N, float x);
@@ -471,9 +499,25 @@ int fim_convn1(float * restrict V, size_t M, size_t N, size_t P,
                const float * K, size_t nK,
                int dim, const int normalized);
 
+/* A = A * B pointwise
+ * Returns non-null if the operation can not be performed.
+ *
+ * if A and B have the same size, the operation is pointwise
+ *
+ * If A id 3D and B is 2D, A(:,:,kk) = A(:,:,kk)*b
+ */
+int fimo_mult_image(fimo * A, const fimo * B);
+
+int fimo_div_image(fimo * A, const fimo * B);
+
 
 /* Gaussian smoothing, normalized at edges */
-void fim_gsmooth(float * restrict V, size_t M, size_t N, size_t P, float sigma);
+void
+fim_gsmooth(float * restrict V,
+            size_t M, size_t N, size_t P,
+            float sigma);
+
+void fimo_gsmooth(fimo * V, float sigma);
 
 /** Gaussian smoothing, normalized at edges, separate values for
  * lateral and axial filter */
@@ -493,15 +537,62 @@ float * fim_LoG_S(const float * V, size_t M, size_t N, size_t P,
 float * fim_LoG_S2(const float * V0, const size_t M, const size_t N, const size_t P,
                    const float sigmaxy, const float sigmaz);
 
-/* Simple interface to write 2D or 3D images without any meta data */
-int fimo_tiff_write(const fimo * Im, const char * fName);
+/* Determinant of Hessian filter for spot detection */
+float *
+fim_DoH(const float * V,
+        const size_t M, const size_t N, const size_t P,
+        const float sigmaxy, const float sigmaz);
 
-
-/* Insert into B into A, with upper left corner at x0, y0 */
-void fimo_blit_2D(fimo * A, const fimo * B, size_t x0, size_t y0);
 
 /**  Anscombe transform and inverse.
  *
  * https://en.wikipedia.org/wiki/Anscombe_transform  */
 void fim_anscombe(float * x, size_t n);
 void fim_ianscombe(float * x, size_t n);
+
+
+/* Trilinear interpolation (3D)
+ *
+ * M, N, P specifies the size of A
+ * M is the size in the non-strided dimension
+ *
+ * x is the coordinate in the non-strided dimension
+ *
+ * Returns 0 if the points are out of
+ * bounds
+ *
+ **/
+
+float
+fim_interp3_linear(const float *,
+                   size_t M, size_t N, size_t P,
+                         double x, double y, double z);
+
+/* Estimate the circularity of a dot
+ *
+ * The correlation matrix of the pixels around (x,y,z) is measured
+ * and the smallest divided by the largest eigenvalue is returned,
+ * i.e. a number in the range [0, 1].
+ *
+ * sigma: Approximate size (Gaussian) of the spot.
+ *
+ * A value of 1 means that the dot is perfectly symmetric while a
+ * value of 0 would be returned for linear structures etc.
+ *
+ * The pixel values are weighted by a circular mask of radius
+ * of approximately 2*sigma.
+ *
+ * The z values is rounded to the nearest integer (until it is shown
+ * that it is much better to interpolate).
+ *
+ * The values of the pixels of interest will be normalized to the
+ * range [0, 1] prior to calculations.
+ *
+ * Results will not be accurate close the image borders.
+ */
+
+float
+fim_dot_lateral_circularity(const float * ,
+                            size_t M, size_t N, size_t P,
+                            double x, double y, double z,
+                            double sigma);

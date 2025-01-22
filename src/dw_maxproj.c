@@ -1,11 +1,25 @@
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <getopt.h>
+
+#include "fim.h"
+#include "fim_tiff.h"
+#include "dw_version.h"
+
+
 #include "dw_maxproj.h"
 
-#define MODE_MAX 0
-#define MODE_MAX_XYZ 1
-#define MODE_SLICE 2
+typedef enum {
+    MODE_MAX,
+    MODE_MAX_XYZ,
+    MODE_SLICE,
+    MODE_GM
+} projection_type;
 
 typedef struct{
-    int mode;
+    projection_type mode;
     int slice;
     int optpos; // Next argument not consumed by getargs
     int overwrite;
@@ -14,10 +28,9 @@ typedef struct{
 
 opts * opts_new()
 {
-    opts * s = malloc(sizeof(opts));
+    opts * s = calloc(1, sizeof(opts));
     assert(s != NULL);
     s->mode = MODE_MAX;
-    s->overwrite = 0;
     s->verbose = 1;
     return s;
 }
@@ -30,10 +43,13 @@ void opts_free(opts * s)
 static void usage(__attribute__((unused)) int argc, char ** argv)
 {
     printf("usage: %s [<options>] input1.tif input2.tif ... \n", argv[0]);
-    printf("Options:\n");
-    printf(" --xyz \n\t Max projection for xy, xz and yz as a collage "
-           "on a single image.\n");
+    printf("Modes:\n");
+    printf(" --xyz \n\t"
+           "A collage of max projections along x, y and z shown in a single image.\n");
     printf(" --slice N\n\t Extract slice N\n");
+    printf(" --gm\n\t"
+           "Extract the slice with the highest gradient magnitude\n");
+    printf("Options:\n");
     printf(" --overwrite\n\t Overwrite existing files\n");
     printf(" --verbose v\n\t Set verbosity level\n");
     return;
@@ -48,11 +64,15 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"overwrite", no_argument, NULL, 'o'},
         {"verbose", required_argument, NULL, 'v'},
         {"xyz", no_argument, NULL, 'x'},
+        {"gm", no_argument, NULL, 'g'},
         {NULL, 0, NULL, 0}};
     int ch;
-    while((ch = getopt_long(argc, argv, "ohs:v:x", longopts, NULL)) != -1)
+    while((ch = getopt_long(argc, argv, "gohs:v:x", longopts, NULL)) != -1)
     {
         switch(ch){
+        case 'g':
+            s->mode = MODE_GM;
+            break;
         case 'o':
             s->overwrite = 1;
             break;
@@ -69,6 +89,10 @@ static void argparsing(int argc, char ** argv, opts * s)
             break;
         case 'x':
             s->mode = MODE_MAX_XYZ;
+            break;
+        default:
+            fprintf(stderr, "Unknown command line option");
+            exit(EXIT_FAILURE);
             break;
         }
     }
@@ -104,7 +128,30 @@ static char * get_outfile_name_for_max(const char * inFile)
     return outFile;
 }
 
-int dw_tiff_max(int argc, char ** argv)
+static void gen_gm(opts * s, const char * inFile, const char * outFile)
+{
+    fimo * I = fimo_tiff_read(inFile);
+    if(I == NULL)
+    {
+        printf("Error reading %s\n", inFile);
+        return;
+    }
+    float * gm = fim_focus_gm(I, 3);
+    int slice = float_arg_max(gm, I->P);
+    if(s->verbose > 0)
+    {
+        printf("Using slice %d/%d (index %d)\n", slice+1,
+               (int) I->P, slice);
+    }
+    fimo * Z = fimo_get_plane(I, slice);
+    fimo_free(I);
+    fimo_tiff_write(Z, outFile);
+    fimo_free(Z);
+    return;
+}
+
+int
+dw_tiff_max(int argc, char ** argv)
 {
 
     opts * s = opts_new();
@@ -119,52 +166,58 @@ int dw_tiff_max(int argc, char ** argv)
 
     fim_tiff_init();
 
-
     char * inFile;
 
     for(int ff = s->optpos; ff<argc; ff++)
     {
         inFile = argv[ff];
+        if(s->verbose > 1)
+        {
+            printf("Infile: %s\n", argv[ff]);
+        }
 
-        if(!dw_file_exist(inFile))
+
+        if(!dw_isfile(inFile))
         {
             printf("Can't open %s!\n", inFile);
             exit(EXIT_FAILURE);
         }
 
-        if(s->mode == MODE_MAX || s->mode == MODE_MAX_XYZ)
+
+        char * outFile = get_outfile_name_for_max(inFile);
+
+        if(s->verbose > 1)
         {
-            char * outFile = get_outfile_name_for_max(inFile);
+            fprintf(stdout, "Input file: %s\n", inFile);
+            fprintf(stdout, "Output file: %s\n", outFile);
+        }
 
-            if(s->verbose > 1)
+        if(s->overwrite == 0 && dw_isfile(outFile))
+        {
+            printf("%s exists, skipping.\n", outFile);
+        } else {
+            if(s->verbose > 0)
             {
-                fprintf(stdout, "Input file: %s\n", inFile);
-                fprintf(stdout, "Output file: %s\n", outFile);
+                printf("%s -> %s\n", inFile, outFile);
+            }
+            switch(s->mode)
+            {
+            case MODE_MAX:
+                fim_tiff_maxproj(inFile, outFile);
+                break;
+            case MODE_MAX_XYZ:
+                fim_tiff_maxproj_XYZ(inFile, outFile);
+                break;
+            case MODE_GM:
+                gen_gm(s, inFile, outFile);
+                break;
+            default:
+                fprintf(stderr, "Unknown mode!\n");
+                exit(EXIT_FAILURE);
+                break;
             }
 
-            if(s->overwrite == 0 && dw_file_exist(outFile))
-            {
-                printf("%s exists, skipping.\n", outFile);
-            } else {
-                if(s->verbose > 0)
-                {
-                    printf("%s -> %s\n", inFile, outFile);
-                }
-                switch(s->mode)
-                {
-                case MODE_MAX:
-                    fim_tiff_maxproj(inFile, outFile);
-                    break;
-                case MODE_MAX_XYZ:
-                    fim_tiff_maxproj_XYZ(inFile, outFile);
-                    break;
-                default:
-                    fprintf(stderr, "Unknown mode!\n");
-                    exit(EXIT_FAILURE);
-                    break;
-                }
 
-            }
             free(outFile);
         }
 
@@ -172,7 +225,7 @@ int dw_tiff_max(int argc, char ** argv)
         {
             char * outFile = malloc(strlen(inFile) + 20);
             sprintf(outFile, "s%04d_%s", s->slice, inFile);
-            if(dw_file_exist(outFile) && s->overwrite == 0)
+            if(dw_isfile(outFile) && s->overwrite == 0)
             {
                 printf("%s exists, skipping.\n", outFile);
             } else {

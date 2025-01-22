@@ -83,7 +83,27 @@ int main(int argc, char ** argv)
             return sparse_preprocess_cli(argc-1, argv+1);
         }
 
+    if( strcmp(argv[1], "align-dots") == 0)
+    {
+#ifdef dw_module_align_dots
+        return dw_align_dots(argc-1, argv+1);
+#else
+        fprintf(stderr, "dw was not built with the 'align-dots' module\n");
+        exit(EXIT_FAILURE);
+#endif
     }
+
+    if( strcmp(argv[1], "background") == 0)
+    {
+#ifdef dw_module_background
+        return dw_background(argc-1, argv+1);
+#else
+        fprintf(stderr, "dw was not built with the 'background' module\n");
+        exit(EXIT_FAILURE);
+#endif
+    }
+
+    } // argc
 
     dw_opts * s = dw_opts_new(); /* Load default settings and initialize */
     dw_argparsing(argc, argv, s); /* Parse command line */

@@ -13,9 +13,26 @@
  *    You should have received a copy of the GNU General Public License
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+#ifndef WINDOWS
+#include <unistd.h>
+#endif
+
+#include <assert.h>
+#include <fftw3.h>
+#include <inttypes.h>
+#define _USE_MATH_DEFINES
+#include <math.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <string.h>
+#include <stdint.h>
+
 
 #include "fim_tiff.h"
 #include "fim.h"
+
+typedef int64_t i64;
 
 /* see man 3 tifflib
  *
@@ -391,7 +408,7 @@ void readUint8(TIFF * tfile, float * V,
     // Number of elements per strip
     size_t nes = ssize/sizeof(uint8_t);
     //  uint16_t * buf = _TIFFmalloc(ssize);
-    uint8_t * buf = malloc(ssize);
+    uint8_t * buf = calloc(ssize, 1);
 
     if(buf == NULL)
     {
@@ -448,7 +465,7 @@ void readFloat(TIFF * tfile, float * V,
 {
     // Number of elements per strip
     size_t nes = ssize/sizeof(float);
-    float * buf = malloc(ssize);
+    float * buf = calloc(ssize, sizeof(float));
     assert(buf != NULL);
 
     for(int64_t dd=0; dd<ndirs; dd++) {
@@ -485,11 +502,14 @@ float raw_file_single_max(const char * rName, const size_t N)
     //  printf("Getting max value from %s\n", rName);
     size_t buf_size = 1024*1024;
     float  max = -INFINITY;
-    float * buf = malloc(buf_size*sizeof(float));
-    FILE * fid = fopen(rName, "r");
+    float * buf = calloc(buf_size, sizeof(float));
+    assert(buf != NULL);
+    FILE * fid = fopen(rName, "rb");
     if(fid == NULL)
     {
         printf("ERROR: unable to open %s\n", rName);
+        free(buf);
+        return -1;
     }
     size_t nread = 0;
     //  printf("N = %zu\n", N);
@@ -531,9 +551,9 @@ void uint16toraw(TIFF * tfile, const char * ofile,
 {
     uint16_t * buf = _TIFFmalloc(ssize);
     assert(buf != NULL);
-    float * wbuf = malloc(ssize/sizeof(uint16_t)*sizeof(float));
+    float * wbuf = calloc(ssize/sizeof(uint16_t), sizeof(float));
     assert(wbuf != NULL);
-    FILE * fout = fopen(ofile, "w");
+    FILE * fout = fopen(ofile, "wb");
     assert(fout != NULL);
 
     for(int64_t dd=0; dd<ndirs; dd++) {
@@ -562,9 +582,9 @@ void floattoraw(TIFF * tfile, const char * ofile,
 {
     float * buf = _TIFFmalloc(ssize);
     assert(buf != NULL);
-    float * wbuf = malloc(ssize/sizeof(float)*sizeof(float));
+    float * wbuf = calloc(ssize/sizeof(float), sizeof(float));
     assert(wbuf != NULL);
-    FILE * fout = fopen(ofile, "w");
+    FILE * fout = fopen(ofile, "wb");
     assert(fout != NULL);
 
 
@@ -743,7 +763,7 @@ int fim_tiff_from_raw(const char * fName, // Name of tiff file to be written
     size_t linbytes = M*bytesPerSample;
     uint16_t * buf = _TIFFmalloc(linbytes);
     assert(buf != NULL);
-    float * rbuf = malloc(M*sizeof(float));
+    float * rbuf = calloc(M, sizeof(float));
     assert(rbuf != NULL);
     memset(buf, 0, linbytes);
 
@@ -757,7 +777,7 @@ int fim_tiff_from_raw(const char * fName, // Name of tiff file to be written
     }
     //  printf("Max value of file: %f\n", rawmax);
 
-    FILE * rf = fopen(rName, "r");
+    FILE * rf = fopen(rName, "rb");
     if(rf == NULL)
     {
         fprintf(stderr, "fim_tiff ERROR: Failed to open %s for writing\n", rName);
@@ -1062,23 +1082,16 @@ int fim_tiff_get_size(const char * fname,
     return 0;
 }
 
-fimo * fimo_tiff_read(const char * fName)
-{
-    int64_t M, N, P;
-    float * V = fim_tiff_read(fName, NULL, &M, &N, &P, 0);
-    fimo * I = malloc(sizeof(fimo));
-    assert(I != NULL);
-    I->V = V;
-    I->M = M;
-    I->N = N;
-    I->P = P;
-    return I;
-}
 
 float * fim_tiff_read(const char * fName,
                       ttags * T,
                       int64_t * N0, int64_t * M0, int64_t * P0, int verbosity)
 {
+    if(fim_tiff_log == NULL)
+    {
+        fim_tiff_log = stdout;
+    }
+
     return fim_tiff_read_sub(fName, T, N0, M0, P0, verbosity,
                              0, // sub disabled
                              0,0,0, // start
@@ -1122,7 +1135,7 @@ void ttags_set_pixelsize(ttags * T, double xres, double yres, double zres)
 
     free(T->imagedescription);
 
-    T->imagedescription = malloc(1024);
+    T->imagedescription = calloc(1024, 1);
     assert(T->imagedescription != NULL);
     sprintf(T->imagedescription,
             "ImageJ=1.52r\nimages=%d\nslices=%d\nunit=nm\nspacing=%.1f\nloop=false.",
@@ -1153,7 +1166,7 @@ void ttags_set_software(ttags * T,
     {
         free(T->software);
     }
-    T->software = malloc(strlen(sw)+2);
+    T->software = calloc(strlen(sw)+2, 1);
     assert(T->software != NULL);
     sprintf(T->software, "%s", sw);
 }
@@ -1192,7 +1205,7 @@ void ttags_get(TIFF * tfile, ttags * T)
     char * desc = NULL;
     if(TIFFGetField(tfile, TIFFTAG_IMAGEDESCRIPTION, &desc) == 1)
     {
-        T->imagedescription = malloc(strlen(desc)+2);
+        T->imagedescription = calloc(strlen(desc)+2, 1);
         assert(T->imagedescription != NULL);
         strcpy(T->imagedescription, desc);
     }
@@ -1200,7 +1213,7 @@ void ttags_get(TIFF * tfile, ttags * T)
     char * software = NULL;
     if(TIFFGetField(tfile, TIFFTAG_SOFTWARE, &software) == 1)
     {
-        T->software = malloc(strlen(software)+2);
+        T->software = calloc(strlen(software)+2, 1);
         assert(T->software != NULL);
         strcpy(T->software, software);
         //    printf("! Got software tag: %s\n", T->software);
@@ -1506,7 +1519,7 @@ int main(int argc, char ** argv)
     {
         outname = argv[2];
     } else {
-        outname = malloc(100*sizeof(char));
+        outname = calloc(100, sizeof(char));
         assert(outname != NULL);
         sprintf(outname, "foo.tif");
     }
@@ -1514,7 +1527,7 @@ int main(int argc, char ** argv)
 
     int64_t M = 0, N = 0, P = 0;
 
-    ttags * T = malloc(sizeof(ttags));
+    ttags * T = calloc(1, sizeof(ttags));
     assert( T!= NULL);
     float * I = (float *) fim_tiff_read(inname, T, &M, &N, &P, 1);
 
@@ -1544,7 +1557,7 @@ int main(int argc, char ** argv)
 
 char * tiff_is_supported(TIFF * tiff)
 {
-    char * errStr = malloc(1024);
+    char * errStr = calloc(1024, 1);
     assert(errStr != NULL);
     if(tiff == NULL) {
         sprintf(errStr, "Can't be opened!");
@@ -1658,7 +1671,7 @@ int fim_tiff_maxproj_XYZ(const char * in, const char * out)
     size_t NN = I->N + I->P;
     fimo_free(I);
 
-    fimo * xview = malloc(sizeof(fimo));
+    fimo * xview = calloc(1, sizeof(fimo));
     assert(xview != NULL);
     xview->M = MM;
     xview->N = NN;
@@ -1710,6 +1723,7 @@ int fim_tiff_maxproj(const char * in, const char * out)
     {
         printf("Can't process %s\n", in);
         printf("Error: %s\n", errStr);
+        free(errStr);
         return -1;
     }
 
@@ -1908,6 +1922,7 @@ int fim_tiff_extract_slice(const char * in, const char * out, int slice)
     {
         printf("Can't process %s\n", in);
         printf("Error: %s\n", errStr);
+        free(errStr);
         return -1;
     }
 

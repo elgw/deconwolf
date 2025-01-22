@@ -2,13 +2,25 @@ CC=gcc -std=gnu99
 
 CFLAGS=-Wall -Wextra
 
+FANA?=0
+ifeq ($(FANA),1)
+CFLAGS+=-g3 -fanalyzer -fno-inline -fstack-protector-all -fsanitize=address -fno-omit-frame-pointer
+endif
+
+
 DEBUG?=0
 ifeq ($(DEBUG),1)
-CFLAGS+=-g3 -fanalyzer -fno-inline -fstack-protector-all -fsanitize=address -fno-omit-frame-pointer
-else
+CFLAGS+=-g3 -fno-inline -fstack-protector-all -fno-omit-frame-pointer
+endif
+
+ifeq ($(DEBUG),0)
+ifeq ($(ASAN),0)
 CFLAGS+=-O3
 LDFLAGS+=-flto
 endif
+endif
+
+FORCE: ;
 
 LDFLAGS+=-lm
 
@@ -27,6 +39,11 @@ LDFLAGS+=`pkg-config libtiff-4 --libs`
 # FFTW3
 CFLAGS += `pkg-config fftw3 fftw3f --cflags`
 LDFLAGS += `pkg-config fftw3 fftw3f --libs` -lfftw3_omp -lfftw3f_omp
+
+# PNG
+CFLAGS += `pkg-config libpng --cflags`
+LDFLAGS += `pkg-config libpng --libs`
+
 
 # OpenMP
 CFLAGS+=-fopenmp
@@ -51,10 +68,21 @@ dw_render: $(dw_render_files)
 
 ## Note: prf_* and qsort comes from pixel_random_forest repo
 
-dw_nuclei_files=dw_nuclei.c fim.o ftab.o fim_tiff.o prf_forest.o qsort.o prf_tree.o prf_util.o
+dw_nuclei_files=dw_nuclei.c fim.o ftab.o fim_tiff.o dw_util.o \
+trafo/libtrafo.a fft.o dw_png.o quickselect.o
 
 dw_nuclei: $(dw_nuclei_files)
 	$(CC) $(CFLAGS) -DSTANDALONE $(dw_nuclei_files) $(LDFLAGS) -o dw_nuclei
+
+dw_bg_files=dw_background.c fim.o ftab.o fim_tiff.o dw_util.o quickselect.o \
+fft.o
+
+dw_background: $(dw_bg_files)
+	$(CC) $(CFLAGS) -DSTANDALONE $(dw_bg_files) $(LDFLAGS) -o dw_background
+
+dw_png_ut_files = dw_png.c dw_png_ut.c
+dw_png_ut: $(dw_png_ut_files)
+	$(CC) $(CFLAGS) $(dw_png_ut_files) $(LDFLAGS) -o dw_png_ut
 
 dw_dots_files=dw_dots.c fim.o ftab.o fim_tiff.o  dw_util.o fft.o gmlfit.o
 dw_dots: $(dw_dots_files)
@@ -69,7 +97,7 @@ dw_psf_sted: $(spsf_files)
 	$(CC) $(CFLAGS) -DSTANDALONE $(spsf_files) $(LDFLAGS) -o dw_psf_sted
 
 # Test the float image module
-fim_ut_files=fim_ut.o fim.o dw_util.o ftab.o fft.o fim_tiff.o
+fim_ut_files=fim_ut.o fim.o dw_util.o ftab.o fft.o fim_tiff.o quickselect.o
 fim_ut: $(fim_ut_files)
 	$(CC)  $(CFLAGS) $(fim_ut_files) $(LDFLAGS) -o fim_ut
 
@@ -93,3 +121,6 @@ li:
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $<
+
+trafo/libtrafo.a: FORCE
+	make -C trafo libtrafo.a

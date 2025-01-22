@@ -42,6 +42,8 @@ typedef struct{
     char * cmdline;
     int write_csv;
 
+    int circularity; /* Set to 1 to enable circularity estimation */
+
     /* For multi scale dot detection.
      *For single scale paths,
      * scales[0] is also used to scale up filter sizes if set. */
@@ -238,13 +240,13 @@ static void argparsing(int argc, char ** argv, opts * s)
 
 
     struct option longopts[] = {
-        {"dog_as", required_argument, NULL, 'a'},
+        {"log_as", required_argument, NULL, 'a'},
         {"fit_as", required_argument, NULL, 'A'},
         {"csv",    no_argument, NULL, 'c'},
+        {"circularity", no_argument, NULL, 'C'},
         {"logfile", required_argument, NULL, 'w'},
         {"out", required_argument, NULL, 'O'},
-
-        {"dog_ls", required_argument, NULL, 'l'},
+        {"log_ls", required_argument, NULL, 'L'},
         {"fit_ls", required_argument, NULL, 'l'},
         {"fitting", no_argument, NULL, 'F'},
         {"help", no_argument, NULL, 'h'},
@@ -263,7 +265,7 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"ni",     required_argument, NULL, '6'},
         {NULL, 0, NULL, 0}};
     int ch;
-    while((ch = getopt_long(argc, argv, "1:3:4:5:6:L:a:A:cF:hi:l:m:n:N:op:r:s:v:w:", longopts, NULL)) != -1)
+    while((ch = getopt_long(argc, argv, "1:3:4:5:6:L:a:A:cCF:hi:l:L:m:n:N:op:r:s:v:w:", longopts, NULL)) != -1)
     {
         switch(ch){
         case '1':
@@ -290,6 +292,9 @@ static void argparsing(int argc, char ** argv, opts * s)
         case 'c':
             s->write_csv = 1;
             break;
+        case 'C':
+            s->circularity = 1;
+            break;
         case 'F':
             s->fitting = 1;
             break;
@@ -298,8 +303,10 @@ static void argparsing(int argc, char ** argv, opts * s)
             exit(0);
             break;
         case 'L':
-            s->fit_lsigma = atof(optarg);
+            s->log_lsigma = atof(optarg);
             break;
+        case 'l':
+            s->fit_lsigma = atof(optarg);
             break;
         case 'm':
             s->max_rel_scale = atof(optarg);
@@ -345,6 +352,11 @@ static void argparsing(int argc, char ** argv, opts * s)
         }
     }
 
+    if(s->verbose > 1)
+    {
+        printf("VERBOSE>1: Printing out the settings just before validation:\n");
+        opts_print(stdout, s);
+    }
 
 
     if(s->NA*s->ni*s->dx*s->dz*s->lambda > 0)
@@ -365,11 +377,6 @@ static void argparsing(int argc, char ** argv, opts * s)
         s->log_asigma = s->fit_asigma*sqrt(2.0);
     }
 
-    if(s->verbose > 1)
-    {
-        printf("VERBOSE>1: Printing out the settings just before validation:\n");
-        opts_print(stdout, s);
-    }
 
     if( (s->log_asigma)*(s->log_lsigma) <= 0 )
     {
@@ -459,10 +466,61 @@ static void argparsing(int argc, char ** argv, opts * s)
         }
     }
 
-
-    s->optpos = optind;
     s->optpos = optind;
     return;
+}
+
+static ftab_t *
+append_circularity(opts * s, ftab_t * T, const float * restrict I,
+                   size_t M, size_t N, size_t P)
+{
+    if(s->verbose > 2)
+    {
+        printf("append_circularity()\n");
+    }
+    int xcol = ftab_get_col(T, "f_x");
+    int ycol = ftab_get_col(T, "f_y");
+    int zcol = ftab_get_col(T, "f_z");
+    int sigma_col = ftab_get_col(T, "f_sigma_lateral");
+    if(xcol < 0)
+    {
+        printf("Error: no sub pixel locations available for circularity estimates\n");
+        return T;
+    }
+
+    assert(xcol >= 0);
+    assert(ycol >= 0);
+    assert(zcol >= 0);
+
+    ftab_t * TC = ftab_new(1);
+    ftab_set_colname(TC, 0, "lat_circularity");
+    free(TC->T);
+    TC->nrow = T->nrow;
+    TC->T = calloc(T->nrow, sizeof(float));
+    assert(TC->T != NULL);
+
+    #pragma omp parallel for
+    for(size_t kk = 0; kk < T->nrow; kk++)
+    {
+        float * row = T->T + kk*T->ncol;
+        double x = row[xcol];
+        double y = row[ycol];
+        double z = row[zcol];
+        double sigma = row[sigma_col];
+        TC->T[kk] = fim_dot_lateral_circularity(I,
+                                                M, N, P,
+                                                x,y,z,
+                                                sigma);
+    }
+
+
+    ftab_t * TT = ftab_concatenate_columns(T, TC);
+
+    ftab_free(T);
+    ftab_free(TC);
+
+
+    return TT;
 }
 
 static ftab_t * append_fitting(opts * s, ftab_t * T, float * I,
@@ -551,7 +609,7 @@ static ftab_t * append_fitting(opts * s, ftab_t * T, float * I,
     }
 
     printf("Concatenating tables\n");
-    ftab_t * TF = ftab_new(10);
+    ftab_t * TF = ftab_new(11);
     free(TF->T);
     ftab_set_colname(TF, 0, "f_bg");
     ftab_set_colname(TF, 1, "f_signal_count");
@@ -563,9 +621,10 @@ static ftab_t * append_fitting(opts * s, ftab_t * T, float * I,
     ftab_set_colname(TF, 7, "f_sigma_axial");
     ftab_set_colname(TF, 8, "f_status");
     ftab_set_colname(TF, 9, "f_error");
+    ftab_set_colname(TF, 10, "f_corr");
     TF->nrow = T->nrow;
     TF->nrow_alloc=T->nrow;
-    assert(TF->ncol == 10);
+    assert(TF->ncol == 11);
     TF->T = calloc(TF->nrow*TF->ncol, sizeof(float));
     assert(TF->T != NULL);
     for(size_t kk = 0; kk< TF->nrow*TF->ncol; kk++)
@@ -581,9 +640,14 @@ static ftab_t * append_fitting(opts * s, ftab_t * T, float * I,
     xcol = ftab_get_col(TT, "x");
     ycol = ftab_get_col(TT, "y");
     zcol = ftab_get_col(TT, "z");
+    assert(xcol != ycol);
+    assert(xcol != zcol);
+
     int fxcol = ftab_get_col(TT, "f_x");
     int fycol = ftab_get_col(TT, "f_y");
     int fzcol = ftab_get_col(TT, "f_z");
+    assert(fxcol != fycol);
+    assert(fxcol != fzcol);
 
     /* Make the fitted positions absolute */
     for(size_t kk = 0; kk < TT->nrow; kk++)
@@ -597,7 +661,7 @@ static ftab_t * append_fitting(opts * s, ftab_t * T, float * I,
     return TT;
 
 
- fail1: ;
+fail1: ;
     return T;
 }
 
@@ -611,7 +675,7 @@ int main(int argc, char ** argv)
 
 void detect_dots(opts * s, char * inFile)
 {
-    if(!dw_file_exist(inFile))
+    if(!dw_isfile(inFile))
     {
         fprintf(stderr, "Can't open %s!\n", inFile);
         return;
@@ -656,7 +720,7 @@ void detect_dots(opts * s, char * inFile)
         fprintf(stdout, "Ouput file: %s\n", outFile);
     }
 
-    if(s->overwrite == 0 && dw_file_exist(outFile))
+    if(s->overwrite == 0 && dw_isfile(outFile))
     {
         printf("%s exists, skipping.\n", outFile);
         return;
@@ -756,6 +820,7 @@ void detect_dots(opts * s, char * inFile)
          *
          */
         float ** LoG = calloc(s->nscale, sizeof(float**));
+        assert(LoG != NULL);
         for(int ss = 0; ss < s->nscale; ss++)
         {
             float scaling = s->scales[ss];
@@ -774,7 +839,7 @@ void detect_dots(opts * s, char * inFile)
 
             float s2 = scaling*scaling;
 #pragma omp parallel for
-            for(size_t kk = 0; kk < M*N*P; kk++)
+            for(size_t kk = 0; kk < (int64_t) M*N*P; kk++)
             {
                 LoG[ss][kk] *= s2;
             }
@@ -788,6 +853,12 @@ void detect_dots(opts * s, char * inFile)
             free(LoG[kk]);
         }
         free(LoG);
+    }
+
+    if(T == NULL)
+    {
+        printf("Unable to continue, table could not be read\n");
+        exit(EXIT_FAILURE);
     }
 
     if(s->verbose > 1)
@@ -849,11 +920,16 @@ void detect_dots(opts * s, char * inFile)
     /* Discard unwanted dots before the computationally demanding fitting */
     ftab_head(T, s->ndots);
 
-
     if(s->fitting)
     {
         T = append_fitting(s, T,
                            A, M, N, P);
+    }
+
+    /* Will use sub pixel locations if fitting was performed */
+    if(s->circularity)
+    {
+        T = append_circularity(s, T, A, M, N, P);
     }
 
     free(A);
@@ -920,8 +996,7 @@ int dw_dots(int argc, char ** argv)
 
     if(s->verbose > 1)
     {
-        printf("Peak memory usage: %zu kB\n",
-               get_peakMemoryKB());
+        fprint_peak_memory(stdout);
     }
 
     opts_free(s);

@@ -14,6 +14,9 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#ifndef WINDOWS
+#include <unistd.h>
+#endif
 #include "dw.h"
 
 /* GLOBALS */
@@ -25,6 +28,7 @@ FILE * logfile = NULL;
 dw_iterator_t * dw_iterator_new(const dw_opts * s)
 {
     dw_iterator_t * it = calloc(1, sizeof(dw_iterator_t));
+    assert(it != NULL);
     it->error = 1;
     it->lasterror = 1;
     it->itertype = s->iter_type;
@@ -147,6 +151,7 @@ void dw_iterator_free(dw_iterator_t * it)
 dw_opts * dw_opts_new(void)
 {
     dw_opts * s = calloc(1, sizeof(dw_opts));
+    assert(s != NULL);
     s->nThreads_FFT = dw_get_threads();
     s->nThreads_OMP = s->nThreads_FFT;
 
@@ -246,8 +251,8 @@ void dw_show_iter(dw_opts * s, int it, int nIter, float err)
 
 
 char * gen_iterdump_name(
-                         __attribute__((unused)) const dw_opts * s,
-                         int it)
+    __attribute__((unused)) const dw_opts * s,
+    int it)
 {
     // Generate a name for the an iterdump file
     // at iteration it
@@ -483,9 +488,9 @@ void dw_fprint_info(FILE * f, dw_opts * s)
 
     if(f != stdout)
     {
-        #ifndef WINDOWS
+#ifndef WINDOWS
         fprintf(f, "PID: %d\n",  (int) getpid());
-        #endif
+#endif
     }
 
     if(f != stdout)
@@ -572,25 +577,27 @@ void dw_fprint_info(FILE * f, dw_opts * s)
     return;
 }
 
-static void getCmdLine(int argc, char ** argv, dw_opts * s)
+static void
+getCmdLine(int argc, char ** argv, dw_opts * s)
 {
     // Copy the command line to s->commandline
-    int lcmd=0;
+    size_t lcmd = 2;
     for(int kk = 0; kk<argc; kk++)
     {
-        lcmd += strlen(argv[kk]);
+        lcmd += strlen(argv[kk]) + 4;
     }
-    lcmd += argc+2;
-    s->commandline = malloc(lcmd);
 
-    int pos = 0;
+    s->commandline = calloc(lcmd, 1);
+    assert(s->commandline != NULL);
+    snprintf(s->commandline, lcmd, "%s", "");
+
     for(int kk = 0; kk<argc; kk++)
     {
-        sprintf(s->commandline+pos, "%s ", argv[kk]);
-        pos += strlen(argv[kk])+1;
+        size_t pos = strlen(s->commandline);
+        snprintf(s->commandline+pos, lcmd, "'%s' ", argv[kk]);
     }
-    s->commandline[pos-1] = '\0';
-    //  printf("argc: %d cmd: '%s'\n", argc, s->commandline);
+
+    return;
 }
 
 
@@ -630,6 +637,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         { "version",   no_argument,       NULL, 'v' },
         { "overwrite", no_argument,       NULL, 'w' },
         { "xyfactor",  required_argument, NULL, 'x' },
+        { "az",        required_argument, NULL, 'A' },
         { "bq",        required_argument, NULL,  'B' },
         { "flatfield", required_argument, NULL,  'C' },
         { "fulldump",  no_argument,       NULL,  'D' },
@@ -646,6 +654,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         { "nopos",     no_argument,       NULL,  'P' },
         { "psigma",    required_argument, NULL,  'Q' },
         { "expe1",     no_argument,       NULL,  'X' },
+        { "cz",        required_argument, NULL,  'Z' },
         { NULL,           0,                 NULL,   0   }
     };
 
@@ -655,7 +664,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     int prefix_set = 0;
     int use_gpu = 0;
     while((ch = getopt_long(argc, argv,
-                            "12345679ab:c:f:Gghil:m:n:o:p:q:s:tvwx:B:C:DFI:L:MOR:S:TPQ:X:",
+                            "12345679ab:c:f:Gghil:m:n:o:p:q:s:tvwx:A:B:C:DFI:L:MOR:S:TPQ:X:Z:",
                             longopts, NULL)) != -1)
     {
         switch(ch) {
@@ -688,6 +697,9 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             break;
         case 'a':
             s->fftw3_planning = FFTW_ESTIMATE;
+            break;
+        case 'A':
+            s->auto_zcrop = atoi(optarg);
             break;
         case 'b':
             s->bg = atof(optarg);
@@ -751,9 +763,8 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             break;
         case 'o':
             free(s->outFile);
-            s->outFile = malloc(strlen(optarg)+1);
+            s->outFile = strdup(optarg);
             assert(s->outFile != NULL);
-            strcpy(s->outFile, optarg);
             break;
         case 'n':
             s->nIter = atoi(optarg);
@@ -876,10 +887,15 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         case 'X':
             s->experimental1 = 1;
             break;
+        case 'Z':
+            s->zcrop = atoi(optarg);
+            break;
         default:
+            fprintf(stderr, "dw got an unknown command line argument. Exiting!\n");
             exit(EXIT_FAILURE);
         }
     }
+
 
     if(s->offset < 0)
     {
@@ -887,17 +903,43 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         s->offset = 0;
     }
 
+    if(s->zcrop < 0)
+    {
+        fprintf(stderr,
+                "the zcrop value (--cz) can not be negative\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if(s->zcrop > 0)
+    {
+        if(s->auto_zcrop > 0)
+        {
+            fprintf(stderr, "zcrop and auto_zcrop can not be combined\n");
+            exit(EXIT_FAILURE);
+        }
+        if(s->tiling_maxSize > 0)
+        {
+            fprintf(stderr, "zcrop can not be combined with tiling\n");
+        }
+    }
+
+    if( (s->auto_zcrop > 0) && (s->tiling_maxSize > 0))
+    {
+        fprintf(stderr, "auto_zcrop can not be combined with tiling\n");
+        exit(EXIT_FAILURE);
+    }
+
     if(use_gpu)
     {
-        #ifdef OPENCL
+#ifdef OPENCL
         if(s->method == DW_METHOD_SHB)
         {
             s->method = DW_METHOD_SHBCL2;
             s->fun = &deconvolve_shb_cl2;
         }
-        #else
+#else
         printf("WARNING: dw was not compiled with GPU support\n");
-        #endif
+#endif
     }
 
     /* Take care of the positional arguments */
@@ -936,30 +978,48 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
 
     /* Set s->outFile and s->outFolder based on s->imFile */
     if(s->outFile == NULL)
-    {        
+    {
         s->outFile = dw_prefix_file(s->imFile, s->prefix);
-   
-        char * dname = dw_dirname(s->imFile);        
+
+        char * dname = dw_dirname(s->imFile);
         s->outFolder = malloc(strlen(dname) + 16);
         assert(s->outFolder != NULL);
-        sprintf(s->outFolder, "%s%c", dname, FILESEP);      
+        sprintf(s->outFolder, "%s%c", dname, FILESEP);
         free(dname);
         if(s->verbosity > 1)
         {
             printf("outFile: %s, outFolder: %s\n", s->outFile, s->outFolder);
         }
     } else {
-        char * dname = dw_dirname(s->outFile);
-        free(s->outFolder);
-        s->outFolder = malloc(strlen(dname) + 16);
-        assert(s->outFolder != NULL);
-        sprintf(s->outFolder, "%s%c", dname, FILESEP);
-        free(dname);
+        if( isdir(s->outFile) )
+        {
+            if(s->verbosity > 0)
+            {
+                printf("--out describes a folder");
+            }
+            free(s->outFolder);
+            s->outFolder = malloc(strlen(s->outFile) + 8);
+            sprintf(s->outFolder, "%s%c", s->outFile, FILESEP);
+            free(s->outFile);
+            char * basename = dw_basename(s->imFile);
+            char * outfile0 = malloc(strlen(basename) + strlen(s->outFolder) + 8);
+            assert(outfile0 != NULL);
+            sprintf(outfile0, "%s%c%s", s->outFolder, FILESEP, basename);
+            s->outFile = dw_prefix_file(outfile0, s->prefix);
+            free(outfile0);
+        } else {
+            char * dname = dw_dirname(s->outFile);
+            free(s->outFolder);
+            s->outFolder = malloc(strlen(dname) + 16);
+            assert(s->outFolder != NULL);
+            sprintf(s->outFolder, "%s%c", dname, FILESEP);
+            free(dname);
+        }
     }
 
     if(! s->iterdump)
     {
-        if( s->overwrite == 0 && dw_file_exist(s->outFile))
+        if( s->overwrite == 0 && dw_isfile(s->outFile))
         {
             printf("%s already exist. Use --overwrite to overwrite existing files.\n",
                    s->outFile);
@@ -1027,17 +1087,6 @@ void fsetzeros(const char * fname, size_t N)
     fwrite(buffer, N-written, 1, fid);
     fclose(fid);
     free(buffer);
-}
-
-
-void fprint_peakMemory(FILE * fout)
-{
-    size_t pm = get_peakMemoryKB();
-
-    if(fout == NULL) fout = stdout;
-    fprintf(fout, "peakMemory: %zu kiB\n", pm);
-
-    return;
 }
 
 void benchmark_write(dw_opts * s, int iter, double fMSE,
@@ -1308,6 +1357,15 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
            "Pre filter the image with a Gaussian filter of sigma=s while Anscombe "
            "transformed\n");
 
+    printf(" --cz n\n\t"
+           "remove n zplanes from the top and bottom of the image.\n\t"
+           "has no effect when tiling is used\n");
+
+    printf(" --az n\n\t"
+           "Automatically crop the image to n z-planes. The plane with the largest\n\t"
+           "will be placed in the centre.\n\t"
+           "has no effect when tiling is used\n");
+
     printf(" --bq Q\n\t Set border handling to \n\t"
            "0 'none' i.e. periodic\n\t"
            "1 'compromise', or\n\t"
@@ -1323,8 +1381,8 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
            "int) and disable scaling\n");
     printf(" --bg l\n\t Set background level, l\n");
     printf(" --offset l\n\t"
-           "Set a positive offset that will be added to the image during\n"
-           "processing and remove before saving to disk. Can help to mitigate\n"
+           "Set a positive offset that will be added to the image during\n\t"
+           "processing and remove before saving to disk. Can help to mitigate\n\t"
            "some of the detector noise (non-Poissonian)\n");
     printf(" --flatfield image.tif\n\t"
            " Use a flat field correction image. Deconwolf will divide each plane of the\n\t"
@@ -1341,21 +1399,27 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
     printf("--start_lp\n\t"
            "Use a low passed version of the input image as the initial guess.n");
     printf(" --noplan\n\t Don't use any planning optimization for fftw3\n");
-    printf(" --no-inplace\n\t Disable in-place FFTs (for fftw3), uses more "
+    printf(" --no-inplace\n\t Disable in-place FFTs (for fftw3), uses more\n\t"
            "memory but could potentially be faster for some problem sizes.\n");
     printf("\n");
 
     printf("Additional commands with separate help sections:\n");
-    printf("   maxproj    maximum Z-projections\n");
-    printf("   merge      merge individual slices to volume\n");
+    printf("   maxproj      maximum Z-projections\n");
+    printf("   merge        merge individual slices to volume\n");
 #ifdef dw_module_dots
-    printf("   dots       detect dots\n");
+    printf("   dots         detect dots with sub pixel precision\n");
 #endif
 #ifdef dw_module_psf
-    printf("   psf        generate PSFs for Widefield and Confocal\n");
+    printf("   psf          generate PSFs for Widefield and Confocal\n");
 #endif
 #ifdef dw_module_psf_sted
-    printf("   psf-STED   PSFs for 3D STED\n");
+    printf("   psf-STED     PSFs for 3D STED\n");
+#endif
+#ifdef dw_module_nuclei
+    printf("   nuclei       pixel classifier\n");
+#endif
+#ifdef dw_module_background
+    printf("   background   vignetting/background estimation\n");
 #endif
     printf("\n");
     printf("see: %s [command] --help\n", argv[0]);
@@ -1804,14 +1868,18 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
         float * dw_im_tile = s->fun(im_tile, tileM, tileN, tileP, // input image and size
                                     tpsf, tpM, tpN, tpP, // psf and size
                                     s);
-        free(im_tile);
+        fim_free(im_tile);
         if(s->offset > 0)
         {
             fim_add_scalar(dw_im_tile, tileM*tileN*tileP, -s->offset);
             fim_project_positive(dw_im_tile, tileM*tileN*tileP);
         }
+        if(s->verbosity > 1)
+        {
+            printf("Saving tile to disk\n");
+        }
         tiling_put_tile_raw(T, tt, tfile, dw_im_tile);
-        free(dw_im_tile);
+        fim_free(dw_im_tile);
         // free(tpsf);
     }
     tiling_free(T);
@@ -1845,7 +1913,7 @@ void timings()
     tictoc
         int64_t M = 1024, N = 1024, P = 50;
 
-    #ifndef WINDOWS
+#ifndef WINDOWS
     tic
         usleep(1000);
     toc(usleep_1000)
@@ -1883,8 +1951,8 @@ void timings()
         fim_flipall(V, A, M, N, P);
     toc(fim_flipall)
 
-    // ---
-    tic
+        // ---
+        tic
         float e1 = getError_ref(V, A, M, N, P, M, N, P);
     toc(getError_ref)
         V[0]+= e1;
@@ -1928,7 +1996,7 @@ void timings()
 
 void dw_unittests()
 {
-    fprint_peakMemory(NULL);
+    fprint_peak_memory(stdout);
     timings();
 
     //fim_ut();
@@ -1985,8 +2053,8 @@ void dcw_init_log(dw_opts * s)
     {
         fprintf(stderr, "Unable to open %s for writing\n", s->logFile);
         fprintf(stderr,
-            "Please check that you have permissions to write to the folder\n"
-            "and that the drive is not full\n");        
+                "Please check that you have permissions to write to the folder\n"
+                "and that the drive is not full\n");
         exit(EXIT_FAILURE);
     }
     assert(s->log != NULL);
@@ -1997,7 +2065,7 @@ void dcw_init_log(dw_opts * s)
 
 void dcw_close_log(dw_opts * s)
 {
-    fprint_peakMemory(s->log);
+    fprint_peak_memory(s->log);
     show_time(s->log);
     fclose(s->log);
 }
@@ -2045,8 +2113,11 @@ void flatfieldCorrection(dw_opts * s, float * im, int64_t M, int64_t N, int64_t 
 
 
 static void prefilter(dw_opts * s,
-               float * im, int64_t M, int64_t N, int64_t P,
-               float * psf, int64_t pM, int64_t pN, int64_t pP)
+                      float * im, int64_t M, int64_t N, int64_t P,
+                      __attribute__((unused)) float * psf,
+                      __attribute__((unused)) int64_t pM,
+                      __attribute__((unused)) int64_t pN,
+                      __attribute__((unused)) int64_t pP)
 {
 
     if(s->psigma<= 0)
@@ -2153,6 +2224,7 @@ int dw_run(dw_opts * s)
                M, N, P);
     }
 
+
     int tiling = 0;
     if(s->tiling_maxSize > 0 && (M > s->tiling_maxSize || N > s->tiling_maxSize))
     {
@@ -2189,6 +2261,56 @@ int dw_run(dw_opts * s)
             }
             printf("Done reading\n"); fflush(stdout);
         }
+
+        if(s->auto_zcrop > 0)
+        {
+            if(s->verbosity > 0)
+            {
+                printf("Cropping the image to %" PRId64 " x %" PRId64 " x %d\n",
+                       M, N, s->auto_zcrop);
+            }
+            float * zim = fim_auto_zcrop(im, M, N, P, s->auto_zcrop);
+            if(zim == NULL)
+            {
+                fprintf(stderr,
+                        "Automatic cropping failed\n");
+                exit(EXIT_FAILURE);
+            }
+            fim_free(im);
+            im = zim;
+            P = s->auto_zcrop;
+
+        }
+
+        if(s->zcrop > 0)
+        {
+            if(2*s->zcrop > P)
+            {
+                fprintf(stderr, "Impossible to remove 2x%d planes from an image with %zu planes\n",
+                        s->zcrop, P);
+            }
+            if(s->verbosity > 0)
+            {
+                printf("Removing %d planes from the top and bottom of the image\n",
+                       s->zcrop);
+            }
+            float * zim = fim_zcrop(im, M, N, P, (size_t )s->zcrop);
+            if(zim == NULL)
+            {
+                fprintf(stderr,
+                        "Automatic cropping failed\n");
+                exit(EXIT_FAILURE);
+            }
+            fim_free(im);
+            im = zim;
+            P = P - 2*s->zcrop;
+            if(s->verbosity > 0)
+            {
+                printf("New image size: [%" PRId64 "x %" PRId64 "x %" PRId64 "]\n",
+                       M, N, P);
+            }
+        }
+
 
         if(fim_min(im, M*N*P) < 0)
         {
@@ -2406,7 +2528,7 @@ int dw_run(dw_opts * s)
     dcw_close_log(s);
 
     if(s->verbosity > 1)
-    { fprint_peakMemory(NULL); }
+    { fprint_peak_memory(stdout); }
 
     if(s->verbosity > 0)
     { printf("Done!\n"); }

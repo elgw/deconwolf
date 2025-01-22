@@ -196,7 +196,7 @@ int sparse_preprocess_cli(int argc, char ** argv)
     {
         inFile = argv[ff];
 
-        if(!dw_file_exist(inFile))
+        if(!dw_isfile(inFile))
         {
             printf("Can't open %s!\n", inFile);
             continue;
@@ -206,7 +206,7 @@ int sparse_preprocess_cli(int argc, char ** argv)
         assert(conf->prefix != NULL);
         char * outfile = dw_prefix_file(inFile, conf->prefix);
 
-        if((conf->overwrite == 0) && dw_file_exist(outfile))
+        if((conf->overwrite == 0) && dw_isfile(outfile))
         {
             printf("%s already exist, skipping\n", outfile);
             free(outfile);
@@ -288,7 +288,7 @@ int sparse_preprocess_cli(int argc, char ** argv)
 
     if(conf->verbose > 1)
     {
-        printf("Peak memory: %lu KB\n", get_peakMemoryKB());
+        fprint_peak_memory(stdout);
     }
 
     sparse_settings_free(conf);
