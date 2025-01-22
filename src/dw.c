@@ -1850,7 +1850,7 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
         float * dw_im_tile = s->fun(im_tile, tileM, tileN, tileP, // input image and size
                                     tpsf, tpM, tpN, tpP, // psf and size
                                     s);
-        free(im_tile);
+        fim_free(im_tile);
         if(s->offset > 0)
         {
             fim_add_scalar(dw_im_tile, tileM*tileN*tileP, -s->offset);
