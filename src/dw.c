@@ -1856,6 +1856,10 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
             fim_add_scalar(dw_im_tile, tileM*tileN*tileP, -s->offset);
             fim_project_positive(dw_im_tile, tileM*tileN*tileP);
         }
+        if(s->verbosity > 1)
+        {
+            printf("Saving tile to disk\n");
+        }
         tiling_put_tile_raw(T, tt, tfile, dw_im_tile);
         free(dw_im_tile);
         // free(tpsf);
