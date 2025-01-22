@@ -1,3 +1,6 @@
+; Requires https://nsis.sourceforge.io/EnVar_plug-in
+; just extract to C:\Program (x86)\NSIS
+
 Name "deconwolf"
 
 ;Icon "todo.ico"
