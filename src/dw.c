@@ -251,8 +251,8 @@ void dw_show_iter(dw_opts * s, int it, int nIter, float err)
 
 
 char * gen_iterdump_name(
-                         __attribute__((unused)) const dw_opts * s,
-                         int it)
+    __attribute__((unused)) const dw_opts * s,
+    int it)
 {
     // Generate a name for the an iterdump file
     // at iteration it
@@ -763,9 +763,8 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             break;
         case 'o':
             free(s->outFile);
-            s->outFile = malloc(strlen(optarg)+1);
+            s->outFile = strdup(optarg);
             assert(s->outFile != NULL);
-            strcpy(s->outFile, optarg);
             break;
         case 'n':
             s->nIter = atoi(optarg);
@@ -897,6 +896,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         }
     }
 
+
     if(s->offset < 0)
     {
         printf("WARNING: A negative offset not allowed, setting it to 0\n");
@@ -991,12 +991,28 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             printf("outFile: %s, outFolder: %s\n", s->outFile, s->outFolder);
         }
     } else {
-        char * dname = dw_dirname(s->outFile);
-        free(s->outFolder);
-        s->outFolder = malloc(strlen(dname) + 16);
-        assert(s->outFolder != NULL);
-        sprintf(s->outFolder, "%s%c", dname, FILESEP);
-        free(dname);
+        if( isdir(s->outFile) )
+        {
+            if(s->verbosity > 0)
+            {
+                printf("--out describes a folder");
+            }
+            free(s->outFolder);
+            s->outFolder = malloc(strlen(s->outFile) + 8);
+            sprintf(s->outFolder, "%s%c", s->outFile, FILESEP);
+            free(s->outFile);
+            char * basename = dw_basename(s->imFile);
+            s->outFile = malloc(strlen(basename) + strlen(s->outFolder) + 8);
+            assert(s->outFile != NULL);
+            sprintf(s->outFile, "%s%c%s", s->outFolder, FILESEP, basename);
+        } else {
+            char * dname = dw_dirname(s->outFile);
+            free(s->outFolder);
+            s->outFolder = malloc(strlen(dname) + 16);
+            assert(s->outFolder != NULL);
+            sprintf(s->outFolder, "%s%c", dname, FILESEP);
+            free(dname);
+        }
     }
 
     if(! s->iterdump)
