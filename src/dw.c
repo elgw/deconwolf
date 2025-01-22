@@ -1861,7 +1861,7 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
             printf("Saving tile to disk\n");
         }
         tiling_put_tile_raw(T, tt, tfile, dw_im_tile);
-        free(dw_im_tile);
+        fim_free(dw_im_tile);
         // free(tpsf);
     }
     tiling_free(T);
