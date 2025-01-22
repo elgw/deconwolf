@@ -130,6 +130,8 @@ char * dw_getcwd(char * buf, size_t size);
  * Examples:
  * ("file.tif", "dw") -> "dw_file.tif"
  * ("/dir/file.tif", "dw" -> "/dir/dw_file.tif"
+ * if prefix == NULL or strlen(prefix) = 0
+ * this command is equivalent to strdup
  **/
 char * dw_prefix_file(const char * file, const char * prefix);
 
