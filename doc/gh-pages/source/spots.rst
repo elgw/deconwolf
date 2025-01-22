@@ -1,6 +1,10 @@
 Spot detection and measurements
 ===============================
 
+.. note::
+   New for version 0.4.4. More documentation planned.
+
+
 Deconwolf includes a few option to detect diffraction limited dots (or
 spots, or signals) via the module `dw dots`. This documentation gives
 and overview of what the program does. Please see the man page for up
@@ -163,9 +167,3 @@ Properties returned from the fitting routine:
 * *f_corr* the correlation between the pixel values and the fitted
   model. This information is really useful to reject spot candidates
   that are found on line- and edge- like structures in images.
-
-Alternative software
---------------------
-
-Please provide a link and short description of good alternatives and
-they will be put here. BigFish, etc.

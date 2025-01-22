@@ -1,3 +1,5 @@
+.. _usage-guide:
+
 Deconvolution: Usage guide
 ==========================
 
@@ -9,9 +11,9 @@ it is important to know that the success or failure of deconvolution
 depends on several factors and that there are limitations that can not
 be overcome.
 
-Most important, the results will always be limited by mismatches between
-the PSF of the microscopy and what is given as input to the software
-(PSF mismatch).
+Most important, the results will always be limited by mismatches
+between the "real" PSF of the microscopy and "practial" PSF that is
+given as input to the software (PSF mismatch).
 
 The “Born and Wolf” PSF model that is included with deconwolf should be
 a good, or at least simple, starting point since it only requires very
@@ -57,22 +59,24 @@ emission wave length.
 If you don’t have one you can create one according to the Born-Wolf
 model with the ``dw_bw`` program that is shipped with deconwolf.
 
-The basic information that you need to know is: - The numerical
-aperture, NA. - The refractive index of the immersion, ni. Common media
-are air (ni = 1) and oil (ni = 1.51) and silicon oil (ni = 1.405). - The
-lateral size of the pixels in the **image** – NOT the size of the pixels
-in the sensor. - The axial size of the pixels in the image,
-i.e. distance between the images/planes.
+The basic information that you need to know is:
 
-For example: one of our microscopes has a 100x objectives with NA =
+- The numerical aperture, NA.
+
+- The refractive index of the immersion, ni. Common media are air (ni = 1) and oil (ni = 1.51) and silicon oil (ni = 1.405).
+
+- The lateral size of the pixels in the **image** – NOT the size of the pixels in the sensor.
+
+- The axial size of the pixels in the image, i.e. distance between the images/planes.
+
+For example: one of our microscopes has a 100X objectives with NA =
 1.45, ni = 1.515 and pixel size is 130 nm. The distance between planes
 was set to 250 nm. To generate a PSF with this information (we will call
 it ``PSF_dapi.tif``) the following command can be used:
 
-.. code:: shell
+.. code:: none
 
    dw_bw --resxy 130 --resz 250 --lambda 461 --NA 1.45 --ni 1.515 PSF_dapi.tif
-
 
 
 .. tip::
@@ -118,7 +122,7 @@ by:
    man dw_bw
 
 If the manuals are not available on your system, they can also be found
-at this link [https://github.com/elgw/deconwolf/tree/master/doc].
+at this link [https://github.com/elgw/deconwolf/doc/man/].
 
 Test data
 ---------
@@ -143,11 +147,11 @@ can:
    handling in the axial direction is quite good so often there is no
    need for a lot of out of focus images planes above and below the
    objects of interest.
-2. Use the **–tilesize N** option. To process the image as slightly
+2. Use the **-\-tilesize N** option. To process the image as slightly
    overlapping tiles.
-3. Use fewer threads, i.e. specify **–threads N**.
-4. Consider switching to a lower quality on the boundaries with **–bq
-   1**. The option **–bq 0** is not recommended for normal images (since
+3. Use fewer threads, i.e. specify **-\-threads N**.
+4. Consider switching to a lower quality on the boundaries with **-\-bq
+   1**. The option **-\-bq 0** is not recommended for normal images (since
    it assumes that the image repeats itself around the edges which is
    bad particularly in the axial direction).
 
@@ -158,7 +162,7 @@ PSF considerations
 ------------------
 
 The **dw_bw** program will generate PSFs that can be used with
-deconwolf, but it is also possible to use PSF from other sources.
+deconwolf, but it is also possible to use PSFs from other sources.
 
 deconwolf requires that the PSF is centered, i.e., that the largest
 value is in the middle. If you generate the PSF with some other program
@@ -173,7 +177,7 @@ when loaded. If it has fewer than the ideal number of planes, an warning
 will be issued.
 
 The PSF might also be cropped in the lateral plane when loaded (to save
-some memory). To prevent that, add the command line argument **–xyfactor
+some memory). To prevent that, add the command line argument **-\-xyfactor
 0**.
 
 Supported image formats
@@ -182,7 +186,7 @@ Supported image formats
 Currently deconwolf can only read tif images, specifically: multi-page,
 8-bit unsigned, 16-bit unsigned or 32-bit floats. The data should be
 written in strip mode (typically the default output format). The output
-is either 16-bit unsigned or 32-bit floating point (with the **–float**
+is either 16-bit unsigned or 32-bit floating point (with the **-\-float**
 flag) and can be read by Matlab, ImageJ, etc. If you use 16-bit output
 note that images will be scaled in order to not be saturated. The
 scaling value can be found at the end of the log files.
@@ -225,7 +229,7 @@ used by default since that is more memory efficient, and 16-bits per
 pixel should be good enough in most cases.
 
 To prevent clipping/saturation and to make full use of the 16-bit
-dynamic range all pixel values are scaled by a scaling factor,
+dynamic range all pixel values are scaled by a factor,
 :math:`s`, prior to writing. The value of the scaling factor is based on
 the deconvolved image, :math:`Y`, and set as
 :math:`s=(2^{16}-1)/\max(Y)`.
@@ -240,16 +244,16 @@ The scaling is reported in the log file like:
 If you care about the absolute intensities there are three things you
 can do:
 
-1. Use the **–float** argument to save images as 32-bit floating point
+1. Use the **-\-float** argument to save images as 32-bit floating point
    tif files. The downside is that the output images will be twice as
    large compared to the default and that the support for reading such
    images is not widespread.
 
-2. Set a scaling factor manually by using **–scale s** where :math:`v`
+2. Set a scaling factor manually by using **-\-scale s** where :math:`v`
    is some value that you have to figure out yourself. :math:`s==1` is a
    natural choice to start with but might cause saturated pixels. If
    that is the case reduce :math:`s` until you are satisfied. For
-   example, if you use **–scale 0.5** the output pixels will have only
+   example, if you use **-\-scale 0.5** the output pixels will have only
    half of the computed value, if you load the images you can then
    multiply the pixel values by :math:`2` to get the original values
    back.
@@ -264,7 +268,7 @@ I have a GPU that I want to use, what can I do?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Congratulations, that will make deconwolf run much faster. In general
-you only need to supply the command line argument **–gpu** to enable GPU
+you only need to supply the command line argument **-\-gpu** to enable GPU
 acceleration. However, there are some things to take into consideration:
 
 -  Was deconwolf compiled with GPU support? If you run ``dw --version``
@@ -283,13 +287,13 @@ acceleration. However, there are some things to take into consideration:
 
 -  Do you have enough memory? The GPU based pipeline use about as much
    GPU memory as the non-gpu pipeline use RAM. If you first deconvolve
-   an image with without the **–gpu** option you can check the log file
+   an image without the **-\-gpu** option you can check the log file
    (at least under linux) to figure out how much RAM was used. If there
    isn’t enough memory on the GPU there is the option to deconvolve
-   using tiles, see the info about the **–tilesize** option.
+   using tiles, see the info about the **-\-tilesize** option.
 
 -  The results will not be pixel identical to images deconvolved without
-   the **–gpu** option. However differences should be negligable (if
+   the **-\-gpu** option. However differences should be negligable (if
    not, please report a bug). This is because the FFT libraries have a
    limited precision.
 
@@ -322,7 +326,7 @@ in ``~/config/deconwolf/``. Those files can in general not be
 transferred to other machines.
 
 This self-tuning can take considerable time but should only be needed
-once per problem size. To turn of the self-tuning use the **–noplan**
+once per problem size. To turn of the self-tuning use the ``--noplan``
 flag.
 
 How can I prepare tif files for deconwolf?
@@ -416,5 +420,4 @@ No, that option is deliberately turned off.
 My question was not in this list!
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Then you are welcome to ask it at
-[https://github.com/elgw/deconwolf/issues].
+See if anyone else has already asked it or you are welcome to ask it by creating a new `issue <https://github.com/elgw/deconwolf/issues>`__.

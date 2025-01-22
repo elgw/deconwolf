@@ -1,12 +1,5 @@
-deconwolf v0.4.3
+deconwolf v0.4.4
 ================
-
-.. hint::
-
-   The source code can be found on `github <https://github.com/elgw/deconwolf>`__.
-
-..
-   And there is also `deconwolf.fht.org <https://deconwolf.fht.org>`__.
 
 .. toctree::
    :maxdepth: 2
