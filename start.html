@@ -20,7 +20,7 @@
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Installation notes" href="install.html" />
-    <link rel="prev" title="deconwolf v0.4.3" href="index.html" /> 
+    <link rel="prev" title="deconwolf v0.4.4" href="index.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -99,7 +99,7 @@
              
   <section id="getting-started">
 <h1>Getting started<a class="headerlink" href="#getting-started" title="Link to this heading"></a></h1>
-<p><strong>deconwolf</strong> <a class="footnote-reference brackets" href="#id10" id="id1" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a> is a software for 3-D deconvolution of fluorescent
+<p><strong>deconwolf</strong> <a class="footnote-reference brackets" href="#id11" id="id1" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a> is a software for 3-D deconvolution of fluorescent
 wide-field images:</p>
 <ul class="simple">
 <li><p>The deconvolved images shows very mild boundary effects which means
@@ -114,8 +114,8 @@ run several instances of dw in parallel.</p></li>
 (PSFs) according to the Born and Wolf model. Our program is the only
 one we know of that actually integrate the PSF over each pixel.</p></li>
 <li><p>The programs are developed under Linux but can be compiled on Mac
-and Windows as well.</p></li>
-<li><p>Fully open source. And we embrace <a class="reference external" href="CONTRIBUTING.md">contributions and suggestions</a>.</p></li>
+and Windows as well, possibly not with 100% functionality.</p></li>
+<li><p>Fully open source and we embrace contributions and suggestions.</p></li>
 </ul>
 <p>Deconwolf does not:</p>
 <ul class="simple">
@@ -123,7 +123,7 @@ and Windows as well.</p></li>
 like to click buttons there is a limited <a class="reference external" href="https://github.com/elgw/deconwolf-gui">GUI</a>.</p></li>
 <li><p>Show your images, for that, try <a class="reference external" href="https://imagej.net/Welcome">ImageJ</a></p></li>
 <li><p>Diagnose your imaging system and correct for typical CMOS or CCD
-artifacts.</p></li>
+artifacts, vignetting, etc.</p></li>
 <li><p>Estimate your PSF based on real images.</p></li>
 <li><p>Tell you how many iterations that you should use although there are
 three ways to make it stop i) after a fixed number of
@@ -131,26 +131,29 @@ iterations ii) when the progress is slow, or iii) at a fixed
 difference between the input image and the current guess (convolved
 with the PSF).</p></li>
 <li><p>If you miss one or more of these features, or just want something
-else, there is an (incomplete) list of <a class="reference external" href="#aternatives">alternative</a> software.</p></li>
+else, there is an (incomplete) list of <a class="reference internal" href="#alternatives"><span class="std std-ref">alternative</span></a> software.</p></li>
 </ul>
-<p>After building and installing you will find two binaries: - <strong>dw</strong> – for
-deconvolution, <a class="reference external" href="doc/dw.txt">man page</a> - <strong>dw_bw</strong> – to create PSFs
-using the Born-Wolf model <a class="reference external" href="doc/dw_bw.txt">man page</a></p>
+<p>After building and installing you will find two binaries:</p>
+<ul class="simple">
+<li><p><strong>dw</strong> – for deconvolution, <a class="reference external" href="dw.txt">man page</a></p></li>
+<li><p><strong>dw_bw</strong> – to create PSFs using the Born-Wolf model
+<a class="reference external" href="dw_bw.txt">man page</a> (will eventually be a sub command of <cite>dw</cite>).</p></li>
+</ul>
 <section id="method">
 <h2>Method<a class="headerlink" href="#method" title="Link to this heading"></a></h2>
 <p>The deconvolution algorithm is based on the Richardson-Lucy (RL) method
-<a class="footnote-reference brackets" href="#id11" id="id2" role="doc-noteref"><span class="fn-bracket">[</span>2<span class="fn-bracket">]</span></a> <a class="footnote-reference brackets" href="#id12" id="id3" role="doc-noteref"><span class="fn-bracket">[</span>3<span class="fn-bracket">]</span></a>. The scaled heavy ball (SHB)  <a class="footnote-reference brackets" href="#id13" id="id4" role="doc-noteref"><span class="fn-bracket">[</span>4<span class="fn-bracket">]</span></a> is used for acceleration,
+<a class="footnote-reference brackets" href="#id12" id="id2" role="doc-noteref"><span class="fn-bracket">[</span>2<span class="fn-bracket">]</span></a> <a class="footnote-reference brackets" href="#id13" id="id3" role="doc-noteref"><span class="fn-bracket">[</span>3<span class="fn-bracket">]</span></a>. The scaled heavy ball (SHB)  <a class="footnote-reference brackets" href="#id14" id="id4" role="doc-noteref"><span class="fn-bracket">[</span>4<span class="fn-bracket">]</span></a> is used for acceleration,
 i.e. to do more work per iteration. Compared to the “Biggs”
 acceleration, it use less memory, it also has a proven convergence
 without any modifications to the algorithm.</p>
-<p>The default boundary handling method is based on  <a class="footnote-reference brackets" href="#id14" id="id5" role="doc-noteref"><span class="fn-bracket">[</span>5<span class="fn-bracket">]</span></a> , although
+<p>The default boundary handling method is based on  <a class="footnote-reference brackets" href="#id15" id="id5" role="doc-noteref"><span class="fn-bracket">[</span>5<span class="fn-bracket">]</span></a> , although
 extended to 3D. In our experiments it cause the least artifacts close to
 the image borders, especially important in the axial direction. To
 disable boundary handling, i.e. use periodic deconvolution, the option
 <strong>–periodic</strong> can be used.</p>
 <p>The PSF calculations in <strong>dw_bw</strong> implements the “Born and Wolf” model
-<a class="footnote-reference brackets" href="#id15" id="id6" role="doc-noteref"><span class="fn-bracket">[</span>6<span class="fn-bracket">]</span></a> which is also decribed well in  <a class="footnote-reference brackets" href="#id16" id="id7" role="doc-noteref"><span class="fn-bracket">[</span>7<span class="fn-bracket">]</span></a>. It is possible to speed up
-the calculations using the method from  <a class="footnote-reference brackets" href="#id17" id="id8" role="doc-noteref"><span class="fn-bracket">[</span>8<span class="fn-bracket">]</span></a> using the <strong>–li</strong> argument.
+<a class="footnote-reference brackets" href="#id16" id="id6" role="doc-noteref"><span class="fn-bracket">[</span>6<span class="fn-bracket">]</span></a> which is also decribed well in  <a class="footnote-reference brackets" href="#id17" id="id7" role="doc-noteref"><span class="fn-bracket">[</span>7<span class="fn-bracket">]</span></a>. It is possible to speed up
+the calculations using the method from  <a class="footnote-reference brackets" href="#id18" id="id8" role="doc-noteref"><span class="fn-bracket">[</span>8<span class="fn-bracket">]</span></a> using the <strong>–li</strong> argument.
 At some point (after some more testing) it might become the default
 method. An important difference to the
 <a class="reference external" href="https://bigwww.epfl.ch/algorithms/psfgenerator/">PSFGenerator</a> is
@@ -160,7 +163,7 @@ improvements, especially when the pixel size to resolution limit is low.
 <strong>dw psf</strong> also contains a few other PSF models which eventually will be
 documented as well.</p>
 <p>For GPU calculations dw use <a class="reference external" href="https://github.com/DTolm/VkFFT">VkFFT</a>
-<a class="footnote-reference brackets" href="#id18" id="id9" role="doc-noteref"><span class="fn-bracket">[</span>9<span class="fn-bracket">]</span></a> via OpenCL. Until version 0.3.6
+<a class="footnote-reference brackets" href="#id19" id="id9" role="doc-noteref"><span class="fn-bracket">[</span>9<span class="fn-bracket">]</span></a> via OpenCL. Until version 0.3.6
 <a class="reference external" href="https://github.com/clMathLibraries/clFFT">libclfft2</a> was used for
 this purpose. Since OpenCL is vendor neutral, this option should work
 for all major GPU brands. On the CPU side
@@ -175,7 +178,7 @@ binaries available, see
 <a class="reference external" href="https://github.com/elgw/deconwolf/releases">releases</a>.</p>
 <p>To compile and install deconwolf should take less than a minute on a
 Linux machine but might be more cumbersome on MacOS and Windows. For
-platform specific build instructions, see <a class="reference external" href="INSTALL.md">INSTALL.md</a>.
+platform specific build instructions, see <a class="reference internal" href="install.html#installation-notes"><span class="std std-ref">installation notes</span></a>
 We hope to provide pre-compiled binaries in the future.</p>
 <section id="dependencies">
 <h3>Dependencies<a class="headerlink" href="#dependencies" title="Link to this heading"></a></h3>
@@ -270,9 +273,9 @@ machine, having only 4 cores:</p>
 <p>Yes, deconvolution is time consuming without a GPU :(</p>
 <p>Below there will be some hints on the performance relative to other
 software. For that purpose synthetic data will be used where periodic
-boundary conditions (<strong>–periodic</strong>) can be used. dw should not try to
+boundary conditions (<strong>--periodic</strong>) can be used. dw should not try to
 crop the PSF (which is usually done automatically to save some
-memory/gain some speed) in this case, hence the flag <strong>–xyfactor 0</strong> is
+memory/gain some speed) in this case, hence the flag <strong>--xyfactor 0</strong> is
 added as well.</p>
 <p>Benchmarking is performed on the <a class="reference external" href="https://bigwww.epfl.ch/deconvolution/data/microtubules/">microtubules
 image</a> using
@@ -333,17 +336,22 @@ RAM, 12 GB RX 6700 XT GPU. Iterations: 115.</p>
 </table>
 <p>Notes:</p>
 <ul class="simple">
-<li><p>sys-mem is measured by parsing the <strong>VmPeak</strong> value from
-<code class="docutils literal notranslate"><span class="pre">/proc/pid/status</span></code>. In the case of DeconvolutionLab2 the values
-does not necessarily reflect the required memory since it is written
-in Java which is garbage collected. For MATLAB/deconvlucy the memory
-includes the full MATLAB environment.</p></li>
+<li><dl class="simple">
+<dt>sys-mem is measured by parsing the <strong>VmPeak</strong> value from</dt><dd><p><code class="docutils literal notranslate"><span class="pre">/proc/pid/status</span></code>. In the case of DeconvolutionLab2 the values
+does not necessarily reflect the required memory since it is
+written in Java which is garbage collected. For MATLAB/deconvlucy
+the memory includes the full MATLAB environment. (newer version of
+<strong>dw</strong> also reports <strong>VmHWM</strong> which might be a more relevant
+measurement).</p>
+</dd>
+</dl>
+</li>
 <li><p>self-mem is the memory usage reported by the software if available.</p></li>
 <li><p>DeconlutionLab2 use vanilla RL, i.e. without any acceleration which
 means that more iterations will be needed before convergence.</p></li>
 <li><p>MATLAB/deconvlucy use “Biggs” acceleration. Matlab version R2020b was
 used in this case.</p></li>
-<li><p>For “real” data, when <strong>–periodic</strong> is not used, the input image is
+<li><p>For “real” data, when <strong>--periodic</strong> is not used, the input image is
 padded automagically during processing and the relevant part is
 cropped out at the end.</p></li>
 <li><p>Also works on Raspberry PI5 :) In that case it took 146 s.</p></li>
@@ -355,8 +363,8 @@ cropped out at the end.</p></li>
 MacOS.</p>
 <ol class="arabic simple">
 <li><p>Get the dependencies. The required libraries should be found on most
-platforms, however, the installation process differs slightly. See
-<a class="reference external" href="INSTALL.md">INSTALL.md</a> for per-platform advice.</p></li>
+platforms, however, the installation process differs slightly. See the
+<a class="reference internal" href="install.html#installation-notes"><span class="std std-ref">installation notes</span></a> for per-platform advice.</p></li>
 <li><p>Compile and install</p></li>
 </ol>
 <div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>mkdir<span class="w"> </span>builddir
@@ -366,13 +374,13 @@ cmake<span class="w"> </span>--build<span class="w"> </span>.
 sudo<span class="w"> </span>make<span class="w"> </span>install
 </pre></div>
 </div>
-<p>Once again, see :doc`install` for more options.</p>
+<p>Once again, see the <a class="reference internal" href="install.html#installation-notes"><span class="std std-ref">installation notes</span></a> for more options.</p>
 </section>
 <section id="minimal-usage-example">
 <h2>Minimal usage example<a class="headerlink" href="#minimal-usage-example" title="Link to this heading"></a></h2>
 <p>To generate a parametric PSF and deconvolve an image, all you need is
 something like this:</p>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span><span class="c1"># generate PSF.tif</span>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span><span class="c1"># generate PSF.tif, units are in [nm]</span>
 dw_bw<span class="w"> </span>--resxy<span class="w"> </span><span class="m">130</span><span class="w"> </span><span class="se">\</span>
 --resz<span class="w"> </span><span class="m">250</span><span class="w"> </span><span class="se">\</span>
 --NA<span class="w"> </span><span class="m">1</span>.46<span class="w"> </span><span class="se">\</span>
@@ -400,8 +408,8 @@ deconvolution, test</p>
 </pre></div>
 </div>
 <p>The results should be visually identical.</p>
-<p>For more documentation see the short <a class="reference external" href="usage.rst">usage guide</a>, and the
-manual pages for both binaries, <a class="reference external" href="doc/dw.txt">man dw</a> <a class="reference external" href="doc/dw_bw.txt">man
+<p>For more documentation see the short <a class="reference internal" href="usage.html#usage-guide"><span class="std std-ref">usage guide</span></a>, and the
+manual pages for both binaries, <a class="reference external" href="dw.txt">man dw</a> <a class="reference external" href="dw_bw.txt">man
 dw_bw</a>.</p>
 </section>
 <section id="bugs">
@@ -412,8 +420,8 @@ ticket</a> if you have any
 issues with the program.</p>
 </section>
 <section id="alternatives">
-<h2>Alternatives<a class="headerlink" href="#alternatives" title="Link to this heading"></a></h2>
-<p>This is a non-complete list of alternative software:</p>
+<span id="id10"></span><h2>Alternatives<a class="headerlink" href="#alternatives" title="Link to this heading"></a></h2>
+<p>This is a non-complete list of alternative and useful software:</p>
 <section id="deconvolution">
 <h3>Deconvolution<a class="headerlink" href="#deconvolution" title="Link to this heading"></a></h3>
 <p>Free and open source:</p>
@@ -451,58 +459,58 @@ with dw.</p></li>
 <section id="references">
 <h2>References<a class="headerlink" href="#references" title="Link to this heading"></a></h2>
 <aside class="footnote-list brackets">
-<aside class="footnote brackets" id="id10" role="doc-footnote">
+<aside class="footnote brackets" id="id11" role="doc-footnote">
 <span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id1">1</a><span class="fn-bracket">]</span></span>
 <p>E. Wernersson et al. “Deconwolf enables high-performance
 deconvolution of widefield fluorescence microscopy images”, in Nature
 Methods, 2024, <a class="reference external" href="https://doi.org/10.1038/s41592-024-02294-7">doi</a></p>
 </aside>
-<aside class="footnote brackets" id="id11" role="doc-footnote">
+<aside class="footnote brackets" id="id12" role="doc-footnote">
 <span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id2">2</a><span class="fn-bracket">]</span></span>
 <p>Richardson, William Hadley (1972). “Bayesian-Based Iterative Method
 of Image Restoration”. JOSA. 62 (1): 55–59.
 <a class="reference external" href="https://doi.org/10.1364/JOSA.62.000055">doi</a></p>
 </aside>
-<aside class="footnote brackets" id="id12" role="doc-footnote">
+<aside class="footnote brackets" id="id13" role="doc-footnote">
 <span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id3">3</a><span class="fn-bracket">]</span></span>
 <p>Lucy, L. B. (1974). “An iterative technique for the rectification of
 observed distributions”. Astronomical Journal. 79 (6): 745–754.
 <a class="reference external" href="https://doi.org/10.1086%2F111605">doi</a></p>
 </aside>
-<aside class="footnote brackets" id="id13" role="doc-footnote">
+<aside class="footnote brackets" id="id14" role="doc-footnote">
 <span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id4">4</a><span class="fn-bracket">]</span></span>
 <p>Wang H, et al. Scaled Heavy-Ball Acceleration of the Richardson-Lucy
 Algorithm for 3D Microscopy Image Restoration. IEEE Trans Image
 Process. 2014 <a class="reference external" href="https://doi.org/10.1109/TIP.2013.2291324">doi</a>.</p>
 </aside>
-<aside class="footnote brackets" id="id14" role="doc-footnote">
+<aside class="footnote brackets" id="id15" role="doc-footnote">
 <span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id5">5</a><span class="fn-bracket">]</span></span>
 <p>M. Bertero and P. Boccacci, A simple method for the reduction of
 boundary effects in the Richardson-Lucy approach to image
 deconvolution, A&amp;A 437, 369-374 (2005).
 <a class="reference external" href="https://doi.org/10.1051/0004-6361:20052717">doi</a></p>
 </aside>
-<aside class="footnote brackets" id="id15" role="doc-footnote">
+<aside class="footnote brackets" id="id16" role="doc-footnote">
 <span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id6">6</a><span class="fn-bracket">]</span></span>
 <p>Max Born. Principles of optics : electromagnetic theory of
 propagation, interference, and diffraction of light. Cambridge:
 Cambridge University Press, 2019. ISBN: 978-1-108-47743-7.</p>
 </aside>
-<aside class="footnote brackets" id="id16" role="doc-footnote">
+<aside class="footnote brackets" id="id17" role="doc-footnote">
 <span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id7">7</a><span class="fn-bracket">]</span></span>
 <p>F. Aguet. “Super-Resolution Fluorescence Microscopy Based on Physical
 Models”. EPFL Thesis no. 4418 (2009), 209 p. Swiss Federal Institute
 of Technology Lausanne (EPFL), May 2009
 <a class="reference external" href="http://bigwww.epfl.ch/publications/aguet0903.html">url</a></p>
 </aside>
-<aside class="footnote brackets" id="id17" role="doc-footnote">
+<aside class="footnote brackets" id="id18" role="doc-footnote">
 <span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id8">8</a><span class="fn-bracket">]</span></span>
 <p>Jizhou Li, Feng Xue, and Thierry Blu. “Fast and accurate
 three-dimensional point spread function computation for fluorescence
 microscopy”. In: Journal of the Optical Society of America A 34.6
 (May 2017), p. 1029. <a class="reference external" href="https://doi.org/10.1364/josaa.34001029">doi</a></p>
 </aside>
-<aside class="footnote brackets" id="id18" role="doc-footnote">
+<aside class="footnote brackets" id="id19" role="doc-footnote">
 <span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id9">9</a><span class="fn-bracket">]</span></span>
 <p>D. Tolmachev, “VkFFT-A Performant, Cross-Platform and Open-Source GPU
 FFT Library,” in IEEE Access, vol. 11, pp. 12039-12058, 2023,
@@ -516,7 +524,7 @@ FFT Library,” in IEEE Access, vol. 11, pp. 12039-12058, 2023,
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="index.html" class="btn btn-neutral float-left" title="deconwolf v0.4.3" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="index.html" class="btn btn-neutral float-left" title="deconwolf v0.4.4" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="install.html" class="btn btn-neutral float-right" title="Installation notes" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

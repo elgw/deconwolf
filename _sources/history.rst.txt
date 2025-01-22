@@ -4,7 +4,7 @@ Version History
 0.4.4
 -----
 
-- Fixes issue `#80 <https://github.com/elgw/deconwolf/issues/80>`__. Thanks to `WisdomUfondu <https://github.com/WisdomUfondu>`__.
+- Fixees issue #77, #80 (Thanks to `WisdomUfondu <https://github.com/WisdomUfondu>), #81.
 
 - Switched to rst/sphinx documentation from markdown.
 

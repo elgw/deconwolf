@@ -20,10 +20,10 @@ wide-field images:
   one we know of that actually integrate the PSF over each pixel.
 
 - The programs are developed under Linux but can be compiled on Mac
-  and Windows as well.
+  and Windows as well, possibly not with 100% functionality.
 
-- Fully open source. And we embrace `contributions and suggestions
-  <CONTRIBUTING.md>`__.
+- Fully open source and we embrace contributions and suggestions.
+
 
 Deconwolf does not:
 
@@ -35,7 +35,7 @@ Deconwolf does not:
   <https://imagej.net/Welcome>`__
 
 - Diagnose your imaging system and correct for typical CMOS or CCD
-  artifacts.
+  artifacts, vignetting, etc.
 
 - Estimate your PSF based on real images.
 
@@ -46,12 +46,15 @@ Deconwolf does not:
   with the PSF).
 
 - If you miss one or more of these features, or just want something
-  else, there is an (incomplete) list of `alternative
-  <#aternatives>`__ software.
+  else, there is an (incomplete) list of :ref:`alternative
+  <alternatives>` software.
 
-After building and installing you will find two binaries: - **dw** – for
-deconvolution, `man page <doc/dw.txt>`__ - **dw_bw** – to create PSFs
-using the Born-Wolf model `man page <doc/dw_bw.txt>`__
+After building and installing you will find two binaries:
+
+- **dw** – for deconvolution, `man page <dw.txt>`__
+
+- **dw_bw** – to create PSFs using the Born-Wolf model
+  `man page <dw_bw.txt>`__ (will eventually be a sub command of `dw`).
 
 
 Method
@@ -99,7 +102,7 @@ binaries available, see
 
 To compile and install deconwolf should take less than a minute on a
 Linux machine but might be more cumbersome on MacOS and Windows. For
-platform specific build instructions, see `INSTALL.md <INSTALL.md>`__.
+platform specific build instructions, see :ref:`installation notes <installation-notes>`
 We hope to provide pre-compiled binaries in the future.
 
 Dependencies
@@ -132,7 +135,7 @@ output, the time is linear with the number of iterations.
 
 Here is a table with performance figures for some real images. Run on a
 system with: a 4-core Intel i7-6700K CPU, 64 GB RAM, NVIDIA GeForce RTX
-3090, using the **–gpu** flag and 50 iterations (**–iter 50**).
+3090, using the **--gpu** flag and 50 iterations (**--iter 50**).
 
 ======== ============ ============= ======== ============
 software image size   job size      time (s) sys-mem (Mb)
@@ -157,9 +160,9 @@ Yes, deconvolution is time consuming without a GPU :(
 
 Below there will be some hints on the performance relative to other
 software. For that purpose synthetic data will be used where periodic
-boundary conditions (**–periodic**) can be used. dw should not try to
+boundary conditions (**-\-periodic**) can be used. dw should not try to
 crop the PSF (which is usually done automatically to save some
-memory/gain some speed) in this case, hence the flag **–xyfactor 0** is
+memory/gain some speed) in this case, hence the flag **-\-xyfactor 0** is
 added as well.
 
 Benchmarking is performed on the `microtubules
@@ -185,11 +188,13 @@ dw 1.3.7 –gpu             3                      5,085
 
 Notes:
 
--  sys-mem is measured by parsing the **VmPeak** value from
+- sys-mem is measured by parsing the **VmPeak** value from
    ``/proc/pid/status``. In the case of DeconvolutionLab2 the values
-   does not necessarily reflect the required memory since it is written
-   in Java which is garbage collected. For MATLAB/deconvlucy the memory
-   includes the full MATLAB environment.
+   does not necessarily reflect the required memory since it is
+   written in Java which is garbage collected. For MATLAB/deconvlucy
+   the memory includes the full MATLAB environment. (newer version of
+   **dw** also reports **VmHWM** which might be a more relevant
+   measurement).
 
 -  self-mem is the memory usage reported by the software if available.
 
@@ -199,7 +204,7 @@ Notes:
 -  MATLAB/deconvlucy use “Biggs” acceleration. Matlab version R2020b was
    used in this case.
 
--  For “real” data, when **–periodic** is not used, the input image is
+-  For “real” data, when **-\-periodic** is not used, the input image is
    padded automagically during processing and the relevant part is
    cropped out at the end.
 
@@ -212,8 +217,8 @@ These instructions should work under Linux, BSD, Windows (via WSL), and
 MacOS.
 
 1. Get the dependencies. The required libraries should be found on most
-   platforms, however, the installation process differs slightly. See
-   `INSTALL.md <INSTALL.md>`__ for per-platform advice.
+   platforms, however, the installation process differs slightly. See the
+   :ref:`installation notes <installation-notes>` for per-platform advice.
 
 2. Compile and install
 
@@ -225,7 +230,7 @@ MacOS.
    cmake --build .
    sudo make install
 
-Once again, see :doc`install` for more options.
+Once again, see the :ref:`installation notes <installation-notes>` for more options.
 
 Minimal usage example
 ---------------------
@@ -235,7 +240,7 @@ something like this:
 
 .. code:: shell
 
-   # generate PSF.tif
+   # generate PSF.tif, units are in [nm]
    dw_bw --resxy 130 \
    --resz 250 \
    --NA 1.46 \
@@ -269,9 +274,9 @@ deconvolution, test
 
 The results should be visually identical.
 
-For more documentation see the short `usage guide <usage.rst>`__, and the
-manual pages for both binaries, `man dw <doc/dw.txt>`__ `man
-dw_bw <doc/dw_bw.txt>`__.
+For more documentation see the short :ref:`usage guide <usage-guide>`, and the
+manual pages for both binaries, `man dw <dw.txt>`__ `man
+dw_bw <dw_bw.txt>`__.
 
 Bugs
 ----
@@ -281,10 +286,12 @@ known. Please open a `new
 ticket <https://github.com/elgw/deconwolf/issues>`__ if you have any
 issues with the program.
 
+.. _alternatives:
+
 Alternatives
 ------------
 
-This is a non-complete list of alternative software:
+This is a non-complete list of alternative and useful software:
 
 Deconvolution
 ^^^^^^^^^^^^^

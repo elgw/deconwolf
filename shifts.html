@@ -86,6 +86,10 @@
              
   <section id="spot-based-image-alignment">
 <h1>Spot-based image alignment<a class="headerlink" href="#spot-based-image-alignment" title="Link to this heading"></a></h1>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>New for version 0.4.4. More documentation planned.</p>
+</div>
 <p>Some microscopes will will have a shift (or translate) images slightly
 different when switching imaging channels (most likely dues to mirror
 alignments).</p>
@@ -136,8 +140,14 @@ sigma might increase robustness.</p>
 the second point set but typically this kind of adjustments make
 little sense to do prior to the alignment. It is better to use this
 rigid shift alignment as the input for a more advanced correction
-model, like what is described in Kozubek. Ask for that to be be
+model, like what is described elsewhere <a class="footnote-reference brackets" href="#id2" id="id1" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a>. Ask for that to be be
 implemented or send a pull request!</p>
+<aside class="footnote-list brackets">
+<aside class="footnote brackets" id="id2" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id1">1</a><span class="fn-bracket">]</span></span>
+<p>Kozubek, M. and Matula, P. (2000), An efficient algorithm for measurement and correction of chromatic aberrations in fluorescence microscopy. Journal of Microscopy, 200: 206-217. <a class="reference external" href="https://doi.org/10.1046/j.1365-2818.2000.00754.x">https://doi.org/10.1046/j.1365-2818.2000.00754.x</a></p>
+</aside>
+</aside>
 </section>
 </section>
 

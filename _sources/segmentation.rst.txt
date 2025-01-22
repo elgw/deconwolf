@@ -1,8 +1,12 @@
 Ilastic-like segmentation
 =========================
 
-Deconwolf is capable of segmenting 2D images.
+.. note::
+   New for version 0.4.4. More documentation planned.
 
+
+Deconwolf is capable of segmenting 2D images using texture features
+and a random forest classifier.
 
 Workflow
 --------

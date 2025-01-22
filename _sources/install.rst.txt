@@ -1,18 +1,24 @@
+.. _installation-notes:
+
 Installation notes
 ==================
 
 General requirements on Linux/Unix
 ----------------------------------
 
--  A compiler, tested with `gcc <https://gcc.gnu.org/>`__ and
-   `clang <https://clang.llvm.org/>`__.
--  openmp, typically bundled with the compiler.
+-  A compiler: `gcc <https://gcc.gnu.org/>`__ or
+   `clang <https://clang.llvm.org/>`__ should do.
+-  OpenMP: typically bundled with the compiler.
 -  `cmake <https://cmake.org/>`__
 
 A package manager to get the dependencies which are:
+
 -  `fftw3 <https://www.fftw.org/>`__
+
 -  `libtiff <https://libtiff.gitlab.io/libtiff/>`__
+
 -  `GSL - GNU Scientific Library <https://www.gnu.org/software/gsl/>`__
+
 -  `libpng <http://libpng.org/pub/png/libpng.html>`__
 
 
@@ -110,18 +116,23 @@ Then set up XCode and install the required packages:
 Windows 10/11
 ^^^^^^^^^^^^^
 
-Deconwolf can be built several different ways under Windows: 1. Using
+Deconwolf can be built several different ways under Windows:
+
+1. Using
 WSL, then follow the instructions for Ubuntu. Most likely there will be
 a `performance
 penalty <https://www.phoronix.com/scan.php?page=article&item=wsl-wsl2-tr3970x&num=1>`__,
 and it will not be possible to enable GPU acceleration, see `issue
-#56 <https://github.com/elgw/deconwolf/issues/56>`__. 2.
+#56 <https://github.com/elgw/deconwolf/issues/56>`__.
+
+2.
 `msys2 <https://www.msys2.org/>`__ or
 `cygwin <https://www.cygwin.com/>`__, however those options will be
 slower since OpenMP will be using an pthreads emulation on top of
-windows threads. It might be possible to get OpenCL working. 3. As a
-native windows program. This is the preferred way since it should work
-with OpenCL without any problems..
+windows threads. It might be possible to get OpenCL working.
+
+3. As a
+native windows program. This is the preferred way since it also works with GPU acceleration.
 
 To build native windows programs, at least the following software is
 required:
@@ -133,7 +144,7 @@ required:
 
 The dependencies can get retrieved by vcpkg:
 
-.. code:: shell
+.. code::
 
    git clone https://github.com/microsoft/vcpkg
    .\vcpkg\bootstrap-vcpkg.bat
@@ -142,14 +153,15 @@ The dependencies can get retrieved by vcpkg:
    .\vcpkg\vcpkg.exe install gsl
    .\vcpkg\vcpkg.exe install opencl
    .\vcpkg\vcpkg.exe install getopt
+   .\vcpkg\vcpkg.exe install libpng
    .\vcpkg\vcpkg integrate install
 
-Please note the value of the ``CMAKE_TOOLCHAIN_FILE`` as it will be used
-later.
+Please note the value of the ``CMAKE_TOOLCHAIN_FILE``, given by the
+last command, as it will be used later.
 
 A visual studio project can be created by
 
-.. code:: shell
+.. code::
 
    cd deconwolf
    mkdir build
@@ -158,17 +170,21 @@ A visual studio project can be created by
 
 Important: Please use the correct path to ``vcpkg.cmake``.
 
-Open the visual studio solution and oo to Linker->Input->Additional
+Open the visual studio solution and go to Linker->Input->Additional
 dependencies and add:
 
-.. code:: shell
+.. code::
 
    libomp.lib
 
 Change the build type from debug to release and compile.
 
+Possibly you will have to manually enable vcpkg as well.
+
 If you are a windows developer and reading this, please help us out to
 make the build process smoother!
+
+To create an installer, see the file `util/create_win_dw_installer.nsi`.
 
 FreeBSD 14.4
 ^^^^^^^^^^^^
