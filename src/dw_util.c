@@ -203,7 +203,7 @@ float timespec_diff(struct timespec* end, struct timespec * start)
 }
 
 #ifdef WINDOWS
-size_t get_peakMemoryKB(size_t * physical, size_t * virtual)
+int get_peakMemoryKB(size_t * physical, size_t * virtual)
 {
     return 1;
 }
