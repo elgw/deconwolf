@@ -1,6 +1,10 @@
 Spot-based image alignment
 ==========================
 
+.. note::
+   New for version 0.4.4. More documentation planned.
+
+
 Some microscopes will will have a shift (or translate) images slightly
 different when switching imaging channels (most likely dues to mirror
 alignments).
@@ -64,5 +68,8 @@ It is possible to manually tune the magnification and the rotation of
 the second point set but typically this kind of adjustments make
 little sense to do prior to the alignment. It is better to use this
 rigid shift alignment as the input for a more advanced correction
-model, like what is described in Kozubek. Ask for that to be be
+model, like what is described elsewhere [1]_. Ask for that to be be
 implemented or send a pull request!
+
+.. [1]
+   Kozubek, M. and Matula, P. (2000), An efficient algorithm for measurement and correction of chromatic aberrations in fluorescence microscopy. Journal of Microscopy, 200: 206-217. https://doi.org/10.1046/j.1365-2818.2000.00754.x

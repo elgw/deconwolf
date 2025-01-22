@@ -4,7 +4,9 @@ Version History
 0.4.4
 -----
 
-- Fixes issue `#80 <https://github.com/elgw/deconwolf/issues/80>`__. Thanks to `WisdomUfondu <https://github.com/WisdomUfondu>`__.
+- Fixed Windows-only issue #77, #80 (Thanks to `WisdomUfondu
+  <https://github.com/WisdomUfondu>) and #81. I.e. tiling should work
+  and the random freezes when using the GPU should be gone (hopefully!).
 
 - Switched to rst/sphinx documentation from markdown.
 
