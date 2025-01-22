@@ -1002,9 +1002,11 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             sprintf(s->outFolder, "%s%c", s->outFile, FILESEP);
             free(s->outFile);
             char * basename = dw_basename(s->imFile);
-            s->outFile = malloc(strlen(basename) + strlen(s->outFolder) + 8);
-            assert(s->outFile != NULL);
-            sprintf(s->outFile, "%s%c%s", s->outFolder, FILESEP, basename);
+            char * outfile0 = malloc(strlen(basename) + strlen(s->outFolder) + 8);
+            assert(outfile0 != NULL);
+            sprintf(outfile0, "%s%c%s", s->outFolder, FILESEP, basename);
+            s->outFile = dw_prefix_file(outfile0, s->prefix);
+            free(outfile0);
         } else {
             char * dname = dw_dirname(s->outFile);
             free(s->outFolder);

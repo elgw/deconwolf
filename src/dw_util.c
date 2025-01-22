@@ -379,6 +379,17 @@ int getline(char **lineptr, size_t *n, FILE *stream)
 char *
 dw_prefix_file(const char * inFile, const char * prefix)
 {
+    assert(inFile != NULL);
+    if(prefix == NULL)
+    {
+        return strdup(inFile);
+    }
+
+    if(strlen(prefix) == 0)
+    {
+        return strdup(inFile);
+    }
+
 #ifdef WINDOWS
 
     char* drive = calloc(strlen(inFile) + 16, 1);
