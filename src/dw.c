@@ -1850,11 +1850,10 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
         {
             char * tfname = calloc(128, 1);
             assert(tfname != NULL);
-            sprintf(tfname, "tile%03d.tif\n", tt);
+            sprintf(tfname, "tile%03d.tif", tt);
             printf("writing to %s\n", tfname);
             fim_tiff_write(tfname, im_tile, NULL, tileM, tileN, tileP);
             free(tfname);
-            getchar();
         }
 
         fim_normalize_sum1(tpsf, tpM, tpN, tpP);
