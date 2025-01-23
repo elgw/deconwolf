@@ -2451,7 +2451,7 @@ int dw_run(dw_opts * s)
         deconvolve_tiles(M, N, P,
                          psf, pM, pN, pP, // psf and size
                          s);// settings
-        free(psf);
+        fim_free(psf);
     } else {
         fim_normalize_sum1(psf, pM, pN, pP);
         if(s->flatfieldFile != NULL)
