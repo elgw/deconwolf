@@ -867,7 +867,7 @@ int fim_tiff_write_float(const char * fName, const float * V,
     char formatString[4] = "w";
     if(M*N*P*sizeof(uint16_t) >= pow(2, 32))
     {
-        sprintf(formatString, "w8\n");
+        sprintf(formatString, "w8");
         fprintf(fim_tiff_log, "fim_tiff: File is > 2 GB, using BigTIFF format\n");
     }
 

@@ -1,6 +1,11 @@
 Version History
 ===============
 
+0.4.5
+-----
+
+- ``--method id`` now works on Windows.
+
 0.4.4
 -----
 
