@@ -280,8 +280,18 @@ float * tiling_get_tile_raw(tiling * T, const int tid, const char * fName)
       assert(wpos+m <= npixels);
       assert(wpos <= spos);
       fseek(fid, spos*sizeof(float), SEEK_SET);
-      size_t nread = fread(R+wpos, m*sizeof(float), 1, fid);
-      (void) nread;
+      errno = 0;
+      size_t nread = fread(R+wpos, sizeof(float), m, fid);
+      if(nread != m)
+      {
+          perror("fread error");
+          fprintf(stderr,
+                  "Error reading from %s. Read %zu elements, expected %zu\n"
+                  "In %s %d\n",
+                  fName, nread, m,
+                  __FILE__, __LINE__);
+          exit(EXIT_FAILURE);
+      }
     }
   }
 
