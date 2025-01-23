@@ -32,6 +32,7 @@
 
 #include "fim_tiff.h"
 #include "fim.h"
+#include "dw_util.h"
 
 typedef int64_t i64;
 typedef uint64_t u64;
