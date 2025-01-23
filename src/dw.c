@@ -1805,7 +1805,7 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
     }
 
     fim_tiff_to_raw(s->imFile, imFileRaw);
-    if(0){
+    if(s->verbosity > 10){
         printf("Writing to imdump.tif\n");
         fim_tiff_from_raw("imdump.tif", M, N, P, imFileRaw, NULL);
     }
