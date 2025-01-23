@@ -1892,16 +1892,29 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
 
     fim_tiff_from_raw(s->outFile, M, N, P, tfile, s->imFile);
 
+    if(s->verbosity > 1)
+    {
+        printf("conversion done\n");
+    }
+
     if(s->verbosity < 5)
     {
         remove(tfile);
     } else {
         printf("Keeping %s for inspection, remove manually\n", tfile);
     }
-    free(tfile);
 
+    if(s->verbosity > 2)
+    {
+        printf("freeing up\n");
+    }
+    free(tfile);
     remove(imFileRaw);
     free(imFileRaw);
+    if(s->verbosity > 2)
+    {
+        printf("Done with tiling\n");
+    }
     return 0;
 }
 
