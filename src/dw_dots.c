@@ -819,7 +819,7 @@ void detect_dots(opts * s, char * inFile)
          * f^(nscale-1) = max_rel_scale;
          *
          */
-        float ** LoG = calloc(s->nscale, sizeof(float**));
+        float ** LoG = calloc(s->nscale, sizeof(float*));
         assert(LoG != NULL);
         for(int ss = 0; ss < s->nscale; ss++)
         {

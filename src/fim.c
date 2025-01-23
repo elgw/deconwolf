@@ -2922,7 +2922,7 @@ fim_histogram_t * fim_histogram(const float * Im, size_t N)
     float delta = (max-min) / ((float) nbin);
     float left = min - 0.5*delta-1e-6;
     float right = max + 0.5*delta+1e-6;
-    delta = (right-left)/((float) nbin);
+    //delta = (right-left)/((float) nbin);
     //printf("Histogram: #=%zu [%f, %f], delta=%f\n", nbin, left, right, delta);
     fim_histogram_t * H = malloc(sizeof(fim_histogram_t));
     assert(H != NULL);

@@ -10,7 +10,7 @@
 # `/etc/ld.so.conf`
 # and then run `ldconfig`
 
-cmake_minimum_required(VERSION 3.9 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
 project(libdw LANGUAGES C)
 
 set (CMAKE_C_STANDARD 11)

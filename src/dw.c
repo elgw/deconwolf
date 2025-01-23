@@ -541,8 +541,8 @@ void dw_fprint_info(FILE * f, dw_opts * s)
         if(gethostname(hname, 1023) == 0)
         {
             fprintf(f, "HOSTNAME: '%s'\n", hname);
-            free(hname);
         }
+        free(hname);
 #endif
     }
 
@@ -999,6 +999,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             }
             free(s->outFolder);
             s->outFolder = malloc(strlen(s->outFile) + 8);
+            assert(s->outFolder != NULL);
             sprintf(s->outFolder, "%s%c", s->outFile, FILESEP);
             free(s->outFile);
             char * basename = dw_basename(s->imFile);

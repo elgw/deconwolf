@@ -7,6 +7,11 @@
 #
 # -- If OpenCL is not available, or to exclude it
 # make OPENCL=0
+#
+# Also useful:
+# sudo apt-get install clang-tools
+# scan-build make dw -B
+
 
 DESTDIR?=/usr/local/bin
 DEBUG?=0
