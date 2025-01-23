@@ -1846,10 +1846,14 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
         int64_t tileN = T->tiles[tt]->xsize[1];
         int64_t tileP = T->tiles[tt]->xsize[2];
 
-        if(0)
+        if(s->verbosity > 10)
         {
-            printf("writing to tiledump.tif\n");
-            fim_tiff_write("tiledump.tif", im_tile, NULL, tileM, tileN, tileP);
+            char * tfname = calloc(128, 1);
+            assert(tfname != NULL);
+            sprintf(tfname, "tile_%03d.tif\n", tt);
+            printf("writing to %s\n", tfname);
+            fim_tiff_write(tfname, im_tile, NULL, tileM, tileN, tileP);
+            free(tfname);
             getchar();
         }
 
