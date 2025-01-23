@@ -471,3 +471,18 @@ float_arg_max(const float * v, size_t N)
     }
     return argmax;
 }
+
+int dw_fseek(FILE *fid, int64_t offset, int origin)
+{
+    int ret = 0;
+    #ifdef WINDOWS
+    ret =  _fseeki64(fid, offset, origin);
+    #else
+    ret = fseek(fid, offset, origin);
+    #endif
+    if(ret)
+    {
+        perror("dw_fseek error:");
+    }
+    return ret;
+}

@@ -16,7 +16,7 @@
 
 #include "tiling.h"
 #include "fim_tiff.h"
-
+#include "dw_util.h"
 
 int64_t * tiling_getDivision(const int64_t M, const int64_t m, int64_t * nDiv)
 {
@@ -279,9 +279,19 @@ float * tiling_get_tile_raw(tiling * T, const int tid, const char * fName)
 //      printf("spos: %zu, wpos: %zu\n", spos, wpos);
       assert(wpos+m <= npixels);
       assert(wpos <= spos);
-      fseek(fid, spos*sizeof(float), SEEK_SET);
-      size_t nread = fread(R+wpos, m*sizeof(float), 1, fid);
-      (void) nread;
+      dw_fseek(fid, spos*sizeof(float), SEEK_SET);
+      errno = 0;
+      size_t nread = fread(R+wpos, sizeof(float), m, fid);
+      if(nread != m)
+      {
+          perror("fread error");
+          fprintf(stderr,
+                  "Error reading from %s. Read %zu elements, expected %zu\n"
+                  "In %s %d\n",
+                  fName, nread, m,
+                  __FILE__, __LINE__);
+          exit(EXIT_FAILURE);
+      }
     }
   }
 
@@ -379,7 +389,7 @@ void tiling_put_tile_raw(tiling * T, int tid, const char * fname, float * restri
       size_t colpos = (bb*M + cc*M*N)*sizeof(float);
       //      printf("colpos: %zu\n", colpos);
       //fsetpos(fid, &colpos);
-      fseek(fid, colpos, SEEK_SET);
+      dw_fseek(fid, colpos, SEEK_SET);
       size_t nread = fread(buf, buf_size, 1, fid);
       (void) nread;
       size_t buf_pos = t->xpos[0];
@@ -394,7 +404,7 @@ void tiling_put_tile_raw(tiling * T, int tid, const char * fname, float * restri
         buf[buf_pos++] += w*(float) S[Sidx];
       }
 
-      fseek(fid, colpos, SEEK_SET);
+      dw_fseek(fid, colpos, SEEK_SET);
       //fsetpos(fid, &colpos);
       fwrite(buf, buf_size, 1, fid);
     }

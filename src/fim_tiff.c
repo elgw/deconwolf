@@ -18,6 +18,7 @@
 #endif
 
 #include <assert.h>
+#include <errno.h>
 #include <fftw3.h>
 #include <inttypes.h>
 #define _USE_MATH_DEFINES
@@ -31,8 +32,10 @@
 
 #include "fim_tiff.h"
 #include "fim.h"
+#include "dw_util.h"
 
 typedef int64_t i64;
+typedef uint64_t u64;
 
 /* see man 3 tifflib
  *
@@ -867,7 +870,7 @@ int fim_tiff_write_float(const char * fName, const float * V,
     char formatString[4] = "w";
     if(M*N*P*sizeof(uint16_t) >= pow(2, 32))
     {
-        sprintf(formatString, "w8\n");
+        sprintf(formatString, "w8");
         fprintf(fim_tiff_log, "fim_tiff: File is > 2 GB, using BigTIFF format\n");
     }
 
@@ -982,12 +985,19 @@ int fim_tiff_write_opt(const char * fName, const float * V,
     char formatString[4] = "w";
     if(M*N*P*sizeof(uint16_t) >= pow(2, 32))
     {
-        sprintf(formatString, "w8\n");
+        sprintf(formatString, "w8");
         fprintf(fim_tiff_log, "tim_tiff: File is > 2 GB, using BigTIFF format\n");
     }
 
+    errno = 0;
     TIFF* out = TIFFOpen(fName, formatString);
-    assert(out != NULL);
+    if(out == NULL)
+    {
+        printf("Unable to open %s using format string %s\n",
+               fName, formatString);
+        exit(EXIT_FAILURE);
+    }
+
 
     if(T)
     {

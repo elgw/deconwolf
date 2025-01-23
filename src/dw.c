@@ -1805,7 +1805,7 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
     }
 
     fim_tiff_to_raw(s->imFile, imFileRaw);
-    if(0){
+    if(s->verbosity > 10){
         printf("Writing to imdump.tif\n");
         fim_tiff_from_raw("imdump.tif", M, N, P, imFileRaw, NULL);
     }
@@ -1846,11 +1846,14 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
         int64_t tileN = T->tiles[tt]->xsize[1];
         int64_t tileP = T->tiles[tt]->xsize[2];
 
-        if(0)
+        if(s->verbosity > 10)
         {
-            printf("writing to tiledump.tif\n");
-            fim_tiff_write("tiledump.tif", im_tile, NULL, tileM, tileN, tileP);
-            getchar();
+            char * tfname = calloc(128, 1);
+            assert(tfname != NULL);
+            sprintf(tfname, "tile%03d.tif", tt);
+            printf("writing to %s\n", tfname);
+            fim_tiff_write(tfname, im_tile, NULL, tileM, tileN, tileP);
+            free(tfname);
         }
 
         fim_normalize_sum1(tpsf, tpM, tpN, tpP);
@@ -1892,16 +1895,29 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
 
     fim_tiff_from_raw(s->outFile, M, N, P, tfile, s->imFile);
 
+    if(s->verbosity > 1)
+    {
+        printf("conversion done\n");
+    }
+
     if(s->verbosity < 5)
     {
         remove(tfile);
     } else {
         printf("Keeping %s for inspection, remove manually\n", tfile);
     }
-    free(tfile);
 
+    if(s->verbosity > 2)
+    {
+        printf("freeing up\n");
+    }
+    free(tfile);
     remove(imFileRaw);
     free(imFileRaw);
+    if(s->verbosity > 2)
+    {
+        printf("Done with tiling\n");
+    }
     return 0;
 }
 
@@ -2438,7 +2454,7 @@ int dw_run(dw_opts * s)
         deconvolve_tiles(M, N, P,
                          psf, pM, pN, pP, // psf and size
                          s);// settings
-        free(psf);
+        fim_free(psf);
     } else {
         fim_normalize_sum1(psf, pM, pN, pP);
         if(s->flatfieldFile != NULL)

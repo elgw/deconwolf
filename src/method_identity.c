@@ -39,7 +39,7 @@
              M, N, P, pM, pN, pP);
      fflush(s->log);
 
-     free(psf);
+     fim_free(psf);
      float * out = fim_malloc(M*N*P*sizeof(float));
      memcpy(out, im, M*N*P*sizeof(float));
      return out;
