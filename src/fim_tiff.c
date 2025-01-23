@@ -992,10 +992,8 @@ int fim_tiff_write_opt(const char * fName, const float * V,
     TIFF* out = TIFFOpen(fName, formatString);
     if(out == NULL)
     {
-        int err = errno;
         printf("Unable to open %s using format string %s\n",
                fName, formatString);
-        printf("errno = %d\n", err);
         exit(EXIT_FAILURE);
     }
 
