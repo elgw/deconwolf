@@ -91,7 +91,8 @@ tiling * tiling_create(const int64_t M, const int64_t N, const int64_t P, const 
   T->maxSize = maxSize;
   T->overlap = overlap;
   T->nTiles = nM*nN;
-  T->tiles = malloc(T->nTiles * sizeof(tile*));
+  T->tiles = calloc(T->nTiles, sizeof(tile*));
+  assert(T->tiles != NULL);
   T->M = M;
   T->N = N;
   T->P = P;

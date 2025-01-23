@@ -399,7 +399,8 @@ void shift_double(double * V, int N, int stride, int shift)
 
 void shift_float(float * V, int N, int stride, int shift)
 {
-    float * buff = malloc(N*sizeof(float));
+    assert(N > 0);
+    float * buff = calloc(N, sizeof(float));
     assert(buff != NULL);
     for(int kk = 0; kk<N; kk++)
     {
@@ -688,7 +689,7 @@ fimo * gen_psf(opts * s, double lambda)
 
     if(s->oversampling > 1)
     {
-        float * Vout = malloc(s->M*s->M*s->P*sizeof(double));
+        float * Vout = calloc(s->M*s->M*s->P, sizeof(float));
         assert(Vout != NULL);
         for(int pp = 0; pp< (int) PSF->P; pp++)
         {
@@ -791,7 +792,7 @@ static void pinhole_convolution(opts * s, fimo * PSF)
     double pinhole_px = pinhole_nm / s->optical.dx;
     printf("Pinhole size: %.2f AU / %.0f nm / %.1f pixels\n",
            s->optical.pinhole, pinhole_nm, pinhole_px);
-    float * P = malloc(PSF->M*PSF->N*sizeof(float));
+    float * P = calloc(PSF->M*PSF->N, sizeof(float));
     assert(P != NULL);
     for(int aa = 0; aa < (int) PSF->M; aa++)
     {

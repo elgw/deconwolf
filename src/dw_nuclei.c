@@ -588,6 +588,7 @@ fit(opts * s, int argc, char ** argv)
         fit_labels = fit_labels2;
     }
 
+    assert(fit_labels != NULL);
     /* Convert features to double and class labels to XXX */
     u32 * fit_labels4 = calloc(fit_labels->nrow, sizeof(u32));
     assert(fit_labels4 != NULL);
@@ -698,6 +699,7 @@ classify(opts * s, int argc, char ** argv)
         fimo * image = get_reduction(s, name_image);
         if(image == NULL)
         {
+            free(name_out);
             continue;
         }
         /* Extract features */
