@@ -203,7 +203,10 @@ dw_tiff_max(int argc, char ** argv)
             switch(s->mode)
             {
             case MODE_MAX:
-                fim_tiff_maxproj(inFile, outFile);
+                if(fim_tiff_maxproj(inFile, outFile))
+                {
+                    exit(EXIT_FAILURE);
+                }
                 break;
             case MODE_MAX_XYZ:
                 fim_tiff_maxproj_XYZ(inFile, outFile);
