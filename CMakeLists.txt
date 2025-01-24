@@ -66,6 +66,8 @@ endif()
 #
 # Default build type is RELEASE
 #
+# Set at command line with commands like:
+# cmake .. -DCMAKE_BUILD_TYPE=Debug
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
