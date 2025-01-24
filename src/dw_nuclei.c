@@ -352,7 +352,7 @@ get_reduction(opts * s, const char * file)
     {
         printf("Reading tif: %s\n", file);
     }
-    float * I = fim_tiff_read(file, NULL, &M, &N, &P, 0);
+    float * I = fim_tiff_read(file, NULL, &M, &N, &P, s->verbose);
     if(I == NULL)
     {
         printf("%s could not be read, unrecognizable format.\n", file);
@@ -800,9 +800,6 @@ int
 dw_nuclei(int argc, char ** argv)
 {
 
-    fim_tiff_init();
-    FILE * out = fopen("/dev/null", "w");
-    fim_tiff_set_log(out);
     opts * s = opts_new();
     int status = EXIT_SUCCESS;
 
@@ -811,6 +808,16 @@ dw_nuclei(int argc, char ** argv)
 #ifdef _OPENMP
     omp_set_num_threads(s->nthreads);
 #endif
+
+    fim_tiff_init();
+    if(s->verbose > 1)
+    {
+        fim_tiff_set_log(stdout);
+    } else {
+        FILE * out = fopen("/dev/null", "w");
+        fim_tiff_set_log(out);
+    }
+
 
     if(s->verbose > 0)
     {
