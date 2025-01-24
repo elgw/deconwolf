@@ -4,3 +4,7 @@
 *.log.txt
 *.o
 *.deb
+build
+*.mexa64
+dw
+dw_bw
