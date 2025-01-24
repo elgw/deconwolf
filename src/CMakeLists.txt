@@ -43,6 +43,24 @@ set(DECONWOLF_PUBLIC_HEADERS
 "kdtree/include/kdtree.h")
 
 #
+# Gnu Scientific Library
+#
+find_package(GSL)
+target_link_libraries(deconwolf ${GSL_LIBRARIES})
+
+# FFTW3
+#
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/../util/findFFTW)
+if(UNIX)
+  find_package(FFTW REQUIRED FLOAT_LIB FLOAT_OPENMP_LIB)
+else()
+  find_package(FFTW REQUIRED FLOAT_LIB)
+endif()
+target_link_libraries(deconwolf FFTW::Double)
+target_link_libraries(deconwolf FFTW::Float)
+
+
+#
 # kdtree
 #
 add_subdirectory("kdtree/")
@@ -70,6 +88,11 @@ else()
 
 endif()
 
+#
+# TIFF
+#
+find_package(TIFF)
+target_link_libraries(deconwolf ${TIFF_LIBRARIES})
 
 include("GNUInstallDirs")
 
