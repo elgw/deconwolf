@@ -1763,7 +1763,7 @@ int fim_tiff_maxproj(const char * in, const char * out)
     {
         printf("Unable to open %s for writing\n", out);
         TIFFClose(input);
-        ttags_free(T);
+        ttags_free(&T);
         return EXIT_FAILURE;
     }
     ttags_set(output, T);
