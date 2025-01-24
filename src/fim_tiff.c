@@ -1759,6 +1759,13 @@ int fim_tiff_maxproj(const char * in, const char * out)
     }
 
     TIFF * output = TIFFOpen(out, "w");
+    if(output == NULL)
+    {
+        printf("Unable to open %s for writing\n", out);
+        TIFFClose(input);
+        ttags_free(T);
+        return EXIT_FAILURE;
+    }
     ttags_set(output, T);
     ttags_free(&T);
 
