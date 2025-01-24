@@ -1406,6 +1406,17 @@ float * fim_tiff_read_sub(const char * fName,
         fflush(stdout);
     }
 
+    uint16_t spp;
+    TIFFGetField(tfile, TIFFTAG_SAMPLESPERPIXEL, &spp);
+    if(spp > 1)
+    {
+        fprintf(fim_tiff_log,
+                "fim_tiff ERROR: The image %s has %u samples per pixel but only one is allowed\n"
+                "                This program can not read multi-color images and will abort\n",
+                fName, spp);
+        exit(EXIT_FAILURE);
+    }
+
     tmsize_t ssize = TIFFStripSize(tfile); // Seems to be in bytes
     uint32_t nstrips = TIFFNumberOfStrips(tfile);
     uint32_t ndirs = TIFFNumberOfDirectories(tfile);
