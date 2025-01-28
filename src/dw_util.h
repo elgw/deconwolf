@@ -60,13 +60,13 @@ void dw_gettime(struct timespec *);
  * Returns 0 if the dir already existed or could be created
  * returns non-zeros if the dir can't be created
  */
-int ensuredir(const char * dir);
+int dw_ensuredir(const char * dir);
 
 /* Check if directory exist
  * returns 1 if it exist
  * */
 
-int isdir(const char * dir);
+int dw_isdir(const char * dir);
 
 /* Return a suggestion for how many threads to use
  * ideally this should be the same as the number of cores

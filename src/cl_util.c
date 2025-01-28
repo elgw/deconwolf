@@ -1271,7 +1271,7 @@ clu_env_t * clu_new(int verbose, int cl_device)
     char * dir_home = getenv("HOME");
     sprintf(clFFT_cache_path, "%s/.config/deconwolf/clFFT/", dir_home);
     setenv("CLFFT_CACHE_PATH", clFFT_cache_path, 1);
-    ensuredir(clFFT_cache_path);
+    dw_ensuredir(clFFT_cache_path);
     free(clFFT_cache_path);
     env->clfft_buffer = NULL;
     env->clfft_buffer_size = 0;

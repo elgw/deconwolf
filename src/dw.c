@@ -991,7 +991,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             printf("outFile: %s, outFolder: %s\n", s->outFile, s->outFolder);
         }
     } else {
-        if( isdir(s->outFile) )
+        if( dw_isdir(s->outFile) )
         {
             if(s->verbosity > 0)
             {

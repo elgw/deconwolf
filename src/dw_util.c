@@ -21,7 +21,7 @@
 
 #endif
 
-int isdir(const char * dir)
+int dw_isdir(const char * dir)
 {
 #ifdef WINDOWS
     if( _taccess_s( dir, 0 ) == 0 )
@@ -51,10 +51,10 @@ int isdir(const char * dir)
 
 
 
-int ensuredir(const char * dir)
+int dw_ensuredir(const char * dir)
 
 {
-    if(isdir(dir) == 1)
+    if(dw_isdir(dir) == 1)
     {
         return 0;
     }
