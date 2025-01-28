@@ -4134,7 +4134,8 @@ fimo * fimo_get_plane(const fimo * A, int plane)
     return Z;
 }
 
-ftab_t * fim_features_2d(const fimo * fI)
+ftab_t * fim_features_2d(const fimo * fI,
+                         const float * sigmas, int nsigma)
 {
     int debug = 0; /* Write out the features  */
     const char debug_image_name[] = "fim_features_2d_debug_image.tif";
@@ -4150,8 +4151,6 @@ ftab_t * fim_features_2d(const fimo * fI)
     //int nsigma = 7;
     //float sigmas[] = {0.3, 1, 3.5, 10};
     //int nsigma = 4;
-    float sigmas[] = {3.5};
-    int nsigma = 1;
     int f_per_s = 7; /* Features per sigma */
     int nfeatures = nsigma*f_per_s;
     //printf("Will produce %d features\n", nfeatures);
@@ -4334,8 +4333,14 @@ void fim_features_2d_ut()
     I->M = M;
     I->N = N;
     I->P = P;
-    ftab_t * T = fim_features_2d(I);
-    T->nrow = 10;
+
+    float * sigma = calloc(2, sizeof(float));
+    assert(sigma != NULL);
+    sigma[0] = 3.5;
+    sigma[1] = sqrt(2)*sigma[0];
+    ftab_t * T = fim_features_2d(I, sigma, 2);
+    free(sigma);
+    T->nrow = 10; // just to print the first 10 ...
     ftab_print(stdout, T, ",");
     ftab_free(T);
     fimo_free(I);

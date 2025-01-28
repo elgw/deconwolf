@@ -127,7 +127,8 @@ fimo * fimo_partial(const fimo *, int dim, float sigma);
  * Returns one row per pixel
  */
 ftab_t *
-fim_features_2d(const fimo *);
+fim_features_2d(const fimo *,
+                const float *sigma, int nsigma);
 
 /* Return a I->P long vector with the integral
  * gradient magnitude per slice in I */
