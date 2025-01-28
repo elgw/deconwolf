@@ -2,7 +2,7 @@ Version History
 ===============
 
 0.4.4_rc4 (windows only)
-________________________
+------------------------
 
 - Fixes issue #83
 - Fixed crashed with ``--method id``.
