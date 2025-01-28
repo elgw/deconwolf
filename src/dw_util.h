@@ -118,9 +118,8 @@ float dw_read_scaling(const char * file);
 char * dw_dirname(const char * path);
 
 /*
- * Linux: basename, compare to dw_dirname
-* Windows: file name without extension.
-* Should only be called for files, not for folders */
+ * returns the file name without the path
+ */
 char * dw_basename(const char * path);
 
 /* POSIX getcwd or _getcwd on windows */
