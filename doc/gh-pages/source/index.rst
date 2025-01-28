@@ -12,4 +12,5 @@ deconwolf v0.4.4
    shifts
    segmentation
    history
+   man/index
    license
