@@ -14,21 +14,34 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "ftab.h"
+
+#define _USE_MATH_DEFINES
 
 #include <assert.h>
-#include <inttypes.h>
-#define _USE_MATH_DEFINES
 #include <math.h>
-
-
+#include <errno.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include <time.h>
+
 #ifndef WINDOWS
 #include <unistd.h>
 #endif
+
+#include "ftab.h"
+
+
+typedef uint8_t u8;
+typedef uint32_t u32;
+typedef uint64_t u64;
+typedef double f64;
+typedef float f32;
+
+/*                     WINDOWS SPECIFIC CODE
+ *                     =====================
+ */
 
 #ifdef WINDOWS
 #define _CRT_SECURE_NO_WARNINGS
@@ -49,11 +62,6 @@ static char * strsep(char **sp, char *sep)
 /* The original code is public domain -- Will Hartung 4/9/09 */
 /* Modifications, public domain as well, by Antti Haapala, 11/10/17
    - Switched to getc on 5/23/19 */
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <stdint.h>
 
 // if typedef doesn't exist (msvc, blah)
 typedef intptr_t ssize_t;
@@ -108,8 +116,31 @@ getline(char **lineptr, size_t *n, FILE *stream) {
 }
 #endif
 
-typedef uint8_t u8;
-typedef uint64_t u64;
+/*                   END OF WINDOWS SPECIFIC CODE
+*                    ============================
+*/
+
+int ftab_has_data(const ftab_t * T)
+{
+    if(T == NULL)
+    {
+        return 0;
+    }
+    if(T->T == NULL)
+    {
+        return 0;
+    }
+    if(T->nrow == 0)
+    {
+        return 0;
+    }
+    if(T->ncol == 0)
+    {
+        return 0;
+    }
+    return 1;
+}
+
 
 /* Count the number of newlines in a file */
 static size_t count_newlines(const char * fname)
@@ -755,7 +786,7 @@ ftab_new_from_data(int nrow, int ncol, const float * data)
     return T;
 }
 
-char * tempfilename()
+char * tempfilename(void)
 {
     char * fname = calloc(1024, 1);
     assert(fname != NULL);
@@ -809,9 +840,9 @@ int ftab_compare(const ftab_t * A, const ftab_t * B)
     {
         for(size_t kk = 0; kk<A->ncol; kk++)
         {
-             if(strcmp(A->colnames[kk], A->colnames[kk]))
-             {
-                 equal_colnames = 0;
+            if(strcmp(A->colnames[kk], A->colnames[kk]))
+            {
+                equal_colnames = 0;
             }
         }
     }
@@ -947,4 +978,55 @@ ftab_subselect_rows(ftab_t * tab, const u8 * selection)
     }
     tab->nrow = nsel;
     return;
+}
+
+
+double * ftab_get_data_f64(const ftab_t * T)
+{
+    if(!ftab_has_data(T))
+    {
+        return NULL;
+    }
+    u64 n = ftab_nel(T);
+    double * C = calloc(n, sizeof(double));
+    if(C == NULL)
+    {
+        return NULL;
+    }
+    for(u64 kk = 0; kk < n; kk++)
+    {
+        C[kk] = T->T[kk];
+    }
+    return C;
+}
+
+u64 ftab_nel(const ftab_t * T)
+{
+    if(ftab_has_data(T))
+    {
+        return T->nrow*T->ncol;
+    } else {
+        return 0;
+    }
+}
+
+
+u32 *
+ftab_get_data_u32(const ftab_t * T)
+{
+    if(!ftab_has_data(T))
+    {
+        return NULL;
+    }
+    u64 n = ftab_nel(T);
+    u32 * C = calloc(n, sizeof(u32));
+    if(C == NULL)
+    {
+        return NULL;
+    }
+    for(u64 kk = 0; kk < n; kk++)
+    {
+        C[kk] = (u32) T->T[kk];
+    }
+    return C;
 }

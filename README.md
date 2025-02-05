@@ -3,7 +3,7 @@ wide-field images.
 
 To get started, please see the [documentation](https://elgw.github.io/deconwolf/).
 
-Pre compiled binaries/installers can be found at [releases page](https://github.com/elgw/deconwolf/releases).
+For windows it is Binaries/installers can be found at [releases page](https://github.com/elgw/deconwolf/releases).
 
 A few showcases can be found at
 [deconwolf.fht.org/](https://deconwolf.fht.org/).

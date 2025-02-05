@@ -31,6 +31,7 @@ add_library( deconwolf SHARED
   gmlfit.c
   lanczos.c
   tiling.c
+  quickselect.c
 )
 
 set(DECONWOLF_PUBLIC_HEADERS

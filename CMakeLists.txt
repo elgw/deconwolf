@@ -101,7 +101,8 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
   src/sparse_preprocess.c
   src/sparse_preprocess_cli.c
   src/quickselect.c
-  src/dw_align_dots.c)
+  src/dw_align_dots.c
+  src/npio.c)
 
   add_executable(dw_bw
     src/bw_gsl.c

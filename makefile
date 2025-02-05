@@ -407,7 +407,8 @@ dw_align_dots.o \
 dw_nuclei.o \
 dw_png.o \
 quickselect.o \
-dw_background.o
+dw_background.o \
+npio.o
 
 dwbw_OBJECTS = fim.o \
 fim_tiff.o \
