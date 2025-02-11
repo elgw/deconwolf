@@ -28,7 +28,7 @@
 
 #include <tiffio.h>
 
-#include "fim.h"
+
 #include "ftab.h"
 #include "dw_version.h"
 
@@ -53,6 +53,8 @@ typedef struct{
     int P;
 } ttags;
 
+#include "fim.h"
+
 /** ttags new with everything set to defaults */
 ttags * ttags_new();
 
@@ -63,7 +65,7 @@ void ttags_get(TIFF *, ttags *);
 void ttags_show(FILE *, ttags *);
 
 /** @brief set tags to open tiff file*/
-void ttags_set(TIFF *, ttags *);
+void ttags_set(TIFF *, const ttags *);
 
 /** @brief Set software tag to S */
 void ttags_set_software(ttags * ,
@@ -90,7 +92,7 @@ void fim_tiff_set_log(FILE * fp);
 
 /* Write to disk, if scaling <= 0 : automatic scaling will be used. Else the provided value. */
 int fim_tiff_write_opt(const char * fName, const float * V,
-                       ttags * T,
+                       const ttags * T,
                        int64_t N, int64_t M, int64_t P, float scaling);
 
 
@@ -106,7 +108,7 @@ int fim_tiff_write_noscale(const char * fName, const float * V,
 
 
 int fim_tiff_write_float(const char * fName, const float * V,
-                         ttags * T,
+                         const ttags * T,
                          int64_t M, int64_t N, int64_t P);
 
 int fim_tiff_write_zeros(const char * fName, int64_t M, int64_t N, int64_t P);
