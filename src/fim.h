@@ -609,6 +609,13 @@ fim_imread(const char * filename,
            int64_t * M, int64_t * N, int64_t * P,
            int verbose);
 
+
+/* Read the size of an image without loading the data */
+int
+fim_imread_size(const char * filename,
+                int64_t * M, int64_t * N, int64_t * P);
+
+
 /* Read a Python NPY file */
 float *
 fim_read_npy(const char * filename,

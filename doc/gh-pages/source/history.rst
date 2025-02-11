@@ -4,7 +4,8 @@ Version History
 0.4.5
 -----
 
-- Added support for reading and writing Numpy npy files.
+- Added experimental support for reading and writing Numpy npy
+  files. At the moment this does not work with the `--tiling` option.
 
 0.4.4_rc4 (windows only)
 ------------------------

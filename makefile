@@ -417,7 +417,9 @@ bw_gsl.o \
 lanczos.o \
 li.o fft.o \
 dw_util.o \
-ftab.o
+ftab.o \
+quickselect.o \
+npio.o
 
 $(info Everything looks ok)
 

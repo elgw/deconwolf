@@ -4952,18 +4952,18 @@ fim_read_npy(const char * filename,
         fprintf(stderr, "Error reading %s, not 3D\n", filename);
         goto fail;
     }
-    *M = npy->shape[0];
+    *M = npy->shape[2];
     *N = npy->shape[1];
-    *P = npy->shape[2];
+    *P = npy->shape[0];
 
     size_t nel = npy->nel;
-    if(nel != M[0]*N[0]*P[0])
+    if( (int64_t) nel != M[0]*N[0]*P[0])
     {
         fprintf(stderr, "Internal error in %s %d\n", __FILE__, __LINE__);
         goto fail;
     }
 
-    float * V = fim_malloc(nel);
+    float * V = fim_malloc(nel*sizeof(float));
 
     if(npy->dtype == NPIO_F32)
     {
@@ -5015,7 +5015,7 @@ fim_imread(const char * filename,
     const size_t n = strlen(filename);
     assert(n > 0);
 
-    if(filename[n-1] == 'z' || filename[n-1] == 'Z')
+    if(filename[n-1] == 'y' || filename[n-1] == 'Y')
     {
         return fim_read_npy(filename, M, N, P, verbose);
     }
@@ -5031,7 +5031,7 @@ fim_imwrite_f32(const char * outname,
     const size_t n = strlen(outname);
     assert(n > 0);
 
-    if(outname[n-1] == 'z' || outname[n-1] == 'Z')
+    if(outname[n-1] == 'y' || outname[n-1] == 'Y')
     {
         int shape[3] = {M, N, P};
         return npio_write(outname, 3, shape, (void *) V,
@@ -5051,22 +5051,49 @@ fim_imwrite_u16(const char * outname,
 {
     const size_t n = strlen(outname);
     assert(n > 0);
+    assert(M > 0);
+    assert(N > 0);
+    assert(P > 0);
 
-    if(outname[n-1] == 'z' || outname[n-1] == 'Z')
+    if(outname[n-1] == 'y' || outname[n-1] == 'Y')
     {
-        uint16_t * I;
+        uint16_t * I = calloc(M*N*P, sizeof(uint16_t));
         float sz = scaling;
         if(scaling <= 0)
         {
-            float sz = ( pow(2, 16) - 1.0 ) / fim_max(V, M*N*P);
+            sz = ( pow(2, 16) - 1.0 ) / fim_max(V, M*N*P);
         }
 
-        for(size_t kk = 0; kk < M*N*P; kk++)
+        for(int64_t kk = 0; kk < M*N*P; kk++)
         {
             I[kk] = V[kk]*sz;
         }
-        int shape[3] = {M, N, P};
+        int shape[3] = {P, N, M};
         return npio_write(outname, 3, shape, (void *) I, NPIO_U16, NPIO_U16);
+        free(I);
     }
     return fim_tiff_write_opt(outname, V, T, M, N, P, scaling);
+}
+
+int
+fim_imread_size(const char * filename,
+                int64_t * M, int64_t * N, int64_t * P)
+{
+    const size_t n = strlen(filename);
+    assert(n > 0);
+
+    if(filename[n-1] == 'y' || filename[n-1] == 'Y')
+    {
+        npio_t * npy = npio_load_metadata(filename);
+        if(npy->ndim != 3)
+        {
+            npio_free(npy);
+            return -1;
+        }
+        *P = npy->shape[0];
+        *N = npy->shape[1];
+        *M = npy->shape[2];
+        return 0;
+    }
+    return fim_tiff_get_size(filename, M, N, P);
 }
