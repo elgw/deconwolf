@@ -2108,7 +2108,7 @@ void flatfieldCorrection(dw_opts * s, float * im, int64_t M, int64_t N, int64_t 
            s->flatfieldFile);
     ttags * T = ttags_new();
     int64_t m = 0, n = 0, p = 0;
-    float * C = fim_tiff_read(s->flatfieldFile, T, &m, &n, &p, s->verbosity);
+    float * C = fim_imread(s->flatfieldFile, T, &m, &n, &p, s->verbosity);
     ttags_free(&T);
 
     assert(m == M);
@@ -2258,7 +2258,7 @@ int dw_run(dw_opts * s)
             printf("Reading %s\n", s->imFile);
         }
 
-        im = fim_tiff_read(s->imFile, T, &M, &N, &P, s->verbosity);
+        im = fim_imread(s->imFile, T, &M, &N, &P, s->verbosity);
         if(im == NULL)
         {
             fprintf(stderr, "Failed to open %s\n", s->imFile);
@@ -2365,7 +2365,7 @@ int dw_run(dw_opts * s)
         if(s->refFile != NULL)
         {
             int64_t rM = 0, rN = 0, rP = 0;
-            s->ref = fim_tiff_read(s->refFile, NULL, &rM, &rN, &rP, s->verbosity);
+            s->ref = fim_imread(s->refFile, NULL, &rM, &rN, &rP, s->verbosity);
             if(s->ref == NULL)
             {
                 fprintf(stderr, "Failed to open %s\n", s->imFile);
@@ -2396,7 +2396,7 @@ int dw_run(dw_opts * s)
     {
         printf("Reading %s\n", s->psfFile);
     }
-    psf = fim_tiff_read(s->psfFile, NULL, &pM, &pN, &pP, s->verbosity);
+    psf = fim_imread(s->psfFile, NULL, &pM, &pN, &pP, s->verbosity);
     if(psf == NULL)
     {
         fprintf(stderr, "Failed to open %s\n", s->psfFile);
@@ -2512,19 +2512,19 @@ int dw_run(dw_opts * s)
                 if(s->iterdump)
                 {
                     char * outFile = gen_iterdump_name(s, s->nIter);
-                    fim_tiff_write_float(outFile, out, T, M, N, P);
+                    fim_imwrite_f32(outFile, out, T, M, N, P);
                     free(outFile);
                 } else {
-                    fim_tiff_write_float(s->outFile, out, T, M, N, P);
+                    fim_imwrite_f32(s->outFile, out, T, M, N, P);
                 }
             } else {
                 if(s->iterdump)
                 {
                     char * outFile = gen_iterdump_name(s, s->nIter);
-                    fim_tiff_write(outFile, out, T, M, N, P);
+                    fim_imwrite_u16(outFile, out, T, M, N, P, -1);
                     free(outFile);
                 } else {
-                    fim_tiff_write_opt(s->outFile, out, T, M, N, P, s->scaling);
+                    fim_imwrite_u16(s->outFile, out, T, M, N, P, s->scaling);
                 }
             }
         }

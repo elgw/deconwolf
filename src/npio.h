@@ -11,10 +11,19 @@
 
 #define NPIO_VERSION_MAJOR "0"
 #define NPIO_VERSION_MINOR "0"
-#define NPIO_VERSION_PATCH "6"
+#define NPIO_VERSION_PATCH "8"
 #define NPIO_version NPIO_VERSION_MAJOR "."     \
     NPIO_VERSION_MINOR "."                      \
     NPIO_VERSION_PATCH
+
+typedef enum
+{ NPIO_F64,
+  NPIO_F32,
+  NPIO_U8, NPIO_U16, NPIO_U32, NPIO_U64,
+  NPIO_I8, NPIO_I16, NPIO_I32, NPIO_I64,
+  NPIO_NOSUPPORT
+} npio_dtype;
+
 
 /* This is what is returned from npio_load */
 typedef struct{
@@ -30,7 +39,7 @@ typedef struct{
     size_t nel; // number of elements
     void * data; // raw pointer to the data
     size_t data_size; // total size of data, in bytes
-
+    npio_dtype dtype;
     /* Not from the npy file */
     char * filename;
 } npio_t;
@@ -47,48 +56,22 @@ typedef struct{
  */
 npio_t * npio_load(const char * filename);
 
+/* Write data to a file decriptor, such as retrieved from fopen or fmemopen
+ * return the number of bytes written or -1 on failure
+ */
+int64_t
+npio_write_FILE(FILE * fid,
+                const int ndim,
+                const int * shape,
+                void * data,
+                npio_dtype in, npio_dtype out);
 
-/** Save a double array to an npy file */
-int npio_save_f64(const char * filename,
-                  const int ndim, const int * shape,
-                  const double * data);
-
-int npio_save_f32(const char * filename,
-                  const int ndim, const int * shape,
-                  const float * data);
-
-int npio_save_i8(const char * filename,
-                 const int ndim, const int * shape,
-                 const int8_t * data);
-
-int npio_save_i16(const char * filename,
-                  const int ndim, const int * shape,
-                  const int16_t * data);
-
-int npio_save_i32(const char * filename,
-                  const int ndim, const int * shape,
-                  const int32_t * data);
-
-int npio_save_i64(const char * filename,
-                  const int ndim, const int * shape,
-                  const int64_t * data);
-
-int npio_save_u8(const char * filename,
-                 const int ndim, const int * shape,
-                 const uint8_t * data);
-
-int npio_save_u16(const char * filename,
-                  const int ndim, const int * shape,
-                  const uint16_t * data);
-
-int npio_save_u32(const char * filename,
-                  const int ndim, const int * shape,
-                  const uint32_t * data);
-
-int npio_save_u64(const char * filename,
-                  const int ndim, const int * shape,
-                  const uint64_t * data);
-
+int64_t
+npio_write(const char * fname,
+           const int ndim,
+           const int * shape,
+           void * data,
+           npio_dtype in, npio_dtype out);
 
 
 /** @brief Print some info about the npio_t object

@@ -72,7 +72,7 @@ typedef struct{
 static int ftab_to_npy(const ftab_t * FT, const char * filename)
 {
     int shape[2] = {FT->nrow, FT->ncol};
-    return npio_save_f32(filename, 2, shape, FT->T);
+    return npio_write(filename, 2, shape, FT->T, NPIO_F32, NPIO_F32);
 }
 
 static opts * opts_new()

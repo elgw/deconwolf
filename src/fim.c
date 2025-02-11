@@ -4935,3 +4935,138 @@ void fim_ut()
     fim_xcorr2_ut();
     myfftw_stop();
 }
+
+float *
+fim_read_npy(const char * filename,
+             int64_t * M, int64_t * N, int64_t * P,
+             int verbose)
+{
+    npio_t * npy = npio_load(filename);
+    if(npy == NULL)
+    {
+        fprintf(stderr, "Error reading %s as a npy file\n", filename);
+        return NULL;
+    }
+    if(npy->ndim != 3)
+    {
+        fprintf(stderr, "Error reading %s, not 3D\n", filename);
+        goto fail;
+    }
+    *M = npy->shape[0];
+    *N = npy->shape[1];
+    *P = npy->shape[2];
+
+    size_t nel = npy->nel;
+    if(nel != M[0]*N[0]*P[0])
+    {
+        fprintf(stderr, "Internal error in %s %d\n", __FILE__, __LINE__);
+        goto fail;
+    }
+
+    float * V = fim_malloc(nel);
+
+    if(npy->dtype == NPIO_F32)
+    {
+        memcpy(V, npy->data, nel*sizeof(float));
+        goto success;
+    }
+
+    if(npy->dtype == NPIO_U8)
+    {
+        uint8_t * IN = (uint8_t * ) npy->data;
+        for(size_t kk = 0; kk < nel; kk++)
+        {
+            V[kk] = (float) IN[kk];
+        }
+        goto success;
+    }
+
+    if(npy->dtype == NPIO_U16)
+    {
+        uint16_t * IN = (uint16_t * ) npy->data;
+        for(size_t kk = 0; kk < nel; kk++)
+        {
+            V[kk] = (float) IN[kk];
+        }
+        goto success;
+    }
+
+    fprintf(stderr, "Unsupported data type in %s\n", filename);
+    goto fail;
+
+fail:
+    if(verbose > 0)
+    {
+        npio_print(stderr, npy);
+    }
+    npio_free(npy);
+    return NULL;
+success:
+    npio_free(npy);
+    return V;
+}
+
+float *
+fim_imread(const char * filename,
+           ttags * T,
+           int64_t * M, int64_t * N, int64_t * P,
+           int verbose)
+{
+    const size_t n = strlen(filename);
+    assert(n > 0);
+
+    if(filename[n-1] == 'z' || filename[n-1] == 'Z')
+    {
+        return fim_read_npy(filename, M, N, P, verbose);
+    }
+    return fim_tiff_read(filename, T, M, N, P, verbose);
+}
+
+int
+fim_imwrite_f32(const char * outname,
+                const float * V,
+                const ttags * T,
+                int64_t M, int64_t N, int64_t P)
+{
+    const size_t n = strlen(outname);
+    assert(n > 0);
+
+    if(outname[n-1] == 'z' || outname[n-1] == 'Z')
+    {
+        int shape[3] = {M, N, P};
+        return npio_write(outname, 3, shape, (void *) V,
+                          NPIO_F32, NPIO_F32);
+    }
+    return fim_tiff_write_float(outname, V, T, M, N, P);
+}
+
+/* Write as uint16 data. If scaling <= 0 automatic scaling is used,
+ * i.e. using the full range. Else the provided value is used */
+int
+fim_imwrite_u16(const char * outname,
+                const float * V,
+                const ttags * T,
+                int64_t M, int64_t N, int64_t P,
+                float scaling)
+{
+    const size_t n = strlen(outname);
+    assert(n > 0);
+
+    if(outname[n-1] == 'z' || outname[n-1] == 'Z')
+    {
+        uint16_t * I;
+        float sz = scaling;
+        if(scaling <= 0)
+        {
+            float sz = ( pow(2, 16) - 1.0 ) / fim_max(V, M*N*P);
+        }
+
+        for(size_t kk = 0; kk < M*N*P; kk++)
+        {
+            I[kk] = V[kk]*sz;
+        }
+        int shape[3] = {M, N, P};
+        return npio_write(outname, 3, shape, (void *) I, NPIO_U16, NPIO_U16);
+    }
+    return fim_tiff_write_opt(outname, V, T, M, N, P, scaling);
+}

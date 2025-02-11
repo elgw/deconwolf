@@ -1,6 +1,11 @@
 Version History
 ===============
 
+0.4.5
+-----
+
+- Added support for reading and writing Numpy npy files.
+
 0.4.4_rc4 (windows only)
 ------------------------
 

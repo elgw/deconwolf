@@ -858,7 +858,7 @@ int fim_tiff_write_zeros(const char * fName, int64_t N, int64_t M, int64_t P)
 }
 
 int fim_tiff_write_float(const char * fName, const float * V,
-                         ttags * T,
+                         const ttags * T,
                          int64_t N, int64_t M, int64_t P)
 {
 
@@ -956,7 +956,7 @@ int fim_tiff_write_noscale(const char * fName, const float * V,
 
 
 int fim_tiff_write_opt(const char * fName, const float * V,
-                       ttags * T,
+                       const ttags * T,
                        int64_t N, int64_t M, int64_t P, float scaling)
 {
     if(fim_tiff_log == NULL)
@@ -1232,7 +1232,7 @@ void ttags_get(TIFF * tfile, ttags * T)
 }
 
 /* Copy some TIFF tags ttags to tfile */
-void ttags_set(TIFF * tfile, ttags * T)
+void ttags_set(TIFF * tfile, const ttags * T)
 {
     //TIFFSetDirectory(tfile, 0);
     if(T->software != NULL)
