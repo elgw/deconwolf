@@ -2224,9 +2224,9 @@ int dw_run(dw_opts * s)
     }
 
     int64_t M = 0, N = 0, P = 0;
-    if(fim_tiff_get_size(s->imFile, &M, &N, &P))
+    if(fim_imread_size(s->imFile, &M, &N, &P))
     {
-        printf("Failed to open %s\n", s->imFile);
+        printf("fim_imread_size failed to open %s\n", s->imFile);
         return -1;
     } else {
         if(s->verbosity > 3)

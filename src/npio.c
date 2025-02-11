@@ -470,7 +470,7 @@ static int parse_shape_string(npio_t * npd,
     return EXIT_SUCCESS;
 }
 
-npio_t * npio_load(const char * filename)
+npio_t * npio_load_opts(const char * filename, int load_data)
 {
     FILE * fid = fopen(filename, "r");
     if(fid == NULL)
@@ -615,6 +615,12 @@ npio_t * npio_load(const char * filename)
         goto fail;
     }
 
+    if(load_data == 0)
+    {
+        npd->data_size = 0;
+        npd->data = NULL;
+        goto post_data;
+    }
     // Forward to the data
     long pos = ftell(fid);
     while(((size_t) pos % 64) != 0)
@@ -654,9 +660,11 @@ npio_t * npio_load(const char * filename)
         goto fail1;
     }
     npd->data_size = npd->np_bytes*npd->nel;
+    npd->data = data;
+ post_data:
     fclose(fid);
 
-    npd->data = data;
+
     return npd;
 
 fail1:
@@ -668,7 +676,18 @@ fail:
     return NULL;
 }
 
-/* Save function signature */
+npio_t * npio_load(const char * filename)
+{
+    return npio_load_opts(filename, 1);
+}
+
+npio_t * npio_load_metadata(const char * filename)
+{
+    return npio_load_opts(filename, 0);
+}
+
+
+
 
 int64_t
 npio_write_FILE(FILE * fid,

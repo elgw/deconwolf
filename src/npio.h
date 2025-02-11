@@ -56,6 +56,9 @@ typedef struct{
  */
 npio_t * npio_load(const char * filename);
 
+/* Read the metadata but do not load the data */
+npio_t * npio_load_metadata(const char * filename);
+
 /* Write data to a file decriptor, such as retrieved from fopen or fmemopen
  * return the number of bytes written or -1 on failure
  */
