@@ -810,9 +810,10 @@ int fim_tiff_from_raw(const char * fName, // Name of tiff file to be written
         TIFFSetField(out, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_UINT);
 
         /* We are writing single page of the multipage file */
-        TIFFSetField(out, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
+        //TIFFSetField(out, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
+
         /* Set the page number */
-        TIFFSetField(out, TIFFTAG_PAGENUMBER, dd, P);
+        //TIFFSetField(out, TIFFTAG_PAGENUMBER, dd, P);
 
         for(size_t nn = 0; nn < (size_t) N; nn++)
         {
@@ -900,9 +901,9 @@ int fim_tiff_write_float(const char * fName, const float * V,
         TIFFSetField(out, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_IEEEFP);
 
         /* We are writing single page of the multipage file */
-        TIFFSetField(out, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
+        //TIFFSetField(out, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
         /* Set the page number */
-        TIFFSetField(out, TIFFTAG_PAGENUMBER, dd, P);
+        //TIFFSetField(out, TIFFTAG_PAGENUMBER, dd, P);
 
 
         for(size_t kk = 0; kk < (size_t) M; kk++)
@@ -1024,9 +1025,9 @@ int fim_tiff_write_opt(const char * fName, const float * V,
         // TODO TIFFSSetFieldTIFFTAG_SOFTWARE
 
         /* We are writing single page of the multipage file */
-        TIFFSetField(out, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
+        //TIFFSetField(out, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
         /* Set the page number */
-        TIFFSetField(out, TIFFTAG_PAGENUMBER, dd, P);
+        //TIFFSetField(out, TIFFTAG_PAGENUMBER, dd, P);
 
 
         for(size_t kk = 0; kk < (size_t) M; kk++)
@@ -1407,7 +1408,11 @@ float * fim_tiff_read_sub(const char * fName,
     }
 
     uint16_t spp;
-    TIFFGetField(tfile, TIFFTAG_SAMPLESPERPIXEL, &spp);
+    if( TIFFGetField(tfile, TIFFTAG_SAMPLESPERPIXEL, &spp) == 0 )
+    {
+        fprintf(fim_tiff_log, "fim_tiff WARNING: TIFFTAG_SAMPLESPERPIXEL not defined, assuming the value is 1\n");
+        spp = 1;
+    }
     if(spp > 1)
     {
         fprintf(fim_tiff_log,
@@ -1800,8 +1805,8 @@ int fim_tiff_maxproj(const char * in, const char * out)
     // Irrelevant if samples per pixel is set to 1
     TIFFSetField(output, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
     TIFFSetField(output, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
-    TIFFSetField(output, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
-    TIFFSetField(output, TIFFTAG_PAGENUMBER, 0, 1);
+    //TIFFSetField(output, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
+    //TIFFSetField(output, TIFFTAG_PAGENUMBER, 0, 1);
 
     tmsize_t ssize = TIFFStripSize(input); // Seems to be in bytes
     //  printf("Strip size: %zu b\n", (size_t) ssize);
@@ -1981,8 +1986,8 @@ int fim_tiff_extract_slice(const char * in, const char * out, int slice)
     TIFFSetField(output, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);
     TIFFSetField(output, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
     TIFFSetField(output, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
-    TIFFSetField(output, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
-    TIFFSetField(output, TIFFTAG_PAGENUMBER, 1, 1);
+    //TIFFSetField(output, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
+    //TIFFSetField(output, TIFFTAG_PAGENUMBER, 1, 1);
 
     tmsize_t ssize = TIFFStripSize(input); // Seems to be in bytes
     //  printf("Strip size: %zu b\n", (size_t) ssize);
