@@ -6,6 +6,8 @@ Version History
 
 - Added experimental support for reading and writing Numpy npy
   files. At the moment this does not work with the `--tiling` option.
+- Not setting `TIFFTAG_SUBFILETYPE` and `TIFFTAG_PAGENUMBER` when
+  writing tif files since it does not seem to be needed.
 
 0.4.4_rc4 (windows only)
 ------------------------
