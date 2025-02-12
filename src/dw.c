@@ -1429,6 +1429,8 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
 #ifdef dw_module_background
     printf("   background   vignetting/background estimation\n");
 #endif
+    printf("   tif2npy      convert a tif file to a Numpy .npy file\n");
+    printf("   npy2tif      convert a Numpy .npy file to a tif file\n");
     printf("\n");
     printf("see: %s [command] --help\n", argv[0]);
     printf("\n");
