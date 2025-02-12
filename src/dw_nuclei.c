@@ -327,9 +327,9 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
            "use the mean value over z as 3D->2D reduction\n");
     printf(" --bg\n\t"
            "specify a background model used for vignetting correction\n");
-    printf("--nscale n"
+    printf(" --nscale n"
            "\n\t Number of scales to use for feature extraction. Default: %d\n", s->nsigma);
-    printf("--scale s"
+    printf(" --scale s"
            "\n\t First scale (sigma value) to use. Default: %.2f\n", s->sigma0);
     printf(" --overwrite\n\t Overwrite existing files\n");
     printf(" --fout name"
