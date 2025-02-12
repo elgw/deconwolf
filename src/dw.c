@@ -2511,9 +2511,10 @@ int dw_run(dw_opts * s)
             {
                 printf("%f%% pixels at bg level in the output image.\n", 100*nZeros/(M*N*P));
                 printf("Writing to %s\n", s->outFile); fflush(stdout);
+                printf("Outformat: %d\n", s->outFormat);
             }
 
-            //    floatimage_normalize(out, M*N*P);
+
             if(s->outFormat == 32)
             {
                 if(s->iterdump)

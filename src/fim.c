@@ -5033,7 +5033,7 @@ fim_imwrite_f32(const char * outname,
 
     if(outname[n-1] == 'y' || outname[n-1] == 'Y')
     {
-        int shape[3] = {M, N, P};
+        int shape[3] = {P, N, M};
         return npio_write(outname, 3, shape, (void *) V,
                           NPIO_F32, NPIO_F32);
     }
