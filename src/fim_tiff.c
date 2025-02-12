@@ -154,37 +154,6 @@ void fim_tiff_ut()
 }
 
 
-void floatimage_normalize(float * restrict I, const size_t N)
-{
-    // Scale image to span the whole 16 bit range.
-    float imax = I[0]; float imin = I[0];
-    int ok = 1;
-    //#pragma omp parallel for reduction(min:imin) reduction(max:imax) shared(I)
-    for(size_t kk=0; kk<N; kk++)
-    {
-        if(!isfinite(I[kk]))
-        {
-            I[kk] = 0;
-            ok = 0;
-        }
-        I[kk] > imax ? imax = I[kk] : 0 ;
-        I[kk] < imin ? imin = I[kk] : 0 ;
-    }
-
-    if(!ok)
-    {
-        printf("floatimage_normalize got non-normal numbers\n");
-    }
-
-    printf("floatimage_normalize imin: %f imax: %f\n", imin, imax);
-
-    if(imax>0)
-    {
-        fim_mult_scalar(I, N, (pow(2,16)-2)/imax);
-    }
-
-}
-
 void floatimage_show_stats(float * I, size_t N, size_t M, size_t P)
 {
     float isum = 0;
@@ -804,15 +773,11 @@ int fim_tiff_from_raw(const char * fName, // Name of tiff file to be written
         TIFFSetField(out, TIFFTAG_SAMPLESPERPIXEL, 1);   // set number of channels per pixel
         TIFFSetField(out, TIFFTAG_BITSPERSAMPLE, 8*bytesPerSample);    // set the size of the channels
         TIFFSetField(out, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);    // set the origin of the image.
-        //   Some other essential fields to set that you do not have to understand for now.
         TIFFSetField(out, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
         TIFFSetField(out, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
         TIFFSetField(out, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_UINT);
 
-        /* We are writing single page of the multipage file */
         //TIFFSetField(out, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
-
-        /* Set the page number */
         //TIFFSetField(out, TIFFTAG_PAGENUMBER, dd, P);
 
         for(size_t nn = 0; nn < (size_t) N; nn++)
@@ -895,16 +860,12 @@ int fim_tiff_write_float(const char * fName, const float * V,
         TIFFSetField(out, TIFFTAG_SAMPLESPERPIXEL, 1);   // set number of channels per pixel
         TIFFSetField(out, TIFFTAG_BITSPERSAMPLE, 8*bytesPerSample);    // set the size of the channels
         TIFFSetField(out, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);    // set the origin of the image.
-        //   Some other essential fields to set that you do not have to understand for now.
         TIFFSetField(out, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
         TIFFSetField(out, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
         TIFFSetField(out, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_IEEEFP);
 
-        /* We are writing single page of the multipage file */
         //TIFFSetField(out, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
-        /* Set the page number */
         //TIFFSetField(out, TIFFTAG_PAGENUMBER, dd, P);
-
 
         for(size_t kk = 0; kk < (size_t) M; kk++)
         {
@@ -968,11 +929,9 @@ int fim_tiff_write_opt(const char * fName, const float * V,
 
     if(scaling <= 0)
     {
-        if(V != NULL)
-        {
-            float imax = fim_max(V, M*N*P);
-            scaling = 1.0/imax*(pow(2,16)-2.0);
-        }
+        fprintf(stderr,
+                "fim_tiff_write_opt called with a non-positive scaling value\n");
+        return EXIT_FAILURE;
     }
 
     if(!isfinite(scaling))
@@ -1566,7 +1525,6 @@ int main(int argc, char ** argv)
     }
 
     floatimage_show_stats(I, M, N, P);
-    // floatimage_normalize(I, M*N*P);
 
     ttags_show(stdout, T);
 

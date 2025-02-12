@@ -5058,15 +5058,10 @@ fim_imwrite_u16(const char * outname,
     if(outname[n-1] == 'y' || outname[n-1] == 'Y')
     {
         uint16_t * I = calloc(M*N*P, sizeof(uint16_t));
-        float sz = scaling;
-        if(scaling <= 0)
-        {
-            sz = ( pow(2, 16) - 1.0 ) / fim_max(V, M*N*P);
-        }
 
         for(int64_t kk = 0; kk < M*N*P; kk++)
         {
-            I[kk] = V[kk]*sz;
+            I[kk] = V[kk]*scaling;
         }
         int shape[3] = {P, N, M};
         return npio_write(outname, 3, shape, (void *) I, NPIO_U16, NPIO_U16);

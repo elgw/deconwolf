@@ -25,6 +25,13 @@ FILE * logfile = NULL;
 /* END GLOBALS */
 
 
+/* Determine the scaling so that the whole range of uint16_t values
+ * are used. n is the number of pixels. */
+static float scaling_for_u16(const float * V, size_t n)
+{
+    return ( pow(2, 16) - 1.0 ) / fim_max(V, n);
+}
+
 dw_iterator_t * dw_iterator_new(const dw_opts * s)
 {
     dw_iterator_t * it = calloc(1, sizeof(dw_iterator_t));
@@ -2521,9 +2528,15 @@ int dw_run(dw_opts * s)
                 if(s->iterdump)
                 {
                     char * outFile = gen_iterdump_name(s, s->nIter);
-                    fim_imwrite_u16(outFile, out, T, M, N, P, -1);
+                    float scaling = scaling_for_u16(out, M*N*P);
+                    fim_imwrite_u16(outFile, out, T, M, N, P, scaling);
                     free(outFile);
                 } else {
+                    if(s->scaling <= 0)
+                    {
+                        s->scaling = scaling_for_u16(out, M*N*P);
+                    }
+                    fprintf(s->log, "scaling: %f\n", s->scaling);
                     fim_imwrite_u16(s->outFile, out, T, M, N, P, s->scaling);
                 }
             }
