@@ -13,6 +13,31 @@
  *    You should have received a copy of the GNU General Public License
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+
+/* Known problem: When writing max projections, the metadata is
+  transferred from the 3D images. If the source image had an
+  imagedescription tag it will be wrong for the 2D output.
+
+  The image description can look like this:
+
+  ImageJ=1.52r
+  images=71
+  slices=71
+  unit=nm
+  spacing=200.0
+  loop=false
+
+  In that case the following lines are wrong/irrelevant:
+
+  images=71
+  slices=71
+  loop=false
+
+  and should be stripped. At the same time we would like to keep the 'unit=...'
+  and possibly all the other information as well.
+*/
+
+
 #ifndef WINDOWS
 #include <unistd.h>
 #endif
@@ -1108,7 +1133,7 @@ void ttags_set_pixelsize(ttags * T, double xres, double yres, double zres)
     T->imagedescription = calloc(1024, 1);
     assert(T->imagedescription != NULL);
     sprintf(T->imagedescription,
-            "ImageJ=1.52r\nimages=%d\nslices=%d\nunit=nm\nspacing=%.1f\nloop=false.",
+            "ImageJ=1.52r\nimages=%d\nslices=%d\nunit=nm\nspacing=%.1f\nloop=false",
             T->P, T->P, T->zresolution);
     return;
 }
@@ -1200,9 +1225,22 @@ void ttags_set(TIFF * tfile, const ttags * T)
         TIFFSetField(tfile, TIFFTAG_SOFTWARE, T->software);
     }
 
+    // TODO: it is wrong to simply copy/paste this tag in case we are
+    // writing a 2D projection
     if(T->imagedescription != NULL)
     {
-        TIFFSetField(tfile, TIFFTAG_IMAGEDESCRIPTION, T->imagedescription);
+        if(0) // T->P == 1
+        {
+            char * desc = calloc(1024, 1);
+            assert(desc != NULL);
+            sprintf(desc,
+                    "ImageJ=1.52r\nimages=%d\nslices=%d\nunit=nm\nspacing=%.1f\nloop=false",
+                    T->P, T->P, T->zresolution);
+            TIFFSetField(tfile, TIFFTAG_IMAGEDESCRIPTION, desc);
+            free(desc);
+        } else {
+            TIFFSetField(tfile, TIFFTAG_IMAGEDESCRIPTION, T->imagedescription);
+        }
     }
 
     TIFFSetField(tfile, TIFFTAG_XRESOLUTION, T->xresolution);
@@ -1715,6 +1753,7 @@ int fim_tiff_maxproj(const char * in, const char * out)
 
     ttags_get(input, T);
     ttags_set_software(T, "deconwolf " deconwolf_version);
+    T->P = 1; /* As we will only write one plane eventually */
 
     uint32_t SF = SAMPLEFORMAT_UINT;
     int gotSF = TIFFGetField(input, TIFFTAG_SAMPLEFORMAT, &SF);

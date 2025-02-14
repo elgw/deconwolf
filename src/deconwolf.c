@@ -39,14 +39,37 @@ npy2tif(int argc, char ** argv)
         return EXIT_FAILURE;
     }
 
-    if(npy->ndim != 3)
+    int64_t M = 1;
+    int64_t N = 1;
+    int64_t P = 1;
+
+    if(npy->ndim > 3 || npy->ndim < 2)
     {
-        printf("This function does only work with 3D images\n");
+        printf("This function does only work with 2D and 3D arrays\n");
         npio_free(npy);
         return EXIT_FAILURE;
     }
 
-    size_t nel = npy->shape[0]*npy->shape[1]*npy->shape[2];
+    switch(npy->ndim)
+    {
+    case 3:
+        M = npy->shape[2];
+        N = npy->shape[1];
+        P = npy->shape[0];
+        break;
+    case 2:
+        M = npy->shape[1];
+        N = npy->shape[0];
+        P = 1;
+        break;
+    default:
+        fprintf(stderr, "Unsupported number of dimensions: %d\n", npy->ndim);
+        npio_free(npy);
+        return EXIT_FAILURE;
+    }
+
+
+    size_t nel = M*N*P;
     float * V = fim_malloc(nel*sizeof(float));
 
     if(npy->dtype == NPIO_F32)
@@ -75,6 +98,16 @@ npy2tif(int argc, char ** argv)
         goto success;
     }
 
+    if(npy->dtype == NPIO_I32)
+    {
+        int32_t * IN = (int32_t * ) npy->data;
+        for(size_t kk = 0; kk < nel; kk++)
+        {
+            V[kk] = (float) IN[kk];
+        }
+        goto success;
+    }
+
     printf("Unable to convert the following npy file to float\n");
     npio_print(stdout, npy);
     npio_free(npy);
@@ -83,7 +116,7 @@ npy2tif(int argc, char ** argv)
 
 success:
     fim_tiff_write_float(argv[2], V, NULL,
-                         npy->shape[2], npy->shape[1], npy->shape[0]);
+                         M, N, P);
 
     fim_free(V);
     npio_free(npy);
