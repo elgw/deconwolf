@@ -201,7 +201,7 @@ void fimo_free(fimo * F)
 
 fimo * fim_wrap_array(float * V, size_t M, size_t N, size_t P)
 {
-    fimo * I = malloc(sizeof(fimo));
+    fimo * I = calloc(1, sizeof(fimo));
     assert(I != NULL);
     I->V = V;
     I->M = M;
@@ -280,7 +280,7 @@ void fim_argmax_max(const float * I,
         size_t n = MNP/omp_get_num_threads();   // step = MAX/number of threads.
         size_t id = omp_get_thread_num();       // id is one of 0, 1, ..., (num_threads-1)
         size_t start = id * n;
-        size_t stop = start;
+        size_t stop;
         if ( id + 1 == (size_t) omp_get_num_threads() ) {
             stop = MNP;
         }
@@ -3496,6 +3496,11 @@ fim_LoG_S2(const float * V0,
            const size_t M, const size_t N, const size_t P,
            const float sigmaxy, const float sigmaz)
 {
+
+    if(P == 0)
+    {
+        return NULL;
+    }
 
     fim_boundary_condition bc = FIM_BC_SYMMETRIC_MIRROR;
 
