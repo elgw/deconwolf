@@ -1206,11 +1206,19 @@ static char * strline(char * line, strline_buff * buff)
 
 /* Uggly temporary fix until the metadata handling is updated.  Use
  * when ttags are read from a 3D image and are to be written to a 2D
- * image
+ * image.
  */
 void ttags_fix_ij_3d_to_2d(ttags * T)
 {
     if(T->imagedescription == NULL)
+    {
+        return;
+    }
+
+    /* Check that the ImageDescription if of ImageJ type, i.e.
+     * not OME-XML etc. */
+
+    if(strstr(T->imagedescription, "ImageJ=") == NULL)
     {
         return;
     }
@@ -1223,7 +1231,7 @@ void ttags_fix_ij_3d_to_2d(ttags * T)
 
     strline_buff B = {0};
     char * line = NULL;
-    while( line = strline(old, &B) )
+    while( (line = strline(old, &B)) )
     {
         int use = 1;
         if(strstr(line, "images=") != NULL)
@@ -1688,6 +1696,27 @@ int main(int argc, char ** argv)
 #endif
 
 
+static const char * tiff_sampleformat_to_string(int sf)
+{
+    switch(sf)
+    {
+    case SAMPLEFORMAT_UINT:
+        return "UINT";
+    case SAMPLEFORMAT_INT:
+        return "INT";
+    case SAMPLEFORMAT_IEEEFP:
+        return "IEEEFP";
+    case SAMPLEFORMAT_VOID:
+        return "VOID";
+    case SAMPLEFORMAT_COMPLEXINT:
+        return "COMPLEXINT";
+    case SAMPLEFORMAT_COMPLEXIEEEFP:
+        return "COMPLEXIEEEFP";
+    default:
+        return "UNKNOWN";
+    }
+}
+
 char * tiff_is_supported(TIFF * tiff)
 {
     char * errStr = calloc(1024, 1);
@@ -1730,9 +1759,18 @@ char * tiff_is_supported(TIFF * tiff)
             isFloat = 1;
             okFormat = 1;
         }
+        if( SF == SAMPLEFORMAT_INT )
+        {
+            okFormat = 0;
+        }
+        if( SF == SAMPLEFORMAT_VOID )
+        {
+            okFormat = 1;
+        }
         if(okFormat == 0)
         {
-            sprintf(errStr, "Neither SAMPLEFORMAT_UINT or SAMPLEFORMAT_IEEEFP\n");
+            // see tiff.h for the definitions
+            sprintf(errStr, "Sample format %s is not supported\n", tiff_sampleformat_to_string(SF));
             return errStr;
         }
     }
@@ -1929,18 +1967,7 @@ int fim_tiff_maxproj(const char * in, const char * out)
     {
         printf("strip size: %" PRId64 "\n", ssize);
         printf("number of strips: %u\n", nstrips);
-        switch(SF)
-        {
-        case SAMPLEFORMAT_UINT:
-            printf("Sample format: UINT\n");
-            break;
-        case SAMPLEFORMAT_IEEEFP:
-            printf("Sample format: float\n");
-            break;
-        default:
-            printf("Unsupported sample format\n");
-            break;
-        }
+        printf("sample format: %s\n", tiff_sampleformat_to_string((SF)));
         printf("Bits per sample: %u\n", BPS);
         printf("Number of directories (Z-planes): %" PRId64 "\n", P);
     }

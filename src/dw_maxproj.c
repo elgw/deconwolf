@@ -183,8 +183,27 @@ dw_tiff_max(int argc, char ** argv)
             exit(EXIT_FAILURE);
         }
 
-
-        char * outFile = get_outfile_name_for_max(inFile);
+        /* Output file name */
+        char *  outFile = NULL;
+        switch(s->mode)
+        {
+        case MODE_MAX:
+            outFile = get_outfile_name_for_max(inFile);
+            break;
+        case MODE_MAX_XYZ:
+            outFile = get_outfile_name_for_max(inFile);
+            break;
+        case MODE_GM:
+            outFile = get_outfile_name_for_max(inFile);
+            break;
+        case MODE_SLICE:
+            outFile = malloc(strlen(inFile) + 20);
+            sprintf(outFile, "s%04d_%s", s->slice, inFile);
+            break;
+        default:
+            fprintf(stderr, "Unknown mode!\n");
+            exit(EXIT_FAILURE);
+        }
 
         if(s->verbose > 1)
         {
@@ -195,54 +214,41 @@ dw_tiff_max(int argc, char ** argv)
         if(s->overwrite == 0 && dw_isfile(outFile))
         {
             printf("%s exists, skipping.\n", outFile);
-        } else {
-            if(s->verbose > 0)
-            {
-                printf("%s -> %s\n", inFile, outFile);
-            }
-            switch(s->mode)
-            {
-            case MODE_MAX:
-                if(fim_tiff_maxproj(inFile, outFile))
-                {
-                    exit(EXIT_FAILURE);
-                }
-                break;
-            case MODE_MAX_XYZ:
-                fim_tiff_maxproj_XYZ(inFile, outFile);
-                break;
-            case MODE_GM:
-                gen_gm(s, inFile, outFile);
-                break;
-            default:
-                fprintf(stderr, "Unknown mode!\n");
-                exit(EXIT_FAILURE);
-                break;
-            }
-
-
             free(outFile);
+            continue;
         }
 
-        if(s->mode == MODE_SLICE)
+        if(s->verbose > 0)
         {
-            char * outFile = malloc(strlen(inFile) + 20);
-            sprintf(outFile, "s%04d_%s", s->slice, inFile);
-            if(dw_isfile(outFile) && s->overwrite == 0)
-            {
-                printf("%s exists, skipping.\n", outFile);
-            } else {
-                if(s->verbose > 0)
-                {
-                    printf("%s -> %s\n", inFile, outFile);
-                }
-                fim_tiff_extract_slice(inFile, outFile, s->slice);
-            }
-            free(outFile);
+            printf("%s -> %s\n", inFile, outFile);
         }
 
+        switch(s->mode)
+        {
+        case MODE_MAX:
+            if(fim_tiff_maxproj(inFile, outFile))
+            {
+                exit(EXIT_FAILURE);
+            }
+            break;
+        case MODE_MAX_XYZ:
+            fim_tiff_maxproj_XYZ(inFile, outFile);
+            break;
+        case MODE_GM:
+            gen_gm(s, inFile, outFile);
+            break;
+        case MODE_SLICE:
+            fim_tiff_extract_slice(inFile, outFile, s->slice);
+            break;
+        default:
+            fprintf(stderr, "Unknown mode!\n");
+            exit(EXIT_FAILURE);
+            break;
+        }
 
+        free(outFile);
     }
+
     opts_free(s);
     return 0;
 }

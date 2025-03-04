@@ -134,7 +134,10 @@ rgb_from_png(const char * filename,
     if(image.warning_or_error)
     {
         printf("png error: %s\n", image.message);
+        free(buffer);
+        return NULL;
     }
+    assert(buffer != NULL);
 
     int known_format = 1;
     switch(image.format)
