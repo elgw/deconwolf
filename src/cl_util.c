@@ -79,6 +79,7 @@ static int clu_release(clu_env_t * C, cl_mem buf)
     }
     check_CL(clReleaseMemObject(buf));
     C->n_release++;
+    return 0;
 }
 
 void clu_exit_error(cl_int err,
@@ -1366,6 +1367,7 @@ clu_env_t * clu_new(int verbose, int cl_device)
     }
 
     env->prefer_inplace = 1;
+    free(devices);
     return env;
 }
 
