@@ -8,6 +8,8 @@ Version History
   files. At the moment this does not work with the `--tiling` option.
 - Not setting `TIFFTAG_SUBFILETYPE` and `TIFFTAG_PAGENUMBER` when
   writing tif files since it does not seem to be needed.
+- Fix: `dw maxproj` does no longer write metadata that hints that the
+  image is 3D. Python/tifffile no longer issues warnings.
 
 0.4.4_rc4 (windows only)
 ------------------------
