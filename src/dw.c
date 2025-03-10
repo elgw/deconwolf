@@ -36,27 +36,6 @@ static float scaling_for_u16(const float * V, size_t n)
     return ( pow(2, 16) - 1.0 ) / fim_max(V, n);
 }
 
-static int npyfilename(const char * filename)
-{
-    // version 1
-    if(filename == NULL)
-    {
-        return 0;
-    }
-
-    size_t n = strlen(filename);
-
-    if(n < 4)
-    {
-        return 0;
-    }
-
-    if(strncasecmp(&filename[n-4], ".npy", 4) == 0)
-    {
-        return 1;
-    }
-    return 0;
-}
 
 static int raw_to_npio(const char * outfile,
                        const char * infile, // Always f32 raw

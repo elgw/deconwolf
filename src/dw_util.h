@@ -147,3 +147,7 @@ float_arg_max(const float * v, size_t N);
 
 /* Portable between windows and linux */
 int dw_fseek(FILE *, int64_t offset, int whence);
+
+
+/* Check if a file name ends with .npy while ignoring case */
+int npyfilename(const char * filename);
