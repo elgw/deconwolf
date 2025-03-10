@@ -105,6 +105,7 @@ int dw_tiff_merge(int argc, char ** argv)
         {
             printf("%s already exists, doing nothing. Use --overwrite to overwrite existing files\n",
                    outfile);
+            tm_config_free(conf);
             exit(EXIT_SUCCESS);
         }
     }
@@ -140,6 +141,7 @@ int dw_tiff_merge(int argc, char ** argv)
                     fprintf(stderr, "Image sizes does not match. A previous image had size "
                             "%" PRIu64 " x %" PRIu64 " while %s has size %" PRIu64 " x %" PRIu64 "\n",
                             M_out, N_out, argv[kk], M, N);
+                    tm_config_free(conf);
                     return EXIT_FAILURE;
                 }
             }

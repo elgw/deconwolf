@@ -399,6 +399,7 @@ void shift_double(double * V, int N, int stride, int shift)
 
 void shift_float(float * V, int N, int stride, int shift)
 {
+    assert(V != NULL);
     assert(N > 0);
     float * buff = calloc(N, sizeof(float));
     assert(buff != NULL);
@@ -686,6 +687,7 @@ fimo * gen_psf(opts * s, double lambda)
         printf("\r done.                         ");
     }
     fftw_destroy_plan(plan);
+    free(ph);
 
     if(s->oversampling > 1)
     {
@@ -792,6 +794,7 @@ static void pinhole_convolution(opts * s, fimo * PSF)
     double pinhole_px = pinhole_nm / s->optical.dx;
     printf("Pinhole size: %.2f AU / %.0f nm / %.1f pixels\n",
            s->optical.pinhole, pinhole_nm, pinhole_px);
+    assert(PSF->M*PSF->N > 0);
     float * P = calloc(PSF->M*PSF->N, sizeof(float));
     assert(P != NULL);
     for(int aa = 0; aa < (int) PSF->M; aa++)
