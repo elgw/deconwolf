@@ -158,11 +158,10 @@ int dw_tiff_merge(int argc, char ** argv)
     size_t plane = 0;
     for(int kk = conf->optind + 1; kk<argc; kk++)
     {
-        ttags T;
         printf("Reading %s\n", argv[kk]); fflush(stdout);
         if(!conf->test)
         {
-            float * im = fim_tiff_read(argv[kk], &T, &M, &N, &P, conf->verbose);
+            float * im = fim_tiff_read(argv[kk], NULL, &M, &N, &P, conf->verbose);
             assert(im != NULL);
             memcpy(im_out + plane*M_out*N_out,
                    im, M*N*P*sizeof(float));

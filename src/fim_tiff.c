@@ -14,29 +14,6 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* Known problem: When writing max projections, the metadata is
-  transferred from the 3D images. If the source image had an
-  imagedescription tag it will be wrong for the 2D output.
-
-  The image description can look like this:
-
-  ImageJ=1.52r
-  images=71
-  slices=71
-  unit=nm
-  spacing=200.0
-  loop=false
-
-  In that case the following lines are wrong/irrelevant:
-
-  images=71
-  slices=71
-  loop=false
-
-  and should be stripped. At the same time we would like to keep the 'unit=...'
-  and possibly all the other information as well.
-*/
-
 
 #ifndef WINDOWS
 #include <unistd.h>
@@ -44,7 +21,6 @@
 
 #include <assert.h>
 #include <errno.h>
-#include <fftw3.h>
 #include <inttypes.h>
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -54,10 +30,30 @@
 #include <string.h>
 #include <stdint.h>
 
-
+#include "dw_version.h"
 #include "fim_tiff.h"
 #include "fim.h"
 #include "dw_util.h"
+
+#define XTAG_IJIJUNKNOWN 50838
+#define XTAG_IJIJINFO 50839
+
+/* Tiff tags -- for simple transfer from one image to another */
+struct _ttags {
+    float xresolution;
+    float yresolution;
+    float zresolution;
+    char * imagedescription;
+    char * software;
+    uint16_t resolutionunit;
+    char * IJIJinfo; // Tag 50839 contains a string, used by Imagej.
+    uint32_t nIJIJinfo;
+    // Image size
+    int M;
+    int N;
+    int P;
+} _ttags;
+
 
 typedef int64_t i64;
 typedef uint64_t u64;
@@ -843,10 +839,6 @@ int fim_tiff_from_raw(const char * fName, // Name of tiff file to be written
     return 0;
 }
 
-int fim_tiff_write_zeros(const char * fName, int64_t N, int64_t M, int64_t P)
-{
-    return fim_tiff_write(fName, NULL, NULL, N, M, P);
-}
 
 int fim_tiff_write_float(const char * fName, const float * V,
                          const ttags * T,
@@ -946,24 +938,33 @@ int fim_tiff_write_opt(const char * fName, const float * V,
                        const ttags * T,
                        int64_t N, int64_t M, int64_t P, float scaling)
 {
+    if(V == NULL)
+    {
+        return EXIT_FAILURE;
+    }
+
     if(fim_tiff_log == NULL)
     {
         fim_tiff_log = stdout;
     }
     // if V == NULL and empty file will be written
 
-    if(scaling <= 0)
-    {
-        fprintf(stderr,
-                "fim_tiff_write_opt called with a non-positive scaling value\n");
-        return EXIT_FAILURE;
-    }
-
     if(!isfinite(scaling))
     {
-        fprintf(fim_tiff_log, "fim_tiff WARNING: Non-finite scaling value, changing to 1\n");
-        scaling = 1;
+        fprintf(fim_tiff_log, "fim_tiff WARNING: Non-finite scaling value, changing to AUTO\n");
+        scaling = -1;
     }
+
+    if(scaling <= 0)
+    {
+        float maxval = V[0];
+        for(i64 kk = 0; kk < M*N*P; kk++)
+        {
+            V[kk] > maxval ? maxval = V[kk] : 0;
+        }
+        scaling = (float) (pow(2, 16)-1) / maxval;
+    }
+
     fprintf(fim_tiff_log, "scaling: %f\n", scaling);
 
     size_t bytesPerSample = sizeof(uint16_t);
@@ -1140,11 +1141,14 @@ void ttags_set_pixelsize(ttags * T, double xres, double yres, double zres)
 
 void ttags_free(ttags ** Tp)
 {
+    if(Tp == NULL)
+    {
+        return;
+    }
     ttags * T = Tp[0];
     if(T == NULL)
     {
-        fprintf(stderr, "fim_tiff: T = NULL, on line %d in %s\n", __LINE__, __FILE__);
-        exit(EXIT_FAILURE);
+        return;
     }
 
     free(T->IJIJinfo);
