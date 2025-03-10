@@ -16,44 +16,59 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* Read and write tiff files to/from single precision floats
+/* ### PROVIDES
+ * Read tiff files as floats
+ * Writes tiff files as uint16 or float
+ *
+ * ### USAGE NOTES:
  * fim_tiff is not thread safe
  * You need to initialize with a call to
  * fim_tiff_init()
  * and should probably also redirect the output by
  * fim_tiff_set_log(FILE *)
  *
- */
+ * ### TODO:
+ * - Thread safe (via a state object)
+ * - Remove all dependencies
+ * - Rename to vtif_* (volumetric tif)
+ * - Correct imagej metadata when writing 2D images (and the metadata says 3D)
+ *   I suggest parsing the IJ metadata and recrating it in a meaningful way on writing.
+ * - Read individual image plane(s).
+ * - config object (log, err, allocator, ...)
+ * - Read and write back OME-XML metadata ?
+ *
+ * ### BUGS:
+ * When writing max projections, the metadata is
+ * transferred from the 3D images. If the source image had an
+ * imagedescription tag it will be wrong for the 2D output.
+ *
+ * The image description can look like this:
+ * ImageJ=1.52r
+ * images=71
+ * slices=71
+ * unit=nm
+ * spacing=200.0
+ * loop=false
+ *
+ * In that case the following lines are wrong/irrelevant:
+ *
+ * images=71
+ * slices=71
+ * loop=false
+ *
+ * and should be stripped. At the same time we would like to keep the 'unit=...'
+ * and possibly all the other information as well.
+ *
+ * ### NOTES
+ * _TIFFmalloc can safely be replaced by any other allocator
+ * (it simply wraps the system malloc, possibly it did something else
+ * a long time ago)
+*/
 
+#include <tiffio.h> // https://gitlab.com/libtiff/libtiff
 
-#include <tiffio.h>
-
-
-#include "ftab.h"
-#include "dw_version.h"
-
-
-#define XTAG_IJIJUNKNOWN 50838
-#define XTAG_IJIJINFO 50839
-
-
-/* Tiff tags -- for simple transfer from one image to another */
-typedef struct{
-    float xresolution;
-    float yresolution;
-    float zresolution;
-    char * imagedescription;
-    char * software;
-    uint16_t resolutionunit;
-    char * IJIJinfo; // Tag 50839 contains a string, used by Imagej.
-    uint32_t nIJIJinfo;
-    // Image size
-    int M;
-    int N;
-    int P;
-} ttags;
-
-#include "fim.h"
+/** For storing tiff meta data */
+typedef struct _ttags ttags;
 
 /** ttags new with everything set to defaults */
 ttags * ttags_new();
@@ -76,7 +91,7 @@ void ttags_set_imagesize(ttags *, int M, int N, int P);
 
 /** @brief set pixel size to tags
  * Note that the resolution unit is not set
-*/
+ */
 void ttags_set_pixelsize(ttags *, double xres, double yres, double zres);
 
 /** @brief Free all data in a ttag* and set it to NULL */
@@ -111,8 +126,6 @@ int fim_tiff_write_float(const char * fName, const float * V,
                          const ttags * T,
                          int64_t M, int64_t N, int64_t P);
 
-int fim_tiff_write_zeros(const char * fName, int64_t M, int64_t N, int64_t P);
-
 /** @brief Write raw floating point data to a 16-bit tif file.
  *
  * This performs a streaming write, never keeping all the data in memory.
@@ -131,7 +144,7 @@ fim_tiff_from_raw(const char * output_tif_file_name,
 
 /** @brief Convert a tiff image to raw float image
  * Note that the image size is not encoded
-*/
+ */
 int
 fim_tiff_to_raw(const char *tif_file_name,
                 const char * output_file_name);
@@ -140,7 +153,7 @@ fim_tiff_to_raw(const char *tif_file_name,
  * @param fName file name
  * @param verbosity how verbose the function should be
  * @param[out] M0, N0, P0, the image size in pixels
- * @param[out] T tiff tags will be written to T
+ * @param[out] T tiff tags will be written to T. Ignored if NULL.
  * @return The returned image is allocate with fim_malloc
  */
 float * fim_tiff_read(const char * fName,
@@ -165,7 +178,7 @@ float * fim_tiff_read_sub(const char * fName,
 
 /** @brief Run self-tests
  *
-*/
+ */
 void fim_tiff_ut();
 
 /** @brief Get image dimensions from tif file

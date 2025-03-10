@@ -17,6 +17,7 @@
 #include "tiling.h"
 #include "fim_tiff.h"
 #include "dw_util.h"
+#include "fim.h"
 
 int64_t * tiling_getDivision(const int64_t M, const int64_t m, int64_t * nDiv)
 {
