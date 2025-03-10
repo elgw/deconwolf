@@ -486,3 +486,25 @@ int dw_fseek(FILE *fid, int64_t offset, int origin)
     }
     return ret;
 }
+
+int npyfilename(const char * filename)
+{
+    // version 1
+    if(filename == NULL)
+    {
+        return 0;
+    }
+
+    size_t n = strlen(filename);
+
+    if(n < 4)
+    {
+        return 0;
+    }
+
+    if(strncasecmp(&filename[n-4], ".npy", 4) == 0)
+    {
+        return 1;
+    }
+    return 0;
+}

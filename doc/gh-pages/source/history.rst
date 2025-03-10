@@ -4,8 +4,8 @@ Version History
 0.4.5
 -----
 
-- New: support for reading and writing Numpy npy
-  files. If the input file ends with `.npy` so will the output file.
+- New: support for reading and writing Numpy npy files in many
+  places. If the input file ends with `.npy` so will the output file.
 - Change: Not setting `TIFFTAG_SUBFILETYPE` and `TIFFTAG_PAGENUMBER` when
   writing tif files since it does not seem to be needed.
 - Fix: `dw maxproj` truncates ImageJ metadata to remove the 3D
