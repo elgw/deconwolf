@@ -48,6 +48,7 @@ cmake_minimum_required(VERSION 3.9)
 
 project(deconwolf
   DESCRIPTION "Deconvolution of wide field images"
+  VERSION 0.4.5
   LANGUAGES C)
 
 set (CMAKE_C_STANDARD 11)
@@ -104,7 +105,7 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
   src/dw_align_dots.c
   src/npio.c)
 
-  add_executable(dw_bw
+  set(dw_bw_SOURCES
     src/bw_gsl.c
     src/dw_bwpsf.c
     src/dw_util.c
@@ -121,6 +122,14 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
   endif()
 
   add_executable(dw ${dw_SOURCES})
+  set_target_properties(dw PROPERTIES VERSION ${PROJECT_VERSION})
+
+  add_executable(dw_bw ${dw_bw_SOURCES})
+  set_target_properties(dw_bw PROPERTIES VERSION ${PROJECT_VERSION})
+
+  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/dw_version.h.in
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/dw_version.h)
+
 
   #
   # kdtree
@@ -142,8 +151,6 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
   elseif(WIN32)
 
   endif()
-
-
 
   #
   # Parse version number from src/dw_version.h
