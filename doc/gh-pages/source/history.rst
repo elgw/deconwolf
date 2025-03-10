@@ -4,12 +4,14 @@ Version History
 0.4.5
 -----
 
-- Added experimental support for reading and writing Numpy npy
-  files. At the moment this does not work with the `--tiling` option.
-- Not setting `TIFFTAG_SUBFILETYPE` and `TIFFTAG_PAGENUMBER` when
+- New: support for reading and writing Numpy npy
+  files. If the input file ends with `.npy` so will the output file.
+- Change: Not setting `TIFFTAG_SUBFILETYPE` and `TIFFTAG_PAGENUMBER` when
   writing tif files since it does not seem to be needed.
 - Fix: `dw maxproj` truncates ImageJ metadata to remove the 3D
   information so that Python/tifffile no longer issues warnings.
+- Fix: `--scaling s` works when tiling is used.
+- Fix: `--float` work when tiling is used.
 
 0.4.4_rc4 (windows only)
 ------------------------

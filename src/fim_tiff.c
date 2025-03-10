@@ -118,7 +118,7 @@ void fim_tiff_ut()
      * read it back and check that it is the same thing*/
 
     char fname[] = "_deconwolf_temporary_XXXXXX";
-    #ifndef WINDOWS
+#ifndef WINDOWS
     int fd = mkstemp(fname);
     if(fd == -1)
     {
@@ -191,8 +191,8 @@ void floatimage_show_stats(float * I, size_t N, size_t M, size_t P)
 
 
 static void sub2ind(size_t ind,
-                            int64_t M, int64_t N, __attribute__((unused)) int64_t P,
-                            int64_t * m, int64_t * n, int64_t * p)
+                    int64_t M, int64_t N, __attribute__((unused)) int64_t P,
+                    int64_t * m, int64_t * n, int64_t * p)
 {
     /* If ind is the linear index from a [M,N,P] image, figure out the coordinates of ind
      */
@@ -324,7 +324,7 @@ void readUint16(TIFF * tfile, float * V,
                 const uint32_t ndirs,
                 const uint32_t  __attribute__((__unused__)) nstrips,
                 const uint32_t perDirectory
-                )
+    )
 {
     //    printf("readUint16\n"); fflush(stdout);
     // Number of elements per strip
@@ -396,7 +396,7 @@ void readUint8(TIFF * tfile, float * V,
                const uint32_t ndirs,
                const uint32_t nstrips,
                const uint32_t perDirectory
-               )
+    )
 {
     // Number of elements per strip
     size_t nes = ssize/sizeof(uint8_t);
@@ -454,7 +454,7 @@ void readFloat(TIFF * tfile, float * V,
                uint32_t ndirs,
                uint32_t nstrips,
                uint32_t perDirectory
-               )
+    )
 {
     // Number of elements per strip
     size_t nes = ssize/sizeof(float);
@@ -601,7 +601,7 @@ void floattoraw(TIFF * tfile, const char * ofile,
 }
 
 
-int fim_tiff_to_raw(const char * fName, const char * oName)
+int fim_tiff_to_raw_f32(const char * fName, const char * oName)
 {
     // Convert a tif image, fName, to a raw float image, oName
 
@@ -715,10 +715,13 @@ int fim_tiff_to_raw(const char * fName, const char * oName)
 }
 
 
-int fim_tiff_from_raw(const char * fName, // Name of tiff file to be written
-                      int64_t M, int64_t N, int64_t P, // Image dimensions
-                      const char * rName,  // name of raw file
-                      const char * meta_tiff_file)
+int
+fim_tiff_imwrite_u16_from_raw(
+    const char * fName, // Name of tiff file to be written
+    int64_t M, int64_t N, int64_t P, // Image dimensions
+    const char * rName,  // name of raw file
+    const char * meta_tiff_file,
+    float scaling)
 {
 
     size_t bytesPerSample = sizeof(uint16_t);
@@ -762,13 +765,14 @@ int fim_tiff_from_raw(const char * fName, // Name of tiff file to be written
 
     // Determine max value
 
-    float scaling = 1;
-    float rawmax = raw_file_single_max(rName, MNP);
-    if(rawmax > 0)
+    if(scaling <= 0)
     {
-        scaling = 65535/rawmax;
+        float rawmax = raw_file_single_max(rName, MNP);
+        if(rawmax > 0)
+        {
+            scaling = 65535/rawmax;
+        }
     }
-    //  printf("Max value of file: %f\n", rawmax);
 
     FILE * rf = fopen(rName, "rb");
     if(rf == NULL)
@@ -809,6 +813,122 @@ int fim_tiff_from_raw(const char * fName, // Name of tiff file to be written
             for(size_t mm = 0; mm < (size_t) M; mm++)
             {
                 buf[mm] = (uint16_t) (rbuf[mm]*scaling);
+            }
+
+            int ok = TIFFWriteScanline(out, // TIFF
+                                       buf,
+                                       nn, // row
+                                       0); //sample
+            if(ok != 1)
+            {
+                fprintf(stderr, "TIFFWriteScanline failed\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+
+        TIFFWriteDirectory(out);
+    }
+
+    _TIFFfree(buf);
+
+    TIFFClose(out);
+    fclose(rf);
+    free(rbuf);
+
+    if(tags)
+    {
+        ttags_free(&tags);
+    }
+
+    return 0;
+}
+
+int
+fim_tiff_imwrite_f32_from_raw(
+    const char * fName, // Name of tiff file to be written
+    int64_t M, int64_t N, int64_t P, // Image dimensions
+    const char * rName,  // name of raw file
+    const char * meta_tiff_file)
+{
+
+    size_t bytesPerSample = sizeof(float);
+    char formatString[4] = "w";
+    size_t MNP = (size_t) M * (size_t) N * (size_t ) P;
+    if(MNP*sizeof(uint16_t) >= pow(2, 32))
+    {
+        sprintf(formatString, "w8\n");
+        fprintf(fim_tiff_log, "fim_tiff WARNING: File is > 2 GB, using BigTIFF format\n");
+    }
+
+    ttags * tags = NULL;
+    if(meta_tiff_file != NULL)
+    {
+        tags = ttags_new();
+        TIFF * ref = TIFFOpen(meta_tiff_file, "r");
+        if(ref)
+        {
+            ttags_get(ref, tags);
+            TIFFClose(ref);
+        }
+    }
+
+    TIFF * out = TIFFOpen(fName, formatString);
+    // printf("Opened %s for writing using formatString: %s\n", fName, formatString);
+
+    if(out == NULL)
+    {
+        fprintf(stderr,
+                "fim_tiff ERROR: Failed to open %s for writing using "
+                "formatString: %s\n", fName, formatString);
+        exit(EXIT_FAILURE);
+    }
+
+    size_t linbytes = M*bytesPerSample;
+    float * buf = _TIFFmalloc(linbytes);
+    assert(buf != NULL);
+    float * rbuf = calloc(M, sizeof(float));
+    assert(rbuf != NULL);
+    memset(buf, 0, linbytes);
+
+    FILE * rf = fopen(rName, "rb");
+    if(rf == NULL)
+    {
+        fprintf(stderr, "fim_tiff ERROR: Failed to open %s for writing\n", rName);
+        exit(EXIT_FAILURE);
+    }
+
+    // Can TIFFCheckpointDirectory be used to speed up this?
+    // http://maptools-org.996276.n3.nabble.com/help-writing-thumbnails-to-TIFF-file-td3824.html
+    // No, that isn't the trick to use.
+    // The "fast" writers puts the metadata last, that should be the way to go...
+
+    for(size_t dd = 0; dd < (size_t) P; dd++)
+    {
+        if(tags)
+        {
+            ttags_set(out, tags);
+        }
+
+        TIFFSetField(out, TIFFTAG_IMAGEWIDTH, M);  // set the width of the image
+        TIFFSetField(out, TIFFTAG_IMAGELENGTH, N);    // set the height of the image
+        TIFFSetField(out, TIFFTAG_SAMPLESPERPIXEL, 1);   // set number of channels per pixel
+        TIFFSetField(out, TIFFTAG_BITSPERSAMPLE, 8*bytesPerSample);    // set the size of the channels
+        TIFFSetField(out, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);    // set the origin of the image.
+        TIFFSetField(out, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
+        TIFFSetField(out, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
+        TIFFSetField(out, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_IEEEFP);
+
+        //TIFFSetField(out, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
+        //TIFFSetField(out, TIFFTAG_PAGENUMBER, dd, P);
+
+        for(size_t nn = 0; nn < (size_t) N; nn++)
+        {
+            size_t nread = fread(rbuf, M*sizeof(float), 1, rf);
+            (void)(nread);
+
+            for(size_t mm = 0; mm < (size_t) M; mm++)
+            {
+                buf[mm] = rbuf[mm];
             }
 
             int ok = TIFFWriteScanline(out, // TIFF

@@ -102,7 +102,15 @@ dw_psf_sted: $(spsf_files)
 	$(CC) $(CFLAGS) -DSTANDALONE $(spsf_files) $(LDFLAGS) -o dw_psf_sted
 
 # Test the float image module
-fim_ut_files=fim_ut.o fim.o dw_util.o ftab.o fft.o fim_tiff.o quickselect.o
+fim_ut_files=fim_ut.o \
+fim.o \
+dw_util.o \
+ftab.o \
+fft.o \
+fim_tiff.o \
+quickselect.o \
+npio.o
+
 fim_ut: $(fim_ut_files)
 	$(CC)  $(CFLAGS) $(fim_ut_files) $(LDFLAGS) -o fim_ut
 

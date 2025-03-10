@@ -36,6 +36,7 @@
 
 typedef uint64_t u64;
 typedef int64_t i64;
+typedef uint16_t u16;
 
 static int fim_verbose = 0;
 
@@ -154,6 +155,29 @@ void fim_free(void * p)
     free(p);
 #endif
 }
+
+static int npyfilename(const char * filename)
+{
+    // version 1
+    if(filename == NULL)
+    {
+        return 0;
+    }
+
+    size_t n = strlen(filename);
+
+    if(n < 4)
+    {
+        return 0;
+    }
+
+    if(strncasecmp(&filename[n-4], ".npy", 4) == 0)
+    {
+        return 1;
+    }
+return 0;
+}
+
 
 void fim_set_verbose(int v)
 {
@@ -1434,6 +1458,7 @@ void fim_conncomp6_ut()
     fim_show_int(L, M, N, 1);
     fim_free(L);
     fim_free(Im);
+    return;
 }
 
 void fim_conv1_vector_ut()
@@ -4503,6 +4528,8 @@ void fim_conv1_ut(fim_boundary_condition bc)
     size_t stride = 1;
     float * V = calloc(nV, sizeof(float));
     assert(V != NULL);
+    float * buf = calloc(nV, sizeof(float));
+    assert(buf != NULL);
     for(size_t kk = 0; kk < nV; kk++)
     { V[kk] = kk+1; }
     printf("V=");fim_show(V, 1, nV, 1);
@@ -4512,9 +4539,12 @@ void fim_conv1_ut(fim_boundary_condition bc)
     K[1] = 1;
     K[2] = 1;
     printf("K=");fim_show(K, 1, nK, 1);
+
     fim_conv1(V, nV, stride,
               K, nK,
-              NULL, bc);
+              buf, bc);
+    free(buf);
+
     printf("V*K=");fim_show(V, 1, nV, 1);
     if(bc == FIM_BC_ZEROS)
     {
@@ -4842,6 +4872,7 @@ void fim_dot_lateral_circularity_ut()
     FILE * fid = fopen("G.f32", "rb");
     if(fid == NULL)
     {
+        fprintf(stderr, "Error opening G.f32 on L%d\n", __LINE__);
         return;
     }
     printf("Testing on data in G.f32 which is assumed to be a square shaped 2D image\n");
@@ -4849,7 +4880,8 @@ void fim_dot_lateral_circularity_ut()
     size_t nb = ftell(fid);
     rewind(fid);
     float * G2 = calloc(nb/sizeof(float), sizeof(float));
-    size_t nread = fread(G2, nb/sizeof(float), sizeof(float), fid);
+    assert(G2 != NULL);
+    size_t nread = fread(G2, sizeof(float), nb/sizeof(float), fid);
 
     if(nread != nb/sizeof(float))
     {
@@ -4883,11 +4915,25 @@ static void fim_DoH_ut(void)
 
 void fim_ut()
 {
-    fim_DoH_ut();
-    return;
-    fim_covariance_lp_ut();
-    fim_dot_lateral_circularity_ut();
+    #ifdef NDEBUG
+    fprintf(stderr, "ERROR: NDEBUG is defined and asserts disabled\n"
+            "please re-compile with asserts enabled\n");
+    #else
+    printf("-> asserts are on\n");
+    #endif
+    printf("-> npyfilename\n");
+    assert(npyfilename(".npy") == 1);
+    assert(npyfilename("npy") == 0);
+    assert(npyfilename(NULL) == 0);
+    assert(npyfilename(".npy.tif") == 0);
 
+    printf("-> DoH_ut\n");
+    fim_DoH_ut();
+    printf("-> fim_covariance_lp\n");
+    fim_covariance_lp_ut();
+    printf("-> fim_dot_lateral_circularity\n");
+    fim_dot_lateral_circularity_ut();
+    printf("-> fim_conv1\n");
     fim_conv1_ut(FIM_BC_SYMMETRIC_MIRROR);
     fim_conv1_ut(FIM_BC_ZEROS);
     fim_conv1_ut(FIM_BC_VALID);
@@ -4899,10 +4945,11 @@ void fim_ut()
     fim_LoG_ut();
     fim_features_2d_ut();
     fim_conv1_vector_ut();
+    printf("-> fim_conncomp6\n");
     fim_conncomp6_ut();
-    exit(EXIT_SUCCESS);
+    printf("-> fim_otsu\n");
     fim_otsu_ut();
-    exit(EXIT_SUCCESS);
+
     fim_flipall_ut();
     shift_vector_ut();
     size_t N = 0;
@@ -4939,6 +4986,7 @@ void fim_ut()
     myfftw_start(1, 1, stdout);
     fim_xcorr2_ut();
     myfftw_stop();
+    printf("-> All tests passed\n");
 }
 
 float *
@@ -5017,10 +5065,7 @@ fim_imread(const char * filename,
            int64_t * M, int64_t * N, int64_t * P,
            int verbose)
 {
-    const size_t n = strlen(filename);
-    assert(n > 0);
-
-    if(filename[n-1] == 'y' || filename[n-1] == 'Y')
+    if(npyfilename(filename))
     {
         return fim_read_npy(filename, M, N, P, verbose);
     }
@@ -5033,10 +5078,7 @@ fim_imwrite_f32(const char * outname,
                 const ttags * T,
                 int64_t M, int64_t N, int64_t P)
 {
-    const size_t n = strlen(outname);
-    assert(n > 0);
-
-    if(outname[n-1] == 'y' || outname[n-1] == 'Y')
+    if(npyfilename(outname))
     {
         int shape[3] = {P, N, M};
         return npio_write(outname, 3, shape, (void *) V,
@@ -5044,6 +5086,8 @@ fim_imwrite_f32(const char * outname,
     }
     return fim_tiff_write_float(outname, V, T, M, N, P);
 }
+
+
 
 /* Write as uint16 data. If scaling <= 0 automatic scaling is used,
  * i.e. using the full range. Else the provided value is used */
@@ -5054,13 +5098,11 @@ fim_imwrite_u16(const char * outname,
                 int64_t M, int64_t N, int64_t P,
                 float scaling)
 {
-    const size_t n = strlen(outname);
-    assert(n > 0);
     assert(M > 0);
     assert(N > 0);
     assert(P > 0);
 
-    if(outname[n-1] == 'y' || outname[n-1] == 'Y')
+    if(npyfilename(outname))
     {
         uint16_t * I = calloc(M*N*P, sizeof(uint16_t));
 
@@ -5082,7 +5124,7 @@ fim_imread_size(const char * filename,
     const size_t n = strlen(filename);
     assert(n > 0);
 
-    if(filename[n-1] == 'y' || filename[n-1] == 'Y')
+    if(npyfilename(filename))
     {
         npio_t * npy = npio_load_metadata(filename);
         if(npy->ndim != 3)
@@ -5096,4 +5138,93 @@ fim_imread_size(const char * filename,
         return 0;
     }
     return fim_tiff_get_size(filename, M, N, P);
+}
+
+
+int fim_to_raw(const char* infile, const char* outfile)
+{
+    if(npyfilename(infile))
+    {
+        npio_t * meta = npio_load_metadata(infile);
+        if(meta == NULL)
+        {
+            fprintf(stderr, "Unable to load metadata from %s\n"
+                    "Either an invalid or unsupported npy file\n", infile);
+            return 1;
+        }
+        if(meta->ndim < 3 || meta->ndim > 3)
+        {
+            goto npio_fail;
+        }
+        if(meta->dtype == NPIO_F32)
+        {
+            printf("outfile: %s infile: %s\n", outfile, infile);
+            FILE * fout = fopen(outfile, "wb");
+            if(fout == NULL)
+            {
+                fprintf(stderr, "Unable to open %s for writing\n", outfile);
+            }
+            FILE * fin = fopen(infile, "rb");
+            if(fin == NULL)
+            {
+                fprintf(stderr, "Unable to open %s for reading\n", infile);
+            }
+            if(fseek(fin, meta->data_offset, SEEK_SET))
+            {
+                fprintf(stderr, "Unable to use %s\n", infile);
+            }
+
+            size_t buff_elements = 262144;
+            float * buf = calloc(buff_elements, sizeof(float));
+            size_t nel_read = 0;
+            size_t nel_total = 0;
+            while((nel_read = fread(buf, sizeof(float), buff_elements, fin)) > 0)
+            {
+                fwrite(buf, sizeof(float), nel_read, fout);
+                nel_total += nel_read;
+            }
+            printf("Wrote %zu elements (%zu bytes)\n",
+                   nel_total, nel_total*sizeof(float));
+            free(buf);
+            fclose(fin);
+            fclose(fout);
+            goto npio_ok;
+        }
+        if(meta->dtype == NPIO_U16)
+        {
+            FILE * fout = fopen(outfile, "wb");
+            FILE * fin = fopen(infile, "rb");
+            if(fseek(fin, meta->data_offset, SEEK_SET))
+            {
+                fprintf(stderr, "Unable to use %s\n", infile);
+            }
+            size_t buff_elements = 2*262144;
+            u16 * buf = calloc(buff_elements, sizeof(u16));
+            size_t nel_read = 0;
+            size_t nel_total = 0;
+            while((nel_read = fread(buf, sizeof(u16), buff_elements, fin)) > 0)
+            {
+                fwrite(buf, sizeof(u16), nel_read, fout);
+                nel_total += nel_read;
+            }
+            printf("Write %zu elements (%zu bytes\n)",
+                   nel_total, nel_total*sizeof(u16));
+            free(buf);
+            fclose(fin);
+            fclose(fout);
+            goto npio_ok;
+        }
+
+    npio_fail:
+        fprintf(stderr, "Unsupported numpy data file with the following metadata:");
+        npio_print(stderr, meta);
+        fim_free(meta);
+        return 1;
+    npio_ok:
+        npio_free(meta);
+        return 0;
+    } else {
+        return fim_tiff_to_raw_f32(infile, outfile);
+    }
+    return 1;
 }
