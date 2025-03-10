@@ -16,6 +16,7 @@
 
 
 #include "dw_bwpsf.h"
+#include "npio.h"
 
 int GLOB_N_GSL_EROUND = 0; /* Counter for GSL_EROUND */
 
@@ -187,11 +188,11 @@ void fprint_time(FILE * f)
 
 void bw_version(FILE* f)
 {
-    #ifdef WINDOWS
+#ifdef WINDOWS
     fprintf(f, "deconwolf: '%s'\n", deconwolf_version);
-    #else
+#else
     fprintf(f, "deconwolf: '%s' PID: %d\n", deconwolf_version, (int) getpid());
-    #endif
+#endif
 }
 
 void usage(__attribute__((unused)) int argc, char ** argv, bw_conf * s)
@@ -208,8 +209,8 @@ void usage(__attribute__((unused)) int argc, char ** argv, bw_conf * s)
     printf("\n");
     printf("Optional:\n");
     printf(" --size N \n\t Set output size to N x N x P [pixels].\n"
-        "\t This should be set big enough so that the PSF cone\n"
-        "\t isn't cropped at the first and last slice of the PSF.\n");
+           "\t This should be set big enough so that the PSF cone\n"
+           "\t isn't cropped at the first and last slice of the PSF.\n");
     printf(" --nslice P\n\t Set output size to N x N x P [pixels].\n");
     printf("\t P has to be an odd number. Please not that P should be at\n"
            "\t least (2Z-1) where Z is the number of slices in the image\n"
@@ -474,7 +475,7 @@ void BW(bw_conf * conf)
     conf->V = malloc(conf->M*conf->N*conf->P*sizeof(float));
     assert(conf->V != NULL);
 
-    #pragma omp parallel for
+#pragma omp parallel for
     for(int z = 0; z < (conf->P+1)/2; z++)
     {
         float defocus = conf->resAxial * (z - (conf->P - 1.0) / 2.0);
@@ -503,8 +504,8 @@ double pixelpointfun(double y, void * _conf)
     }
 
     double res = lanczos5(iconf->radprofile,
-                              iconf->nr,
-                              r*(double) iconf->radsample);
+                          iconf->nr,
+                          r*(double) iconf->radsample);
     return res;
 }
 
@@ -532,7 +533,7 @@ double integrate_pixel(bw_conf * conf,
                        gsl_integration_workspace * wspx,
                        gsl_integration_workspace * wspy,
                        double * radprofile, size_t nr, int radsample,
-                             double x0, double x1,
+                       double x0, double x1,
                        double y0, double y1)
 {
     assert(x1 > x0);
@@ -773,17 +774,25 @@ int main(int argc, char ** argv)
         printf("Writing '%s' (32-bit float)\n", conf->outFile);
     }
 
-    ttags * T = ttags_new();
-    char * swstring = malloc(1024);
-    assert(swstring != NULL);
-    sprintf(swstring, "deconwolf %s", deconwolf_version);
-    ttags_set_software(T, swstring);
-    ttags_set_imagesize(T, conf->M, conf->N, conf->P);
-    ttags_set_pixelsize(T, conf->resLateral, conf->resLateral, conf->resAxial);
-    free(swstring);
 
-    fim_tiff_write_float(conf->outFile, conf->V, T, conf->M, conf->N, conf->P);
-    ttags_free(&T);
+    if(npyfilename(conf->outFile))
+    {
+        int shape[3] = {conf->P, conf->N, conf->M};
+        npio_write(conf->outFile, 3, shape, conf->V, NPIO_F32, NPIO_F32);
+    } else
+    {
+        ttags * T = ttags_new();
+        char * swstring = malloc(1024);
+        assert(swstring != NULL);
+        sprintf(swstring, "deconwolf %s", deconwolf_version);
+        ttags_set_software(T, swstring);
+        ttags_set_imagesize(T, conf->M, conf->N, conf->P);
+        ttags_set_pixelsize(T, conf->resLateral, conf->resLateral, conf->resAxial);
+        free(swstring);
+
+        fim_tiff_write_float(conf->outFile, conf->V, T, conf->M, conf->N, conf->P);
+        ttags_free(&T);
+    }
 
     fprint_time(conf->log);
     dw_gettime(&tend);
