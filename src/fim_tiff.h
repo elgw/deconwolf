@@ -126,7 +126,26 @@ int fim_tiff_write_float(const char * fName, const float * V,
                          const ttags * T,
                          int64_t M, int64_t N, int64_t P);
 
-/** @brief Write raw floating point data to a 16-bit tif file.
+/** @brief Write a 16-bit tif file from f32 raw data
+ *
+ * This performs a streaming write, never keeping all the data in memory.
+ * @param output_file_name name of tiff file to write to
+ * @param M, N, P the size of the image
+ * @param raw_data_file_name file containing raw float data
+ * @param meta_tiff_file Specify a tif file to copy metadata from. Can be NULL
+ * @param scaling Specify a scaling values for all pixels. If <=0 this will be set to use the full dynamic range of the image.
+ * @returns EXIT_SUCCESS or EXIT_FAILURE
+ */
+
+int
+fim_tiff_imwrite_u16_from_raw(const char * output_tif_file_name,
+                  int64_t M, int64_t N, int64_t P,
+                  const char * raw_data_file_name,
+                              const char * meta_tiff_file,
+    float scaling);
+
+
+/** @brief Write a f32 tif file from f32 raw data
  *
  * This performs a streaming write, never keeping all the data in memory.
  * @param output_file_name name of tiff file to write to
@@ -137,16 +156,17 @@ int fim_tiff_write_float(const char * fName, const float * V,
  */
 
 int
-fim_tiff_from_raw(const char * output_tif_file_name,
-                  int64_t M, int64_t N, int64_t P,
-                  const char * raw_data_file_name,
-                  const char * meta_tiff_file);
+fim_tiff_imwrite_f32_from_raw(
+    const char * fName, // Name of tiff file to be written
+    int64_t M, int64_t N, int64_t P, // Image dimensions
+    const char * rName,  // name of raw file
+    const char * meta_tiff_file);
 
 /** @brief Convert a tiff image to raw float image
  * Note that the image size is not encoded
  */
 int
-fim_tiff_to_raw(const char *tif_file_name,
+fim_tiff_to_raw_f32(const char *tif_file_name,
                 const char * output_file_name);
 
 /* @brief Read a 3D tif stack as a float array
@@ -203,3 +223,6 @@ int fim_tiff_maxproj_XYZ(const char * in, const char * out);
 
 /** @brief Extract a single slice from input to output file */
 int fim_tiff_extract_slice(const char *in, const char *out, int slice);
+
+/** @brief Read the max value of a file consisting of f32 (raw) */
+float raw_file_single_max(const char * rName, const size_t N);

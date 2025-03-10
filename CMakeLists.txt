@@ -115,7 +115,8 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
     src/li.c
     src/ftab.c
     src/lanczos.c
-    src/quickselect.c)
+    src/quickselect.c
+  src/npio.c)
 
   if(UNIX)
     set(dw_SOURCES ${dw_SOURCES} src/dw_nuclei.c)

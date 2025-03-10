@@ -469,7 +469,7 @@ typedef enum  {
 } fim_boundary_condition;
 
 /* 1D convolution between possibly strided data and a kernel.
- *
+ * The buffer has to contain nV elements
  */
 
 void
@@ -638,3 +638,5 @@ fim_imwrite_u16(const char * outname,
                 const ttags * T,
                 int64_t M, int64_t N, int64_t P,
                 float scaling);
+
+int fim_to_raw(const char * infile, const char * outfile);

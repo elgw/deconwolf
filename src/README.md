@@ -23,3 +23,14 @@ Implemented methods:
 Extra stuff under development:
  * `dw_dots.c/h` for dot detection.
  * `dw_maxproj.c/h` for max projections of tif files.
+
+Tiling:
+
+When the tiling option is used the following functions are relevant:
+- `fim_tiff_to_raw` -- converts a tif (u16 or f32) file to a contiguous raw (f32) data file
+- `tiling_get_tile` -- read a tile from a raw file
+- `tiling_put_tile` -- write a tile to a raw file
+- `fim_tiff_from_raw` -- convert a raw file to tif (f32 -> u16)
+
+Status:
+ - No support for `npy` files.

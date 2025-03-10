@@ -19,6 +19,10 @@
 #endif
 #include "dw.h"
 
+typedef uint16_t u16;
+typedef uint32_t u32;
+typedef float f32;
+
 /* GLOBALS */
 /* used by tiffErrHandler */
 FILE * logfile = NULL;
@@ -30,6 +34,141 @@ FILE * logfile = NULL;
 static float scaling_for_u16(const float * V, size_t n)
 {
     return ( pow(2, 16) - 1.0 ) / fim_max(V, n);
+}
+
+static int npyfilename(const char * filename)
+{
+    // version 1
+    if(filename == NULL)
+    {
+        return 0;
+    }
+
+    size_t n = strlen(filename);
+
+    if(n < 4)
+    {
+        return 0;
+    }
+
+    if(strncasecmp(&filename[n-4], ".npy", 4) == 0)
+    {
+        return 1;
+    }
+    return 0;
+}
+
+static int raw_to_npio(const char * outfile,
+                       const char * infile, // Always f32 raw
+                       u32 M, u32 N, u32 P,
+                       int outformat, float scaling)
+{
+    npio_dtype format = NPIO_U16;
+    if(outformat == 32)
+    {
+        format = NPIO_F32;
+    }
+    int shape[3] = {P, N, M};
+    if(npio_write(outfile, 3, shape,
+                  NULL, // DATA
+                  format, format) == 0)
+    {
+        fprintf(stderr, "Unable to write to %s\n", outfile);
+        return 1;
+    }
+    // Get the start position
+    npio_t * meta = npio_load_metadata(outfile);
+    if(meta == NULL)
+    {
+        fprintf(stderr, "Unable to read from %s\n", outfile);
+        return 1;
+    }
+    size_t startpos = meta->data_offset;
+    npio_free(meta);
+
+    /* No scaling is used with f32 */
+    if(format == NPIO_F32)
+    {
+        FILE * fout = fopen(outfile, "a+b");
+        dw_fseek(fout, startpos, SEEK_SET);
+        if(fout == NULL)
+        {
+            printf("Unable to open %s for appending\n", outfile);
+            return 1;
+        }
+        FILE * fin = fopen(infile, "rb");
+        if(fin == NULL)
+        {
+            printf("Unable to open %s for reading\n", infile);
+            fclose(fout);
+            return 1;
+        }
+        size_t buff_elements = 262144;
+        float * buf = calloc(buff_elements, sizeof(float));
+        size_t nel_read = 0;
+        size_t nel_total = 0;
+        while((nel_read = fread(buf, sizeof(float), buff_elements, fin)) > 0)
+        {
+            fwrite(buf, sizeof(float), nel_read, fout);
+            nel_total += nel_read;
+        }
+        fclose(fin);
+        fclose(fout);
+        free(buf);
+        printf("Wrote %zu elements (%zu bytes)\n",
+               nel_total, nel_total*sizeof(float));
+        return 0;
+    }
+
+    /* No scaling is used with f32 */
+    if(format == NPIO_U16)
+    {
+        FILE * fout = fopen(outfile, "a+b");
+        if(fout == NULL)
+        {
+            printf("Unable to open %s for appending\n", outfile);
+            return 1;
+        }
+        dw_fseek(fout, startpos, SEEK_SET);
+
+        FILE * fin = fopen(infile, "rb");
+        if(fin == NULL)
+        {
+            printf("Unable to open %s for reading\n", infile);
+            fclose(fout);
+            return 1;
+        }
+        size_t buff_elements = 262144;
+        f32 * rbuf = calloc(buff_elements, sizeof(f32));
+        assert(rbuf != NULL);
+        u16 * wbuf = calloc(buff_elements, sizeof(u16));
+        size_t nel_read = 0;
+        size_t nel_total = 0;
+        while((nel_read = fread(rbuf, sizeof(f32), buff_elements, fin)) > 0)
+        {
+                for(size_t kk = 0; kk < nel_read; kk++)
+                {
+                    wbuf[kk] = nearbyintf((float) rbuf[kk] * scaling);
+                }
+
+            size_t nwritten = fwrite(wbuf, sizeof(u16), nel_read, fout);
+            if(nwritten != nel_read)
+            {
+                fprintf(stderr, "Error while writing to %s\n", outfile);
+                exit(EXIT_FAILURE);
+            }
+            nel_total += nel_read;
+        }
+        fclose(fin);
+        fclose(fout);
+        free(rbuf);
+        free(wbuf);
+        printf("Wrote %zu elements (%zu bytes)\n",
+               nel_total, nel_total*sizeof(float));
+        return 0;
+    }
+
+    return 1;
 }
 
 dw_iterator_t * dw_iterator_new(const dw_opts * s)
@@ -153,8 +292,6 @@ void dw_iterator_free(dw_iterator_t * it)
     free(it);
 }
 
-
-
 dw_opts * dw_opts_new(void)
 {
     dw_opts * s = calloc(1, sizeof(dw_opts));
@@ -258,8 +395,8 @@ void dw_show_iter(dw_opts * s, int it, int nIter, float err)
 
 
 char * gen_iterdump_name(
-    __attribute__((unused)) const dw_opts * s,
-    int it)
+                         __attribute__((unused)) const dw_opts * s,
+                         int it)
 {
     // Generate a name for the an iterdump file
     // at iteration it
@@ -1814,10 +1951,12 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
         printf("Dumping %s to %s (for quicker io)\n", s->imFile, imFileRaw);
     }
 
-    fim_tiff_to_raw(s->imFile, imFileRaw);
+    fim_to_raw(s->imFile, imFileRaw);
+
     if(s->verbosity > 10){
         printf("Writing to imdump.tif\n");
-        fim_tiff_from_raw("imdump.tif", M, N, P, imFileRaw, NULL);
+        fim_tiff_imwrite_u16_from_raw("imdump.tif", M, N, P, imFileRaw,
+                                      NULL, s->scaling);
     }
 
     //fim_tiff_write_zeros(s->outFile, M, N, P);
@@ -1903,7 +2042,44 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
         printf("converting %s to %s\n", tfile, s->outFile);
     }
 
-    fim_tiff_from_raw(s->outFile, M, N, P, tfile, s->imFile);
+    if(s->outFormat == 32)
+    {
+        s->scaling = 1;
+    } else {
+        if(s->scaling <= 0)
+        {
+            float rawmax = raw_file_single_max(tfile, (size_t) M * (size_t) N * (size_t) P );
+            if(rawmax > 0)
+            {
+                s->scaling = 65535/rawmax;
+            }
+        }
+    }
+    fprintf(s->log, "scaling: %f\n", s->scaling);
+
+    // TODO: fim_from_raw( ... )
+    if(npyfilename(s->outFile))
+    {
+        if(raw_to_npio(s->outFile, tfile, M, N, P,
+                       s->outFormat,
+                       s->scaling))
+        {
+            fprintf(stderr, "Error converting %s to %s\n", s->outFile, tfile);
+            exit(EXIT_FAILURE);
+        }
+
+    } else {
+        if(s->outFormat == 32)
+        {
+            fim_tiff_imwrite_f32_from_raw(s->outFile,
+                                          M, N, P,
+                                          tfile, s->imFile);
+        } else {
+            fim_tiff_imwrite_u16_from_raw(s->outFile,
+                                          M, N, P,
+                                          tfile, s->imFile,
+                                          s->scaling);
+        }}
 
     if(s->verbosity > 1)
     {
