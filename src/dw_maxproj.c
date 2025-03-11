@@ -44,14 +44,17 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
 {
     printf("usage: %s [<options>] input1.tif input2.tif ... \n", argv[0]);
     printf("Modes:\n");
-    printf(" --xyz \n\t"
+    printf("--xyz \n\t"
            "A collage of max projections along x, y and z shown in a single image.\n");
-    printf(" --slice N\n\t Extract slice N\n");
-    printf(" --gm\n\t"
+    printf("--slice N\n\t"
+           "Extract slice N\n");
+    printf("--gm\n\t"
            "Extract the slice with the highest gradient magnitude\n");
     printf("Options:\n");
-    printf(" --overwrite\n\t Overwrite existing files\n");
-    printf(" --verbose v\n\t Set verbosity level\n");
+    printf(" --overwrite\n\t"
+           "Overwrite existing files\n");
+    printf(" --verbose v\n\t"
+           "Set verbosity level\n");
     return;
 }
 
