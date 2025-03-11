@@ -74,11 +74,8 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
-#
-# Add source files
-#
 
-  set(dw_SOURCES
+set(dw_SOURCES
   src/deconwolf.c
   src/dw.c
   src/dw_background.c
@@ -105,7 +102,7 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
   src/dw_align_dots.c
   src/npio.c)
 
-  set(dw_bw_SOURCES
+set(dw_bw_SOURCES
     src/bw_gsl.c
     src/dw_bwpsf.c
     src/dw_util.c
@@ -130,6 +127,9 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/dw_version.h.in
     ${CMAKE_CURRENT_SOURCE_DIR}/src/dw_version.h)
+
+  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/doc/gh-pages/source/version.rst.in
+    ${CMAKE_CURRENT_SOURCE_DIR}//doc/gh-pages/source/version.rst)
 
 
   #

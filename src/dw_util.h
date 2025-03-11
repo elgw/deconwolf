@@ -53,6 +53,10 @@
 #define FILESEP '/'
 #endif
 
+#ifdef WINDOWS
+#define strncasecmp _strnicmp
+#endif
+
 /* Get the current time  */
 void dw_gettime(struct timespec *);
 

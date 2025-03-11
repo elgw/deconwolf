@@ -1,0 +1,3 @@
+.. version.rst is generated from version.rst.in by cmake
+
+.. |DW_VERSION| replace:: ${deconwolf_VERSION_MAJOR}.${deconwolf_VERSION_MINOR}.${deconwolf_VERSION_PATCH}

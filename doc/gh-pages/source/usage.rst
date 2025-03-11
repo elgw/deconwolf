@@ -183,16 +183,53 @@ some memory). To prevent that, add the command line argument **-\-xyfactor
 Supported image formats
 -----------------------
 
-Currently deconwolf can only read tif images, specifically: multi-page,
-8-bit unsigned, 16-bit unsigned or 32-bit floats. The data should be
-written in strip mode (typically the default output format). The output
-is either 16-bit unsigned or 32-bit floating point (with the **-\-float**
-flag) and can be read by Matlab, ImageJ, etc. If you use 16-bit output
-note that images will be scaled in order to not be saturated. The
-scaling value can be found at the end of the log files.
+deconwolf can read and write tif images (using `LibTIFF <https://libtiff.gitlab.io/libtiff/libtiff.html>`__) and Python/numpy `.npy` files (using `npio <https://www.github.com/elgw/npio>`__).
+
+The images have to be 3D stacks. I.e. if you are working with
+multi-color images or time stacks, these images have to be converted
+to simple 3D stacks before they can be used by deconwolf. And no, 2D
+images are not supported.
+
+The data format has to be 16-bit unsigned integers or 32-bit floating
+point. Tif files can also be understood when the data format is
+8-bit unsigned integers.
+
+The output is either 16-bit unsigned int or 32-bit floating point
+(with the **-\-float** flag). The format (npy or tif) is decided by
+the name of the input file.
+
+Please keep in mind that when deconwolf writes 16-bit images, they
+will be scaled to avoid saturation (a scaling value :math:`<1`) or to
+use as much of the dynamic range as possible (a scaling value
+:math:`>1`). The scaling value can be found at the end of the log
+files. To use a specific/custom/consistent scaling value, see the
+**-\-scaling** option.
+
+TIF files
+~~~~~~~~~
+
+TIF or TIFF files have many flavors and deconwolf does not understand
+all of them. However, what works in ImageJ typically works with
+deconwolf as long as they meet the general requirements described above.
 
 It is undefined behavior to use pyramidal (multiple resolution) or
 multi-color images.
+
+OME-XML metadata (see the `OME-TIFF
+format <https://docs.openmicroscopy.org/ome-model/5.6.3/ome-tiff/>`__)
+is not parsed by deconwolf, i.e. it does not understand any of that.
+
+Numpy files
+~~~~~~~~~~~
+
+To use `.npy` files should be no different to using `.tif`
+files. Please note that Python reports the image dimensions in the
+reverse order compared to deconwolf, i.e., the number of z-planes is
+first dimension in Python but the last dimension in deconwolf.
+
+Support for numpy files was added in version 0.4.5, and is not
+universally available in all modules yet. Currently 16-bit unsigned
+data and 32-bit floats are supported.
 
 Log files
 ---------

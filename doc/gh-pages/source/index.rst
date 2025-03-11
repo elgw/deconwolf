@@ -1,5 +1,9 @@
-deconwolf v0.4.4
-================
+deconwolf |DW_VERSION|
+======================
+
+A software for deconvolution of widefield microscopy images.
+
+.. include:: version.rst
 
 .. toctree::
    :maxdepth: 2
