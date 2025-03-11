@@ -49,8 +49,8 @@ static void usage(const char * progname)
            "along the Z-axis to produce a 2D image. After averaging a Gaussian low pass\n"
            "filter is applied.\n"
            "The output is always a 2D tif image which is not normalized in any way.\n"
-           "The approach can work well even for images with biological content, given that the\n"
-           "number of images is high.\n",
+           "The approach can work well even for images with biological content, given that\n"
+           "the number of images is high.\n",
            progname);
 
     printf("\n");
@@ -63,7 +63,8 @@ static void usage(const char * progname)
     printf(" --verbose n\n\t"
            "set verbosity level to n\n");
     printf(" --sigma s\n\t"
-           "set the sigma value of the Gaussian smoothing kernel (default: %.1f [pixels])\n", defaults->sigma);
+           "set the sigma value of the Gaussian smoothing kernel\n\t"
+           "default value: %.1f [pixels]\n", defaults->sigma);
     opts_free(defaults);
     return;
 }
@@ -84,7 +85,7 @@ argparsing(int argc, char ** argv, opts * s)
         switch(ch){
         case 'h':
             usage(argv[0]);
-            return 1;
+            exit(EXIT_SUCCESS);
             break;
         case 'o':
             s->overwrite = 1;

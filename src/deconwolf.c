@@ -24,6 +24,12 @@
 static int
 npy2tif(int argc, char ** argv)
 {
+    if(argc > 1 && strcmp(argv[1], "--help") == 0)
+    {
+        printf("Usage:\n");
+        printf("%s input.npy output.tif\n", argv[0]);
+        exit(EXIT_SUCCESS);
+    }
     if(argc < 3)
     {
         printf("Usage:\n");
@@ -127,6 +133,12 @@ success:
 static int
 tif2npy(int argc, char ** argv)
 {
+    if(argc > 1 && strcmp(argv[1], "--help") == 0)
+    {
+        printf("Usage:\n");
+        printf("%s input.tif output.npy\n", argv[0]);
+        exit(EXIT_SUCCESS);
+    }
     if(argc < 3)
     {
         printf("Usage:\n");
