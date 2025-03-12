@@ -138,7 +138,7 @@ set(dw_bw_SOURCES
   add_subdirectory("src/kdtree/")
   target_include_directories(dw PUBLIC "src/kdtree/include/")
   target_link_directories(dw PUBLIC "src/kdtree/")
-  target_link_libraries(dw kdtree)
+  target_link_libraries(dw PRIVATE kdtree)
 
   #
   # trafo
@@ -147,7 +147,7 @@ set(dw_bw_SOURCES
     add_subdirectory("src/trafo")
     target_include_directories(dw PUBLIC "src/trafo/src/")
     target_link_directories(dw PUBLIC "src/trafo/")
-    target_link_libraries(dw trafo)
+    target_link_libraries(dw PRIVATE trafo)
 
   elseif(WIN32)
 
@@ -233,15 +233,15 @@ set(dw_bw_SOURCES
   else()
     find_package(FFTW REQUIRED FLOAT_LIB)
   endif()
-  target_link_libraries(dw FFTW::Double)
-  target_link_libraries(dw FFTW::Float)
+  target_link_libraries(dw PRIVATE FFTW::Double)
+  target_link_libraries(dw PRIVATE FFTW::Float)
 
 
-  target_link_libraries(dw_bw FFTW::Float)
+  target_link_libraries(dw_bw PRIVATE FFTW::Float)
 
   if(UNIX)
-    target_link_libraries(dw_bw FFTW::FloatOpenMP)
-    target_link_libraries(dw FFTW::FloatOpenMP)
+    target_link_libraries(dw_bw PRIVATE FFTW::FloatOpenMP)
+    target_link_libraries(dw PRIVATE FFTW::FloatOpenMP)
   endif()
 
 
@@ -249,7 +249,7 @@ set(dw_bw_SOURCES
   # on windows, multicore support should be baked
   # into the basic library.
   if(NOT WIN32)
-    target_link_libraries(dw FFTW::FloatOpenMP)
+    target_link_libraries(dw PRIVATE FFTW::FloatOpenMP)
   endif()
 
   #
@@ -258,23 +258,23 @@ set(dw_bw_SOURCES
 
   find_library(MATH_LIBRARY m)
   if(MATH_LIBRARY)
-    target_link_libraries(dw ${MATH_LIBRARY})
-    target_link_libraries(dw_bw ${MATH_LIBRARY})
+    target_link_libraries(dw PRIVATE ${MATH_LIBRARY})
+    target_link_libraries(dw_bw PRIVATE ${MATH_LIBRARY})
   endif()
 
   #
   # TIFF
   #
   find_package(TIFF)
-  target_link_libraries(dw ${TIFF_LIBRARIES})
-  target_link_libraries(dw_bw ${TIFF_LIBRARIES})
+  target_link_libraries(dw PRIVATE ${TIFF_LIBRARIES})
+  target_link_libraries(dw_bw PRIVATE ${TIFF_LIBRARIES})
 
   #
   # Gnu Scientific Library
   #
   find_package(GSL)
-  target_link_libraries(dw ${GSL_LIBRARIES})
-  target_link_libraries(dw_bw ${GSL_LIBRARIES})
+  target_link_libraries(dw PRIVATE ${GSL_LIBRARIES})
+  target_link_libraries(dw_bw PRIVATE ${GSL_LIBRARIES})
 
   #
   # OpenCL
@@ -285,8 +285,7 @@ set(dw_bw_SOURCES
     find_package(OpenCL)
     if(OpenCL_FOUND)
       message("Will use OpenCL")
-      target_link_libraries(dw ${OpenCL_LIBRARIES})
-      target_include_directories(dw PRIVATE ${OpenCL_INCLUDE_DIRS})
+      target_link_libraries(dw PRIVATE OpenCL::OpenCL)
       add_definitions(-DOPENCL)
       add_definitions(-DVKFFT_BACKEND=3)
       target_include_directories(dw PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/VkFFT/vkFFT/)
@@ -306,8 +305,8 @@ set(dw_bw_SOURCES
   find_package(OpenMP)
   if(OpenMP_C_FOUND)
     message("Found OpenMP")
-    target_link_libraries(dw OpenMP::OpenMP_C)
-    target_link_libraries(dw_bw OpenMP::OpenMP_C)
+    target_link_libraries(dw PRIVATE OpenMP::OpenMP_C)
+    target_link_libraries(dw_bw PRIVATE OpenMP::OpenMP_C)
   else()
     message("OpenMP not found automatically, trying manual")
 
@@ -326,7 +325,7 @@ set(dw_bw_SOURCES
   include(FindPNG)
   if(PNG_FOUND)
     message("Found libPNG")
-    target_link_libraries(dw ${PNG_LIBRARIES})
+    target_link_libraries(dw PRIVATE ${PNG_LIBRARIES})
     target_include_directories(dw PRIVATE ${PNG_INCLUDE_DIRS})
   else()
     message("libPNG not found")
