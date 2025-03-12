@@ -3,8 +3,11 @@
 #include <stdlib.h>
 //#include <unistd.h>
 #include <string.h>
+
+#include "fim.h"
 #include "fim_tiff.h"
 #include "dw_util.h"
+#include "dw_version.h"
 #include "sparse_preprocess.h"
 
 
@@ -221,10 +224,10 @@ int sparse_preprocess_cli(int argc, char ** argv)
         {
             printf("Reading %s\n", inFile);
         }
-        ttags T;
+        ttags * T = ttags_new();
         int64_t M, N, P;
         float * I = fim_tiff_read(inFile,
-                                  &T,
+                                  T,
                                   &M, &N, &P,
                                   conf->verbose);
         if(I == NULL)
@@ -279,7 +282,8 @@ int sparse_preprocess_cli(int argc, char ** argv)
 
         free(I);
         fim_tiff_write_float(outfile, J,
-                       &T, M, N, P);
+                       T, M, N, P);
+        ttags_free(&T);
         free(J);
 
         free(outfile);

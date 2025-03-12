@@ -53,6 +53,10 @@
 #define FILESEP '/'
 #endif
 
+#ifdef WINDOWS
+#define strncasecmp _strnicmp
+#endif
+
 /* Get the current time  */
 void dw_gettime(struct timespec *);
 
@@ -60,13 +64,13 @@ void dw_gettime(struct timespec *);
  * Returns 0 if the dir already existed or could be created
  * returns non-zeros if the dir can't be created
  */
-int ensuredir(const char * dir);
+int dw_ensuredir(const char * dir);
 
 /* Check if directory exist
  * returns 1 if it exist
  * */
 
-int isdir(const char * dir);
+int dw_isdir(const char * dir);
 
 /* Return a suggestion for how many threads to use
  * ideally this should be the same as the number of cores
@@ -118,9 +122,8 @@ float dw_read_scaling(const char * file);
 char * dw_dirname(const char * path);
 
 /*
- * Linux: basename, compare to dw_dirname
-* Windows: file name without extension.
-* Should only be called for files, not for folders */
+ * returns the file name without the path
+ */
 char * dw_basename(const char * path);
 
 /* POSIX getcwd or _getcwd on windows */
@@ -148,3 +151,7 @@ float_arg_max(const float * v, size_t N);
 
 /* Portable between windows and linux */
 int dw_fseek(FILE *, int64_t offset, int whence);
+
+
+/* Check if a file name ends with .npy while ignoring case */
+int npyfilename(const char * filename);

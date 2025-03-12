@@ -19,7 +19,11 @@ extensions = []
 templates_path = ['_templates']
 exclude_patterns = []
 
-
+# At some point it would make sense to switch to sphinx also for
+# man pages. This is here just to test.
+# build with `make man`
+# the output will go to build/man
+man_pages = [ ("man/dw-nuclei", "dw-nuclei", "", "", 1)]
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output

@@ -13,13 +13,14 @@
  *    You should have received a copy of the GNU General Public License
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+
+
 #ifndef WINDOWS
 #include <unistd.h>
 #endif
 
 #include <assert.h>
 #include <errno.h>
-#include <fftw3.h>
 #include <inttypes.h>
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -29,10 +30,30 @@
 #include <string.h>
 #include <stdint.h>
 
-
+#include "dw_version.h"
 #include "fim_tiff.h"
 #include "fim.h"
 #include "dw_util.h"
+
+#define XTAG_IJIJUNKNOWN 50838
+#define XTAG_IJIJINFO 50839
+
+/* Tiff tags -- for simple transfer from one image to another */
+struct _ttags {
+    float xresolution;
+    float yresolution;
+    float zresolution;
+    char * imagedescription;
+    char * software;
+    uint16_t resolutionunit;
+    char * IJIJinfo; // Tag 50839 contains a string, used by Imagej.
+    uint32_t nIJIJinfo;
+    // Image size
+    int M;
+    int N;
+    int P;
+} _ttags;
+
 
 typedef int64_t i64;
 typedef uint64_t u64;
@@ -97,7 +118,7 @@ void fim_tiff_ut()
      * read it back and check that it is the same thing*/
 
     char fname[] = "_deconwolf_temporary_XXXXXX";
-    #ifndef WINDOWS
+#ifndef WINDOWS
     int fd = mkstemp(fname);
     if(fd == -1)
     {
@@ -154,37 +175,6 @@ void fim_tiff_ut()
 }
 
 
-void floatimage_normalize(float * restrict I, const size_t N)
-{
-    // Scale image to span the whole 16 bit range.
-    float imax = I[0]; float imin = I[0];
-    int ok = 1;
-    //#pragma omp parallel for reduction(min:imin) reduction(max:imax) shared(I)
-    for(size_t kk=0; kk<N; kk++)
-    {
-        if(!isfinite(I[kk]))
-        {
-            I[kk] = 0;
-            ok = 0;
-        }
-        I[kk] > imax ? imax = I[kk] : 0 ;
-        I[kk] < imin ? imin = I[kk] : 0 ;
-    }
-
-    if(!ok)
-    {
-        printf("floatimage_normalize got non-normal numbers\n");
-    }
-
-    printf("floatimage_normalize imin: %f imax: %f\n", imin, imax);
-
-    if(imax>0)
-    {
-        fim_mult_scalar(I, N, (pow(2,16)-2)/imax);
-    }
-
-}
-
 void floatimage_show_stats(float * I, size_t N, size_t M, size_t P)
 {
     float isum = 0;
@@ -201,8 +191,8 @@ void floatimage_show_stats(float * I, size_t N, size_t M, size_t P)
 
 
 static void sub2ind(size_t ind,
-                            int64_t M, int64_t N, __attribute__((unused)) int64_t P,
-                            int64_t * m, int64_t * n, int64_t * p)
+                    int64_t M, int64_t N, __attribute__((unused)) int64_t P,
+                    int64_t * m, int64_t * n, int64_t * p)
 {
     /* If ind is the linear index from a [M,N,P] image, figure out the coordinates of ind
      */
@@ -334,7 +324,7 @@ void readUint16(TIFF * tfile, float * V,
                 const uint32_t ndirs,
                 const uint32_t  __attribute__((__unused__)) nstrips,
                 const uint32_t perDirectory
-                )
+    )
 {
     //    printf("readUint16\n"); fflush(stdout);
     // Number of elements per strip
@@ -406,7 +396,7 @@ void readUint8(TIFF * tfile, float * V,
                const uint32_t ndirs,
                const uint32_t nstrips,
                const uint32_t perDirectory
-               )
+    )
 {
     // Number of elements per strip
     size_t nes = ssize/sizeof(uint8_t);
@@ -464,7 +454,7 @@ void readFloat(TIFF * tfile, float * V,
                uint32_t ndirs,
                uint32_t nstrips,
                uint32_t perDirectory
-               )
+    )
 {
     // Number of elements per strip
     size_t nes = ssize/sizeof(float);
@@ -611,7 +601,7 @@ void floattoraw(TIFF * tfile, const char * ofile,
 }
 
 
-int fim_tiff_to_raw(const char * fName, const char * oName)
+int fim_tiff_to_raw_f32(const char * fName, const char * oName)
 {
     // Convert a tif image, fName, to a raw float image, oName
 
@@ -725,10 +715,13 @@ int fim_tiff_to_raw(const char * fName, const char * oName)
 }
 
 
-int fim_tiff_from_raw(const char * fName, // Name of tiff file to be written
-                      int64_t M, int64_t N, int64_t P, // Image dimensions
-                      const char * rName,  // name of raw file
-                      const char * meta_tiff_file)
+int
+fim_tiff_imwrite_u16_from_raw(
+    const char * fName, // Name of tiff file to be written
+    int64_t M, int64_t N, int64_t P, // Image dimensions
+    const char * rName,  // name of raw file
+    const char * meta_tiff_file,
+    float scaling)
 {
 
     size_t bytesPerSample = sizeof(uint16_t);
@@ -772,13 +765,14 @@ int fim_tiff_from_raw(const char * fName, // Name of tiff file to be written
 
     // Determine max value
 
-    float scaling = 1;
-    float rawmax = raw_file_single_max(rName, MNP);
-    if(rawmax > 0)
+    if(scaling <= 0)
     {
-        scaling = 65535/rawmax;
+        float rawmax = raw_file_single_max(rName, MNP);
+        if(rawmax > 0)
+        {
+            scaling = 65535/rawmax;
+        }
     }
-    //  printf("Max value of file: %f\n", rawmax);
 
     FILE * rf = fopen(rName, "rb");
     if(rf == NULL)
@@ -804,15 +798,12 @@ int fim_tiff_from_raw(const char * fName, // Name of tiff file to be written
         TIFFSetField(out, TIFFTAG_SAMPLESPERPIXEL, 1);   // set number of channels per pixel
         TIFFSetField(out, TIFFTAG_BITSPERSAMPLE, 8*bytesPerSample);    // set the size of the channels
         TIFFSetField(out, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);    // set the origin of the image.
-        //   Some other essential fields to set that you do not have to understand for now.
         TIFFSetField(out, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
         TIFFSetField(out, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
         TIFFSetField(out, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_UINT);
 
-        /* We are writing single page of the multipage file */
-        TIFFSetField(out, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
-        /* Set the page number */
-        TIFFSetField(out, TIFFTAG_PAGENUMBER, dd, P);
+        //TIFFSetField(out, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
+        //TIFFSetField(out, TIFFTAG_PAGENUMBER, dd, P);
 
         for(size_t nn = 0; nn < (size_t) N; nn++)
         {
@@ -852,13 +843,125 @@ int fim_tiff_from_raw(const char * fName, // Name of tiff file to be written
     return 0;
 }
 
-int fim_tiff_write_zeros(const char * fName, int64_t N, int64_t M, int64_t P)
+int
+fim_tiff_imwrite_f32_from_raw(
+    const char * fName, // Name of tiff file to be written
+    int64_t M, int64_t N, int64_t P, // Image dimensions
+    const char * rName,  // name of raw file
+    const char * meta_tiff_file)
 {
-    return fim_tiff_write(fName, NULL, NULL, N, M, P);
+
+    size_t bytesPerSample = sizeof(float);
+    char formatString[4] = "w";
+    size_t MNP = (size_t) M * (size_t) N * (size_t ) P;
+    if(MNP*sizeof(uint16_t) >= pow(2, 32))
+    {
+        sprintf(formatString, "w8\n");
+        fprintf(fim_tiff_log, "fim_tiff WARNING: File is > 2 GB, using BigTIFF format\n");
+    }
+
+    ttags * tags = NULL;
+    if(meta_tiff_file != NULL)
+    {
+        tags = ttags_new();
+        TIFF * ref = TIFFOpen(meta_tiff_file, "r");
+        if(ref)
+        {
+            ttags_get(ref, tags);
+            TIFFClose(ref);
+        }
+    }
+
+    TIFF * out = TIFFOpen(fName, formatString);
+    // printf("Opened %s for writing using formatString: %s\n", fName, formatString);
+
+    if(out == NULL)
+    {
+        fprintf(stderr,
+                "fim_tiff ERROR: Failed to open %s for writing using "
+                "formatString: %s\n", fName, formatString);
+        exit(EXIT_FAILURE);
+    }
+
+    size_t linbytes = M*bytesPerSample;
+    float * buf = _TIFFmalloc(linbytes);
+    assert(buf != NULL);
+    float * rbuf = calloc(M, sizeof(float));
+    assert(rbuf != NULL);
+    memset(buf, 0, linbytes);
+
+    FILE * rf = fopen(rName, "rb");
+    if(rf == NULL)
+    {
+        fprintf(stderr, "fim_tiff ERROR: Failed to open %s for writing\n", rName);
+        exit(EXIT_FAILURE);
+    }
+
+    // Can TIFFCheckpointDirectory be used to speed up this?
+    // http://maptools-org.996276.n3.nabble.com/help-writing-thumbnails-to-TIFF-file-td3824.html
+    // No, that isn't the trick to use.
+    // The "fast" writers puts the metadata last, that should be the way to go...
+
+    for(size_t dd = 0; dd < (size_t) P; dd++)
+    {
+        if(tags)
+        {
+            ttags_set(out, tags);
+        }
+
+        TIFFSetField(out, TIFFTAG_IMAGEWIDTH, M);  // set the width of the image
+        TIFFSetField(out, TIFFTAG_IMAGELENGTH, N);    // set the height of the image
+        TIFFSetField(out, TIFFTAG_SAMPLESPERPIXEL, 1);   // set number of channels per pixel
+        TIFFSetField(out, TIFFTAG_BITSPERSAMPLE, 8*bytesPerSample);    // set the size of the channels
+        TIFFSetField(out, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);    // set the origin of the image.
+        TIFFSetField(out, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
+        TIFFSetField(out, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
+        TIFFSetField(out, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_IEEEFP);
+
+        //TIFFSetField(out, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
+        //TIFFSetField(out, TIFFTAG_PAGENUMBER, dd, P);
+
+        for(size_t nn = 0; nn < (size_t) N; nn++)
+        {
+            size_t nread = fread(rbuf, M*sizeof(float), 1, rf);
+            (void)(nread);
+
+            for(size_t mm = 0; mm < (size_t) M; mm++)
+            {
+                buf[mm] = rbuf[mm];
+            }
+
+            int ok = TIFFWriteScanline(out, // TIFF
+                                       buf,
+                                       nn, // row
+                                       0); //sample
+            if(ok != 1)
+            {
+                fprintf(stderr, "TIFFWriteScanline failed\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+
+        TIFFWriteDirectory(out);
+    }
+
+    _TIFFfree(buf);
+
+    TIFFClose(out);
+    fclose(rf);
+    free(rbuf);
+
+    if(tags)
+    {
+        ttags_free(&tags);
+    }
+
+    return 0;
 }
 
+
 int fim_tiff_write_float(const char * fName, const float * V,
-                         ttags * T,
+                         const ttags * T,
                          int64_t N, int64_t M, int64_t P)
 {
 
@@ -894,16 +997,12 @@ int fim_tiff_write_float(const char * fName, const float * V,
         TIFFSetField(out, TIFFTAG_SAMPLESPERPIXEL, 1);   // set number of channels per pixel
         TIFFSetField(out, TIFFTAG_BITSPERSAMPLE, 8*bytesPerSample);    // set the size of the channels
         TIFFSetField(out, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);    // set the origin of the image.
-        //   Some other essential fields to set that you do not have to understand for now.
         TIFFSetField(out, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
         TIFFSetField(out, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
         TIFFSetField(out, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_IEEEFP);
 
-        /* We are writing single page of the multipage file */
-        TIFFSetField(out, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
-        /* Set the page number */
-        TIFFSetField(out, TIFFTAG_PAGENUMBER, dd, P);
-
+        //TIFFSetField(out, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
+        //TIFFSetField(out, TIFFTAG_PAGENUMBER, dd, P);
 
         for(size_t kk = 0; kk < (size_t) M; kk++)
         {
@@ -956,29 +1055,36 @@ int fim_tiff_write_noscale(const char * fName, const float * V,
 
 
 int fim_tiff_write_opt(const char * fName, const float * V,
-                       ttags * T,
+                       const ttags * T,
                        int64_t N, int64_t M, int64_t P, float scaling)
 {
+    if(V == NULL)
+    {
+        return EXIT_FAILURE;
+    }
+
     if(fim_tiff_log == NULL)
     {
         fim_tiff_log = stdout;
     }
     // if V == NULL and empty file will be written
 
-    if(scaling <= 0)
-    {
-        if(V != NULL)
-        {
-            float imax = fim_max(V, M*N*P);
-            scaling = 1.0/imax*(pow(2,16)-2.0);
-        }
-    }
-
     if(!isfinite(scaling))
     {
-        fprintf(fim_tiff_log, "fim_tiff WARNING: Non-finite scaling value, changing to 1\n");
-        scaling = 1;
+        fprintf(fim_tiff_log, "fim_tiff WARNING: Non-finite scaling value, changing to AUTO\n");
+        scaling = -1;
     }
+
+    if(scaling <= 0)
+    {
+        float maxval = V[0];
+        for(i64 kk = 0; kk < M*N*P; kk++)
+        {
+            V[kk] > maxval ? maxval = V[kk] : 0;
+        }
+        scaling = (float) (pow(2, 16)-1) / maxval;
+    }
+
     fprintf(fim_tiff_log, "scaling: %f\n", scaling);
 
     size_t bytesPerSample = sizeof(uint16_t);
@@ -1024,9 +1130,9 @@ int fim_tiff_write_opt(const char * fName, const float * V,
         // TODO TIFFSSetFieldTIFFTAG_SOFTWARE
 
         /* We are writing single page of the multipage file */
-        TIFFSetField(out, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
+        //TIFFSetField(out, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
         /* Set the page number */
-        TIFFSetField(out, TIFFTAG_PAGENUMBER, dd, P);
+        //TIFFSetField(out, TIFFTAG_PAGENUMBER, dd, P);
 
 
         for(size_t kk = 0; kk < (size_t) M; kk++)
@@ -1148,18 +1254,136 @@ void ttags_set_pixelsize(ttags * T, double xres, double yres, double zres)
     T->imagedescription = calloc(1024, 1);
     assert(T->imagedescription != NULL);
     sprintf(T->imagedescription,
-            "ImageJ=1.52r\nimages=%d\nslices=%d\nunit=nm\nspacing=%.1f\nloop=false.",
+            "ImageJ=1.52r\nimages=%d\nslices=%d\nunit=nm\nspacing=%.1f\nloop=false",
             T->P, T->P, T->zresolution);
+    return;
+}
+
+typedef struct {
+    char * pos;
+    char * next;
+} strline_buff;
+
+/* Return each line in the string,
+ *
+ * Example usage:
+ *
+ * char * line = NULL;
+ * int n = 1;
+ * while( (line = strline(str, &B)) )
+ * {
+ *     printf("%d: %s\n", n++, line);
+ * }
+ *
+ * Notes:
+ *
+ * - str is altered
+ *
+ * - strline(str, &B) only cares about the str the first time that it
+ *   is called, later calls can also pass NULL
+ *
+ * Original repo (private): 25/03/04_strline/
+ * Version 1.0.0
+ */
+static char * strline(char * line, strline_buff * buff)
+{
+    if(buff == NULL)
+    {
+        return NULL;
+    }
+
+    if(buff->pos == NULL)
+    {
+        if(line == NULL)
+        {
+            return NULL;
+        }
+        buff->pos = line;
+        buff->next = strchr(line, '\n');
+        if(buff->next != NULL)
+        {
+            buff->next[0] = '\0';
+            buff->next++;
+        }
+    } else {
+        if(buff->next == NULL)
+        {
+            return NULL;
+        }
+        buff->pos = buff->next;
+        buff->next = strchr(buff->pos, '\n');
+        if(buff->next == NULL)
+        {
+            buff->next = NULL;
+        } else {
+            buff->next[0] = '\0';
+            buff->next++;
+        }
+    }
+    return buff->pos;
+}
+
+
+/* Uggly temporary fix until the metadata handling is updated.  Use
+ * when ttags are read from a 3D image and are to be written to a 2D
+ * image.
+ */
+void ttags_fix_ij_3d_to_2d(ttags * T)
+{
+    if(T->imagedescription == NULL)
+    {
+        return;
+    }
+
+    /* Check that the ImageDescription if of ImageJ type, i.e.
+     * not OME-XML etc. */
+
+    if(strstr(T->imagedescription, "ImageJ=") == NULL)
+    {
+        return;
+    }
+
+    char * old = T->imagedescription;
+
+    char * new = calloc(strlen(T->imagedescription) + 1, 1);
+    assert(new != NULL);
+    char * write = new;
+
+    strline_buff B = {0};
+    char * line = NULL;
+    while( (line = strline(old, &B)) )
+    {
+        int use = 1;
+        if(strstr(line, "images=") != NULL)
+        {
+            use = 0;
+        }
+        if(strstr(line, "slices=") != NULL)
+        {
+            use = 0;
+        }
+        if(use)
+        {
+            sprintf(write, "%s\n", line);
+            write = write + strlen(write);
+        }
+    }
+
+    free(T->imagedescription);
+    T->imagedescription = new;
     return;
 }
 
 void ttags_free(ttags ** Tp)
 {
+    if(Tp == NULL)
+    {
+        return;
+    }
     ttags * T = Tp[0];
     if(T == NULL)
     {
-        fprintf(stderr, "fim_tiff: T = NULL, on line %d in %s\n", __LINE__, __FILE__);
-        exit(EXIT_FAILURE);
+        return;
     }
 
     free(T->IJIJinfo);
@@ -1232,7 +1456,7 @@ void ttags_get(TIFF * tfile, ttags * T)
 }
 
 /* Copy some TIFF tags ttags to tfile */
-void ttags_set(TIFF * tfile, ttags * T)
+void ttags_set(TIFF * tfile, const ttags * T)
 {
     //TIFFSetDirectory(tfile, 0);
     if(T->software != NULL)
@@ -1240,9 +1464,22 @@ void ttags_set(TIFF * tfile, ttags * T)
         TIFFSetField(tfile, TIFFTAG_SOFTWARE, T->software);
     }
 
+    // TODO: it is wrong to simply copy/paste this tag in case we are
+    // writing a 2D projection
     if(T->imagedescription != NULL)
     {
-        TIFFSetField(tfile, TIFFTAG_IMAGEDESCRIPTION, T->imagedescription);
+        if(0) // T->P == 1
+        {
+            char * desc = calloc(1024, 1);
+            assert(desc != NULL);
+            sprintf(desc,
+                    "ImageJ=1.52r\nimages=%d\nslices=%d\nunit=nm\nspacing=%.1f\nloop=false",
+                    T->P, T->P, T->zresolution);
+            TIFFSetField(tfile, TIFFTAG_IMAGEDESCRIPTION, desc);
+            free(desc);
+        } else {
+            TIFFSetField(tfile, TIFFTAG_IMAGEDESCRIPTION, T->imagedescription);
+        }
     }
 
     TIFFSetField(tfile, TIFFTAG_XRESOLUTION, T->xresolution);
@@ -1406,6 +1643,21 @@ float * fim_tiff_read_sub(const char * fName,
         fflush(stdout);
     }
 
+    uint16_t spp;
+    if( TIFFGetField(tfile, TIFFTAG_SAMPLESPERPIXEL, &spp) == 0 )
+    {
+        fprintf(fim_tiff_log, "fim_tiff WARNING: TIFFTAG_SAMPLESPERPIXEL not defined, assuming the value is 1\n");
+        spp = 1;
+    }
+    if(spp > 1)
+    {
+        fprintf(fim_tiff_log,
+                "fim_tiff ERROR: The image %s has %u samples per pixel but only one is allowed\n"
+                "                This program can not read multi-color images and will abort\n",
+                fName, spp);
+        exit(EXIT_FAILURE);
+    }
+
     tmsize_t ssize = TIFFStripSize(tfile); // Seems to be in bytes
     uint32_t nstrips = TIFFNumberOfStrips(tfile);
     uint32_t ndirs = TIFFNumberOfDirectories(tfile);
@@ -1550,7 +1802,6 @@ int main(int argc, char ** argv)
     }
 
     floatimage_show_stats(I, M, N, P);
-    // floatimage_normalize(I, M*N*P);
 
     ttags_show(stdout, T);
 
@@ -1564,6 +1815,27 @@ int main(int argc, char ** argv)
 }
 #endif
 
+
+static const char * tiff_sampleformat_to_string(int sf)
+{
+    switch(sf)
+    {
+    case SAMPLEFORMAT_UINT:
+        return "UINT";
+    case SAMPLEFORMAT_INT:
+        return "INT";
+    case SAMPLEFORMAT_IEEEFP:
+        return "IEEEFP";
+    case SAMPLEFORMAT_VOID:
+        return "VOID";
+    case SAMPLEFORMAT_COMPLEXINT:
+        return "COMPLEXINT";
+    case SAMPLEFORMAT_COMPLEXIEEEFP:
+        return "COMPLEXIEEEFP";
+    default:
+        return "UNKNOWN";
+    }
+}
 
 char * tiff_is_supported(TIFF * tiff)
 {
@@ -1607,9 +1879,18 @@ char * tiff_is_supported(TIFF * tiff)
             isFloat = 1;
             okFormat = 1;
         }
+        if( SF == SAMPLEFORMAT_INT )
+        {
+            okFormat = 0;
+        }
+        if( SF == SAMPLEFORMAT_VOID )
+        {
+            okFormat = 1;
+        }
         if(okFormat == 0)
         {
-            sprintf(errStr, "Neither SAMPLEFORMAT_UINT or SAMPLEFORMAT_IEEEFP\n");
+            // see tiff.h for the definitions
+            sprintf(errStr, "Sample format %s is not supported\n", tiff_sampleformat_to_string(SF));
             return errStr;
         }
     }
@@ -1741,6 +2022,8 @@ int fim_tiff_maxproj(const char * in, const char * out)
 
     ttags_get(input, T);
     ttags_set_software(T, "deconwolf " deconwolf_version);
+    T->P = 1; /* As we will only write one plane eventually */
+
 
     uint32_t SF = SAMPLEFORMAT_UINT;
     int gotSF = TIFFGetField(input, TIFFTAG_SAMPLEFORMAT, &SF);
@@ -1759,6 +2042,16 @@ int fim_tiff_maxproj(const char * in, const char * out)
     }
 
     TIFF * output = TIFFOpen(out, "w");
+    if(output == NULL)
+    {
+        printf("Unable to open %s for writing\n", out);
+        TIFFClose(input);
+        ttags_free(&T);
+        return EXIT_FAILURE;
+    }
+
+    ttags_fix_ij_3d_to_2d(T);
+
     ttags_set(output, T);
     ttags_free(&T);
 
@@ -1782,8 +2075,8 @@ int fim_tiff_maxproj(const char * in, const char * out)
     // Irrelevant if samples per pixel is set to 1
     TIFFSetField(output, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
     TIFFSetField(output, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
-    TIFFSetField(output, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
-    TIFFSetField(output, TIFFTAG_PAGENUMBER, 0, 1);
+    //TIFFSetField(output, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
+    //TIFFSetField(output, TIFFTAG_PAGENUMBER, 0, 1);
 
     tmsize_t ssize = TIFFStripSize(input); // Seems to be in bytes
     //  printf("Strip size: %zu b\n", (size_t) ssize);
@@ -1794,18 +2087,7 @@ int fim_tiff_maxproj(const char * in, const char * out)
     {
         printf("strip size: %" PRId64 "\n", ssize);
         printf("number of strips: %u\n", nstrips);
-        switch(SF)
-        {
-        case SAMPLEFORMAT_UINT:
-            printf("Sample format: UINT\n");
-            break;
-        case SAMPLEFORMAT_IEEEFP:
-            printf("Sample format: float\n");
-            break;
-        default:
-            printf("Unsupported sample format\n");
-            break;
-        }
+        printf("sample format: %s\n", tiff_sampleformat_to_string((SF)));
         printf("Bits per sample: %u\n", BPS);
         printf("Number of directories (Z-planes): %" PRId64 "\n", P);
     }
@@ -1963,8 +2245,8 @@ int fim_tiff_extract_slice(const char * in, const char * out, int slice)
     TIFFSetField(output, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);
     TIFFSetField(output, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
     TIFFSetField(output, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
-    TIFFSetField(output, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
-    TIFFSetField(output, TIFFTAG_PAGENUMBER, 1, 1);
+    //TIFFSetField(output, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
+    //TIFFSetField(output, TIFFTAG_PAGENUMBER, 1, 1);
 
     tmsize_t ssize = TIFFStripSize(input); // Seems to be in bytes
     //  printf("Strip size: %zu b\n", (size_t) ssize);

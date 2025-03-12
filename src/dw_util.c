@@ -21,7 +21,7 @@
 
 #endif
 
-int isdir(const char * dir)
+int dw_isdir(const char * dir)
 {
 #ifdef WINDOWS
     if( _taccess_s( dir, 0 ) == 0 )
@@ -51,10 +51,10 @@ int isdir(const char * dir)
 
 
 
-int ensuredir(const char * dir)
+int dw_ensuredir(const char * dir)
 
 {
-    if(isdir(dir) == 1)
+    if(dw_isdir(dir) == 1)
     {
         return 0;
     }
@@ -485,4 +485,26 @@ int dw_fseek(FILE *fid, int64_t offset, int origin)
         perror("dw_fseek error:");
     }
     return ret;
+}
+
+int npyfilename(const char * filename)
+{
+    // version 1
+    if(filename == NULL)
+    {
+        return 0;
+    }
+
+    size_t n = strlen(filename);
+
+    if(n < 4)
+    {
+        return 0;
+    }
+
+    if(strncasecmp(&filename[n-4], ".npy", 4) == 0)
+    {
+        return 1;
+    }
+    return 0;
 }

@@ -16,11 +16,11 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-
+#include "dw_util.h"
 #include "fft.h"
 #include "fim_tiff.h"
 #include "ftab.h"
-#include "dw_util.h"
+#include "npio.h"
 
 /* fim : operations on 3D Floating point IMages
  *
@@ -34,9 +34,9 @@ void fim_set_verbose(int);
 #define MAGIC_FIMO 0xFIM35555DEC04301UL
 
 typedef struct{
-    #ifndef NDEBUG
+#ifndef NDEBUG
     uint64_t magic; // TODO: set to MAGIC_FIMO
-    #endif
+#endif
     float * V;
     size_t M;
     size_t N;
@@ -91,13 +91,13 @@ fimo * fimo_zeros(size_t M, size_t N, size_t P);
  *
  */
 fimo * fim_image_from_array(const float * restrict V,
-                             size_t M, size_t N, size_t P);
+                            size_t M, size_t N, size_t P);
 
 /** @brief Wrap an array by a fimo object
  *
  * This creates a pointer to the data, not a copy.
  *
-*/
+ */
 fimo * fim_wrap_array(float * V, size_t M, size_t N, size_t P);
 
 /* Return a new copy */
@@ -127,7 +127,8 @@ fimo * fimo_partial(const fimo *, int dim, float sigma);
  * Returns one row per pixel
  */
 ftab_t *
-fim_features_2d(const fimo *);
+fim_features_2d(const fimo *,
+                const float *sigma, int nsigma);
 
 /* Return a I->P long vector with the integral
  * gradient magnitude per slice in I */
@@ -468,7 +469,7 @@ typedef enum  {
 } fim_boundary_condition;
 
 /* 1D convolution between possibly strided data and a kernel.
- *
+ * The buffer has to contain nV elements
  */
 
 void
@@ -566,7 +567,7 @@ void fim_ianscombe(float * x, size_t n);
 float
 fim_interp3_linear(const float *,
                    size_t M, size_t N, size_t P,
-                         double x, double y, double z);
+                   double x, double y, double z);
 
 /* Estimate the circularity of a dot
  *
@@ -596,3 +597,46 @@ fim_dot_lateral_circularity(const float * ,
                             size_t M, size_t N, size_t P,
                             double x, double y, double z,
                             double sigma);
+
+/* Read an image and return the data as float, possibly after
+ * conversion. The ttags argument can be set to NULL if not
+ * required and will only be set for tiff files.
+ * Supported image formats: tiff and npy
+ */
+float *
+fim_imread(const char * filename,
+           ttags * T,
+           int64_t * M, int64_t * N, int64_t * P,
+           int verbose);
+
+
+/* Read the size of an image without loading the data */
+int
+fim_imread_size(const char * filename,
+                int64_t * M, int64_t * N, int64_t * P);
+
+
+/* Read a Python NPY file */
+float *
+fim_read_npy(const char * filename,
+             int64_t * M, int64_t * N, int64_t * P,
+             int verbose);
+
+/* Write image as 32-bit floats,
+ * if file name ends with y or Y it will
+ * be saved as a npy file
+ */
+int
+fim_imwrite_f32(const char * outname,
+                const float * V,
+                const ttags * T,
+                int64_t M, int64_t N, int64_t P);
+
+int
+fim_imwrite_u16(const char * outname,
+                const float * V,
+                const ttags * T,
+                int64_t M, int64_t N, int64_t P,
+                float scaling);
+
+int fim_to_raw(const char * infile, const char * outfile);

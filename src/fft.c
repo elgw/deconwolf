@@ -167,7 +167,7 @@ static char * get_swf_file_name(int nThreads)
 
     sprintf(dir_config, "%s/.config/", dir_home);
     // printf("dir_config = %s\n", dir_config);
-    if( !isdir(dir_config) )
+    if( !dw_isdir(dir_config) )
     {
         free(dir_config);
         return swf;
@@ -175,7 +175,7 @@ static char * get_swf_file_name(int nThreads)
 
     sprintf(dir_config, "%s/.config/deconwolf/", dir_home);
     //  printf("dir_config = %s\n", dir_config);
-    if( ensuredir(dir_config) == 0 )
+    if( dw_ensuredir(dir_config) == 0 )
     {
         char * prefered = malloc(1024*sizeof(char));
         assert(prefered != NULL);

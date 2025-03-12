@@ -4,13 +4,26 @@ Version History
 0.4.5
 -----
 
-- ``--method id`` now works on Windows.
+- New: support for reading and writing Numpy npy files in many
+  places. If the input file ends with ``.npy`` so will the output file.
+- Change: Not setting ``TIFFTAG_SUBFILETYPE`` and ``TIFFTAG_PAGENUMBER`` when
+  writing tif files since it does not seem to be needed.
+- Fix: ``dw maxproj`` truncates ImageJ metadata to remove the 3D
+  information so that Python/tifffile no longer issues warnings.
+- Fix: ``--scaling s`` works when tiling is used.
+- Fix: ``--float`` work when tiling is used.
+
+0.4.4_rc4 (windows only)
+------------------------
+
+- Fixes issue #83
+- Fixed crashed with ``--method id``.
 
 0.4.4
 -----
 
 - Fixed Windows-only issue #77, #80 (Thanks to `WisdomUfondu
-  <https://github.com/WisdomUfondu>) and #81. I.e. tiling should work
+  <https://github.com/WisdomUfondu>`__) and #81. I.e. tiling should work
   and the random freezes when using the GPU should be gone (hopefully!).
 
 - Switched to rst/sphinx documentation from markdown.
@@ -247,24 +260,18 @@ Results when testing on the microtubules image shown below.
 -  **dw maxproj** There were problems reading the output in MATLAB.
    Updated so that the output image will be written as a single strip.
 
-.. _section-10:
-
 0.3.4
 ^^^^^
 
 -  Minor bug fixes which gives a clean build with ``-fanalyzer``.
-
-.. _section-11:
 
 0.3.3
 ^^^^^
 
 -  Writing pixel size to output file also when tiling is used.
 
-.. _section-12:
-
 0.3.2
---
+^^^^^
 
 -  Tested on raspberry pi 4 using 64-bit bookworm.
 -  Found a bug in ``fft.c`` where ``memcpy`` was used wrongly (replaced
@@ -276,8 +283,6 @@ Results when testing on the microtubules image shown below.
 -  Header files: Using ``#pragma once`` instead of the
    ``#ifndef file_h_`` pattern.
 
-.. _section-13:
-
 0.3.1
 ^^^^^
 
@@ -286,8 +291,6 @@ Results when testing on the microtubules image shown below.
    ``MADV_HUGEPAGE`` for the allocations but the results are
    inconclusive (but it uses more RAM when enabled). Cleared all uses of
    ``fftw_free`` and ``fftw_malloc``.
-
-.. _section-14:
 
 0.3.0
 ^^^^^
@@ -311,22 +314,17 @@ Results when testing on the microtubules image shown below.
    commenting in/out the corresponding lines in the makefile.
 -  Cleaned up the output of ``dw --version``
 
-.. _section-15:
-
 0.2.7
 ^^^^^
 
 -  Converted a few minor code paths to execute in parallel by OpenMP
    directives.
 
-.. _section-16:
 
 0.2.6
 ^^^^^
 
 -  Using ISO 8601 in log files, e.g., ``2023-02-14T11:14:14``.
-
-.. _section-17:
 
 0.2.5
 ^^^^^
@@ -335,7 +333,6 @@ Results when testing on the microtubules image shown below.
    projections along the three axes and collecting them on a single 2D
    image.
 
-.. _section-18:
 
 0.2.4
 ^^^^^
@@ -349,7 +346,6 @@ Results when testing on the microtubules image shown below.
 -  Setting the background level automatically to min(image) unless
    specified with **–bg**.
 
-.. _section-19:
 
 0.2.3
 ^^^^^
@@ -359,7 +355,6 @@ Results when testing on the microtubules image shown below.
 -  added the subcommand **dw merge**. To be used to merge single
    z-planes into a 3D volume.
 
-.. _section-20:
 
 0.2.2
 ^^^^^
@@ -371,7 +366,6 @@ Results when testing on the microtubules image shown below.
    is something to improve upon in future version, possibly by switching
    to vkFFT.
 
-.. _section-21:
 
 0.1.1
 ^^^^^
@@ -380,7 +374,6 @@ Results when testing on the microtubules image shown below.
    estimation using normalized cross correlation with **dw imshift –ref
    file.tif**. Might be extended to basic tiling etc.
 
-.. _section-22:
 
 0.1.0
 ^^^^^
@@ -412,7 +405,6 @@ Results when testing on the microtubules image shown below.
 -  **dw maxproj** works with file that are not in the current folder.
 -  Fixed **–iterdump** not always working.
 
-.. _section-24:
 
 0.0.25
 ^^^^^^
@@ -420,7 +412,6 @@ Results when testing on the microtubules image shown below.
 -  Builds with cuFFT on Linux, use ``make CUFFT=1 -B``, requires a CUDA
    compatible GPU and of course the cuFFT library installed.
 
-.. _section-25:
 
 0.0.24
 ^^^^^^
@@ -429,7 +420,6 @@ Results when testing on the microtubules image shown below.
 -  Fixed a memory leak with the **–tilesize** option causing crashed
    sometimes.
 
-.. _section-26:
 
 0.0.23
 ^^^^^^
@@ -445,14 +435,12 @@ Results when testing on the microtubules image shown below.
 -  Aborting if the number of threads is set < 1.
 -  The algorithm is still unchanged since v 0.0.20.
 
-.. _section-27:
 
 0.0.22
 ^^^^^^
 
 -  Fixed double free-bug in tiling mode.
 
-.. _section-28:
 
 0.0.21
 ^^^^^^
@@ -463,7 +451,6 @@ Results when testing on the microtubules image shown below.
 -  Changed behavior when too few input arguments are given to only give
    a two-line message.
 
-.. _section-29:
 
 0.0.20
 ^^^^^^
@@ -485,7 +472,6 @@ Results when testing on the microtubules image shown below.
    experimental option. 14 percent faster on a small test image, varied
    results on larger images.
 
-.. _section-30:
 
 0.0.19
 ^^^^^^
@@ -496,7 +482,6 @@ Results when testing on the microtubules image shown below.
 -  dw_bw can now use more than one thread (wrongly disabled in v
    0.0.18).
 
-.. _section-31:
 
 0.0.18
 ^^^^^^
@@ -508,8 +493,6 @@ Results when testing on the microtubules image shown below.
    building with cmake. It is also possible to cross compile for Windows
    on Linux although it takes some effort to collect the DLL files for
    the dependencies.
-
-.. _section-32:
 
 0.0.17
 ^^^^^^

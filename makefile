@@ -7,6 +7,11 @@
 #
 # -- If OpenCL is not available, or to exclude it
 # make OPENCL=0
+#
+# Also useful:
+# sudo apt-get install clang-tools
+# scan-build make dw -B
+
 
 DESTDIR?=/usr/local/bin
 DEBUG?=0
@@ -402,7 +407,8 @@ dw_align_dots.o \
 dw_nuclei.o \
 dw_png.o \
 quickselect.o \
-dw_background.o
+dw_background.o \
+npio.o
 
 dwbw_OBJECTS = fim.o \
 fim_tiff.o \
@@ -411,7 +417,9 @@ bw_gsl.o \
 lanczos.o \
 li.o fft.o \
 dw_util.o \
-ftab.o
+ftab.o \
+quickselect.o \
+npio.o
 
 $(info Everything looks ok)
 

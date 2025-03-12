@@ -37,11 +37,11 @@ void usage()
     printf("Usage for subcommand 'merge'\n");
     printf("dw merge [merge] output.tif input1.tif input2.tif ...\n");
     printf("Options:\n");
-    printf("--help\n\t "
+    printf("--help\n\t"
            "Show this help message and quit\n");
-    printf("--verbose v\n\t "
+    printf("--verbose v\n\t"
            "Set verbosity level to v\n");
-    printf("--overwrite\n\t "
+    printf("--overwrite\n\t"
            "Overwrite output image if it already exists\n");
     return;
 }
@@ -105,6 +105,7 @@ int dw_tiff_merge(int argc, char ** argv)
         {
             printf("%s already exists, doing nothing. Use --overwrite to overwrite existing files\n",
                    outfile);
+            tm_config_free(conf);
             exit(EXIT_SUCCESS);
         }
     }
@@ -140,6 +141,7 @@ int dw_tiff_merge(int argc, char ** argv)
                     fprintf(stderr, "Image sizes does not match. A previous image had size "
                             "%" PRIu64 " x %" PRIu64 " while %s has size %" PRIu64 " x %" PRIu64 "\n",
                             M_out, N_out, argv[kk], M, N);
+                    tm_config_free(conf);
                     return EXIT_FAILURE;
                 }
             }
@@ -158,11 +160,10 @@ int dw_tiff_merge(int argc, char ** argv)
     size_t plane = 0;
     for(int kk = conf->optind + 1; kk<argc; kk++)
     {
-        ttags T;
         printf("Reading %s\n", argv[kk]); fflush(stdout);
         if(!conf->test)
         {
-            float * im = fim_tiff_read(argv[kk], &T, &M, &N, &P, conf->verbose);
+            float * im = fim_tiff_read(argv[kk], NULL, &M, &N, &P, conf->verbose);
             assert(im != NULL);
             memcpy(im_out + plane*M_out*N_out,
                    im, M*N*P*sizeof(float));

@@ -19,11 +19,136 @@
 #endif
 #include "dw.h"
 
+typedef uint16_t u16;
+typedef uint32_t u32;
+typedef float f32;
+
 /* GLOBALS */
 /* used by tiffErrHandler */
 FILE * logfile = NULL;
 /* END GLOBALS */
 
+
+/* Determine the scaling so that the whole range of uint16_t values
+ * are used. n is the number of pixels. */
+static float scaling_for_u16(const float * V, size_t n)
+{
+    return ( pow(2, 16) - 1.0 ) / fim_max(V, n);
+}
+
+
+static int raw_to_npio(const char * outfile,
+                       const char * infile, // Always f32 raw
+                       u32 M, u32 N, u32 P,
+                       int outformat, float scaling)
+{
+    npio_dtype format = NPIO_U16;
+    if(outformat == 32)
+    {
+        format = NPIO_F32;
+    }
+    int shape[3] = {P, N, M};
+    if(npio_write(outfile, 3, shape,
+                  NULL, // DATA
+                  format, format) == 0)
+    {
+        fprintf(stderr, "Unable to write to %s\n", outfile);
+        return 1;
+    }
+    // Get the start position
+    npio_t * meta = npio_load_metadata(outfile);
+    if(meta == NULL)
+    {
+        fprintf(stderr, "Unable to read from %s\n", outfile);
+        return 1;
+    }
+    size_t startpos = meta->data_offset;
+    npio_free(meta);
+
+    /* No scaling is used with f32 */
+    if(format == NPIO_F32)
+    {
+        FILE * fout = fopen(outfile, "a+b");
+        dw_fseek(fout, startpos, SEEK_SET);
+        if(fout == NULL)
+        {
+            printf("Unable to open %s for appending\n", outfile);
+            return 1;
+        }
+        FILE * fin = fopen(infile, "rb");
+        if(fin == NULL)
+        {
+            printf("Unable to open %s for reading\n", infile);
+            fclose(fout);
+            return 1;
+        }
+        size_t buff_elements = 262144;
+        float * buf = calloc(buff_elements, sizeof(float));
+        size_t nel_read = 0;
+        size_t nel_total = 0;
+        while((nel_read = fread(buf, sizeof(float), buff_elements, fin)) > 0)
+        {
+            fwrite(buf, sizeof(float), nel_read, fout);
+            nel_total += nel_read;
+        }
+        fclose(fin);
+        fclose(fout);
+        free(buf);
+        printf("Wrote %zu elements (%zu bytes)\n",
+               nel_total, nel_total*sizeof(float));
+        return 0;
+    }
+
+    /* No scaling is used with f32 */
+    if(format == NPIO_U16)
+    {
+        FILE * fout = fopen(outfile, "a+b");
+        if(fout == NULL)
+        {
+            printf("Unable to open %s for appending\n", outfile);
+            return 1;
+        }
+        dw_fseek(fout, startpos, SEEK_SET);
+
+        FILE * fin = fopen(infile, "rb");
+        if(fin == NULL)
+        {
+            printf("Unable to open %s for reading\n", infile);
+            fclose(fout);
+            return 1;
+        }
+        size_t buff_elements = 262144;
+        f32 * rbuf = calloc(buff_elements, sizeof(f32));
+        assert(rbuf != NULL);
+        u16 * wbuf = calloc(buff_elements, sizeof(u16));
+        size_t nel_read = 0;
+        size_t nel_total = 0;
+        while((nel_read = fread(rbuf, sizeof(f32), buff_elements, fin)) > 0)
+        {
+                for(size_t kk = 0; kk < nel_read; kk++)
+                {
+                    wbuf[kk] = nearbyintf((float) rbuf[kk] * scaling);
+                }
+
+            size_t nwritten = fwrite(wbuf, sizeof(u16), nel_read, fout);
+            if(nwritten != nel_read)
+            {
+                fprintf(stderr, "Error while writing to %s\n", outfile);
+                exit(EXIT_FAILURE);
+            }
+            nel_total += nel_read;
+        }
+        fclose(fin);
+        fclose(fout);
+        free(rbuf);
+        free(wbuf);
+        printf("Wrote %zu elements (%zu bytes)\n",
+               nel_total, nel_total*sizeof(float));
+        return 0;
+    }
+
+    return 1;
+}
 
 dw_iterator_t * dw_iterator_new(const dw_opts * s)
 {
@@ -146,8 +271,6 @@ void dw_iterator_free(dw_iterator_t * it)
     free(it);
 }
 
-
-
 dw_opts * dw_opts_new(void)
 {
     dw_opts * s = calloc(1, sizeof(dw_opts));
@@ -251,8 +374,8 @@ void dw_show_iter(dw_opts * s, int it, int nIter, float err)
 
 
 char * gen_iterdump_name(
-    __attribute__((unused)) const dw_opts * s,
-    int it)
+                         __attribute__((unused)) const dw_opts * s,
+                         int it)
 {
     // Generate a name for the an iterdump file
     // at iteration it
@@ -541,8 +664,8 @@ void dw_fprint_info(FILE * f, dw_opts * s)
         if(gethostname(hname, 1023) == 0)
         {
             fprintf(f, "HOSTNAME: '%s'\n", hname);
-            free(hname);
         }
+        free(hname);
 #endif
     }
 
@@ -991,7 +1114,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             printf("outFile: %s, outFolder: %s\n", s->outFile, s->outFolder);
         }
     } else {
-        if( isdir(s->outFile) )
+        if( dw_isdir(s->outFile) )
         {
             if(s->verbosity > 0)
             {
@@ -999,6 +1122,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             }
             free(s->outFolder);
             s->outFolder = malloc(strlen(s->outFile) + 8);
+            assert(s->outFolder != NULL);
             sprintf(s->outFolder, "%s%c", s->outFile, FILESEP);
             free(s->outFile);
             char * basename = dw_basename(s->imFile);
@@ -1334,27 +1458,39 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
 
     printf("\n");
     printf(" Options:\n");
-    printf(" --version\n\t Show version info\n");
-    printf(" --help\n\t Show this message\n");
-    printf(" --out file\n\t Specify output image name. If not set the input image "
-           "will be prefixed with dw_\n.");
-    printf(" --iter N\n\t "
+    printf(" --version\n\t"
+           "Show version info\n");
+    printf(" --help\n\t"
+           "Show this message\n");
+    printf(" --out file\n\t"
+           "Specify output image name. If not set the input image will be prefixed\n\t"
+           "with dw_.\n");
+    printf(" --iter N\n\t"
            "Specify the number of iterations to use (default: %d)\n", s->nIter);
-    printf(" --gpu\n\t Use GPU processing\n");
-    printf(" --cldevice n\n\t Use OpenCL device #n\n");
-    printf(" --threads N\n\t Specify the number of CPU threads to use\n");
-    printf(" --verbose N\n\t Set verbosity level (default: %d)\n", s->verbosity);
-    printf(" --test\n\t Run unit tests\n");
-    printf(" --tilesize N\n\t Enables tiling mode and sets the largest tile size\n\t"
+    printf(" --gpu\n\t"
+           "Use GPU processing\n");
+    printf(" --cldevice n\n\t"
+           "Use OpenCL device #n\n");
+    printf(" --threads N\n\t"
+           "Specify the number of CPU threads to use\n");
+    printf(" --verbose N\n\t"
+           "Set verbosity level (default: %d)\n", s->verbosity);
+    printf(" --test\n\t"
+           "Run unit tests\n");
+    printf(" --tilesize N\n\t"
+           "Enables tiling mode and sets the largest tile size\n\t"
            "to N voxels in x and y.\n");
-    printf(" --tilepad N\n\t Sets the tiles to overlap by N voxels in tile mode \n\t"
+    printf(" --tilepad N\n\t"
+           "Sets the tiles to overlap by N voxels in tile mode \n\t"
            "(default: %d)\n", s->tiling_padding);
-    printf(" --prefix str\n\t Set the prefix of the output files (default: '%s')\n",
+    printf(" --prefix str\n\t"
+           "Set the prefix of the output files (default: '%s')\n",
            s->prefix);
-    printf(" --overwrite\n\t Allows deconwolf to overwrite already existing output files\n");
+    printf(" --overwrite\n\t"
+           "Allows deconwolf to overwrite already existing output files\n");
 
     printf(" --psigma s\n\t"
-           "Pre filter the image with a Gaussian filter of sigma=s while Anscombe "
+           "Pre filter the image with a Gaussian filter of sigma=s while Anscombe\n\t"
            "transformed\n");
 
     printf(" --cz n\n\t"
@@ -1366,30 +1502,34 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
            "will be placed in the centre.\n\t"
            "has no effect when tiling is used\n");
 
-    printf(" --bq Q\n\t Set border handling to \n\t"
+    printf(" --bq Q\n\t"
+           "Set border handling to \n\t"
            "0 'none' i.e. periodic\n\t"
            "1 'compromise', or\n\t"
            "2 'normal' which is default\n");
-    printf("--periodic\n\t Equivalent to --bq 0\n");
+    printf("--periodic\n\t"
+           "Equivalent to --bq 0\n");
 
     printf("--scale s\n\t"
            "Set the scaling factor for the output image manually to s.\n\t"
            "Warning: Might cause clipping or discretization artifacts\n\t"
            "This option is only used when the output format is 16-bit (i.e. \n\t"
            "not with --float)\n");
-    printf(" --float\n\t Set output format to 32-bit float (default is 16-bit \n\t"
+    printf(" --float\n\t"
+           "Set output format to 32-bit float (default is 16-bit \n\t"
            "int) and disable scaling\n");
-    printf(" --bg l\n\t Set background level, l\n");
+    printf(" --bg l\n\t"
+           "Set background level, l\n");
     printf(" --offset l\n\t"
            "Set a positive offset that will be added to the image during\n\t"
            "processing and remove before saving to disk. Can help to mitigate\n\t"
            "some of the detector noise (non-Poissonian)\n");
     printf(" --flatfield image.tif\n\t"
-           " Use a flat field correction image. Deconwolf will divide each plane of the\n\t"
-           " input image, pixel by pixel, by this correction image.\n");
-    printf(" --lookahead N"
-           "\n\t Try to do a speed-for-memory trade off by using a N pixels larger"
-           "\n\t job size that is better suited for FFT.\n");
+           "Use a flat field correction image. Deconwolf will divide each plane of\n\t"
+           "the input image, pixel by pixel, by this correction image.\n");
+    printf(" --lookahead N\n\t"
+           "Try to do a speed-for-memory trade off by using a N pixels larger\n\t"
+           "job size that is better suited for FFT.\n");
     printf("--method name\n\t"
            "Select what method to use. Valid options: rl, shb, shbcl2\n");
     printf("--start_id\n\t"
@@ -1397,9 +1537,11 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
     printf("--start_flat\n\t"
            "Use the average of the input image as the initial guess. Default\n");
     printf("--start_lp\n\t"
-           "Use a low passed version of the input image as the initial guess.n");
-    printf(" --noplan\n\t Don't use any planning optimization for fftw3\n");
-    printf(" --no-inplace\n\t Disable in-place FFTs (for fftw3), uses more\n\t"
+           "Use a low passed version of the input image as the initial guess.\n");
+    printf(" --noplan\n\t"
+           "Don't use any planning optimization for fftw3\n");
+    printf(" --no-inplace\n\t"
+           "Disable in-place FFTs (for fftw3), uses more\n\t"
            "memory but could potentially be faster for some problem sizes.\n");
     printf("\n");
 
@@ -1421,6 +1563,8 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
 #ifdef dw_module_background
     printf("   background   vignetting/background estimation\n");
 #endif
+    printf("   tif2npy      convert a tif file to a Numpy .npy file\n");
+    printf("   npy2tif      convert a Numpy .npy file to a tif file\n");
     printf("\n");
     printf("see: %s [command] --help\n", argv[0]);
     printf("\n");
@@ -1804,10 +1948,12 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
         printf("Dumping %s to %s (for quicker io)\n", s->imFile, imFileRaw);
     }
 
-    fim_tiff_to_raw(s->imFile, imFileRaw);
+    fim_to_raw(s->imFile, imFileRaw);
+
     if(s->verbosity > 10){
         printf("Writing to imdump.tif\n");
-        fim_tiff_from_raw("imdump.tif", M, N, P, imFileRaw, NULL);
+        fim_tiff_imwrite_u16_from_raw("imdump.tif", M, N, P, imFileRaw,
+                                      NULL, s->scaling);
     }
 
     //fim_tiff_write_zeros(s->outFile, M, N, P);
@@ -1893,7 +2039,44 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
         printf("converting %s to %s\n", tfile, s->outFile);
     }
 
-    fim_tiff_from_raw(s->outFile, M, N, P, tfile, s->imFile);
+    if(s->outFormat == 32)
+    {
+        s->scaling = 1;
+    } else {
+        if(s->scaling <= 0)
+        {
+            float rawmax = raw_file_single_max(tfile, (size_t) M * (size_t) N * (size_t) P );
+            if(rawmax > 0)
+            {
+                s->scaling = 65535/rawmax;
+            }
+        }
+    }
+    fprintf(s->log, "scaling: %f\n", s->scaling);
+
+    // TODO: fim_from_raw( ... )
+    if(npyfilename(s->outFile))
+    {
+        if(raw_to_npio(s->outFile, tfile, M, N, P,
+                       s->outFormat,
+                       s->scaling))
+        {
+            fprintf(stderr, "Error converting %s to %s\n", s->outFile, tfile);
+            exit(EXIT_FAILURE);
+        }
+
+    } else {
+        if(s->outFormat == 32)
+        {
+            fim_tiff_imwrite_f32_from_raw(s->outFile,
+                                          M, N, P,
+                                          tfile, s->imFile);
+        } else {
+            fim_tiff_imwrite_u16_from_raw(s->outFile,
+                                          M, N, P,
+                                          tfile, s->imFile,
+                                          s->scaling);
+        }}
 
     if(s->verbosity > 1)
     {
@@ -2107,7 +2290,7 @@ void flatfieldCorrection(dw_opts * s, float * im, int64_t M, int64_t N, int64_t 
            s->flatfieldFile);
     ttags * T = ttags_new();
     int64_t m = 0, n = 0, p = 0;
-    float * C = fim_tiff_read(s->flatfieldFile, T, &m, &n, &p, s->verbosity);
+    float * C = fim_imread(s->flatfieldFile, T, &m, &n, &p, s->verbosity);
     ttags_free(&T);
 
     assert(m == M);
@@ -2223,9 +2406,9 @@ int dw_run(dw_opts * s)
     }
 
     int64_t M = 0, N = 0, P = 0;
-    if(fim_tiff_get_size(s->imFile, &M, &N, &P))
+    if(fim_imread_size(s->imFile, &M, &N, &P))
     {
-        printf("Failed to open %s\n", s->imFile);
+        printf("fim_imread_size failed to open %s\n", s->imFile);
         return -1;
     } else {
         if(s->verbosity > 3)
@@ -2257,7 +2440,7 @@ int dw_run(dw_opts * s)
             printf("Reading %s\n", s->imFile);
         }
 
-        im = fim_tiff_read(s->imFile, T, &M, &N, &P, s->verbosity);
+        im = fim_imread(s->imFile, T, &M, &N, &P, s->verbosity);
         if(im == NULL)
         {
             fprintf(stderr, "Failed to open %s\n", s->imFile);
@@ -2364,7 +2547,7 @@ int dw_run(dw_opts * s)
         if(s->refFile != NULL)
         {
             int64_t rM = 0, rN = 0, rP = 0;
-            s->ref = fim_tiff_read(s->refFile, NULL, &rM, &rN, &rP, s->verbosity);
+            s->ref = fim_imread(s->refFile, NULL, &rM, &rN, &rP, s->verbosity);
             if(s->ref == NULL)
             {
                 fprintf(stderr, "Failed to open %s\n", s->imFile);
@@ -2395,7 +2578,7 @@ int dw_run(dw_opts * s)
     {
         printf("Reading %s\n", s->psfFile);
     }
-    psf = fim_tiff_read(s->psfFile, NULL, &pM, &pN, &pP, s->verbosity);
+    psf = fim_imread(s->psfFile, NULL, &pM, &pN, &pP, s->verbosity);
     if(psf == NULL)
     {
         fprintf(stderr, "Failed to open %s\n", s->psfFile);
@@ -2503,27 +2686,34 @@ int dw_run(dw_opts * s)
             {
                 printf("%f%% pixels at bg level in the output image.\n", 100*nZeros/(M*N*P));
                 printf("Writing to %s\n", s->outFile); fflush(stdout);
+                printf("Outformat: %d\n", s->outFormat);
             }
 
-            //    floatimage_normalize(out, M*N*P);
+
             if(s->outFormat == 32)
             {
                 if(s->iterdump)
                 {
                     char * outFile = gen_iterdump_name(s, s->nIter);
-                    fim_tiff_write_float(outFile, out, T, M, N, P);
+                    fim_imwrite_f32(outFile, out, T, M, N, P);
                     free(outFile);
                 } else {
-                    fim_tiff_write_float(s->outFile, out, T, M, N, P);
+                    fim_imwrite_f32(s->outFile, out, T, M, N, P);
                 }
             } else {
                 if(s->iterdump)
                 {
                     char * outFile = gen_iterdump_name(s, s->nIter);
-                    fim_tiff_write(outFile, out, T, M, N, P);
+                    float scaling = scaling_for_u16(out, M*N*P);
+                    fim_imwrite_u16(outFile, out, T, M, N, P, scaling);
                     free(outFile);
                 } else {
-                    fim_tiff_write_opt(s->outFile, out, T, M, N, P, s->scaling);
+                    if(s->scaling <= 0)
+                    {
+                        s->scaling = scaling_for_u16(out, M*N*P);
+                    }
+                    fprintf(s->log, "scaling: %f\n", s->scaling);
+                    fim_imwrite_u16(s->outFile, out, T, M, N, P, s->scaling);
                 }
             }
         }

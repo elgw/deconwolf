@@ -10,7 +10,7 @@
 # `/etc/ld.so.conf`
 # and then run `ldconfig`
 
-cmake_minimum_required(VERSION 3.9 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
 project(libdw LANGUAGES C)
 
 set (CMAKE_C_STANDARD 11)
@@ -31,6 +31,7 @@ add_library( deconwolf SHARED
   gmlfit.c
   lanczos.c
   tiling.c
+  quickselect.c
 )
 
 set(DECONWOLF_PUBLIC_HEADERS
@@ -41,6 +42,24 @@ set(DECONWOLF_PUBLIC_HEADERS
   "ftab.h"
   "dw_version.h"
 "kdtree/include/kdtree.h")
+
+#
+# Gnu Scientific Library
+#
+find_package(GSL)
+target_link_libraries(deconwolf ${GSL_LIBRARIES})
+
+# FFTW3
+#
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/../util/findFFTW)
+if(UNIX)
+  find_package(FFTW REQUIRED FLOAT_LIB FLOAT_OPENMP_LIB)
+else()
+  find_package(FFTW REQUIRED FLOAT_LIB)
+endif()
+target_link_libraries(deconwolf FFTW::Double)
+target_link_libraries(deconwolf FFTW::Float)
+
 
 #
 # kdtree
@@ -70,6 +89,11 @@ else()
 
 endif()
 
+#
+# TIFF
+#
+find_package(TIFF)
+target_link_libraries(deconwolf ${TIFF_LIBRARIES})
 
 include("GNUInstallDirs")
 
