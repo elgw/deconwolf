@@ -53,7 +53,11 @@
 <li class="toctree-l2"><a class="reference internal" href="#test-data">Test data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#memory-considerations">Memory considerations</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#psf-considerations">PSF considerations</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#supported-image-formats">Supported image formats</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#supported-image-formats">Supported image formats</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#tif-files">TIF files</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#numpy-files">Numpy files</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="#log-files">Log files</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#output-format">Output format</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#questions-and-answers">Questions and Answers</a><ul>
@@ -76,6 +80,7 @@
 <li class="toctree-l1"><a class="reference internal" href="shifts.html">Spot-based image alignment</a></li>
 <li class="toctree-l1"><a class="reference internal" href="segmentation.html">Ilastic-like segmentation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="history.html">Version History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="man/index.html">Man pages</a></li>
 <li class="toctree-l1"><a class="reference internal" href="license.html">GNU General Public License</a></li>
 </ul>
 
@@ -250,15 +255,44 @@ some memory). To prevent that, add the command line argument <strong>--xyfactor
 </section>
 <section id="supported-image-formats">
 <h2>Supported image formats<a class="headerlink" href="#supported-image-formats" title="Link to this heading"></a></h2>
-<p>Currently deconwolf can only read tif images, specifically: multi-page,
-8-bit unsigned, 16-bit unsigned or 32-bit floats. The data should be
-written in strip mode (typically the default output format). The output
-is either 16-bit unsigned or 32-bit floating point (with the <strong>--float</strong>
-flag) and can be read by Matlab, ImageJ, etc. If you use 16-bit output
-note that images will be scaled in order to not be saturated. The
-scaling value can be found at the end of the log files.</p>
+<p>deconwolf can read and write tif images (using <a class="reference external" href="https://libtiff.gitlab.io/libtiff/libtiff.html">LibTIFF</a>) and Python/numpy <cite>.npy</cite> files (using <a class="reference external" href="https://www.github.com/elgw/npio">npio</a>).</p>
+<p>The images have to be 3D stacks. I.e. if you are working with
+multi-color images or time stacks, these images have to be converted
+to simple 3D stacks before they can be used by deconwolf. And no, 2D
+images are not supported.</p>
+<p>The data format has to be 16-bit unsigned integers or 32-bit floating
+point. Tif files can also be understood when the data format is
+8-bit unsigned integers.</p>
+<p>The output is either 16-bit unsigned int or 32-bit floating point
+(with the <strong>--float</strong> flag). The format (npy or tif) is decided by
+the name of the input file.</p>
+<p>Please keep in mind that when deconwolf writes 16-bit images, they
+will be scaled to avoid saturation (a scaling value <span class="math notranslate nohighlight">\(&lt;1\)</span>) or to
+use as much of the dynamic range as possible (a scaling value
+<span class="math notranslate nohighlight">\(&gt;1\)</span>). The scaling value can be found at the end of the log
+files. To use a specific/custom/consistent scaling value, see the
+<strong>--scaling</strong> option.</p>
+<section id="tif-files">
+<h3>TIF files<a class="headerlink" href="#tif-files" title="Link to this heading"></a></h3>
+<p>TIF or TIFF files have many flavors and deconwolf does not understand
+all of them. However, what works in ImageJ typically works with
+deconwolf as long as they meet the general requirements described above.</p>
 <p>It is undefined behavior to use pyramidal (multiple resolution) or
 multi-color images.</p>
+<p>OME-XML metadata (see the <a class="reference external" href="https://docs.openmicroscopy.org/ome-model/5.6.3/ome-tiff/">OME-TIFF
+format</a>)
+is not parsed by deconwolf, i.e. it does not understand any of that.</p>
+</section>
+<section id="numpy-files">
+<h3>Numpy files<a class="headerlink" href="#numpy-files" title="Link to this heading"></a></h3>
+<p>To use <cite>.npy</cite> files should be no different to using <cite>.tif</cite>
+files. Please note that Python reports the image dimensions in the
+reverse order compared to deconwolf, i.e., the number of z-planes is
+first dimension in Python but the last dimension in deconwolf.</p>
+<p>Support for numpy files was added in version 0.4.5, and is not
+universally available in all modules yet. Currently 16-bit unsigned
+data and 32-bit floats are supported.</p>
+</section>
 </section>
 <section id="log-files">
 <h2>Log files<a class="headerlink" href="#log-files" title="Link to this heading"></a></h2>
