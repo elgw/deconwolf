@@ -1965,7 +1965,9 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
         tempdir = dw_dirname(s->outFile);
     }
 
-    char * raw_source = tempnam(tempdir, "dw_raw_source");
+    // TODO: On WIN32 we need to use _mktemp_s since tempnam only use the
+    // folder as a fallback when no system temp folder is available.
+    char * raw_source = dw_tempfile(tempdir);
     if(raw_source == NULL)
     {
         fprintf(stderr,
@@ -1973,7 +1975,7 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
                 "hold the input data\n");
         exit(EXIT_FAILURE);
     }
-    char * raw_target = tempnam(tempdir, "dw_raw_target");
+    char * raw_target = dw_tempfile(tempdir);
     if(raw_target == NULL)
     {
         fprintf(stderr,
