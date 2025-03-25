@@ -321,6 +321,9 @@ dw_opts * dw_opts_new(void)
     s->positivity = 1;
     s->bg = 1e-2; /* Should be strictly positive or pixels will be freezed */
     s->bg_auto = 1;
+    /* A scalar offset/constant added to the image before processing
+       and removed after processing. Believed to reduce the influence
+       of Gaussian noise for low pixel values. */
     s->offset = 5;
     s->flatfieldFile = NULL;
     s->lookahead = 0;
@@ -410,6 +413,7 @@ void dw_opts_free(dw_opts ** sp)
     {
         fclose(s->tsv);
     }
+    free(s->tempFolder);
     free(s);
 }
 
@@ -757,6 +761,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         { "offset",    required_argument, NULL, 'q' },
         { "tilesize",  required_argument, NULL, 's' },
         { "test",      no_argument,       NULL, 't' },
+        { "tempdir",   required_argument, NULL, 'u' },
         { "version",   no_argument,       NULL, 'v' },
         { "overwrite", no_argument,       NULL, 'w' },
         { "xyfactor",  required_argument, NULL, 'x' },
@@ -787,7 +792,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     int prefix_set = 0;
     int use_gpu = 0;
     while((ch = getopt_long(argc, argv,
-                            "12345679ab:c:f:Gghil:m:n:o:p:q:s:tvwx:A:B:C:DFI:L:MOR:S:TPQ:X:Z:",
+                            "12345679ab:c:f:Gghil:m:n:o:p:q:s:tu:vwx:A:B:C:DFI:L:MOR:S:TPQ:X:Z:",
                             longopts, NULL)) != -1)
     {
         switch(ch) {
@@ -918,6 +923,10 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             break;
         case 'p':
             s->tiling_padding = atoi(optarg);
+            break;
+        case 'u':
+            free(s->tempFolder);
+            s->tempFolder = strdup(optarg);
             break;
         case 'w':
             s->overwrite = 1;
@@ -1181,6 +1190,24 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     if(s->verbosity > 2)
     {
         printf("Command line arguments accepted\n");
+    }
+
+    if(s->tempFolder == NULL)
+    {
+        char * tmpdir = getenv("DW_TEMPDIR");
+        if(tmpdir)
+        {
+            s->tempFolder = strdup(tmpdir);
+        }
+    }
+
+    if(s->tempFolder != NULL)
+    {
+        if(!dw_isdir(s->tempFolder))
+        {
+            fprintf(stderr, "the temp folder '%s' does not exist\n", s->tempFolder);
+            exit(1);
+        }
     }
 }
 
@@ -1543,6 +1570,8 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
     printf(" --no-inplace\n\t"
            "Disable in-place FFTs (for fftw3), uses more\n\t"
            "memory but could potentially be faster for some problem sizes.\n");
+    printf(" --tempdir\n\t"
+           "Specify the folder where temporary files should be written\n");
     printf("\n");
 
     printf("Additional commands with separate help sections:\n");
@@ -1926,33 +1955,51 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
         printf("-> Divided the [%" PRId64 " x %" PRId64 " x %" PRId64 "] image into %d tiles\n", M, N, P, T->nTiles);
     }
 
-    /* Output image initialize as zeros
-     * will be updated block by block
+    /* File names:
+       raw_source: The image image as raw pixel data.
+       raw_target: The deconvolved tiles as raw pixel data.
      */
-    char * tfile = malloc(strlen(s->outFile)+10);
-    assert(tfile != NULL);
-    sprintf(tfile, "%s.raw", s->outFile);
+    char * tempdir = s->tempFolder;
+    if(tempdir == NULL)
+    {
+        tempdir = dw_dirname(s->outFile);
+    }
+
+    char * raw_source = tempnam(tempdir, "dw_raw_source");
+    if(raw_source == NULL)
+    {
+        fprintf(stderr,
+                "Unable to create the name for the temporary file to "
+                "hold the input data\n");
+        exit(EXIT_FAILURE);
+    }
+    char * raw_target = tempnam(tempdir, "dw_raw_target");
+    if(raw_target == NULL)
+    {
+        fprintf(stderr,
+                "Unable to create the name for the temporary file to "
+                "hold the output data\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // printf("DEBUG\n\nraw_source = %s, raw_target = %s\n\n", raw_source, raw_target);
+
+    if(s->verbosity > 1)
+    {
+        printf("Initializing %s to 0\n", raw_target); fflush(stdout);
+    }
+    fsetzeros(raw_target, (size_t) M* (size_t) N* (size_t) P*sizeof(float));
 
     if(s->verbosity > 0)
     {
-        printf("Initializing %s to 0\n", tfile); fflush(stdout);
-    }
-    fsetzeros(tfile, (size_t) M* (size_t) N* (size_t) P*sizeof(float));
-
-    char * imFileRaw = malloc(strlen(s->imFile) + 10);
-    assert(imFileRaw != NULL);
-    sprintf(imFileRaw, "%s.raw", s->imFile);
-
-    if(s->verbosity > 0)
-    {
-        printf("Dumping %s to %s (for quicker io)\n", s->imFile, imFileRaw);
+        printf("Dumping %s to %s (for quicker io)\n", s->imFile, raw_source);
     }
 
-    fim_to_raw(s->imFile, imFileRaw);
+    fim_to_raw(s->imFile, raw_source);
 
     if(s->verbosity > 10){
         printf("Writing to imdump.tif\n");
-        fim_tiff_imwrite_u16_from_raw("imdump.tif", M, N, P, imFileRaw,
+        fim_tiff_imwrite_u16_from_raw("imdump.tif", M, N, P, raw_source,
                                       NULL, s->scaling);
     }
 
@@ -1985,7 +2032,7 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
         //    tictoc
         //   tic
         //float * im_tile = tiling_get_tile_tiff(T, tt, s->imFile);
-        float * im_tile = tiling_get_tile_raw(T, tt, imFileRaw);
+        float * im_tile = tiling_get_tile_raw(T, tt, raw_source);
         //    toc(tiling_get_tile_tiff)
 
         int64_t tileM = T->tiles[tt]->xsize[0];
@@ -2027,7 +2074,7 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
         {
             printf("Saving tile to disk\n");
         }
-        tiling_put_tile_raw(T, tt, tfile, dw_im_tile);
+        tiling_put_tile_raw(T, tt, raw_target, dw_im_tile);
         fim_free(dw_im_tile);
         // free(tpsf);
     }
@@ -2036,7 +2083,7 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
 
     if(s->verbosity > 2)
     {
-        printf("converting %s to %s\n", tfile, s->outFile);
+        printf("converting %s to %s\n", raw_target, s->outFile);
     }
 
     if(s->outFormat == 32)
@@ -2045,7 +2092,7 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
     } else {
         if(s->scaling <= 0)
         {
-            float rawmax = raw_file_single_max(tfile, (size_t) M * (size_t) N * (size_t) P );
+            float rawmax = raw_file_single_max(raw_target, (size_t) M * (size_t) N * (size_t) P );
             if(rawmax > 0)
             {
                 s->scaling = 65535/rawmax;
@@ -2057,11 +2104,11 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
     // TODO: fim_from_raw( ... )
     if(npyfilename(s->outFile))
     {
-        if(raw_to_npio(s->outFile, tfile, M, N, P,
+        if(raw_to_npio(s->outFile, raw_target, M, N, P,
                        s->outFormat,
                        s->scaling))
         {
-            fprintf(stderr, "Error converting %s to %s\n", s->outFile, tfile);
+            fprintf(stderr, "Error converting %s to %s\n", s->outFile, raw_target);
             exit(EXIT_FAILURE);
         }
 
@@ -2070,11 +2117,11 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
         {
             fim_tiff_imwrite_f32_from_raw(s->outFile,
                                           M, N, P,
-                                          tfile, s->imFile);
+                                          raw_target, s->imFile);
         } else {
             fim_tiff_imwrite_u16_from_raw(s->outFile,
                                           M, N, P,
-                                          tfile, s->imFile,
+                                          raw_target, s->imFile,
                                           s->scaling);
         }}
 
@@ -2085,18 +2132,18 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
 
     if(s->verbosity < 5)
     {
-        remove(tfile);
+        remove(raw_target);
     } else {
-        printf("Keeping %s for inspection, remove manually\n", tfile);
+        printf("Keeping %s for inspection, remove manually\n", raw_target);
     }
 
     if(s->verbosity > 2)
     {
         printf("freeing up\n");
     }
-    free(tfile);
-    remove(imFileRaw);
-    free(imFileRaw);
+    free(raw_target);
+    remove(raw_source);
+    free(raw_source);
     if(s->verbosity > 2)
     {
         printf("Done with tiling\n");

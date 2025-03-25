@@ -1,6 +1,20 @@
 Version History
 ===============
 
+0.4.7
+-----
+
+? Updated man pages built with sphinx?
+? GPU accelerated dot detection/fitting?
+
+0.4.6
+-----
+- Enhancement: the command line argument ``--tempdir`` can be used to
+  specify where the temporary files (used by tiling) are stored. If
+  that is not specified dw will look for the environmental variable
+  ``DW_TEMPDIR``. If that is not specified dw will use the folder of
+  the output file.
+
 0.4.5
 -----
 
