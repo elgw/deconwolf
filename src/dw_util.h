@@ -19,6 +19,7 @@
 #include <assert.h>
 #ifndef WINDOWS
 #include <dirent.h>
+#include <fileapi.h>
 #endif
 #include <errno.h>
 #include <fcntl.h>
@@ -155,3 +156,6 @@ int dw_fseek(FILE *, int64_t offset, int whence);
 
 /* Check if a file name ends with .npy while ignoring case */
 int npyfilename(const char * filename);
+
+/* Create a empty file in a given folder and return the name */
+char * dw_tempfile(const char * folder);
