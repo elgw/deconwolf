@@ -17,10 +17,7 @@
  */
 
 #include <assert.h>
-#ifndef WINDOWS
-#include <dirent.h>
-#include <fileapi.h>
-#endif
+
 #include <errno.h>
 #include <fcntl.h>
 #define _USE_MATH_DEFINES
@@ -33,12 +30,17 @@
 #include <sys/types.h>
 #include <time.h>
 #ifdef WINDOWS
+
 #include <io.h>
 #include <tchar.h>
 #include <direct.h>
+
 #else
+
 #include <libgen.h>
 #include <unistd.h>
+#include <dirent.h>
+
 #endif
 
 #include <string.h>

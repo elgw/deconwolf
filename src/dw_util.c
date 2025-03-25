@@ -517,23 +517,28 @@ char * dw_tempfile(const char * folder)
         return dw_tempfile("./");
     }
 
-#ifdef WIN32
-    char * fname = calloc(MAX_PATH, 1);
-    if(fname == NULL)
+#ifdef _WIN32
+    char* template = calloc(strlen(folder) + 16+16, 1);
+    if (template == NULL)
     {
+        printf("Failed to allocate for template\n"); fflush(stdout);
         return NULL;
     }
-
-    if(GetTempFileNameA(
-           folder,
-           "dw_",
-           1,
-           fname) == 0)
+    sprintf(template, "%s/dw_XXXXXX", folder);
+    if(_mktemp_s(template, strlen(template)+16))
     {
-        free(fname);
+        printf("Unable to generate template\n"); fflush(stdout);
+        free(template);
         return NULL;
     }
-    return fname;
+    FILE * fid = fopen(template, "wb");
+    if (fid == NULL)
+    {
+        printf("Error opening temp file '%s'\n", template);
+        return NULL;
+    }
+    fclose(fid);
+    return template;
 #else
     char * template = calloc(strlen(folder) + 16, 1);
     if(template == NULL)
@@ -547,8 +552,6 @@ char * dw_tempfile(const char * folder)
         free(template);
         return NULL;
     }
-    printf("template = %s (getchar)\n", template);
-    int test = getchar();
     close(file);
 
     return template;
