@@ -121,10 +121,11 @@ struct _dw_opts{
     int nThreads_FFT;
     int nThreads_OMP;
 
-    char * imFile;
-    char * psfFile;
-    char * refFile; /* Name of reference image */
+    char * imFile; /* File name: Image to deconvolve */
+    char * psfFile; /* File name: Point spread function */
+    char * refFile; /* File name: reference image */
     char * tsvFile; /* Where to write tsv benchmark data */
+
     float * ref; /* Reference image */
     char * outFile;
     char * logFile;
@@ -133,6 +134,10 @@ struct _dw_opts{
     char * flatfieldFile;
     FILE * log;
     FILE * tsv;
+
+    /* Where tiling temporary files will go */
+    char * tempFolder;
+
     int tiling_maxSize;
     int tiling_padding;
     int overwrite; /* overwrite output if exist */
