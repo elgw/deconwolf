@@ -220,7 +220,7 @@ MacOS.
    platforms, however, the installation process differs slightly. See the
    :ref:`installation notes <installation-notes>` for per-platform advice.
 
-2. Compile and install
+2. Compile
 
 .. code:: shell
 
@@ -228,7 +228,11 @@ MacOS.
    cd builddir
    cmake ..
    cmake --build .
-   sudo make install
+
+3. Install
+
+.. code:: shell
+   sudo cmake --install . --prefix /usr
 
 Once again, see the :ref:`installation notes <installation-notes>` for more options.
 
