@@ -14,6 +14,7 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <inttypes.h>
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
