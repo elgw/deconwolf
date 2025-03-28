@@ -33,6 +33,8 @@ To build:
    cd builddir
    cmake ..
    cmake --build .
+   # change the prefix depending on where you want to install the program
+   cmake --install . --prefix /usr
 
 Without GPU acceleration:
 -------------------------
