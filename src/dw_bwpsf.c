@@ -18,7 +18,7 @@
 #include "dw_bwpsf.h"
 #include "npio.h"
 
-int GLOB_N_GSL_EROUND = 0; /* Counter for GSL_EROUND */
+volatile int GLOB_N_GSL_EROUND = 0; /* Counter for GSL_EROUND */
 
 void dw_bw_gsl_err_handler(const char * reason,
                            const char * file,
@@ -118,7 +118,7 @@ bw_conf * bw_conf_new()
     conf->N = 181;
     conf->P = 181; // Does only need to be 2*size(I,3)+1
 
-    conf->nThreads = 8;
+    conf->nThreads = omp_get_max_threads()/2;
     conf->V = NULL;
     conf->verbose = 1;
     conf->V = NULL;
@@ -457,6 +457,11 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
     {
         s->nThreads = s->P;
     }
+    if(s->nThreads < 1)
+    {
+	s->nThreads = 1;
+    }
+    omp_set_num_threads(s->nThreads);
 
     return;
 }
@@ -475,13 +480,14 @@ void BW(bw_conf * conf)
     conf->V = malloc(conf->M*conf->N*conf->P*sizeof(float));
     assert(conf->V != NULL);
 
+    
 #pragma omp parallel for
     for(int z = 0; z < (conf->P+1)/2; z++)
     {
         float defocus = conf->resAxial * (z - (conf->P - 1.0) / 2.0);
         BW_slice(conf->V + z*conf->M*conf->N, defocus, conf);
     }
-
+    
     /* symmetry in Z */
     for(int z = 0; z< (conf->P-1)/2; z++)
     {
@@ -796,9 +802,15 @@ int main(int argc, char ** argv)
 
     fprint_time(conf->log);
     dw_gettime(&tend);
+    fprint_peak_memory(conf->log);
     fprintf(conf->log, "Took: %f s\n", timespec_diff(&tend, &tstart));
     fprintf(conf->log, "done!\n");
 
+    if(conf->verbose > 1)
+    {
+	fprint_peak_memory(stdout);
+    }    
+    
     /* Clean up */
     free(conf->V);
     bw_conf_free(&conf);

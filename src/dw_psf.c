@@ -329,10 +329,10 @@ static void argparsing(int argc, char ** argv, opts * s)
         assert(s->outfile != NULL);
         if(s->optical.lambda2 == 0)
         {
-        sprintf(s->outfile,
-                "psf_NA%.2f_ni%.2f_lambda%.0f_dx%.0f_dz%.0f.tif",
-                s->optical.NA, s->optical.ni, s->optical.lambda,
-                s->optical.dx, s->optical.dz);
+	    sprintf(s->outfile,
+		    "psf_NA%.2f_ni%.2f_lambda%.0f_dx%.0f_dz%.0f.tif",
+		    s->optical.NA, s->optical.ni, s->optical.lambda,
+		    s->optical.dx, s->optical.dz);
         } else {
             sprintf(s->outfile,
                     "cpsf_NA%.2f_ni%.2f_lambda%.0f_exlambda%.0f_dx%.0f_dz%.0f.tif",
@@ -564,9 +564,9 @@ static void downsample_integrate(float * A, float * B, int nA, int nB)
 
     /* Convolution */
     fim_convn1(B, nB, nB, 1,
-              K, factor, 0, 0);
+               K, factor, 0, 0);
     fim_convn1(B, nB, nB, 1,
-              K, factor, 1, 0);
+               K, factor, 1, 0);
 
 
     /* Subsample */
@@ -581,7 +581,7 @@ static void downsample_integrate(float * A, float * B, int nA, int nB)
 }
 
 fimo * gen_psf(opts * s, double lambda)
-    {
+{
     if(s->verbose > 2) { printf("Allocating for output\n"); fflush(stdout); }
 
     double optical_dx = s->optical.dx/s->oversampling;
@@ -610,8 +610,8 @@ fimo * gen_psf(opts * s, double lambda)
             float dx = (float) kk - rmax;
             float dy = (float) ll - rmax;
             float r = Fn*sqrt(
-                              pow(dx/rmax, 2) + pow(dy/rmax, 2)
-                              );
+                pow(dx/rmax, 2) + pow(dy/rmax, 2)
+                );
             float f = pow(s->optical.ni/lambda, 2) - pow(r, 2);
             if(f > 0)
             {
@@ -711,8 +711,8 @@ fimo * gen_psf(opts * s, double lambda)
         for(int pp = 0; pp< (int) PSF->P; pp++)
         {
             downsample_integrate(Vout + pp*s->M*s->M,
-                       PSF->V + pp*PSF->M*PSF->M,
-                       s->M, PSF->M);
+                                 PSF->V + pp*PSF->M*PSF->M,
+                                 s->M, PSF->M);
         }
         free(PSF->V);
         PSF->V = Vout;
@@ -722,7 +722,7 @@ fimo * gen_psf(opts * s, double lambda)
 
 
     return PSF;
-    }
+}
 
 static double max_double(double a, double b)
 {
@@ -767,9 +767,9 @@ static float * conv2d_float(float * A, float * B,
     fftwf_complex * FB = fim_malloc(M*N*sizeof(fftwf_complex));
 
     fftwf_plan plan1 = fftwf_plan_dft_r2c_2d(M, N,
-                                      A, /* In */
-                                      FA, /* Out */
-                                      FFTW_ESTIMATE);
+                                             A, /* In */
+                                             FA, /* Out */
+                                             FFTW_ESTIMATE);
     fftwf_execute(plan1);
     fftwf_destroy_plan(plan1);
     fftwf_plan plan2 = fftwf_plan_dft_r2c_2d(M, N,
@@ -826,9 +826,9 @@ static void pinhole_convolution(opts * s, fimo * PSF)
                 double x1 = x0 + s->optical.dx;
                 double y0 = bpos*s->optical.dx - s->optical.dx/2.0;
                 double y1 = y0 + s->optical.dx;
-            P[bb+aa*PSF->M] = square_overlap(-pinhole_nm/2.0, pinhole_nm/2.0,
-                                             -pinhole_nm/2.0, pinhole_nm/2.0,
-                                             x0, x1, y0, y1);
+                P[bb+aa*PSF->M] = square_overlap(-pinhole_nm/2.0, pinhole_nm/2.0,
+                                                 -pinhole_nm/2.0, pinhole_nm/2.0,
+                                                 x0, x1, y0, y1);
             }
             /* error function approximation for disks */
             if(s->optical.pinhole_shape == PINHOLE_DISK)
@@ -881,7 +881,7 @@ static void dw_psf(opts * s)
     if(s->optical.lambda2 != 0)
     {
         /* We will generate a PSF for a confocal microscope with
-        * square-shaped pin-hole */
+         * square-shaped pin-hole */
 
         /* Convolve PSF with the pinhole */
 
@@ -938,8 +938,14 @@ int dw_psf_cli(int argc, char ** argv)
     }
     /* Ready to go */
     dw_psf(s);
+
+    if(s->verbose > 1)
+    {
+        fprint_peak_memory(stdout);
+    }    
     /* Clean up */
     opts_free(s);
+    
     return 0;
 }
 
