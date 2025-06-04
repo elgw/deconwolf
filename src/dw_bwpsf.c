@@ -797,6 +797,7 @@ int main(int argc, char ** argv)
     fprint_time(conf->log);
     dw_gettime(&tend);
     fprintf(conf->log, "Took: %f s\n", timespec_diff(&tend, &tstart));
+    fprint_peak_memory(conf->log);
     fprintf(conf->log, "done!\n");
 
     /* Clean up */

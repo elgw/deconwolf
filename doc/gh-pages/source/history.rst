@@ -6,6 +6,7 @@ Version History
 
 ? Updated man pages built with sphinx?
 ? GPU accelerated dot detection/fitting?
+? Disabling color output etc when `isatty` returns 0.
 
 0.4.6
 -----
@@ -14,6 +15,9 @@ Version History
   that is not specified dw will look for the environmental variable
   ``DW_TEMPDIR``. If that is not specified dw will use the folder of
   the output file.
+- Fixed errors in the ``--help`` for ``dw dots``.
+- Fixed: ``f_corr`` values from ``dw dots`` are no longer `NaN` for
+  points close the image boundaries.
 
 0.4.5
 -----

@@ -80,7 +80,11 @@ correlation_lp(const float * X, const float * Y, size_t n)
     {
         corr += ((double) X[kk]-mx)*((double) Y[kk]-my);
     }
+
     corr = corr / sqrt( sx*sy );
+
+    assert(!isnan(corr));
+
     return (float) corr;
 }
 
@@ -248,9 +252,12 @@ float correlate_spot(const gsl_vector * v, optParams * params)
     {
         if(use[kk])
         {
-            Spt[writepos] = Spt[kk];
-            use[writepos] = R[kk];
-            writepos++;
+            if(isfinite(R[kk])) // is NaN for pixels outside of the image
+            {
+                Spt[writepos] = Spt[kk];
+                use[writepos] = R[kk];
+                writepos++;
+            }
         }
     }
     // printf("using %zu / %zu pixels\n", writepos, M*N*P);

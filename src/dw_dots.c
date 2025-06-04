@@ -199,9 +199,9 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
     printf("\n");
     printf("If you want to control the filter sizes, skip the optical parameters\n"
            "above and set the filter sizes manually by:\n");
-    printf(" --dog_ls s\n\t"
+    printf(" --log_ls s\n\t"
            "Lateral sigma (location of zero-crossing)\n");
-    printf(" --dog_as s\n\t"
+    printf(" --log_as s\n\t"
            "Axial sigma (location of zero-crossing)\n");
     printf(" --fit_ls\n\t"
            "Lateral sigma, initial guess for the dot fitting\n");
