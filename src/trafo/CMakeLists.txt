@@ -9,6 +9,8 @@ if(WIN32)
   add_definitions(-DWINDOWS)
 endif()
 
+add_definitions(-D_DEFAULT_SOURCE)
+
 #
 # Default build type is RELEASE
 #
@@ -18,8 +20,8 @@ endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 # Don't install to /usr/local/ use /usr/
-#set( CMAKE_INSTALL_PREFIX
-#  /usr )
+set( CMAKE_INSTALL_PREFIX
+  /usr )
 
 add_library(trafo SHARED
   src/entropy.c

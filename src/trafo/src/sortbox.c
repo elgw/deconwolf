@@ -1,6 +1,5 @@
 #include "sortbox.h"
 
-#include <malloc.h>
 #include <assert.h>
 #include <string.h>
 #include <stdio.h>

@@ -750,8 +750,11 @@ void detect_dots(opts * s, char * inFile)
             if(s->verbose > 0)
             {
                 printf("Scaling by %f\n", 1.0/scaling);
+                fprintf(s->log, "Scaling by %f\n", 1.0/scaling);
                 fim_mult_scalar(A, M*N*P, 1.0/scaling);
             }
+        } else {
+            fprintf(s->log, "Could not read a scaling value from %s.log.txt\n", inFile);
         }
     }
 

@@ -1,6 +1,14 @@
 CFLAGS=-Wall -Wextra
-CFLAGS+=-pedantic -std=gnu11 -fopenmp -std=gnu11
-CFLAGS+=-O3 -DNDEBUG
+CFLAGS+=-pedantic -std=gnu11 -fopenmp -D_DEFAULT_SOURCE
+DEBUG?=0
+
+CFLAGS+=-fvisibility=hidden
+
+ifeq ($(DEBUG),1)
+CFLAGS += -O0 -Wno-unknown-pragmas -g3 -fanalyzer
+else
+CFLAGS += -O3 -DNDEBUG
+endif
 
 LTRAFO_SRC=src/trafo.c \
 src/qsort.c \
@@ -20,6 +28,8 @@ entropy.o
 
 VISIBILITY=-DHAVE___ATTRIBUTE__VISIBILITY_HIDDEN -fvisibility=hidden
 
+# For visibility of static library
+CFLAGS+=-Wl,--exclude-libs=ALL
 
 # $(OBJDIR)/%.o : %.c | $(OBJDIR)
 
@@ -34,6 +44,11 @@ libtrafo.so:
 	$(CC) --shared -fPIC $(VISIBILITY) $(CFLAGS) \
 $(LTRAFO_SRC)  -o libtrafo.so
 
+CLI_FILES = $(wildcard src/*.c)
+LDFLAGS=-lm
+
+trafo_cli: $(CLI_FILES)
+	$(CC) $(CFLAGS) $(CLI_FILES) $(LDFLAGS) -o trafo_cli
 
 clean:
 	rm -rf *.o
