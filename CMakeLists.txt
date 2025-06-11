@@ -74,6 +74,9 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
+if (NOT CMAKE_BUILD_TYPE MATCHES Debug)
+  add_definitions(-DNDEBUG)
+endif()
 
 set(dw_SOURCES
   src/deconwolf.c
