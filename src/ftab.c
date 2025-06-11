@@ -380,7 +380,7 @@ parse_col_names(ftab_t * T,
         char * token = strsep(&line, dlm);
         T->colnames[kk] = strdup(token);
         trim_whitespace(T->colnames[kk]);
-        printf("read colnames: '%s'\n", T->colnames[kk]);
+        // printf("read colnames: '%s'\n", T->colnames[kk]);
     }
 
     if(0){
