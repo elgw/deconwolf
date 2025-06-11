@@ -1485,92 +1485,92 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
 
     printf("\n");
     printf(" Options:\n");
-    printf(" --version\n\t"
+    printf("  --version\n\t"
            "Show version info\n");
-    printf(" --help\n\t"
+    printf("  --help\n\t"
            "Show this message\n");
-    printf(" --out file\n\t"
+    printf("  --out file\n\t"
            "Specify output image name. If not set the input image will be prefixed\n\t"
            "with dw_.\n");
-    printf(" --iter N\n\t"
+    printf("  --iter N\n\t"
            "Specify the number of iterations to use (default: %d)\n", s->nIter);
-    printf(" --gpu\n\t"
+    printf("  --gpu\n\t"
            "Use GPU processing\n");
-    printf(" --cldevice n\n\t"
+    printf("  --cldevice n\n\t"
            "Use OpenCL device #n\n");
-    printf(" --threads N\n\t"
+    printf("  --threads N\n\t"
            "Specify the number of CPU threads to use\n");
-    printf(" --verbose N\n\t"
+    printf("  --verbose N\n\t"
            "Set verbosity level (default: %d)\n", s->verbosity);
-    printf(" --test\n\t"
+    printf("  --test\n\t"
            "Run unit tests\n");
-    printf(" --tilesize N\n\t"
+    printf("  --tilesize N\n\t"
            "Enables tiling mode and sets the largest tile size\n\t"
            "to N voxels in x and y.\n");
-    printf(" --tilepad N\n\t"
+    printf("  --tilepad N\n\t"
            "Sets the tiles to overlap by N voxels in tile mode \n\t"
            "(default: %d)\n", s->tiling_padding);
-    printf(" --prefix str\n\t"
+    printf("  --prefix str\n\t"
            "Set the prefix of the output files (default: '%s')\n",
            s->prefix);
-    printf(" --overwrite\n\t"
+    printf("  --overwrite\n\t"
            "Allows deconwolf to overwrite already existing output files\n");
 
-    printf(" --psigma s\n\t"
+    printf("  --psigma s\n\t"
            "Pre filter the image with a Gaussian filter of sigma=s while Anscombe\n\t"
            "transformed\n");
 
-    printf(" --cz n\n\t"
+    printf("  --cz n\n\t"
            "remove n zplanes from the top and bottom of the image.\n\t"
            "has no effect when tiling is used\n");
 
-    printf(" --az n\n\t"
+    printf("  --az n\n\t"
            "Automatically crop the image to n z-planes. The plane with the largest\n\t"
            "will be placed in the centre.\n\t"
            "has no effect when tiling is used\n");
 
-    printf(" --bq Q\n\t"
+    printf("  --bq Q\n\t"
            "Set border handling to \n\t"
            "0 'none' i.e. periodic\n\t"
            "1 'compromise', or\n\t"
            "2 'normal' which is default\n");
-    printf("--periodic\n\t"
+    printf("  --periodic\n\t"
            "Equivalent to --bq 0\n");
 
-    printf("--scale s\n\t"
+    printf("  --scale s\n\t"
            "Set the scaling factor for the output image manually to s.\n\t"
            "Warning: Might cause clipping or discretization artifacts\n\t"
            "This option is only used when the output format is 16-bit (i.e. \n\t"
            "not with --float)\n");
-    printf(" --float\n\t"
+    printf("  --float\n\t"
            "Set output format to 32-bit float (default is 16-bit \n\t"
            "int) and disable scaling\n");
-    printf(" --bg l\n\t"
+    printf("  --bg l\n\t"
            "Set background level, l\n");
-    printf(" --offset l\n\t"
+    printf("  --offset l\n\t"
            "Set a positive offset that will be added to the image during\n\t"
            "processing and remove before saving to disk. Can help to mitigate\n\t"
            "some of the detector noise (non-Poissonian)\n");
-    printf(" --flatfield image.tif\n\t"
+    printf("  --flatfield image.tif\n\t"
            "Use a flat field correction image. Deconwolf will divide each plane of\n\t"
            "the input image, pixel by pixel, by this correction image.\n");
-    printf(" --lookahead N\n\t"
+    printf("  --lookahead N\n\t"
            "Try to do a speed-for-memory trade off by using a N pixels larger\n\t"
            "job size that is better suited for FFT.\n");
-    printf("--method name\n\t"
+    printf("  --method name\n\t"
            "Select what method to use. Valid options: rl, shb, shbcl2\n");
-    printf("--start_id\n\t"
+    printf("  --start_id\n\t"
            "Set the input image as the initial guess\n");
-    printf("--start_flat\n\t"
+    printf("  --start_flat\n\t"
            "Use the average of the input image as the initial guess. Default\n");
-    printf("--start_lp\n\t"
+    printf("  --start_lp\n\t"
            "Use a low passed version of the input image as the initial guess.\n");
-    printf(" --noplan\n\t"
+    printf("  --noplan\n\t"
            "Don't use any planning optimization for fftw3\n");
-    printf(" --no-inplace\n\t"
+    printf("  --no-inplace\n\t"
            "Disable in-place FFTs (for fftw3), uses more\n\t"
            "memory but could potentially be faster for some problem sizes.\n");
-    printf(" --tempdir\n\t"
+    printf("  --tempdir\n\t"
            "Specify the folder where temporary files should be written\n");
     printf("\n");
 

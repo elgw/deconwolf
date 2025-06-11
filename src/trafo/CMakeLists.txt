@@ -19,6 +19,10 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
+if (NOT CMAKE_BUILD_TYPE MATCHES Debug)
+  add_definitions(-DNDEBUG)
+endif()
+
 # Don't install to /usr/local/ use /usr/
 set( CMAKE_INSTALL_PREFIX
   /usr )

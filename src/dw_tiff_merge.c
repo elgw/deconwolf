@@ -38,11 +38,11 @@ void usage()
     printf("Usage for subcommand 'merge'\n");
     printf("dw merge [merge] output.tif input1.tif input2.tif ...\n");
     printf("Options:\n");
-    printf("--help\n\t"
+    printf("  --help\n\t"
            "Show this help message and quit\n");
-    printf("--verbose v\n\t"
+    printf("  --verbose v\n\t"
            "Set verbosity level to v\n");
-    printf("--overwrite\n\t"
+    printf("  --overwrite\n\t"
            "Overwrite output image if it already exists\n");
     return;
 }

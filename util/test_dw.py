@@ -44,6 +44,16 @@ def check_help_section(command):
                 errol()
                 print(f"Too many initial white spaces on line {n}")
                 print(line)
+        # If the the first characters are '--' then there should be no
+        # space before that
+        test = line.strip()
+        if len(test) > 3:
+            #breakpoint()
+            if(test[0:1] == '-'):
+                if(line[0:3] != '  -'):
+                    errol()
+                    print(f" Not 2 ws before initial '-' on line {n}")
+                    print(line)
 
 def test_tif_npy(image):
     """ Convert
@@ -109,7 +119,7 @@ if __name__ == '__main__':
     check_help_section([dw, '--help'])
     subcmds = ['maxproj', 'merge', 'dots', 'psf',
                'psf-STED', 'nuclei', 'background',
-               'tif2npy', 'npy2tif'];
+               'tif2npy', 'npy2tif', 'imshift', 'align-dots'];
     for subcmd in subcmds:
         check_help_section([dw, subcmd, '--help'])
 

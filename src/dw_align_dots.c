@@ -124,24 +124,24 @@ static void usage(void)
     printf("usage: dw align-dots [<options>] file1.tsv file2.tsv\n");
     printf("\n");
     printf("Options:\n");
-    printf("--radius d, -d d\n"
+    printf("  --radius d, -d d\n"
            "\tSet the capture radius, i.e. largest expected shift in pixels\n"
            "\tDefault value: %.1f\n", dopts->capture_distance);
-    printf("--sigma s, -s s\n"
+    printf("  --sigma s, -s s\n"
            "\tSet the size of the KDE used to identify the peak\n"
            "\tDefault value: %.2f\n", dopts->sigma);
-    printf("--npoint n, -n n\n"
+    printf("  --npoint n, -n n\n"
            "\tset the maximum number of points to use from each file\n");
-    printf("--mag f\n"
+    printf("  --mag f\n"
            "\tMultiplicative magnification factor for the 2nd point set\n");
-    printf("--rotz d\n"
+    printf("  --rotz d\n"
            "\tRotation around the z-axis at (x,y)=(0,0), hence\n"
            "\tonly small rotations like +/- 0.0001 are meaningful\n");
-    printf("--out file, -o file\n"
+    printf("  --out file, -o file\n"
            "\tWhere to write the results.\n");
-    printf("--overwrite\n"
+    printf("  --overwrite\n"
            "\tOverwrite the destination file if it exists\n");
-    printf("--append, -a\n"
+    printf("  --append, -a\n"
            "\tAppend to the output file\n");
     printf("\n");
     printf("Output columns:\n");

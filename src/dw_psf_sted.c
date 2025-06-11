@@ -148,20 +148,20 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
     printf("Deconwolf %s STED PSF generator.\n", deconwolf_version);
     printf("usage: %s [<options>] output.tif\n", argv[0]);
     printf("Options:\n");
-    printf(" --lateral l\n\t"
+    printf("  --lateral l\n\t"
            "Lateral FWHM in pixels\n");
-    printf(" --axial l\n\t"
+    printf("  --axial l\n\t"
            "Axial FWHM in pixels\n");
-    printf(" --size N\n\t"
+    printf("  --size N\n\t"
            "Set number of pixels along lateral dimensions\n");
-    printf(" --nslice P\n\t"
+    printf("  --nslice P\n\t"
            "Set number of pixels along axial dimension\n");
     printf("General:\n");
-    printf(" --overwrite\n\t"
+    printf("  --overwrite\n\t"
            "Overwrite existing files\n");
-    printf(" --help\n\t"
+    printf("  --help\n\t"
            "Show this message\n");
-    printf(" --verbose v\n\t"
+    printf("  --verbose v\n\t"
            "Verbosity level\n");
     printf("\n");
     opts_free(s);

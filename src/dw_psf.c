@@ -140,36 +140,36 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
     opts * s = opts_new();
     printf("usage: %s [<options>] output.tif\n", argv[0]);
     printf("Options:\n");
-    printf(" --NA NA\n\t"
+    printf("  --NA NA\n\t"
            "Set numerical aperture\n");
-    printf(" --ni ni\n\t"
+    printf("  --ni ni\n\t"
            "Set refractive index\n");
-    printf(" --dx dx\n\t"
+    printf("  --dx dx\n\t"
            "Lateral pixel size\n");
-    printf(" --dz dz\n\t"
+    printf("  --dz dz\n\t"
            "Axial pixel size\n");
-    printf(" --lambda l\n\t"
+    printf("  --lambda l\n\t"
            "Emission wave length\n");
-    printf(" --lambda2 l\n\t"
+    printf("  --lambda2 l\n\t"
            "Excitation wave length\n");
-    printf(" --pinhole p\n\t"
+    printf("  --pinhole p\n\t"
            "Pinhole size in AU\n");
-    printf(" --pinhole_disk \n\t"
+    printf("  --pinhole_disk \n\t"
            "Set the pinhole shape to a disk, default is square\n");
-    printf(" --size s\n\t"
+    printf("  --size s\n\t"
            "Set the lateral size (pixels). Default: %d\n", s->M);
-    printf(" --nslice p\n\t"
+    printf("  --nslice p\n\t"
            "Set the number of planes (pixels). Default: %d\n", s->P);
-    printf(" --xgrid x\n\t"
+    printf("  --xgrid x\n\t"
            "Set the factor for lateral image padding. Default: %d\n", s->xgrid);
-    printf(" --oversample x\n\t"
+    printf("  --oversample x\n\t"
            "Process the PSF at x times higher resolution. Default: %d\n", s->oversampling);
     printf("General:\n");
-    printf(" --overwrite\n\t"
+    printf("  --overwrite\n\t"
            "Overwrite existing files\n");
-    printf(" --help\n\t"
+    printf("  --help\n\t"
            "Show this message\n");
-    printf(" --verbose v\n\t"
+    printf("  --verbose v\n\t"
            "Verbosity level\n");
     printf("\n");
     opts_free(s);

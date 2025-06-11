@@ -58,11 +58,11 @@ static void usage(const char * progname)
     printf("%s [OPTIONS] --out bg.tif file1.tif file2.tif ...\n", progname);
     printf("\n");
     printf("Options:\n");
-    printf(" --overwrite\n\t"
+    printf("  --overwrite\n\t"
            "overwrite existing files\n");
-    printf(" --verbose n\n\t"
+    printf("  --verbose n\n\t"
            "set verbosity level to n\n");
-    printf(" --sigma s\n\t"
+    printf("  --sigma s\n\t"
            "set the sigma value of the Gaussian smoothing kernel\n\t"
            "default value: %.1f [pixels]\n", defaults->sigma);
     opts_free(defaults);

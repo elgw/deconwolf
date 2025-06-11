@@ -66,19 +66,21 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
     printf("The method is only efficient for small shifts.\n");
     printf("\n");
     printf("Options:\n");
-    printf(" --dx dx\n"
+    printf("  --dx dx\n"
            "\tthe shift in the first dimension (non-strided)\n");
-    printf("--dy dy\n"
+    printf("  --dy dy\n"
            "\tshift along the 2nd dimension\n");
-    printf("--dz dz\n"
+    printf("  --dz dz\n"
            "\tshift along the 3rd dimension\n");
-    printf(" --overwrite\n\t Overwrite existing files\n");
-    printf(" --help\n\t Show this message\n");
-    printf(" --verbose v\n"
+    printf("  --overwrite\n\t"
+           "Overwrite existing files\n");
+    printf("  --help\n\t"
+           "Show this message\n");
+    printf("  --verbose v\n"
            "\tset verbosity level\n");
-    printf(" --threads t\n"
+    printf("  --threads t\n"
            "\tnumber of threads to use\n");
-    printf("--ref ref.tif\n"
+    printf("  --ref ref.tif\n"
            "\tspecify a reference image to align with using normalized\n"
            "\tcross correlation\n");
     // TODO: does the normalized cross correlation feature work? Then
