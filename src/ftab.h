@@ -16,6 +16,11 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 /* Floating point-only table stored in row-major format.
  * Original repository: github.com/elgw/ftab/
  *
@@ -23,7 +28,6 @@
  *
  * - Missing values will be parsed as 0
  * - Always interprets the first line as a header
- *
  *
  * TODO
  *
@@ -41,11 +45,8 @@
  * 0.1.2 : added ftab_compare to compare two tables.
  * 0.1.3 : build on windows with clang (added missing functions)
  * 0.1.4 : added convenience functions: ftab_get_data_f64, ftab_get_data_u32, ftab_nel and ftab_has_data
+ * 0.1.5 : Fixed a few potential problems. Moved version from the header file.
  */
-
-#define FTAB_VERSION_MAJOR 0
-#define FTAB_VERSION_MINOR 1
-#define FTAB_VERSION_PATCH 4
 
 #include <stdint.h>
 #include <stdio.h>
@@ -169,3 +170,13 @@ ftab_get_data_u32(const ftab_t *);
 * number of rows x number of columns
 */
 uint64_t ftab_nel(const ftab_t * T);
+
+    const char * ftab_version(void);
+
+    int ftab_version_major(void);
+    int ftab_version_minor(void);
+    int ftab_version_patch(void);
+
+#ifdef __cplusplus
+}
+#endif
