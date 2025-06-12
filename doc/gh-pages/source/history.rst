@@ -18,6 +18,8 @@ Version History
 - Fixed errors in the ``--help`` for ``dw dots``.
 - Fixed: ``f_corr`` values from ``dw dots`` are no longer `NaN` for
   points close the image boundaries.
+- Change: ``dw imshift`` does not scale the output images any more. If
+  the input is f32 the output will be f32, else u16.
 
 0.4.5
 -----

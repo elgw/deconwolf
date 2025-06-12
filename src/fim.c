@@ -1007,7 +1007,7 @@ void fim_circshift(float * restrict A,
     return;
 }
 
-/* A linear interpolation kernel for -1<delta<1 */
+/* A linear interpolation kernel for -1 < delta < 1 */
 static float * kernel_linear_shift(float delta, int * _N)
 {
     if(delta == 0)
@@ -1056,66 +1056,61 @@ void fim_shift(float * restrict A,
 
     /* Start a parallel region to figure out how many threads that will be used
        and how much memory to allocate for the buffers */
+
 #pragma omp parallel
     {
-        nThreads = omp_get_num_threads();
-    }
 
-    const size_t bsize = fmax(fmax(M, N), P);
-    float * restrict buf = fim_malloc(bsize*sizeof(float)*nThreads);
-    assert(buf != NULL);
+        const size_t bsize = fmax(fmax(M, N), P);
+        float * restrict tbuf = fim_malloc(bsize*sizeof(float));
+        assert(tbuf != NULL);
 
 
-    /* Dimension 1 */
-#pragma omp parallel for
-    for(int64_t cc = 0; cc<P; cc++)
-    {
-        float * tbuf = buf + bsize*omp_get_thread_num();
+        /* Dimension 1 */
+#pragma omp for
+        for(int64_t cc = 0; cc<P; cc++)
+        {
+            for(int64_t bb = 0; bb<N; bb++)
+            {
+                shift_vector_float_buf(A + bb*M + cc*M*N, // start
+                                       1, // stride
+                                       M, // number of elements
+                                       sm, // shift
+                                       kernelx,
+                                       nkernelx,
+                                       tbuf); // buffer
+            }
+        }
+
+        /* Dimension 2 */
+#pragma omp for
+        for(int64_t cc = 0; cc<P; cc++)
+        {
+            for(int64_t aa = 0; aa<M; aa++)
+            {
+                //shift_vector(A + aa+cc*M*N, M, N, sn);
+                shift_vector_float_buf(A + aa+cc*M*N,
+                                       M,
+                                       N,
+                                       sn, kernely, nkernely, tbuf);
+            }
+        }
+
+        /* Dimension 3 */
+#pragma omp for
         for(int64_t bb = 0; bb<N; bb++)
         {
-            //shift_vector(A + bb*M + cc*M*N, 1, M, sm);
-            shift_vector_float_buf(A + bb*M + cc*M*N, // start
-                                   1, // stride
-                                   M, // number of elements
-                                   sm, // shift
-                                   kernelx,
-                                   nkernelx,
-                                   tbuf); // buffer
+            for(int64_t aa = 0; aa<M; aa++)
+            {
+                //shift_vector(A + aa+bb*M, M*N, P, sp);
+                shift_vector_float_buf(A + aa+bb*M,
+                                       M*N,
+                                       P,
+                                       sp, kernelz, nkernelz, tbuf);
+            }
         }
-    }
 
-    /* Dimension 2 */
-#pragma omp parallel for
-    for(int64_t cc = 0; cc<P; cc++)
-    {
-        float * tbuf = buf + bsize*omp_get_thread_num();
-        //printf("Thread num: %d\n", omp_get_thread_num());
-        for(int64_t aa = 0; aa<M; aa++)
-        {
-            //shift_vector(A + aa+cc*M*N, M, N, sn);
-            shift_vector_float_buf(A + aa+cc*M*N,
-                                   M,
-                                   N,
-                                   sn, kernely, nkernely, tbuf);
-        }
+        fim_free(tbuf);
     }
-
-    /* Dimension 3 */
-#pragma omp parallel for
-    for(int64_t bb = 0; bb<N; bb++)
-    {
-        float * tbuf = buf + bsize*omp_get_thread_num();
-        for(int64_t aa = 0; aa<M; aa++)
-        {
-            //shift_vector(A + aa+bb*M, M*N, P, sp);
-            shift_vector_float_buf(A + aa+bb*M,
-                                   M*N,
-                                   P,
-                                   sp, kernelz, nkernelz, tbuf);
-        }
-    }
-
-    fim_free(buf);
 
     fim_free(kernelx);
     fim_free(kernely);
@@ -1151,9 +1146,6 @@ void shift_vector_float_buf(float * restrict V, // data
                             float * restrict buffer)
 {
     // 1. Sub pixel shift by convolution (conv1) of signal and kernel
-    // 2. Integer part of the shift
-    /* TODO: Interpolation here ... by interpolation kernel?*/
-    /* First integer part and then sub pixel? */
     if(kernel == NULL)
     {
         for(size_t pp = 0; pp < (size_t) N; pp++)
@@ -1164,9 +1156,10 @@ void shift_vector_float_buf(float * restrict V, // data
         fim_conv1_vector(V, S, buffer, N, kernel, nkernel, 1);
     }
 
+    // 2. Integer part of the shift
     for(size_t pp = 0; pp<(size_t) N; pp++)
     {
-        int q = pp+n;
+        int q = pp+n; // Integer shift
         if(q>= 0 && q<N)
         {
             buffer[pp] = V[q*S];
@@ -1899,9 +1892,12 @@ void fim_conv1(float * restrict V, const size_t nV, const int stride,
     return;
 }
 
-void fim_conv1_vector(float * restrict V, const int stride, float * restrict W,
-                      const size_t nV,
-                      const float * restrict K, const size_t nKu, const int normalized)
+void
+fim_conv1_vector(float * restrict V, const int stride,
+                 float * restrict W, /* Optional buffer to avoid malloc */
+                 const size_t nV,
+                 const float * restrict K, const size_t nKu,
+                 const int normalized)
 {
     if(V == NULL || K == NULL)
     {
@@ -4892,12 +4888,12 @@ static void fim_DoH_ut(void)
 
 void fim_ut()
 {
-    #ifdef NDEBUG
+#ifdef NDEBUG
     fprintf(stderr, "ERROR: NDEBUG is defined and asserts disabled\n"
             "please re-compile with asserts enabled\n");
-    #else
+#else
     printf("-> asserts are on\n");
-    #endif
+#endif
     printf("-> npyfilename\n");
     assert(npyfilename(".npy") == 1);
     assert(npyfilename("npy") == 0);

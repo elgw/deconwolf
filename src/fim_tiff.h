@@ -210,9 +210,26 @@ void fim_tiff_ut();
 int fim_tiff_get_size(const char * fname,
                       int64_t * M, int64_t * N, int64_t * P);
 
+typedef struct {
+    int64_t M; // Number of elements along non-strided dimension
+    int64_t N;
+    int64_t P;
+    uint32_t BPS; // Bits per sample
+} fim_tiff_info;
+
+/** @brief Get some basic information about a tiff file without reading the image data.
+ * @return 0 upon success.
+ * @param fname Name of tiff file
+ * @param[out] M, N, P the image size
+ */
+
+int fim_tiff_get_info(const char * fname, fim_tiff_info * info);
+
 /** @brief Max projection from input to output file
  * Not loading the full images into memory.
  * The output file will have the same sample format as the input image.
+ *
+ * return value: 0 on success
  */
 int fim_tiff_maxproj(const char * in, const char * out);
 

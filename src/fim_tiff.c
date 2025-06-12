@@ -1172,11 +1172,11 @@ int fim_tiff_write_opt(const char * fName, const float * V,
     return 0;
 }
 
-int fim_tiff_get_size(const char * fname,
-                      int64_t * M, int64_t * N, int64_t * P)
+int fim_tiff_get_info(const char * fname,
+                      fim_tiff_info * info)
 {
     TIFF * tiff = TIFFOpen(fname, "r");
-    uint32_t m, n, p;
+    uint32_t m, n, p, BPS;
 
     if(tiff == NULL) {
         return -1;
@@ -1185,6 +1185,7 @@ int fim_tiff_get_size(const char * fname,
     int ok = 1;
     ok *= TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &m);
     ok *= TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &n);
+    ok *= TIFFGetField(tiff, TIFFTAG_BITSPERSAMPLE, &BPS);
     if(ok != 1)
     {
         return -1;
@@ -1193,11 +1194,26 @@ int fim_tiff_get_size(const char * fname,
 
     p = TIFFNumberOfDirectories(tiff);
     TIFFClose(tiff);
-
-    M[0] = m; N[0] = n; P[0] = p;
+    info->M = m;
+    info->N = n;
+    info->P = p;
+    info->BPS = BPS;
     return 0;
 }
 
+int fim_tiff_get_size(const char * fname,
+                      int64_t * M, int64_t * N, int64_t * P)
+{
+    fim_tiff_info info;
+    if(fim_tiff_get_info(fname, &info) == 0)
+    {
+    *M = info.M;
+    *N = info.N;
+    *P = info.P;
+    return 0;
+    }
+    return 1;
+}
 
 float * fim_tiff_read(const char * fName,
                       ttags * T,
