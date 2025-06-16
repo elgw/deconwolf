@@ -179,6 +179,7 @@ static void perform_imshift(const opts * s){
     }
     fim_shift(A, M, N, P, s->dx, s->dy, s->dz);
 
+    // Write without auto scaling
     if(info.BPS <= 16)
     {
         fim_tiff_write_opt(s->outFile, A,

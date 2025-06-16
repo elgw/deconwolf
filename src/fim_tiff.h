@@ -205,6 +205,8 @@ void fim_tiff_ut();
  * @return 0 upon success.
  * @param fname Name of tiff file
  * @param[out] M, N, P the image size
+ *
+ * Please use fim_tiff_get_info instead.
  */
 
 int fim_tiff_get_size(const char * fname,
