@@ -186,6 +186,14 @@ dw_tiff_max(int argc, char ** argv)
             exit(EXIT_FAILURE);
         }
 
+        fim_tiff_info info = {0};
+        fim_tiff_get_info(inFile, &info);
+        if(info.P <= 1)
+        {
+            printf("%s is 2D, skipping\n", inFile);
+            continue;
+        }
+
         /* Output file name */
         char *  outFile = NULL;
         switch(s->mode)

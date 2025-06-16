@@ -20,6 +20,7 @@ Version History
   points close the image boundaries.
 - Change: ``dw imshift`` does not scale the output images any more. If
   the input is f32 the output will be f32, else u16.
+- Change: ``dw maxproj`` will skip over 2D images.
 
 0.4.5
 -----
