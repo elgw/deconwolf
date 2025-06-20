@@ -32,6 +32,7 @@ add_library( deconwolf SHARED
   lanczos.c
   tiling.c
   quickselect.c
+  npio.c
 )
 
 set(DECONWOLF_PUBLIC_HEADERS
@@ -41,6 +42,7 @@ set(DECONWOLF_PUBLIC_HEADERS
   "fft.h"
   "ftab.h"
   "dw_version.h"
+  "npio.h"
 "kdtree/include/kdtree.h")
 
 #
