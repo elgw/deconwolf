@@ -911,7 +911,6 @@ void fft_set_inplace(int ip)
 
 fftwf_complex * fft_inplace(float * X, const size_t M, const size_t N, const size_t P)
 {
-
     fft_inplace_pad(&X, M, N, P);
     assert(plan_r2c_inplace != NULL);
     fftwf_execute_dft_r2c(plan_r2c_inplace, X, (fftwf_complex *) X);
