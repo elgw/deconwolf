@@ -371,7 +371,7 @@ float iter_shb(
 
 
     const double mindiv = 1e-6; /* Smallest allowed divisor */
-#pragma omp parallel for shared(y, im)
+#pragma omp parallel for shared(y, im) collapse(2)
     for(size_t cc =0; cc < (size_t) wP; cc++){
         for(size_t bb = 0; bb < (size_t) wN; bb++){
             for(size_t aa = 0; aa < (size_t) wM; aa++){

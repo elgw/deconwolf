@@ -29,7 +29,7 @@ fft_block_of_ones(clu_env_t * clu,
 
     float * one = fim_zeros(wM*wN*wP);
 
-#pragma omp parallel for shared(one)
+#pragma omp parallel for shared(one) collapse(2)
     for(int64_t cc = 0; cc < P; cc++) {
         for(int64_t bb = 0; bb < N; bb++) {
             for(int64_t aa = 0; aa < M; aa++) {
