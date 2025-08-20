@@ -80,7 +80,7 @@ dw_nuclei: $(dw_nuclei_files)
 	$(CC) $(CFLAGS) -DSTANDALONE $(dw_nuclei_files) $(LDFLAGS) -o dw_nuclei
 
 dw_bg_files=dw_background.c fim.o ftab.o fim_tiff.o dw_util.o quickselect.o \
-fft.o
+fft.o npio.o
 
 dw_background: $(dw_bg_files)
 	$(CC) $(CFLAGS) -DSTANDALONE $(dw_bg_files) $(LDFLAGS) -o dw_background
