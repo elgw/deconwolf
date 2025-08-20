@@ -21,6 +21,7 @@ Version History
 - Change: ``dw imshift`` does not scale the output images any more. If
   the input is f32 the output will be f32, else u16.
 - Change: ``dw maxproj`` will skip over 2D images.
+- Fixed: ``dw --start_lp ...`` does no longer fail for images with few z-planes.
 
 0.4.5
 -----

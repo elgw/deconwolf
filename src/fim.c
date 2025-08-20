@@ -1904,13 +1904,6 @@ fim_conv1_vector(float * restrict V, const int stride,
         return;
     }
 
-    if(nKu > nV)
-    {
-        fprintf(stderr,
-                "fim_conv1_vector: error - kernel can't be longer than data\n");
-        return;
-    }
-
     /* Allocate buffer if not provided */
     int Walloc = 0;
     if(W == NULL)
@@ -2213,9 +2206,16 @@ void fim_gsmooth_aniso(float * restrict V,
     if(asigma > 0 && P > 1)
     {
         size_t nKa = 0;
-        float * Ka = gaussian_kernel(asigma, &nKa);
+        float * Ka0 = gaussian_kernel(asigma, &nKa);
+        float * Ka = Ka0;
+        // Trim the kernel if larger than needed
+        while(nKa > 2*P-1)
+        {
+            Ka = Ka + 1;
+            nKa -= 2;
+        }
         fim_convn1(V, M, N, P, Ka, nKa, 2, 1);
-        fim_free(Ka);
+        fim_free(Ka0);
     }
 
     return;
