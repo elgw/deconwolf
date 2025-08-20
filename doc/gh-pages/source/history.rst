@@ -1,12 +1,13 @@
 Version History
 ===============
 
-0.4.7
------
+Planned/todo
+------------
 
 ? Updated man pages built with sphinx?
 ? GPU accelerated dot detection/fitting?
 ? Disabling color output etc when `isatty` returns 0.
+? Use transpositions instead of strided convolutions for `fim_gmsooth` etc.
 
 0.4.6
 -----
