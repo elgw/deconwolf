@@ -324,15 +324,18 @@ set(dw_bw_SOURCES
   #
   # LibPNG
   #
+  find_package(PNG)
+  target_link_libraries(dw PRIVATE PNG::PNG)
 
-  include(FindPNG)
-  if(PNG_FOUND)
-    message("Found libPNG")
-    target_link_libraries(dw PRIVATE ${PNG_LIBRARIES})
-    target_include_directories(dw PRIVATE ${PNG_INCLUDE_DIRS})
-  else()
-    message("libPNG not found")
-  endif()
+
+  #include(FindPNG)
+  #if(PNG_FOUND)
+  #  message("Found libPNG")
+  #  target_link_libraries(dw PRIVATE ${PNG_LIBRARIES})
+  #  target_include_directories(dw PRIVATE ${PNG_INCLUDE_DIRS})
+  #else()
+  #  message("libPNG not found")
+  #endif()
 
 
 
