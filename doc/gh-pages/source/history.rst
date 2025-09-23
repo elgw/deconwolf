@@ -11,6 +11,10 @@ Planned/todo
 
 0.4.6
 -----
+- ``dw align-dots``: accepts separate magnification/scaling values for
+  the dots tables. The scaling is only applied in the lateral plane
+  (previous versions applied it also to the z-coordinate)
+
 - Enhancement: the command line argument ``--tempdir`` can be used to
   specify where the temporary files (used by tiling) are stored. If
   that is not specified dw will look for the environmental variable

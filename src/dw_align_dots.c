@@ -38,8 +38,9 @@ typedef struct{
     /* Append to the outfile ? */
     int append;
 
-    /* Magnification factor for the 2nd list of dots */
-    double mag;
+    /* Magnification factor for the list of dots */
+    double mag1;
+    double mag2;
 
     /* Rotation about the z-axis, i.e. in the plane */
     double rotz;
@@ -95,7 +96,8 @@ static opts * opts_new()
     s->verbose = 1;
     s->capture_distance = 10;
     s->sigma = 0.4;
-    s->mag = 1.0;
+    s->mag1 = 1.0;
+    s->mag2 = 1.0;
     return s;
 }
 
@@ -132,7 +134,10 @@ static void usage(void)
            "\tDefault value: %.2f\n", dopts->sigma);
     printf("  --npoint n, -n n\n"
            "\tset the maximum number of points to use from each file\n");
-    printf("  --mag f\n"
+    printf("  --mag1 f\n"
+           "\tMultiplicative magnification factor for the 1st point set in the lateral plane\n"
+           "\tDots coordinates will be multiplied with this factor directly after loading\n");
+    printf("  --mag2 f\n"
            "\tMultiplicative magnification factor for the 2nd point set\n");
     printf("  --rotz d\n"
            "\tRotation around the z-axis at (x,y)=(0,0), hence\n"
@@ -152,9 +157,10 @@ static void usage(void)
     printf(" 5. goodness\n");
     printf(" 6. reference file\n");
     printf(" 7. other file\n");
-    printf(" 8. magnification\n");
-    printf(" 9. sigma\n");
-    printf("10. search radius\n");
+    printf(" 8. magnification for 1st set\n");
+    printf(" 9. magnification for 2nd set\n");
+    printf("10. sigma\n");
+    printf("11. search radius\n");
     printf("\n");
     opts_free(dopts);
     dopts = NULL;
@@ -168,7 +174,8 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"help", no_argument, NULL, 'h'},
         {"verbose", required_argument, NULL, 'v'},
         {"radius",   required_argument, NULL, 'd'},
-        {"mag",      required_argument, NULL, 'm'},
+        {"mag1",      required_argument, NULL, 'm'},
+        {"mag2",      required_argument, NULL, 'M'},
         {"npoint", required_argument, NULL, 'n'},
         {"out",    required_argument, NULL, 'o'},
         {"append", no_argument, NULL, 'a'},
@@ -179,7 +186,7 @@ static void argparsing(int argc, char ** argv, opts * s)
 
     int ch;
     while( (ch = getopt_long(argc, argv,
-                             "ad:hm:n:o:r:s:v:w",
+                             "ad:hm:M:n:o:r:s:v:w",
                              longopts, NULL)) != -1)
     {
         switch(ch)
@@ -195,7 +202,10 @@ static void argparsing(int argc, char ** argv, opts * s)
             exit(EXIT_SUCCESS);
             break;
         case 'm':
-            s->mag = atof(optarg);
+            s->mag1 = atof(optarg);
+            break;
+        case 'M':
+            s->mag2 = atof(optarg);
             break;
         case 'n':
             s->npoint = atol(optarg);
@@ -244,9 +254,10 @@ static void magnify_dots(double * X, size_t n, double mag)
     {
         return;
     }
+
     for(size_t kk = 0; kk<n ; kk++)
     {
-        for(size_t dd = 0; dd < 3; dd++)
+        for(size_t dd = 0; dd < 2; dd++)
         {
             X[3*kk + dd] *= mag;
         }
@@ -606,9 +617,9 @@ static void align_dots(opts * s,
 
     if(s->verbose > 0)
     {
-        printf("Estimated shift: [% .2f, % .2f, % .2f] pixels, KDE=%.2f, Score=%.2f (%.1f/%.1f) mag=%f\n",
+        printf("Estimated shift: [% .2f, % .2f, % .2f] pixels, KDE=%.2f, Score=%.2f (%.1f/%.1f) mag1=%f mag2=%f\n",
                maxpos[0], maxpos[1], maxpos[2],
-               maxkde, maxkde/maxkde2, maxkde, maxkde2, s->mag);
+               maxkde, maxkde/maxkde2, maxkde, maxkde2, s->mag1, s->mag2);
 
         if(maxkde < 2)
         {
@@ -717,7 +728,8 @@ int dw_align_dots(int argc, char ** argv)
         nXB > s->npoint ? nXB = s->npoint : 0;
     }
 
-    magnify_dots(XB, nXB, s->mag);
+    magnify_dots(XA, nXA, s->mag1);
+    magnify_dots(XB, nXB, s->mag2);
     rotz_dots(XB, nXB, s->rotz);
 
     if(s->verbose > 0)
@@ -744,7 +756,8 @@ int dw_align_dots(int argc, char ** argv)
         fprintf(fid, ", %f, %f", s->kde, s->goodness);
         fprintf(fid, ", '%s'", argv[optind]);
         fprintf(fid, ", '%s'", argv[optind+1]);
-        fprintf(fid, ", %f", s->mag);
+        fprintf(fid, ", %f", s->mag1);
+        fprintf(fid, ", %f", s->mag2);
         fprintf(fid, ", %f", s->sigma);
         fprintf(fid, ", %f", s->capture_distance);
         fprintf(fid, "\n");
