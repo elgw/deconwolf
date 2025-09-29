@@ -204,9 +204,9 @@ static void usage(void)
            "\tOverwrite the destination file if it exists\n");
     printf("  --append, -a\n"
            "\tAppend to the output file\n");
-    printf("  --delta1 file\n"
+    printf("  --delta1 delta1.npy\n"
            "\tInitial displacements for dots in file1\n");
-        printf("  --delta2 file\n"
+        printf("  --delta2 delta2.npy\n"
            "\tInitial displacements for dots in file2\n");
     printf("\n");
     printf("Output columns:\n");
