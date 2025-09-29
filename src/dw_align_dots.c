@@ -317,12 +317,20 @@ static void argparsing(int argc, char ** argv, opts * s)
     s->optind = optind;
 
     if(s->fname_d1)
-    {
+    {        
         load_delta(s->fname_d1, s->delta1);
+        if(s->verbose > 1)
+        {
+            printf("delta1=[%f, %f, %f]\n", s->delta1[0], s->delta1[1], s->delta1[2]);
+        }
     }
     if(s->fname_d2)
     {
-        load_delta(s->fname_d1, s->delta1);
+        load_delta(s->fname_d2, s->delta2);
+        if(s->verbose > 1)
+        {
+            printf("delta2=[%f, %f, %f]\n", s->delta2[0], s->delta2[1], s->delta2[2]);
+        }
     }
     return;
 }
@@ -731,15 +739,14 @@ static void shift_dots(double * X, double * D, i64 n)
     double s = abs(D[0]) + abs(D[1]) + abs(D[2]);
     if(s == 0)
     {
-        // no shift needed
         return;
     }
-    
+
     for(i64 kk = 0; kk < n; kk++)
     {
-        X[3*kk + 0] = X[3*kk + 0] - D[0];
-        X[3*kk + 1] = X[3*kk + 1] - D[1];
-        X[3*kk + 2] = X[3*kk + 2] - D[2];
+        X[3*kk + 0] = X[3*kk + 0] + D[0];
+        X[3*kk + 1] = X[3*kk + 1] + D[1];
+        X[3*kk + 2] = X[3*kk + 2] + D[2];
     }
 }
 
@@ -829,7 +836,6 @@ int dw_align_dots(int argc, char ** argv)
 
     shift_dots(XA, s->delta1, nXA);
     shift_dots(XB, s->delta2, nXB);
-
     
     rotz_dots(XB, nXB, s->rotz);
 
