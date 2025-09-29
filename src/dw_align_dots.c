@@ -174,10 +174,10 @@ static void usage(void)
 {
     opts * dopts = opts_new();
     printf(
-           "With the dots in the first table as reference, estimate how the \n"
-           "dots in the second table are shifted. Add the returned value to\n"
-           "the coordinates in the 1st table, or subtract them from the coordinates\n"
-           "in the 2nd table to align the dots\n");
+           "Estimates a displacement vector d=[dx, dy, dz] so that\n"
+           "A + d overlaps B, where A are dots from file1.tsv and\n"
+           "B are dots from file2.tsv\n"
+           "The input files should be generated with dw dots\n");
     printf("\n");
     printf("usage: dw align-dots [<options>] file1.tsv file2.tsv\n");
     printf("\n");
