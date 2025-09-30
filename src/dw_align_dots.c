@@ -617,9 +617,9 @@ static void align_dots(opts * s,
 
     if(s->verbose > 0)
     {
-        printf("Estimated shift: [% .2f, % .2f, % .2f] pixels, KDE=%.2f, Score=%.2f (%.1f/%.1f) mag1=%f mag2=%f\n",
+        printf("Estimated shift: [% .2f, % .2f, % .2f] pixels, KDE=%.2f, 2nd KDE: %.2f mag1=%f mag2=%f\n",
                maxpos[0], maxpos[1], maxpos[2],
-               maxkde, maxkde/maxkde2, maxkde, maxkde2, s->mag1, s->mag2);
+               maxkde, maxkde2, s->mag1, s->mag2);
 
         if(maxkde < 2)
         {
@@ -636,7 +636,8 @@ static void align_dots(opts * s,
     s->dy = maxpos[1];
     s->dz = maxpos[2];
     s->kde = maxkde;
-    s->goodness = maxkde / maxkde2;
+    /* Gap / combined height */
+    s->goodness = (maxkde-maxkde2) / (maxkde + maxkde2);
     kdtree_free(TD);
     TD = NULL;
 
