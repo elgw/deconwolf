@@ -9,6 +9,7 @@
 #include "ftab.h"
 #include "dw_version.h"
 #include "dw_util.h"
+#include "npio.h"
 
 /* TODO
  *
@@ -18,6 +19,8 @@
  * - Use paired dots to create a polynomial model.
  *
 */
+
+typedef int64_t i64;
 
 typedef struct{
     int verbose;
@@ -42,6 +45,12 @@ typedef struct{
     double mag1;
     double mag2;
 
+    /* Initial shifts for the dots */
+    char * fname_d1;
+    char * fname_d2;
+    double delta1[3];
+    double delta2[3];
+
     /* Rotation about the z-axis, i.e. in the plane */
     double rotz;
 
@@ -52,6 +61,8 @@ typedef struct{
     double kde;
     /* Some measurement on how certain the result is */
     double goodness;
+
+
 
 } opts;
 
@@ -103,6 +114,8 @@ static opts * opts_new()
 
 static void opts_free(opts * s)
 {
+    free(s->fname_d1);
+    free(s->fname_d2);
     free(s->outfile);
     free(s);
 }
@@ -114,14 +127,57 @@ static void opts_print(opts * s, FILE * fid)
     return;
 }
 
+static void load_delta(const char * fname, double * delta)
+{
+    npio_t * np = npio_load(fname);
+    if(np == NULL)
+    {
+        fprintf(stderr, "Unable to load %s\n", fname);
+        exit(EXIT_FAILURE);
+    }
+    if(np->nel != 3)
+    {
+        fprintf(stderr, "Wrong number of elements in %s\n", fname);
+        exit(EXIT_FAILURE);
+    }
+    
+    if(np->dtype == NPIO_F32)
+    {
+        float * X = (float*) np->data;
+        for(int kk = 0; kk < 3; kk++)
+        {
+            delta[kk] = X[kk];
+        }
+        npio_free(np);
+        return;
+    }
+
+    if(np->dtype == NPIO_F64)
+    {
+        double * X = (double*) np->data;
+        for(int kk = 0; kk < 3; kk++)
+        {
+            delta[kk] = X[kk];
+        }
+        npio_free(np);
+        return;
+    }
+
+    fprintf(stderr,
+            "Unable to load data from %s\n"
+            "Please check the data type and the number of elements\n",
+        fname);
+    exit(EXIT_FAILURE);
+}
+
 static void usage(void)
 {
     opts * dopts = opts_new();
     printf(
-           "With the dots in the first table as reference, estimate how the \n"
-           "dots in the second table are shifted. Add the returned value to\n"
-           "the coordinates in the 1st table, or subtract them from the coordinates\n"
-           "in the 2nd table to align the dots\n");
+           "Estimates a displacement vector d=[dx, dy, dz] so that\n"
+           "A + d overlaps B, where A are dots from file1.tsv and\n"
+           "B are dots from file2.tsv\n"
+           "The input files should be generated with dw dots\n");
     printf("\n");
     printf("usage: dw align-dots [<options>] file1.tsv file2.tsv\n");
     printf("\n");
@@ -148,6 +204,10 @@ static void usage(void)
            "\tOverwrite the destination file if it exists\n");
     printf("  --append, -a\n"
            "\tAppend to the output file\n");
+    printf("  --delta1 delta1.npy\n"
+           "\tInitial displacements for dots in file1\n");
+        printf("  --delta2 delta2.npy\n"
+           "\tInitial displacements for dots in file2\n");
     printf("\n");
     printf("Output columns:\n");
     printf(" 1. dx\n");
@@ -182,15 +242,25 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"rotz", required_argument, NULL, 'r'},
         {"sigma", required_argument, NULL, 's'},
         {"overwrite", no_argument, NULL, 'w'},
+        {"delta1", required_argument, NULL, '1'},
+        {"delta2", required_argument, NULL, '2'},
         {NULL, 0, NULL, 0}};
 
     int ch;
     while( (ch = getopt_long(argc, argv,
-                             "ad:hm:M:n:o:r:s:v:w",
+                             "ad:hm:M:n:o:r:s:v:w1:2:",
                              longopts, NULL)) != -1)
     {
         switch(ch)
         {
+        case '1':
+            free(s->fname_d1);
+            s->fname_d1 = strdup(optarg);
+            break;
+        case '2':
+            free(s->fname_d2);
+            s->fname_d2 = strdup(optarg);
+            break;
         case 'a':
             s->append = 1;
             break;
@@ -245,6 +315,23 @@ static void argparsing(int argc, char ** argv, opts * s)
     }
 
     s->optind = optind;
+
+    if(s->fname_d1)
+    {        
+        load_delta(s->fname_d1, s->delta1);
+        if(s->verbose > 1)
+        {
+            printf("delta1=[%f, %f, %f]\n", s->delta1[0], s->delta1[1], s->delta1[2]);
+        }
+    }
+    if(s->fname_d2)
+    {
+        load_delta(s->fname_d2, s->delta2);
+        if(s->verbose > 1)
+        {
+            printf("delta2=[%f, %f, %f]\n", s->delta2[0], s->delta2[1], s->delta2[2]);
+        }
+    }
     return;
 }
 
@@ -282,7 +369,8 @@ static void rotz_dots(double * X, size_t n, double rot)
     }
 }
 
-double * get_dots(opts * s, ftab_t * T)
+/* Extract the X,Y,Z values from the table */
+static double * get_dots(opts * s, ftab_t * T)
 {
     if(s->verbose > 1)
     {
@@ -646,6 +734,23 @@ static void align_dots(opts * s,
 
 }
 
+/* Add a D=[dx, dy, dz] to each point in X */
+static void shift_dots(double * X, double * D, i64 n)
+{
+    double s = abs(D[0]) + abs(D[1]) + abs(D[2]);
+    if(s == 0)
+    {
+        return;
+    }
+
+    for(i64 kk = 0; kk < n; kk++)
+    {
+        X[3*kk + 0] = X[3*kk + 0] + D[0];
+        X[3*kk + 1] = X[3*kk + 1] + D[1];
+        X[3*kk + 2] = X[3*kk + 2] + D[2];
+    }
+}
+
 int dw_align_dots(int argc, char ** argv)
 {
 
@@ -713,14 +818,12 @@ int dw_align_dots(int argc, char ** argv)
     double * XB = get_dots(s, TB);
 
 
-
     size_t nXB = TB->nrow;
     ftab_free(TB); TB = NULL;
     if(XB == NULL)
     {
         return EXIT_FAILURE;
     }
-
 
     /* Limit the number of dots to use? */
     if(s->npoint > 0)
@@ -731,6 +834,10 @@ int dw_align_dots(int argc, char ** argv)
 
     magnify_dots(XA, nXA, s->mag1);
     magnify_dots(XB, nXB, s->mag2);
+
+    shift_dots(XA, s->delta1, nXA);
+    shift_dots(XB, s->delta2, nXB);
+    
     rotz_dots(XB, nXB, s->rotz);
 
     if(s->verbose > 0)
