@@ -408,7 +408,8 @@ dw_nuclei.o \
 dw_png.o \
 quickselect.o \
 dw_background.o \
-npio.o
+npio.o \
+qalign.o
 
 dwbw_OBJECTS = fim.o \
 fim_tiff.o \

@@ -11,8 +11,8 @@ typedef int32_t i32;
 qalign_config * qalign_config_new(void)
 {
     qalign_config * qconf = malloc(sizeof(qalign_config));
-    qconf->similarity_threshold = 0.5;
-    qconf->deviation_x = 1;
+    qconf->similarity_threshold = 1.5;
+    qconf->deviation_x = qconf->similarity_threshold/2;
     qconf->verbose = 1;
     qconf->npoint = 1000;
     return qconf;

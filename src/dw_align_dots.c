@@ -65,6 +65,25 @@ typedef struct{
 } opts;
 
 
+/* Poisson Probability Mass Function (PMF)
+ * I.e. lambda^k*exp(-lambda)/k!
+ */
+static double poisson_pmf(double k, double lambda)
+{
+    return exp(k*log(lambda)-lambda-lgamma(k+1));
+}
+
+static double poisson_cdf(double k0, double lambda)
+{
+    double s = 0;
+    for(int k = 0; k <= k0 ; k++)
+    {
+        s += poisson_pmf(k, lambda);
+    }
+    // printf("poisscdf(%e, %e) == %e\n", k0, lambda, s);
+    return s;
+}
+
 /* Get the value of the linspace from a to b with n points at idx */
 static double linspace(double a, double b, size_t n, size_t idx)
 {
@@ -737,98 +756,11 @@ static void align_dots(opts * s,
 
 }
 
-static int cmp_double(const void * _A, const void * _B)
-{
-    double * A = (double*) _A;
-    double * B = (double*) _B;
-    if( *A > *B )
-    {
-        return 1;
-    }
-    if( *B > *A )
-    {
-        return -1;
-    }
-    return 0;
-}
-
-static void get_lnf_feature(double * F, // where to write the feature
-                            const kdtree_t * T,
-                            const double * Q, // point to query
-                            const double * X, // all points
-                            const int nf)
-{
-    size_t nfound = 0;
-    size_t * idx = NULL;
-    double r = 20;
-    while(nfound < nf)
-    {
-        r*= 1.5;
-        free(idx);
-        idx = kdtree_query_radius(T, Q,
-                                  r,
-                                  &nfound);
-    }
-
-    if(nfound >= nf)
-    {
-        for(int kk = 0; kk < nf ; kk++)
-        {
-            F[kk] = eudist3_sq(X+3*idx[0], X+3*idx[kk]);
-        }
-        qsort(F, nf, sizeof(double), cmp_double);
-    } else {
-        printf("(%zu)", nfound);
-        F[0] = -1;
-    }
-
-    free(idx);
-    return;
-}
-
-static double lnf_distance(const double * A, const double * B, i64 n)
-{
-    double simil = 0;
-    int apos = 0;
-    int bpos = 0;
-    double th = 0.1;
-    while(1)
-    {
-        double va = A[apos];
-        double vb = B[bpos];
-        double d = fabs(va - vb);
-        if(d  < th)
-        {
-            simil += exp( - d*d/8.0 );
-            apos++;
-            bpos++;
-        } else {
-            if( va < vb)
-            {
-                apos++;
-            } else {
-                bpos++;
-            }
-        }
-
-        if(apos == n)
-        {
-            break;
-        }
-        if(bpos == n)
-        {
-            break;
-        }
-    }
-
-    return simil;
-}
-
 
 /* Add a D=[dx, dy, dz] to each point in X */
 static void shift_dots(double * X, double * D, i64 n)
 {
-    double s = abs(D[0]) + abs(D[1]) + abs(D[2]);
+    double s = fabs(D[0]) + fabs(D[1]) + fabs(D[2]);
     if(s == 0)
     {
         return;
@@ -860,7 +792,8 @@ get_displacement_from_qalign_result(opts * s,
     double best_kde = -1;
     for(i64 kk = 0; kk < nqD; kk++)
     {
-        double kde = kdtree_kde(T, qD+3*kk, 0.5, -1);
+        //printf("%f, %f, %f\n", qD[3*kk], qD[3*kk+1], qD[3*kk+2]);
+        double kde = kdtree_kde(T, qD+3*kk, s->sigma, -1);
         if(kde > best_kde)
         {
             best_kde = kde;
@@ -880,21 +813,46 @@ get_displacement_from_qalign_result(opts * s,
     {
         kdtree_kde_mean(T,
                         Q0,
-                        0.5, // radius
+                        s->sigma, // radius
                         -1, // cutoff (auto)
                         Q1);
         memcpy(Q0, Q1, 3*sizeof(double));
     }
 
-    s->kde = kdtree_kde(T, Q1, 0.5, -1);
+    s->kde = kdtree_kde(T, Q1, s->sigma, -1);
 
     if(s->verbose > 1)
     {
-        printf("qalign -> [%f, %f, %f]\n", Q1[0], Q1[1], Q1[2]);
+        printf("qalign -> [%f, %f, %f] (kde=%.2f)\n", Q1[0], Q1[1], Q1[2], s->kde);
     }
 
     kdtree_free(T);
     return;
+}
+
+/* Volume of a point cloud calculated via the bounding box */
+static double
+bbx_volume(const double * X, i64 nX)
+{
+    double mincoord[3];
+    double maxcoord[3];
+    for(int kk = 0; kk < 3; kk++)
+    {
+        mincoord[kk] = X[kk];
+        maxcoord[kk] = X[kk];
+    }
+    for(i64 kk = 0; kk < nX; kk++)
+    {
+        for(int ll = 0; ll < 3; ll++)
+        {
+            double c = X[3*kk+ll];
+            c > maxcoord[ll] ? maxcoord[ll] = c : 0;
+            c < mincoord[ll] ? mincoord[ll] = c : 0;
+        }
+    }
+    return (maxcoord[0]-mincoord[0])
+        *(maxcoord[1]-mincoord[1])
+        *(maxcoord[2]-mincoord[2]);
 }
 
 static int
@@ -907,14 +865,14 @@ run_qalign(opts * s,
     struct timespec t0, t1;
     dw_gettime(&t0);
     float * fXA = malloc(3*nXA*sizeof(float));
-    for(size_t kk = 0; kk < nXA; kk++)
+    for(i64 kk = 0; kk < nXA; kk++)
     {
         fXA[3*kk] = XA[3*kk];
         fXA[3*kk+1] = XA[3*kk+1];
         fXA[3*kk+2] = XA[3*kk+2];
     }
     float * fXB = malloc(3*nXB*sizeof(float));
-    for(size_t kk = 0; kk < nXB; kk++)
+    for(i64 kk = 0; kk < nXB; kk++)
     {
         fXB[3*kk] = XB[3*kk];
         fXB[3*kk+1] = XB[3*kk+1];
@@ -929,9 +887,11 @@ run_qalign(opts * s,
     qconf->nA = nXA;
     qconf->B = fXB;
     qconf->nB = nXB;
+
     int res = qalign(qconf);
     free(fXA);
     free(fXB);
+
     if(res == EXIT_SUCCESS)
     {
         nqD = qconf->nH;
@@ -940,7 +900,7 @@ run_qalign(opts * s,
         {
             for(i64 ii = 0; ii < 3; ii++)
             {
-                qD[3*kk + ii] = qconf->H[3*kk].delta[ii];
+                qD[3*kk + ii] = qconf->H[kk].delta[ii];
             }
         }
 
@@ -952,23 +912,65 @@ run_qalign(opts * s,
         printf("qalign took %f s\n", timespec_diff(&t1, &t0));
     }
 
-    double Q1[3] = {0};
-    if(qD != NULL)
+    if(nqD < 2)
     {
-        get_displacement_from_qalign_result(s,
-                                            qD, nqD,
-                                            Q1);
+        if(s->verbose > 0)
+        {
+            printf("qalign could not find any correspondences\n");
+        }
         free(qD);
-        qD = NULL;
+        return EXIT_FAILURE;
     }
+
+    double Q1[3] = {0};
+
+    get_displacement_from_qalign_result(s,
+                                        qD, nqD,
+                                        Q1);
+    free(qD);
+    qD = NULL;
+
+    if(s->kde < 2)
+    {
+        if(s->verbose > 0)
+        {
+            printf("qalign could not find anything\n");
+            return EXIT_FAILURE;
+        }
+    }
+
     s->dx = Q1[0];
     s->dy = Q1[1];
     s->dz = Q1[2];
 
     /* TODO: fix model for expected kde given random points
     * */
-    double expected = (double) (nXA+nXB) / (double) (2048*2048);
-    s->goodness = 1.0 - expected / s->kde;
+    double observed = ceil(s->kde/2); //
+
+    double ncell1 = bbx_volume(XA, nXA) / s->sigma;
+    double ncell2 = bbx_volume(XB, nXB) / s->sigma;
+    if(ncell1 < 1e-6 || ncell2 < 1e-6)
+    {
+        s->goodness = -1;
+        return EXIT_SUCCESS;
+    }
+    double lambda1 = nXA / ncell1;
+    double lambda2 = nXB / ncell2;
+    double prob1 = 1.0 - poisson_cdf(observed, lambda1);
+    double prob2 = 1.0 - poisson_cdf(observed, lambda2);
+    double expected = 0.5*(ncell1+ncell2)*prob1*prob2;
+
+    if(s->verbose > 1)
+    {
+        printf("ncell1: %f ncell2: %f\n", ncell1, ncell2);
+        printf("lambda1: %e, lambda2: %e\n", lambda1, lambda2);
+        printf("prob1: %e, prob2: %e\n", prob1, prob2);
+        printf("observed: %f, expected %f\n", observed, expected);
+    }
+
+    s->goodness = 1.0 - expected / observed;
+    s->goodness > 1.0 ? s->goodness = 1 : 0;
+    s->goodness < 0.0 ? s->goodness = 0 : 0;
     return EXIT_SUCCESS;
 }
 
