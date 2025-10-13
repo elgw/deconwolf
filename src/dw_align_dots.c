@@ -10,6 +10,7 @@
 #include "dw_version.h"
 #include "dw_util.h"
 #include "npio.h"
+#include "qalign.h"
 
 /* TODO
  *
@@ -18,7 +19,7 @@
  * - option to rotate ?
  * - Use paired dots to create a polynomial model.
  *
-*/
+ */
 
 typedef int64_t i64;
 
@@ -61,9 +62,6 @@ typedef struct{
     double kde;
     /* Some measurement on how certain the result is */
     double goodness;
-
-
-
 } opts;
 
 
@@ -105,10 +103,11 @@ static opts * opts_new()
     opts * s = calloc(1, sizeof(opts));
     assert(s != NULL);
     s->verbose = 1;
-    s->capture_distance = 10;
+    s->capture_distance = 4;
     s->sigma = 0.4;
     s->mag1 = 1.0;
     s->mag2 = 1.0;
+    s->npoint = 250;
     return s;
 }
 
@@ -140,7 +139,7 @@ static void load_delta(const char * fname, double * delta)
         fprintf(stderr, "Wrong number of elements in %s\n", fname);
         exit(EXIT_FAILURE);
     }
-    
+
     if(np->dtype == NPIO_F32)
     {
         float * X = (float*) np->data;
@@ -166,7 +165,7 @@ static void load_delta(const char * fname, double * delta)
     fprintf(stderr,
             "Unable to load data from %s\n"
             "Please check the data type and the number of elements\n",
-        fname);
+            fname);
     exit(EXIT_FAILURE);
 }
 
@@ -188,8 +187,9 @@ static void usage(void)
     printf("  --sigma s, -s s\n"
            "\tSet the size of the KDE used to identify the peak\n"
            "\tDefault value: %.2f\n", dopts->sigma);
-    printf("  --npoint n, -n n\n"
-           "\tset the maximum number of points to use from each file\n");
+    printf("  --npoint n\n"
+           "\tset the maximum number of points to use from each file"
+           "Default value: %zu\n", dopts->npoint);
     printf("  --mag1 f\n"
            "\tMultiplicative magnification factor for the 1st point set in the lateral plane\n"
            "\tDots coordinates will be multiplied with this factor directly after loading\n");
@@ -206,7 +206,7 @@ static void usage(void)
            "\tAppend to the output file\n");
     printf("  --delta1 delta1.npy\n"
            "\tInitial displacements for dots in file1\n");
-        printf("  --delta2 delta2.npy\n"
+    printf("  --delta2 delta2.npy\n"
            "\tInitial displacements for dots in file2\n");
     printf("\n");
     printf("Output columns:\n");
@@ -214,7 +214,7 @@ static void usage(void)
     printf(" 2. dy\n");
     printf(" 3. dz\n");
     printf(" 4. kde\n");
-    printf(" 5. goodness\n");
+    printf(" 5. goodness or confidence. 1=perfect\n");
     printf(" 6. reference file\n");
     printf(" 7. other file\n");
     printf(" 8. magnification for 1st set\n");
@@ -317,7 +317,7 @@ static void argparsing(int argc, char ** argv, opts * s)
     s->optind = optind;
 
     if(s->fname_d1)
-    {        
+    {
         load_delta(s->fname_d1, s->delta1);
         if(s->verbose > 1)
         {
@@ -644,7 +644,7 @@ static void align_dots(opts * s,
         n = linspace_n(-rs, rs, 0.5);
         // double * KDE = calloc(n*n*n, sizeof(double)); // TODO
 
-        #pragma omp parallel for
+#pragma omp parallel for
         for(size_t iz = 0; iz < n; iz++) {
             double z = linspace(-rs, rs, n, iz);
             for(size_t iy = 0; iy < n; iy ++) {
@@ -703,9 +703,17 @@ static void align_dots(opts * s,
                maxpos2[2]);
     }
 
+    s->dx = maxpos[0];
+    s->dy = maxpos[1];
+    s->dz = maxpos[2];
+    s->kde = maxkde;
+    /* Gap / combined height */
+    s->goodness = (maxkde-maxkde2) / (maxkde + maxkde2);
+
     if(s->verbose > 0)
     {
-        printf("Estimated shift: [% .2f, % .2f, % .2f] pixels, KDE=%.2f, 2nd KDE: %.2f mag1=%f mag2=%f\n",
+        printf("Estimated shift: [% .2f, % .2f, % .2f] pixels, G=%.2f, KDE=%.2f, 2nd KDE: %.2f mag1=%f mag2=%f\n",
+               s->goodness,
                maxpos[0], maxpos[1], maxpos[2],
                maxkde, maxkde2, s->mag1, s->mag2);
 
@@ -720,12 +728,7 @@ static void align_dots(opts * s,
         }
     }
 
-    s->dx = maxpos[0];
-    s->dy = maxpos[1];
-    s->dz = maxpos[2];
-    s->kde = maxkde;
-    /* Gap / combined height */
-    s->goodness = (maxkde-maxkde2) / (maxkde + maxkde2);
+
     kdtree_free(TD);
     TD = NULL;
 
@@ -733,6 +736,94 @@ static void align_dots(opts * s,
     return;
 
 }
+
+static int cmp_double(const void * _A, const void * _B)
+{
+    double * A = (double*) _A;
+    double * B = (double*) _B;
+    if( *A > *B )
+    {
+        return 1;
+    }
+    if( *B > *A )
+    {
+        return -1;
+    }
+    return 0;
+}
+
+static void get_lnf_feature(double * F, // where to write the feature
+                            const kdtree_t * T,
+                            const double * Q, // point to query
+                            const double * X, // all points
+                            const int nf)
+{
+    size_t nfound = 0;
+    size_t * idx = NULL;
+    double r = 20;
+    while(nfound < nf)
+    {
+        r*= 1.5;
+        free(idx);
+        idx = kdtree_query_radius(T, Q,
+                                  r,
+                                  &nfound);
+    }
+
+    if(nfound >= nf)
+    {
+        for(int kk = 0; kk < nf ; kk++)
+        {
+            F[kk] = eudist3_sq(X+3*idx[0], X+3*idx[kk]);
+        }
+        qsort(F, nf, sizeof(double), cmp_double);
+    } else {
+        printf("(%zu)", nfound);
+        F[0] = -1;
+    }
+
+    free(idx);
+    return;
+}
+
+static double lnf_distance(const double * A, const double * B, i64 n)
+{
+    double simil = 0;
+    int apos = 0;
+    int bpos = 0;
+    double th = 0.1;
+    while(1)
+    {
+        double va = A[apos];
+        double vb = B[bpos];
+        double d = fabs(va - vb);
+        if(d  < th)
+        {
+            simil += exp( - d*d/8.0 );
+            apos++;
+            bpos++;
+        } else {
+            if( va < vb)
+            {
+                apos++;
+            } else {
+                bpos++;
+            }
+        }
+
+        if(apos == n)
+        {
+            break;
+        }
+        if(bpos == n)
+        {
+            break;
+        }
+    }
+
+    return simil;
+}
+
 
 /* Add a D=[dx, dy, dz] to each point in X */
 static void shift_dots(double * X, double * D, i64 n)
@@ -749,6 +840,153 @@ static void shift_dots(double * X, double * D, i64 n)
         X[3*kk + 1] = X[3*kk + 1] + D[1];
         X[3*kk + 2] = X[3*kk + 2] + D[2];
     }
+}
+
+
+static void
+get_displacement_from_qalign_result(opts * s,
+                                    const double * qD, // 3xnqD vector
+                                    i64 nqD,
+                                    double * Q1) // return value
+{
+    /* Use mean shift to find a single displacement vector from the
+       hypotheses returned from qalign */
+    if(s->verbose > 1)
+    {
+        printf("Refining the result among %ld points\n", nqD);
+    }
+    kdtree_t * T = kdtree_new(qD, nqD, 20);
+    i64 start_idx = 0;
+    double best_kde = -1;
+    for(i64 kk = 0; kk < nqD; kk++)
+    {
+        double kde = kdtree_kde(T, qD+3*kk, 0.5, -1);
+        if(kde > best_kde)
+        {
+            best_kde = kde;
+            start_idx = kk;
+        }
+    }
+    if(s->verbose > 1)
+    {
+        printf("Best start point at %ld (kde=%f)\n", start_idx, best_kde);
+    }
+
+    double Q0[3] = {qD[start_idx*3 + 0],
+                    qD[start_idx*3 + 1],
+                    qD[start_idx*3 + 2]};
+
+    for(i64 kk = 0; kk < 100; kk++)
+    {
+        kdtree_kde_mean(T,
+                        Q0,
+                        0.5, // radius
+                        -1, // cutoff (auto)
+                        Q1);
+        memcpy(Q0, Q1, 3*sizeof(double));
+    }
+
+    s->kde = kdtree_kde(T, Q1, 0.5, -1);
+
+    if(s->verbose > 1)
+    {
+        printf("qalign -> [%f, %f, %f]\n", Q1[0], Q1[1], Q1[2]);
+    }
+
+    kdtree_free(T);
+    return;
+}
+
+static int
+run_qalign(opts * s,
+           const double * XA,
+           i64 nXA,
+           const double * XB,
+           i64 nXB)
+{
+    struct timespec t0, t1;
+    dw_gettime(&t0);
+    float * fXA = malloc(3*nXA*sizeof(float));
+    for(size_t kk = 0; kk < nXA; kk++)
+    {
+        fXA[3*kk] = XA[3*kk];
+        fXA[3*kk+1] = XA[3*kk+1];
+        fXA[3*kk+2] = XA[3*kk+2];
+    }
+    float * fXB = malloc(3*nXB*sizeof(float));
+    for(size_t kk = 0; kk < nXB; kk++)
+    {
+        fXB[3*kk] = XB[3*kk];
+        fXB[3*kk+1] = XB[3*kk+1];
+        fXB[3*kk+2] = XB[3*kk+2];
+    }
+
+    double * qD = NULL;
+    i64 nqD = 0;
+
+    qalign_config * qconf = qalign_config_new();
+    qconf->A = fXA;
+    qconf->nA = nXA;
+    qconf->B = fXB;
+    qconf->nB = nXB;
+    int res = qalign(qconf);
+    free(fXA);
+    free(fXB);
+    if(res == EXIT_SUCCESS)
+    {
+        nqD = qconf->nH;
+        qD = malloc(nqD*3*sizeof(double));
+        for(i64 kk = 0; kk < nqD; kk++)
+        {
+            for(i64 ii = 0; ii < 3; ii++)
+            {
+                qD[3*kk + ii] = qconf->H[3*kk].delta[ii];
+            }
+        }
+
+    }
+    qalign_config_free(qconf);
+    dw_gettime(&t1);
+    if(s->verbose > 1)
+    {
+        printf("qalign took %f s\n", timespec_diff(&t1, &t0));
+    }
+
+    double Q1[3] = {0};
+    if(qD != NULL)
+    {
+        get_displacement_from_qalign_result(s,
+                                            qD, nqD,
+                                            Q1);
+        free(qD);
+        qD = NULL;
+    }
+    s->dx = Q1[0];
+    s->dy = Q1[1];
+    s->dz = Q1[2];
+
+    /* TODO: fix model for expected kde given random points
+    * */
+    double expected = (double) (nXA+nXB) / (double) (2048*2048);
+    s->goodness = 1.0 - expected / s->kde;
+    return EXIT_SUCCESS;
+}
+
+static void print_results(FILE * fid, opts * s,
+                          const char * file1,
+                          const char * file2)
+{
+
+    fprintf(fid, "%f, %f, %f", s->dx, s->dy, s->dz);
+    fprintf(fid, ", %f, %f", s->kde, s->goodness);
+    fprintf(fid, ", '%s'", file1);
+    fprintf(fid, ", '%s'", file2);
+    fprintf(fid, ", %f", s->mag1);
+    fprintf(fid, ", %f", s->mag2);
+    fprintf(fid, ", %f", s->sigma);
+    fprintf(fid, ", %f", s->capture_distance);
+    fprintf(fid, "\n");
+    return;
 }
 
 int dw_align_dots(int argc, char ** argv)
@@ -796,6 +1034,7 @@ int dw_align_dots(int argc, char ** argv)
         opts_free(s);
         exit(EXIT_FAILURE);
     }
+
     double * XA = get_dots(s, TA);
     size_t nXA = TA->nrow;
     ftab_free(TA); TA = NULL;
@@ -837,7 +1076,7 @@ int dw_align_dots(int argc, char ** argv)
 
     shift_dots(XA, s->delta1, nXA);
     shift_dots(XB, s->delta2, nXB);
-    
+
     rotz_dots(XB, nXB, s->rotz);
 
     if(s->verbose > 0)
@@ -845,7 +1084,11 @@ int dw_align_dots(int argc, char ** argv)
         printf("Will align %zu dots vs %zu\n", nXA, nXB);
     }
 
-    align_dots(s, XA, nXA, XB, nXB);
+
+    if(run_qalign(s, XA, nXA, XB, nXB))
+    {
+        align_dots(s, XA, nXA, XB, nXB);
+    }
 
     free(XA);
     free(XB);
@@ -853,25 +1096,30 @@ int dw_align_dots(int argc, char ** argv)
     /* Present the result */
     if(s->outfile != NULL)
     {
-        FILE * fid = NULL;
+        FILE * fid;
         if(s->append)
         {
             fid = fopen(s->outfile, "a");
         } else {
             fid = fopen(s->outfile, "w");
         }
-        fprintf(fid, "%f, %f, %f", s->dx, s->dy, s->dz);
-        fprintf(fid, ", %f, %f", s->kde, s->goodness);
-        fprintf(fid, ", '%s'", argv[optind]);
-        fprintf(fid, ", '%s'", argv[optind+1]);
-        fprintf(fid, ", %f", s->mag1);
-        fprintf(fid, ", %f", s->mag2);
-        fprintf(fid, ", %f", s->sigma);
-        fprintf(fid, ", %f", s->capture_distance);
-        fprintf(fid, "\n");
+        print_results(stdout, s, argv[optind], argv[optind+1]);
+        fclose(fid);
+    }
+    if(s->verbose > 0)
+    {
+        printf("dx, dy, dz, kde, goodness, file1, file2, mag1, mag2, sigma, capture_distance\n");
+        print_results(stdout, s, argv[optind], argv[optind+1]);
     }
 
     opts_free(s);
     s = NULL;
     return EXIT_SUCCESS;
 }
+
+#ifdef STANDALONE
+int main(int argc, char ** argv)
+{
+    return dw_align_dots(argc, argv);
+}
+#endif

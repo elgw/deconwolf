@@ -55,10 +55,10 @@ static int node_is_final(const kdtree_node_t * node)
  */
 static void
 partition_vectors(double * restrict X,
-          const size_t n, /* Number of points */
-          const size_t vdim, /* Dimension to take value from */
-          const double pivot,
-          size_t * nLow, size_t * nHigh)
+                  const size_t n, /* Number of points */
+                  const size_t vdim, /* Dimension to take value from */
+                  const double pivot,
+                  size_t * nLow, size_t * nHigh)
 {
     int64_t low = -1;
     int64_t high = n;
@@ -822,11 +822,71 @@ static double gaussian(double d2, double sigma22)
     return exp(-d2/sigma22);
 }
 
-static double _kdtree_kde(const kdtree_t * T,
-                          const double * Q,
-                          size_t node_id,
-                          const double r2,
-                          const double sigma22)
+static void
+_kdtree_kde_mean(const kdtree_t * T,
+                 const double * Q,
+                 size_t node_id,
+                 const double r2,
+                 const double sigma22,
+                 double * xmeank,
+                 double * meank,
+                 size_t * npoint)
+{
+
+    kdtree_node_t * node = T->nodes + node_id;
+    /* Termination condition */
+    if( ! bounds_overlap_ball_raw(node->bbx, Q, r2) )
+    {
+        return;
+    }
+
+    if(node_is_final(node))
+    {
+        double * X = T->XID + node->data_idx;
+        *npoint += node->n_points;
+
+        for(size_t kk = 0; kk < node->n_points; kk++)
+        {
+            double * x = X + kk*XID_STRIDE;
+            double d2 = eudist_sq(x, Q);
+            // Possibly check r2 criteria here
+            double kde = gaussian(d2, sigma22);
+
+            *meank += kde;
+            for(int ll = 0; ll < 3; ll++)
+            {
+                xmeank[ll] += kde*x[ll];
+            }
+
+        }
+        return;
+    }
+
+
+    /* If not in a leaf, we see what children it makes sense to traverse */
+    // Some linear algebra: If Q + (mid-Q)/||mid-Q||*r crosses any of the 6 faces
+    // we need to check. Simpler way to determine ?
+    // if (x_intersect) if (y_intersect) if (z_intersect) then traverse ...
+
+    _kdtree_kde_mean(T, Q,
+                     node_left_child_id(node_id),
+                     r2, sigma22,
+                     xmeank, meank, npoint);
+
+    _kdtree_kde_mean(T, Q,
+                     node_right_child_id(node_id),
+                     r2, sigma22,
+                     xmeank, meank, npoint);
+
+    return;
+}
+
+static double
+_kdtree_kde(const kdtree_t * T,
+            const double * Q,
+            size_t node_id,
+            const double r2,
+            const double sigma22)
 {
     kdtree_node_t * node = T->nodes + node_id;
     if( ! bounds_overlap_ball_raw(node->bbx, Q, r2) )
@@ -880,6 +940,44 @@ double kdtree_kde(const kdtree_t * T,
         r = cutoff*sigma;
     }
     return _kdtree_kde(T, Q, 0, pow(r,2.0), 2.0*pow(sigma, 2.0));
+}
+
+void
+kdtree_kde_mean(const kdtree_t * T,
+                const double * Q,
+                double sigma,
+                double cutoff,
+                double * mean)
+{
+    double r = 4.0*2.5*sigma;
+    if(cutoff > 0.0)
+    {
+        r = cutoff*sigma;
+    }
+    double xmeank[3] = {0};
+    double meank = 0;
+    size_t npoint = 0;
+
+    _kdtree_kde_mean(T, Q,
+                     0, // start node == root
+                     pow(r,2.0), // radius squared
+                     2.0*pow(sigma, 2.0), // divisor for exponent
+                     xmeank, // accumulate positions
+                     &meank, // accumulate kernel values
+                     &npoint); // number of points
+
+    if(meank < 1e-9)
+    {
+        memcpy(mean, Q, 3*sizeof(double));
+    } else {
+        for(int kk = 0; kk < 3; kk++)
+        {
+            mean[kk] = xmeank[kk] / meank;
+        }
+    }
+    //printf("npoint = %zu, meank = %F\n", npoint, meank);
+    return;
+
 }
 
 void kdtree_print_info(kdtree_t * T)

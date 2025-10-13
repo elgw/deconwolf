@@ -93,6 +93,11 @@ dw_dots_files=dw_dots.c fim.o ftab.o fim_tiff.o  dw_util.o fft.o gmlfit.o
 dw_dots: $(dw_dots_files)
 	$(CC) $(CFLAGS) -DSTANDALONE $(dw_dots_files) $(LDFLAGS) -o dw_dots
 
+dw_align_dots_files=dw_align_dots.c fim.o ftab.o fim_tiff.o  dw_util.o fft.o gmlfit.o qalign.c npio.c quickselect.o kdtree/kdtree.o
+dw_align_dots: $(dw_align_dots_files)
+	$(CC) $(CFLAGS) -DSTANDALONE $(dw_align_dots_files) $(LDFLAGS) -o dw_align_dots
+
+
 psf_files = dw_psf.c fim.o ftab.o fim_tiff.o  dw_util.o fft.o
 dw_psf: $(psf_files)
 	$(CC) $(CFLAGS) -DSTANDALONE $(psf_files) $(LDFLAGS) -o dw_psf

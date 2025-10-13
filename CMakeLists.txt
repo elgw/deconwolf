@@ -103,7 +103,8 @@ set(dw_SOURCES
   src/sparse_preprocess_cli.c
   src/quickselect.c
   src/dw_align_dots.c
-  src/npio.c)
+  src/npio.c
+  src/qalign.c)
 
 set(dw_bw_SOURCES
     src/bw_gsl.c
