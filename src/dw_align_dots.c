@@ -56,9 +56,14 @@ typedef struct{
     double rotz;
 
     /* For storing the result */
-    double dx;
-    double dy;
-    double dz;
+    union{
+        double delta[3];
+        struct{
+            double dx;
+            double dy;
+            double dz;
+        };
+    };
     double kde;
     /* Some measurement on how certain the result is */
     double goodness;
@@ -200,9 +205,12 @@ static void usage(void)
     printf("usage: dw align-dots [<options>] file1.tsv file2.tsv\n");
     printf("\n");
     printf("Options:\n");
-    printf("  --radius d, -d d\n"
-           "\tSet the capture radius, i.e. largest expected shift in pixels\n"
-           "\tDefault value: %.1f\n", dopts->capture_distance);
+    printf("  --out file, -o file\n"
+           "\tWhere to write the results.\n");
+    printf("  --overwrite\n"
+           "\tOverwrite the destination file if it exists\n");
+    printf("  --append, -a\n"
+           "\tAppend to the output file\n");
     printf("  --sigma s, -s s\n"
            "\tSet the size of the KDE used to identify the peak\n"
            "\tDefault value: %.2f\n", dopts->sigma);
@@ -217,29 +225,27 @@ static void usage(void)
     printf("  --rotz d\n"
            "\tRotation around the z-axis at (x,y)=(0,0), hence\n"
            "\tonly small rotations like +/- 0.0001 are meaningful\n");
-    printf("  --out file, -o file\n"
-           "\tWhere to write the results.\n");
-    printf("  --overwrite\n"
-           "\tOverwrite the destination file if it exists\n");
-    printf("  --append, -a\n"
-           "\tAppend to the output file\n");
+    printf("Depreciated options, that only applies to the fallback/brute force algorithm:\n");
+    printf("  --radius d, -d d\n"
+           "\tSet the capture radius, i.e. largest expected shift in pixels\n"
+           "\tDefault value: %.1f\n", dopts->capture_distance);
     printf("  --delta1 delta1.npy\n"
            "\tInitial displacements for dots in file1\n");
     printf("  --delta2 delta2.npy\n"
            "\tInitial displacements for dots in file2\n");
     printf("\n");
-    printf("Output columns:\n");
+    printf("Output columns, written to the --out file:\n");
     printf(" 1. dx\n");
     printf(" 2. dy\n");
     printf(" 3. dz\n");
-    printf(" 4. kde\n");
+    printf(" 4. kde, approximately the number of correspondences found\n");
     printf(" 5. goodness or confidence. 1=perfect\n");
-    printf(" 6. reference file\n");
-    printf(" 7. other file\n");
-    printf(" 8. magnification for 1st set\n");
+    printf(" 6. file1.tsv \n");
+    printf(" 7. file2.tsv\n");
+    printf(" 8. magnification applied to the 1st set\n");
     printf(" 9. magnification for 2nd set\n");
     printf("10. sigma\n");
-    printf("11. search radius\n");
+    printf("11. search radius (only relevant for the fallback algorithm)\n");
     printf("\n");
     opts_free(dopts);
     dopts = NULL;
@@ -423,9 +429,39 @@ static double * get_dots(opts * s, ftab_t * T)
         return NULL;
     }
 
-    double * X = calloc(3*T->nrow, sizeof(double));
+    i64 nuse = T->nrow;
+
+    int cv = ftab_get_col(T, "value");
+    if(cv >= 0)
+    {
+        nuse = 0;
+        for(i64 kk = 0; kk < T->nrow; kk++)
+        {
+            float * row = T->T + kk*T->ncol;
+            float value = row[cv];
+            if(value > 0)
+            {
+                nuse++;
+            } else {
+                break;
+            }
+        }
+    }
+
+    if(s->verbose > 1)
+    {
+        if(cv >= 0)
+        {
+            printf("Will load %ld / %ld dots where value > 0\n",
+                   nuse, T->nrow);
+        } else {
+            printf("Will load %ld dots\n", nuse);
+        }
+    }
+
+    double * X = calloc(3*nuse, sizeof(double));
     assert(X != NULL);
-    for(size_t kk = 0; kk< T->nrow; kk++)
+    for(size_t kk = 0; kk < nuse; kk++)
     {
         float * row = T->T + kk*T->ncol;
         X[3*kk + 0] = row[cx];
@@ -503,10 +539,13 @@ static double eudist3_sq(const double * A, const double * B)
     return pow(A[0]-B[0], 2.0) + pow(A[1]-B[1], 2.0) + pow(A[2]-B[2], 2.0);
 }
 
-static void align_dots(opts * s,
+static void align_dots_bf(opts * s,
                        const double * XA, size_t nXA,
                        const double * XB, size_t nXB)
 {
+    /* Brute Force (BF) alignment of dots from the two sets
+     */
+
     kdtree_t * TA = kdtree_new(XA, nXA, 20);
 
     /* Detect all pairs of points within some distance */
@@ -725,11 +764,15 @@ static void align_dots(opts * s,
     s->dx = maxpos[0];
     s->dy = maxpos[1];
     s->dz = maxpos[2];
+
+    /* Please note that these values will be overwritten by the
+       function determine_alignment_quality */
+
     s->kde = maxkde;
     /* Gap / combined height */
     s->goodness = (maxkde-maxkde2) / (maxkde + maxkde2);
 
-    if(s->verbose > 0)
+    if(s->verbose > 1)
     {
         printf("Estimated shift: [% .2f, % .2f, % .2f] pixels, G=%.2f, KDE=%.2f, 2nd KDE: %.2f mag1=%f mag2=%f\n",
                s->goodness,
@@ -750,7 +793,6 @@ static void align_dots(opts * s,
 
     kdtree_free(TD);
     TD = NULL;
-
 
     return;
 
@@ -855,6 +897,96 @@ bbx_volume(const double * X, i64 nX)
         *(maxcoord[2]-mincoord[2]);
 }
 
+
+static int determine_alignment_quality(opts * s,
+                                       const double * XA, i64 nXA,
+                                       const double * XB, i64 nXB)
+{
+    /* Determine the number of times that points overlap calculate the
+     * probability for assuming that the dots are uniformly randomly
+     * distributed and placed in bins so that the number of dots per
+     * bin is distributed according to Poisson.  Finally calculate a
+     * goodness score in [0, 1] such that a value of 1 indicates that
+     * this could not happen if XA and XB were uncorrelated.
+     */
+
+    /* Number of times that a point from B overlaps a point in A after
+       shift correction */
+    double overlap_threshold = 0.7;
+    kdtree_t * T = kdtree_new(XA, nXA, 20);
+    i64 nalign = 0;
+    double kde = 0;
+    for(i64 kk = 0; kk < nXB; kk++)
+    {
+        double Q[3];
+        for(int ii = 0; ii < 3; ii++)
+        {
+            Q[ii] = XB[3*kk + ii] - s->delta[ii];
+        }
+        double kde0 = kdtree_kde(T, Q, s->sigma, -1);
+        kde += kde0;
+        if(kde0 > overlap_threshold)
+        {
+            nalign++;
+        }
+    }
+    printf("%ld correspondences were found after alignment\n", nalign);
+    kdtree_free(T);
+    s->kde = kde;
+
+
+    /* If there was a 3D grid over the images, how many bins would it have?
+     * We assume that the images have the same size. Would be more accurate
+     * to calculate the bbx from all points directly */
+    double ncell = bbx_volume(XA, nXA) / pow(s->sigma, 3);
+    {
+        double ncell2 = bbx_volume(XB, nXB) / pow(s->sigma, 3);
+        ncell2 > ncell ? ncell = ncell2 : 0;
+    }
+
+
+    if(ncell < 1e-6 )
+    {
+        fprintf(stderr,
+                "Failed to calculate the goodness value since the dot coordinates "
+                "in combination with sigma does not make sense\n");
+        s->goodness = -1;
+        return EXIT_FAILURE;
+    }
+
+    /* We substract 1 since there will always be one aligned dot when
+       successful and that should not count */
+    double observed = nalign-1.0;
+    if(observed < 1.0)
+    {
+        s->goodness = 0;
+        return EXIT_FAILURE;
+    }
+
+    /* If the points in XA and XB are uniformly random and uncorrelated
+     * how many times do we expect two dots in the same bin? */
+    double lambda1 = nXA / ncell;
+    double lambda2 = nXB / ncell;
+    double prob1 = 1.0 - poisson_cdf(0, lambda1); // == 1 - poisson_pmf(0, lambda)
+    double prob2 = 1.0 - poisson_cdf(0, lambda2);
+    double expected = ncell*prob1*prob2;
+
+    if(s->verbose > 1)
+    {
+        printf("ncell: %f\n", ncell);
+        printf("lambda1: %e, lambda2: %e\n", lambda1, lambda2);
+        printf("prob1: %e, prob2: %e\n", prob1, prob2);
+        printf("observed: %f, expected %f\n", observed, expected);
+    }
+
+    s->goodness = 1.0 - expected / observed;
+    s->goodness > 1.0 ? s->goodness = 1 : 0;
+    s->goodness < 0.0 ? s->goodness = 0 : 0;
+
+    return EXIT_SUCCESS;
+}
+
+
 static int
 run_qalign(opts * s,
            const double * XA,
@@ -929,6 +1061,10 @@ run_qalign(opts * s,
                                         Q1);
     free(qD);
     qD = NULL;
+    for(int i = 0; i < 3; i++)
+    {
+        s->delta[i] = -Q1[i];
+    }
 
     if(s->kde < 2)
     {
@@ -939,38 +1075,6 @@ run_qalign(opts * s,
         }
     }
 
-    s->dx = Q1[0];
-    s->dy = Q1[1];
-    s->dz = Q1[2];
-
-    /* TODO: fix model for expected kde given random points
-    * */
-    double observed = ceil(s->kde/2); //
-
-    double ncell1 = bbx_volume(XA, nXA) / s->sigma;
-    double ncell2 = bbx_volume(XB, nXB) / s->sigma;
-    if(ncell1 < 1e-6 || ncell2 < 1e-6)
-    {
-        s->goodness = -1;
-        return EXIT_SUCCESS;
-    }
-    double lambda1 = nXA / ncell1;
-    double lambda2 = nXB / ncell2;
-    double prob1 = 1.0 - poisson_cdf(observed, lambda1);
-    double prob2 = 1.0 - poisson_cdf(observed, lambda2);
-    double expected = 0.5*(ncell1+ncell2)*prob1*prob2;
-
-    if(s->verbose > 1)
-    {
-        printf("ncell1: %f ncell2: %f\n", ncell1, ncell2);
-        printf("lambda1: %e, lambda2: %e\n", lambda1, lambda2);
-        printf("prob1: %e, prob2: %e\n", prob1, prob2);
-        printf("observed: %f, expected %f\n", observed, expected);
-    }
-
-    s->goodness = 1.0 - expected / observed;
-    s->goodness > 1.0 ? s->goodness = 1 : 0;
-    s->goodness < 0.0 ? s->goodness = 0 : 0;
     return EXIT_SUCCESS;
 }
 
@@ -1081,16 +1185,22 @@ int dw_align_dots(int argc, char ** argv)
 
     rotz_dots(XB, nXB, s->rotz);
 
-    if(s->verbose > 0)
+    if(s->verbose > 1)
     {
         printf("Will align %zu dots vs %zu\n", nXA, nXB);
     }
 
-
+    /* Only try the brute force algorithm if the quick does not find
+       anything. It seems like the brute force is never better so it
+       should be removed eventually. */
     if(run_qalign(s, XA, nXA, XB, nXB))
     {
-        align_dots(s, XA, nXA, XB, nXB);
+        align_dots_bf(s, XA, nXA, XB, nXB);
     }
+
+    /* evaluate s->delta to set s->goodness and s->kde
+     */
+    determine_alignment_quality(s, XA, nXA, XB, nXB);
 
     free(XA);
     free(XB);
@@ -1110,8 +1220,14 @@ int dw_align_dots(int argc, char ** argv)
     }
     if(s->verbose > 0)
     {
-        printf("dx, dy, dz, kde, goodness, file1, file2, mag1, mag2, sigma, capture_distance\n");
-        print_results(stdout, s, argv[optind], argv[optind+1]);
+        printf("Shift: [%.2f, %.2f %.2f] ", s->dx, s->dy, s->dz);
+        if(s->goodness > 0.99)
+        {
+            printf("with high confidence");
+        } else {
+            printf("with low confidence");
+        }
+        printf(", goodness = %.2e\n", s->goodness);
     }
 
     opts_free(s);
