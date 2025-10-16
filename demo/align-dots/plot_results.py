@@ -45,10 +45,12 @@ D = np.array([R[0], R[1], R[2]])
 print("Loading dots")
 A = pd.read_table('A.dots.tsv')
 B = pd.read_table('B.dots.tsv')
+
+# select the strong ones for display
 A = A.loc[A['value'] > 1000, :]
 B = B.loc[B['value'] > 1000, :]
 
-
+# Apply the found correction
 A2 = A.copy()
 A2['f_x'] = A['f_x'] + D[0]
 A2['f_y'] = A['f_y'] + D[1]

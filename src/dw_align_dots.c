@@ -825,6 +825,7 @@ get_displacement_from_qalign_result(opts * s,
 {
     /* Use mean shift to find a single displacement vector from the
        hypotheses returned from qalign */
+    
     if(s->verbose > 1)
     {
         printf("Refining the result among %ld points\n", nqD);
@@ -1202,6 +1203,8 @@ int dw_align_dots(int argc, char ** argv)
      */
     determine_alignment_quality(s, XA, nXA, XB, nXB);
 
+    /* Here we could make a higher order estimation from correspondence points */
+    
     free(XA);
     free(XB);
 
