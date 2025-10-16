@@ -1215,7 +1215,7 @@ int dw_align_dots(int argc, char ** argv)
         } else {
             fid = fopen(s->outfile, "w");
         }
-        print_results(stdout, s, argv[optind], argv[optind+1]);
+        print_results(fid, s, argv[optind], argv[optind+1]);
         fclose(fid);
     }
     if(s->verbose > 0)
