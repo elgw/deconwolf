@@ -18,4 +18,10 @@ target_include_directories(kdtree PUBLIC
 )
 
 set_target_properties(kdtree PROPERTIES PUBLIC_HEADER "include/kdtree.h")
-INSTALL(TARGETS kdtree)
+
+include(GNUInstallDirs)
+
+INSTALL(TARGETS kdtree
+  PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)

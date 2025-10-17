@@ -199,7 +199,7 @@ ttable_grow(ttable * T)
 {
     size_t new_size = T->nalloc*1.2;
     tnode * old_location = T->nodes;
-    #ifdef WINDOWS
+    #if defined(WINDOWS) || (defined(__GLIBC__) && (__GLIBC__ < 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ < 26)))
     T->nodes = realloc(T->nodes, new_size*sizeof(tnode));
     #else
     T->nodes = reallocarray(T->nodes, new_size, sizeof(tnode));
