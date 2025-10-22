@@ -11,10 +11,10 @@ typedef int32_t i32;
 qalign_config * qalign_config_new(void)
 {
     qalign_config * qconf = malloc(sizeof(qalign_config));
-    qconf->similarity_threshold = 1.5;
-    qconf->deviation_x = qconf->similarity_threshold/2;
+    qconf->localication_sigma = 0.2;
     qconf->verbose = 1;
     qconf->npoint = 1000;
+    qconf->rel_error = 1.0/1000.0;
     return qconf;
 }
 
@@ -24,6 +24,8 @@ void qalign_config_free(qalign_config * q)
     {
         return;
     }
+    free(q->S);
+    free(q->SZ);
     free(q->H);
     free(q);
     return;
@@ -75,6 +77,12 @@ static float float3_norm(float * v)
     return sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
 }
 
+static float float3_norm_lat(float * v)
+{
+    return sqrt(v[0]*v[0] + v[1]*v[1]);
+}
+
+
 static float qpair_distance(const qalign_pair * A,
                             const qalign_pair * B)
 {
@@ -103,14 +111,17 @@ static void find_hypotheses(qalign_config * config,
                             i64 npA,
                             const qalign_pair * pB,
                             i64 npB,
-                            qalign_pair * H, i64 nH_alloc, i64 * nH)
+                            float * S, float * SZ, qalign_pair * H, i64 nH_alloc, i64 * nH)
 {
     /* Loop over all pairs in pA and see if we can find correponding
        pairs in pB. If found they are added to array of Hypotheses, H
     */
     i64 iB0 = 0; // range in B: [iB0, iB1]
-    float deviation_x = config->deviation_x;
-    float similarity_threshold = config->similarity_threshold;
+    // if A, B has std sigma, then A-B has std \sqrt(2)*sigma
+    // the factor 2.0 is to not loose too much.
+    float sigma = config->localication_sigma;
+    float deviation_x = sqrt(2.0)*2.0*sigma;
+    float rel_error = config->rel_error;
 
     for(i64 iA = 0; iA < npA; iA++)
     {
@@ -132,13 +143,6 @@ static void find_hypotheses(qalign_config * config,
             {
                 break;
             }
-
-
-            // TODO:
-            // Model points with measurement error e, i.e., something like
-            // X = X' + e, i.e. include
-            // where X' is the true location and X the measured
-
             // Handle Direction ambivalence:
             // -- test with both A vs B and A vs -B
             i64 idxA = A.idx1;
@@ -153,14 +157,19 @@ static void find_hypotheses(qalign_config * config,
 
             float d1 = float3_norm(A.delta);
             float d2 = float3_norm(B.delta);
+
+            float lat_d1 = float3_norm_lat(A.delta);
+            float lat_d2 = float3_norm_lat(B.delta);
+
             float dm = d1;
             dm < d2 ? dm = d2 : 0;
 
             if(dm > 1.0) // very short distance vectors ignored
             {
-                if(diff / dm < 1e-4) // relative error
+                if( (diff / dm) < (rel_error + sigma/dm) )
                 {
-
+                    S[*nH]= lat_d1/lat_d2;
+                    SZ[*nH] = A.dz/B.dz;
                     H[*nH].dx = config->A[3*idxA + 0] - config->B[3*idxB+0];
                     H[*nH].dy = config->A[3*idxA + 1] - config->B[3*idxB+1];
                     H[*nH].dz = config->A[3*idxA + 2] - config->B[3*idxB+2];
@@ -244,6 +253,8 @@ int qalign(qalign_config * conf)
     i64 nH_alloc = 1000;
     i64 nH = 0;
     qalign_pair * H = malloc(nH_alloc*sizeof(qalign_pair));
+    conf->S = malloc(nH_alloc*sizeof(float));
+    conf->SZ = malloc(nH_alloc*sizeof(float));
     conf->H = H;
     if(H == NULL)
     {
@@ -257,6 +268,8 @@ int qalign(qalign_config * conf)
     find_hypotheses(conf,
                     pA, npA,
                     pB, npB,
+                    conf->S,
+                    conf->SZ,
                     H, nH_alloc, &nH);
     conf->nH = nH;
     if(conf->verbose > 1)
@@ -275,6 +288,10 @@ int qalign(qalign_config * conf)
 
     free(pA);
     free(pB);
+    if(nH < 1)
+    {
+        return EXIT_FAILURE;
+    }
     return EXIT_SUCCESS;
 
 cleanup:

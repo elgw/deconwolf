@@ -17,17 +17,26 @@ typedef struct
 
 
 typedef struct {
-    const float * A;
+    /* Input data */
+    const float * A; /* 3*nA elements, x, y, z for each point */
     const float * B;
     int64_t nA;
     int64_t nB;
-    float similarity_threshold;
-    float deviation_x;
+
+    /* Settings */
     int verbose;
+    /* Largest expected delative difference in magnification. For example 1/1000  */
+    float rel_error;
+    /* Standard deviation of the localization accuracy
+     * given in pixels. */
+    float localication_sigma;
+    /* Number of points to use at most */
     int64_t npoint;
 
     /* Results */
     qalign_pair * H; /* Hypotheses */
+    float * S; /* Scaling */
+    float * SZ;
     int64_t nH; /* Number of hypotheses */
 } qalign_config;
 

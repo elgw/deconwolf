@@ -161,3 +161,6 @@ int npyfilename(const char * filename);
 
 /* Create a empty file in a given folder and return the name */
 char * dw_tempfile(const char * folder);
+
+/* Return "yes" or "no" if value is 1 or something else */
+const char * dw_yes_no(int value);

@@ -557,3 +557,13 @@ char * dw_tempfile(const char * folder)
     return template;
 #endif
 }
+
+const char * dw_yes_no(int value)
+{
+    if(value == 1)
+    {
+        return "yes";
+    } else {
+        return "no";
+    }
+}

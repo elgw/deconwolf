@@ -11,15 +11,7 @@
 #include "dw_util.h"
 #include "npio.h"
 #include "qalign.h"
-
-/* TODO
- *
- * - automatically scan for the best magnification --magscan in the
- *    range +/- 1% by default.
- * - option to rotate ?
- * - Use paired dots to create a polynomial model.
- *
- */
+#include "quickselect.h"
 
 typedef int64_t i64;
 
@@ -43,8 +35,13 @@ typedef struct{
     int append;
 
     /* Magnification factor for the list of dots */
+    int mag_is_set;
     double mag1;
     double mag2;
+
+    /* Multiplier for the z-component to match the localization
+       accuracy in the lateral plane and the axial direction */
+    double weightz;
 
     /* Initial shifts for the dots */
     char * fname_d1;
@@ -132,6 +129,7 @@ static opts * opts_new()
     s->mag1 = 1.0;
     s->mag2 = 1.0;
     s->npoint = 250;
+    s->weightz = 0.5;
     return s;
 }
 
@@ -145,8 +143,22 @@ static void opts_free(opts * s)
 
 static void opts_print(opts * s, FILE * fid)
 {
-    fprintf(fid, "capture distance: %f\n", s->capture_distance);
-    fprintf(fid, "       KDE sigma: %f\n", s->sigma);
+    fprintf(fid, "\n");
+    fprintf(fid, "Settings:\n");
+    fprintf(fid, "             verbosity: %d\n", s->verbose);
+    fprintf(fid, "             KDE sigma: %f\n", s->sigma);
+    fprintf(fid, "  Magnification is set: %s\n", dw_yes_no(s->mag_is_set));
+    if(s->mag_is_set)
+    {
+        fprintf(fid, "                  mag1: %f\n", s->mag1);
+        fprintf(fid, "                  mag2: %f\n", s->mag2);
+    }
+    fprintf(fid, "               weightz: %f\n", s->weightz);
+    fprintf(fid, "                  rotz: %f\n", s->rotz);
+    fprintf(fid, "             overwrite: %s\n", dw_yes_no(s->overwrite));
+    fprintf(fid, "                append: %s\n", dw_yes_no(s->append));
+    fprintf(fid, "      capture distance: %f\n", s->capture_distance);
+    fprintf(fid, "\n");
     return;
 }
 
@@ -211,20 +223,29 @@ static void usage(void)
            "\tOverwrite the destination file if it exists\n");
     printf("  --append, -a\n"
            "\tAppend to the output file\n");
-    printf("  --sigma s, -s s\n"
+    printf("  --sigma s\n"
            "\tSet the size of the KDE used to identify the peak\n"
+           "\tShould be set approximately to the localization accurracy in the lateral plane\n"
            "\tDefault value: %.2f\n", dopts->sigma);
     printf("  --npoint n\n"
            "\tset the maximum number of points to use from each file"
-           "Default value: %zu\n", dopts->npoint);
+           "\tDefault value: %zu\n", dopts->npoint);
     printf("  --mag1 f\n"
            "\tMultiplicative magnification factor for the 1st point set in the lateral plane\n"
-           "\tDots coordinates will be multiplied with this factor directly after loading\n");
+           "\tDots coordinates will be multiplied with this factor directly after loading\n"
+           "\tUnless either --mag1 and/or --mag2 is set the algorithm will be more restrictive\n"
+           "\tlooking for correspondences\n");
     printf("  --mag2 f\n"
            "\tMultiplicative magnification factor for the 2nd point set\n");
     printf("  --rotz d\n"
            "\tRotation around the z-axis at (x,y)=(0,0), hence\n"
            "\tonly small rotations like +/- 0.0001 are meaningful\n");
+    printf(" --weightz w\n"
+           "\tSet the weight/scaling of the z-component of the dot coordinates\n"
+           "\tDefault value: %.2f\n"
+           "\tSet so this so that the localization accuracy in the lateral and axial planes conincide\n",
+           dopts->weightz);
+    printf("\n");
     printf("Depreciated options, that only applies to the fallback/brute force algorithm:\n");
     printf("  --radius d, -d d\n"
            "\tSet the capture radius, i.e. largest expected shift in pixels\n"
@@ -233,6 +254,10 @@ static void usage(void)
            "\tInitial displacements for dots in file1\n");
     printf("  --delta2 delta2.npy\n"
            "\tInitial displacements for dots in file2\n");
+    printf("\n"
+           "Usage notes:\n"
+           "\n"
+           "If no correpondences are found, try increasing --sigma and/or --ndots\n");
     printf("\n");
     printf("Output columns, written to the --out file:\n");
     printf(" 1. dx\n");
@@ -249,8 +274,8 @@ static void usage(void)
     printf("\n");
     opts_free(dopts);
     dopts = NULL;
-    return;
-}
+    return;}
+
 
 static void argparsing(int argc, char ** argv, opts * s)
 {
@@ -267,13 +292,14 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"rotz", required_argument, NULL, 'r'},
         {"sigma", required_argument, NULL, 's'},
         {"overwrite", no_argument, NULL, 'w'},
+        {"weightz", required_argument, NULL, 'z'},
         {"delta1", required_argument, NULL, '1'},
         {"delta2", required_argument, NULL, '2'},
         {NULL, 0, NULL, 0}};
 
     int ch;
     while( (ch = getopt_long(argc, argv,
-                             "ad:hm:M:n:o:r:s:v:w1:2:",
+                             "ad:hm:M:n:o:r:s:v:wz:1:2:",
                              longopts, NULL)) != -1)
     {
         switch(ch)
@@ -298,9 +324,11 @@ static void argparsing(int argc, char ** argv, opts * s)
             break;
         case 'm':
             s->mag1 = atof(optarg);
+            s->mag_is_set = 1;
             break;
         case 'M':
             s->mag2 = atof(optarg);
+            s->mag_is_set = 1;
             break;
         case 'n':
             s->npoint = atol(optarg);
@@ -320,6 +348,9 @@ static void argparsing(int argc, char ** argv, opts * s)
             break;
         case 'w':
             s->overwrite = 1;
+            break;
+        case 'z':
+            s->weightz = atof(optarg);
             break;
         default:
             exit(EXIT_FAILURE);
@@ -360,7 +391,9 @@ static void argparsing(int argc, char ** argv, opts * s)
     return;
 }
 
-static void magnify_dots(double * X, size_t n, double mag)
+/* Multiply the x and y coordinates in X by mag */
+static void
+magnify_dots(double * X, size_t n, double mag)
 {
     if(mag == 1.0)
     {
@@ -373,6 +406,19 @@ static void magnify_dots(double * X, size_t n, double mag)
         {
             X[3*kk + dd] *= mag;
         }
+    }
+    return;
+}
+
+static void scale_z(double * X, i64 n, double weightz)
+{
+    if(weightz == 1.0)
+    {
+        return;
+    }
+    for(i64 kk = 0; kk < n; kk++)
+    {
+        X[3*kk + 2] *= weightz;
     }
     return;
 }
@@ -540,8 +586,8 @@ static double eudist3_sq(const double * A, const double * B)
 }
 
 static void align_dots_bf(opts * s,
-                       const double * XA, size_t nXA,
-                       const double * XB, size_t nXB)
+                          const double * XA, size_t nXA,
+                          const double * XB, size_t nXB)
 {
     /* Brute Force (BF) alignment of dots from the two sets
      */
@@ -825,7 +871,7 @@ get_displacement_from_qalign_result(opts * s,
 {
     /* Use mean shift to find a single displacement vector from the
        hypotheses returned from qalign */
-    
+
     if(s->verbose > 1)
     {
         printf("Refining the result among %ld points\n", nqD);
@@ -995,6 +1041,12 @@ run_qalign(opts * s,
            const double * XB,
            i64 nXB)
 {
+    if( (nXA < 3) || (nXB < 3) )
+    {
+        printf("Too few dots for qalign (%ld in set A, %ld in set B)\n", nXA, nXB);
+        return EXIT_FAILURE;
+    }
+
     struct timespec t0, t1;
     dw_gettime(&t0);
     float * fXA = malloc(3*nXA*sizeof(float));
@@ -1020,24 +1072,56 @@ run_qalign(opts * s,
     qconf->nA = nXA;
     qconf->B = fXB;
     qconf->nB = nXB;
+    qconf->localication_sigma = s->sigma;
+    qconf->verbose = s->verbose;
+    if(s->mag_is_set)
+    {
+        qconf->rel_error = 0;
+    }
 
     int res = qalign(qconf);
     free(fXA);
     free(fXB);
 
-    if(res == EXIT_SUCCESS)
+    if(res != EXIT_SUCCESS)
     {
-        nqD = qconf->nH;
-        qD = malloc(nqD*3*sizeof(double));
-        for(i64 kk = 0; kk < nqD; kk++)
+        if(s->verbose > 1)
         {
-            for(i64 ii = 0; ii < 3; ii++)
-            {
-                qD[3*kk + ii] = qconf->H[kk].delta[ii];
-            }
+            printf("qalign failed\n");
         }
-
+        qalign_config_free(qconf);
+        return EXIT_FAILURE;
     }
+
+
+    float scaling = qselect_f32(qconf->S, qconf->nH, qconf->nH/2);
+    float scalingZ = qselect_f32(qconf->SZ, qconf->nH, qconf->nH/2);
+    //printf("S: %f, SZ: %f\n", scaling, scalingZ);
+
+    if(scaling > (1.0+1e-4) || (1.0 / scaling) > (1.0+1e-4))
+    {
+        if(s->verbose > 0)
+        {
+            printf("\n");
+            printf("!!! Lateral magnification mismatch: "
+                   "median(mag A/ mag B) = %f\n", scaling);
+            printf("    Either scale the input data and set --mag1 0\n"
+                   "    or let use --mag1 %f OR --mag2 %f\n", 1.0/scaling, scaling);
+            printf("\n");
+        }
+    }
+
+    nqD = qconf->nH;
+    qD = malloc(nqD*3*sizeof(double));
+    for(i64 kk = 0; kk < nqD; kk++)
+    {
+        for(i64 ii = 0; ii < 3; ii++)
+        {
+            qD[3*kk + ii] = qconf->H[kk].delta[ii];
+        }
+    }
+
+
     qalign_config_free(qconf);
     dw_gettime(&t1);
     if(s->verbose > 1)
@@ -1180,6 +1264,8 @@ int dw_align_dots(int argc, char ** argv)
 
     magnify_dots(XA, nXA, s->mag1);
     magnify_dots(XB, nXB, s->mag2);
+    scale_z(XA, nXA, s->weightz);
+    scale_z(XB, nXB, s->weightz);
 
     shift_dots(XA, s->delta1, nXA);
     shift_dots(XB, s->delta2, nXB);
@@ -1194,8 +1280,12 @@ int dw_align_dots(int argc, char ** argv)
     /* Only try the brute force algorithm if the quick does not find
        anything. It seems like the brute force is never better so it
        should be removed eventually. */
-    if(run_qalign(s, XA, nXA, XB, nXB))
+    if(run_qalign(s, XA, nXA, XB, nXB) != EXIT_SUCCESS)
     {
+        if(s->verbose > 0)
+        {
+            printf("Trying the fallback algorithm\n");
+        }
         align_dots_bf(s, XA, nXA, XB, nXB);
     }
 
@@ -1204,7 +1294,10 @@ int dw_align_dots(int argc, char ** argv)
     determine_alignment_quality(s, XA, nXA, XB, nXB);
 
     /* Here we could make a higher order estimation from correspondence points */
-    
+
+    /* Scale back the z-component */
+    s->dz /= s->weightz;
+
     free(XA);
     free(XB);
 
@@ -1223,14 +1316,15 @@ int dw_align_dots(int argc, char ** argv)
     }
     if(s->verbose > 0)
     {
-        printf("Shift: [%.2f, %.2f %.2f] ", s->dx, s->dy, s->dz);
-        if(s->goodness > 0.99)
+        printf("Shift: [%.2f, %.2f, %.2f]", s->dx, s->dy, s->dz);
+        printf(", goodness = %.2e ", s->goodness);
+        if(s->goodness > 0.999)
         {
-            printf("with high confidence");
+            printf("(high confidence)");
         } else {
-            printf("with low confidence");
+            printf("(low confidence)");
         }
-        printf(", goodness = %.2e\n", s->goodness);
+        printf("\n");
     }
 
     opts_free(s);
