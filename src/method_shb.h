@@ -22,8 +22,6 @@
 #include <assert.h>
 
 #include "dw.h"
-#include "fim.h"
-#include "fft.h"
 
 /* Wang and Miller Scaled Heavy Ball */
 
@@ -32,13 +30,3 @@ float * deconvolve_shb(float * restrict im,
                        float * restrict psf,
                        const int64_t pM, const int64_t pN, const int64_t pP,
                        dw_opts * s);
-
-float iter_shb(
-    float ** xp, // Output, f_(t+1)
-    const float * restrict im, // Input image
-    fftwf_complex * restrict cK, // fft(psf)
-    float * restrict pk, // Current guess
-    float * restrict W, // Bertero Weights
-    const int64_t wM, const int64_t wN, const int64_t wP, // expanded size
-    const int64_t M, const int64_t N, const int64_t P, // input image size
-    __attribute__((unused)) const dw_opts * s);

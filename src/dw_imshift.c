@@ -309,9 +309,7 @@ int dw_imshift(int argc, char ** argv)
     {
         perform_imshift(s);
     } else {
-        myfftw_start(s->nthreads, s->verbose, stdout);
         perform_xcorr(s);
-        myfftw_stop();
     }
 
     opts_free(s);

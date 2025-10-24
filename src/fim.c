@@ -2386,9 +2386,8 @@ float * fim_xcorr2(const float * T, const float * A,
     size_t wM = 2*M-1;
     size_t wN = 2*N-1;
 
-    fft_train(wM, wN, 1,
-              1, 0,
-              stdout);
+    // TODO: Number of threads missing here.
+    dw_fft * ff = dw_fft_new(2, 1, stdout, wM, wN, 1, FFTW_ESTIMATE);
 
     float * xA = fim_zeros(wM*wN);
     fim_insert(xA, wM, wN, 1,
@@ -2409,13 +2408,15 @@ float * fim_xcorr2(const float * T, const float * A,
     fim_free(temp);
     temp = NULL;
 
-    fftwf_complex * fxT = fft(xA, wM, wN, 1);
+    fftwf_complex * fxT = fft(ff, xA, wM, wN, 1);
     fim_free(xA);
-    fftwf_complex * fxA = fft(xT, wM, wN, 1);
+    fftwf_complex * fxA = fft(ff, xT, wM, wN, 1);
     fim_free(xT);
-    float * C = fft_convolve_cc(fxT, fxA, wM, wN, 1);
+    float * C = fft_convolve_cc(ff, fxT, fxA, wM, wN, 1);
     // TODO fft_convolve_cc_conj instead?
     //fim_tiff_write_float("C.tif", C, NULL, wM, wN, 1);
+    dw_fft_destroy(ff);
+    ff = NULL;
     fim_free(fxT);
     fim_free(fxA);
 
@@ -4956,9 +4957,9 @@ void fim_ut()
     fim_cumsum_ut();
     fim_local_sum_ut();
     //exit(EXIT_FAILURE);
-    myfftw_start(1, 1, stdout);
+
     fim_xcorr2_ut();
-    myfftw_stop();
+
     printf("-> All tests passed\n");
 }
 

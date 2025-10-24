@@ -944,9 +944,6 @@ int dw_opts_validate_and_init(dw_opts * s)
         fprintf(s->tsv, "iteration\ttime\tKL\n");
     }
 
-    /* Set the plan to be used with fftw3 */
-    fft_set_plan(s->fftw3_planning);
-    fft_set_inplace(s->fft_inplace);
     if(s->verbosity > 2)
     {
         printf("Command line arguments accepted\n");
@@ -971,6 +968,19 @@ int dw_opts_validate_and_init(dw_opts * s)
         }
     }
     return EXIT_SUCCESS;
+}
+
+int dw_opts_enable_gpu(dw_opts * s)
+{
+#ifdef OPENCL
+    if(s->method == DW_METHOD_SHB)
+    {
+        s->method = DW_METHOD_SHBCL2;
+        s->fun = &deconvolve_shb_cl2;
+    }
+#else
+    printf("WARNING: dw was not compiled with GPU support\n");
+#endif
 }
 
 void dw_argparsing(int argc, char ** argv, dw_opts * s)
@@ -1034,7 +1044,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     int known_method = 1;
     int ch;
     int prefix_set = 0;
-    int use_gpu = 0;
+
     while((ch = getopt_long(argc, argv,
                             "12345679ab:c:f:Gghil:m:n:o:p:q:s:tu:vwx:A:B:C:DFI:L:MOR:S:TPQ:X:Z:",
                             longopts, NULL)) != -1)
@@ -1088,7 +1098,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
             s->showTime = 1;
             break;
         case 'G':
-            use_gpu = 1;
+            dw_opts_enable_gpu(s);
             break;
         case 'j': /* --relerror */
             s->err_rel = atof(optarg);
@@ -1293,19 +1303,6 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
 #else
     s->psfFile = realpath(argv[++optind], 0);
 #endif
-
-    if(use_gpu)
-    {
-#ifdef OPENCL
-        if(s->method == DW_METHOD_SHB)
-        {
-            s->method = DW_METHOD_SHBCL2;
-            s->fun = &deconvolve_shb_cl2;
-        }
-#else
-        printf("WARNING: dw was not compiled with GPU support\n");
-#endif
-    }
 }
 
 
@@ -2495,7 +2492,7 @@ static void prefilter(dw_opts * s,
  *
  * Possibly more stable to use the mean of the input image rather than 1
  */
-fftwf_complex * initial_guess(const int64_t M, const int64_t N, const int64_t P,
+fftwf_complex * initial_guess(dw_fft * ff, const int64_t M, const int64_t N, const int64_t P,
                               const int64_t wM, const int64_t wN, const int64_t wP)
 {
     assert(wM >= M); assert(wN >= N); assert(wP >= P);
@@ -2514,7 +2511,7 @@ fftwf_complex * initial_guess(const int64_t M, const int64_t N, const int64_t P,
     //fim_tiff_write_float("one.tif", one, NULL, wM, wN, wP);
     //  writetif("one.tif", one, wM, wN, wP);
 
-    fftwf_complex * Fone = fft(one, wM, wN, wP);
+    fftwf_complex * Fone = fft(ff, one, wM, wN, wP);
 
     fim_free(one);
     return Fone;
@@ -2817,8 +2814,6 @@ int dw_run(dw_opts * s)
         printf("Output: %s(.log.txt)\n", s->outFile);
     }
 
-    myfftw_start(s->nThreads_FFT, s->verbosity, s->log);
-
     float * out = NULL;
 
     if(tiling)
@@ -2933,7 +2928,7 @@ int dw_run(dw_opts * s)
     }
 
     fim_free(out);
-    myfftw_stop();
+
 
     dw_gettime(&tend);
     fprintf(s->log, "Took: %f s\n", timespec_diff(&tend, &tstart));

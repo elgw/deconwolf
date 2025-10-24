@@ -36,7 +36,7 @@
 #include <sys/types.h>
 #include <time.h>
 #include <wchar.h>
-
+#include "fft.h"
 
 #ifdef _OPENMP // turned on with -fopenmp
 #include <omp.h>
@@ -213,6 +213,7 @@ dw_opts * dw_opts_new(void);
 void dw_argparsing(int argc, char ** argv, dw_opts * s);
 /* Check that the settings make sense, derive secondary settings etc */
 int dw_opts_validate_and_init(dw_opts * s);
+int dw_opts_enable_gpu(dw_opts * s);
 void dw_opts_fprint(FILE *f, dw_opts * s);
 void dw_opts_free(dw_opts ** sp);
 void dw_usage(const int argc, char ** argv, const dw_opts * );
@@ -254,7 +255,7 @@ void dw_show_iter(dw_opts * s, int it, int nIter, float error);
  *
  * Possibly more stable to use the mean of the input image rather than 1
  */
-fftwf_complex * initial_guess(const int64_t M, const int64_t N, const int64_t P,
+fftwf_complex * initial_guess(dw_fft * ff, const int64_t M, const int64_t N, const int64_t P,
                               const int64_t wM, const int64_t wN, const int64_t wP);
 
 /* Generate a name for the an iterdump file
