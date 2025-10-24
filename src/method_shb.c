@@ -1,5 +1,7 @@
 #include "method_shb.h"
 
+#include "dw.h"
+
 //#define here() printf("\n%s %s %d\n", __FILE__, __FUNCTION__, __LINE__);
 #define here() ;
 float * deconvolve_shb(float * restrict im,

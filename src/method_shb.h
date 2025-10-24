@@ -16,8 +16,14 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <assert.h>
 
 #include "dw.h"
+#include "fim.h"
+#include "fft.h"
 
 /* Wang and Miller Scaled Heavy Ball */
 

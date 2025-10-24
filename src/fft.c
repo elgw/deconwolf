@@ -39,6 +39,8 @@
  * Settings
  */
 
+// TODO: Can't have these things here:
+
 /* Should only be changed with fft_set_plan() */
 static unsigned int FFTW3_PLANNING = FFTW_MEASURE;
 static int fft_nthreads = 1;
@@ -287,9 +289,13 @@ void myfftw_stop(void)
 {
 #ifndef CUDA
     fftwf_destroy_plan(plan_r2c);
+    plan_r2c = NULL;
     fftwf_destroy_plan(plan_c2r);
+    plan_c2r = NULL;
     fftwf_destroy_plan(plan_r2c_inplace);
+    plan_r2c_inplace = NULL;
     fftwf_destroy_plan(plan_c2r_inplace);
+    plan_c2r_inplace = NULL;
     fftwf_cleanup_threads();
 #endif
     fftwf_cleanup();
@@ -586,7 +592,10 @@ void fft_train(const size_t M, const size_t N, const size_t P,
         char * swf = get_swf_file_name(nThreads);
 
         assert(swf != NULL);
-
+        if(verbosity > 1)
+        {
+            printf("Exporting fftw wisdom to %s\n", swf);
+        }
         fprintf(log, "Exporting fftw wisdom to %s\n", swf);
         int ret = fftwf_export_wisdom_to_filename(swf);
 

@@ -14,7 +14,15 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <assert.h>
+
+#include "dw.h"
 #include "method_rl.h"
+#include "fft.h"
+#include "fim.h"
 
 /* One RL iteration */
 float iter_rl(

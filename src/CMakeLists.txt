@@ -36,6 +36,10 @@ add_library( deconwolf SHARED
   dw_bwpsf.c
   bw_gsl.c
   li.c
+  dw.c
+  method_rl.c
+  method_identity.c
+  method_shb.c
 )
 
 set(DECONWOLF_PUBLIC_HEADERS
@@ -47,6 +51,7 @@ set(DECONWOLF_PUBLIC_HEADERS
   "dw_version.h"
   "npio.h"
   "dw_bwpsf.h"
+  "dw.h"
 "kdtree/include/kdtree.h")
 
 #

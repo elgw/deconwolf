@@ -307,6 +307,50 @@ void usage(__attribute__((unused)) int argc, char ** argv, bw_conf * s)
     return;
 }
 
+/* Returns 0 on success */
+int bw_conf_validate(bw_conf * s)
+{
+    if(s->lambda < 50)
+    {
+        fprintf(stderr, "Error: lambda has be be at least 50 nm\n");
+        return EXIT_FAILURE;
+    }
+
+    if(s->lambda > 2000)
+    {
+        fprintf(stderr, "Error lambda can be at most 2000 nm\n");
+        return EXIT_FAILURE;
+    }
+
+    if(s->M % 2 == 0)
+    {
+        if(s->verbose > 0)
+        {
+            printf("Warning: The size has to be odd, 1, 3, ...\n");
+            printf("Changing from %d to %d.\n", s->M, s->M+1);
+        }
+        s->M++;
+        s->N++;
+    }
+
+    if(s->P % 2 == 0)
+    {
+        if(s->verbose > 0)
+        {
+            printf("Warning: The number of slices has to be odd, 1, 3, ...\n");
+            printf("          Changing from %d to %d.\n", s->P, s->P+1);
+        }
+        s->P++;
+    }
+
+    /* Not more threads than slices */
+    if(s->nThreads > s->P)
+    {
+        s->nThreads = s->P;
+    }
+    return EXIT_SUCCESS;
+}
+
 void bw_argparsing(int argc, char ** argv, bw_conf * s)
 {
     bw_conf * defaults = calloc(1, sizeof(bw_conf));
@@ -453,32 +497,6 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
         exit(EXIT_FAILURE);
     }
 
-    if(s->lambda < 50)
-    {
-        fprintf(stderr, "Error: lambda has be be at least 50 nm\n");
-        exit(-1);
-    }
-
-    if(s->lambda > 2000)
-    {
-        fprintf(stderr, "Error lambda can be at most 2000 nm\n");
-        exit(-1);
-    }
-
-    if(s->M % 2 == 0)
-    {
-        printf("Warning: The size has to be odd, 1, 3, ...\n");
-        printf("Changing from %d to %d.\n", s->M, s->M+1);
-        s->M++;
-        s->N++;
-    }
-
-    if(s->P % 2 == 0)
-    {
-        printf("Warning: The number of slices has to be odd, 1, 3, ...\n");
-        printf("          Changing from %d to %d.\n", s->P, s->P+1);
-        s->P++;
-    }
 
     if(Pset == 0)
     {
@@ -511,11 +529,6 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
     assert(s->logFile != NULL);
     sprintf(s->logFile, "%s.log.txt", s->outFile);
 
-    /* Not more threads than slices */
-    if(s->nThreads > s->P)
-    {
-        s->nThreads = s->P;
-    }
 
     return;
 }
@@ -779,6 +792,12 @@ int dw_bwpsf(int argc, char ** argv)
 
     bw_conf * conf = bw_conf_new();
     bw_argparsing(argc, argv, conf);
+
+    if(bw_conf_validate(conf))
+    {
+        printf("Can't continue with the provided settings\n");
+        return EXIT_FAILURE;
+    }
 
     if( conf->overwrite == 0 && dw_isfile(conf->outFile))
     {

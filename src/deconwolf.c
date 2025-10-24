@@ -19,6 +19,38 @@
 /* Extra modules can be enabled by un-commenting in
  * the header file. */
 #include "dw.h"
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <assert.h>
+
+
+#include "dw_util.h"
+#include "dw_maxproj.h"
+#include "dw_tiff_merge.h"
+#include "dw_imshift.h"
+#include "dw_version.h"
+#ifndef WINDOWS
+#include "dw_nuclei.h"
+#endif
+#include "dw_background.h"
+
+/* Uncomment to include, requires linking with libpng and libz
+ * can be build separately by the makefile in the src folder
+ */
+// #include "dw_otsu.h"
+#ifndef WINDOWS
+#include "dw_dots.h"
+#include "dw_psf.h"
+#include "dw_psf_sted.h"
+#include "dw_align_dots.h"
+#endif
+
+#include "fim.h"
+#include "fim_tiff.h"
+#include "fft.h"
+#include "tiling.h"
+#include "sparse_preprocess_cli.h"
 
 
 static int
@@ -265,5 +297,13 @@ int main(int argc, char ** argv)
 
     dw_opts * s = dw_opts_new(); /* Load default settings and initialize */
     dw_argparsing(argc, argv, s); /* Parse command line */
-    return dw_run(s); /* And do the job */
+    if(dw_opts_validate_and_init(s))
+    {
+        dw_opts_free(&s);
+        return EXIT_FAILURE;
+    }
+
+    int ret = dw_run(s); /* And do the job */
+    dw_opts_free(&s);
+    return ret;
 }

@@ -14,10 +14,87 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef WINDOWS
-#include <unistd.h>
-#endif
+
+
 #include "dw.h"
+#include "dw_util.h"
+#include "dw_maxproj.h"
+#include "dw_tiff_merge.h"
+#include "dw_imshift.h"
+#include "dw_version.h"
+#ifndef WINDOWS
+#include "dw_nuclei.h"
+#endif
+#include "dw_background.h"
+
+/* Uncomment to include, requires linking with libpng and libz
+ * can be build separately by the makefile in the src folder
+ */
+// #include "dw_otsu.h"
+#ifndef WINDOWS
+#include "dw_dots.h"
+#include "dw_psf.h"
+#include "dw_psf_sted.h"
+#include "dw_align_dots.h"
+#endif
+
+#include "fim.h"
+#include "fim_tiff.h"
+#include "fft.h"
+#include "tiling.h"
+#include "sparse_preprocess_cli.h"
+
+typedef int64_t i64;
+typedef float f32;
+
+/* Additive Vector Extrapolation (AVE) */
+float * deconvolve_ave(float * restrict im, const int64_t M, const int64_t N, const int64_t P,
+                       float * restrict psf, const int64_t pM, const int64_t pN, const int64_t pP,
+                       dw_opts * s);
+
+
+/* Determine Biggs' acceleration parameter alpha  */
+float biggs_alpha(const float * restrict g,
+                  const float * restrict gm,
+                  const size_t wMNP, int mode);
+
+
+/* Autocrop the PSF by:
+ * 1/ Cropping if the size is larger than needed by the image.
+ * 2/ Optionally, trim the sides in x and y where the PSF vanishes.
+ */
+float * psf_autocrop(float * psf, int64_t * pM, int64_t * pN, int64_t * pP,  // psf and size
+                     int64_t M, int64_t N, int64_t P, // image size
+                     dw_opts * s);
+
+#define ANSI_COLOR_RED     "\x1b[31m"
+#define ANSI_COLOR_GREEN   "\x1b[32m"
+#define ANSI_COLOR_YELLOW  "\x1b[33m"
+#define ANSI_COLOR_BLUE    "\x1b[34m"
+#define ANSI_COLOR_MAGENTA "\x1b[35m"
+#define ANSI_COLOR_CYAN    "\x1b[36m"
+#define ANSI_COLOR_RESET   "\x1b[0m"
+#define ANSI_UNDERSCORE    "\x1b[4m"
+
+
+
+#ifdef OPENCL
+#include "method_shb_cl.h"
+#include "method_shb_cl2.h"
+#endif
+
+#include "method_identity.h"
+#include "method_rl.h"
+#include "method_shb.h"
+
+/* fftw3 wisdom data is stored and loaded from
+ * $home/.config/
+ *
+ * Internally column major indexing is used, i.e., the distance
+ * between elements is 1 for the first dimension and increases with
+ * each new dimension.
+ */
+
 
 typedef uint16_t u16;
 typedef uint32_t u32;
@@ -125,10 +202,10 @@ static int raw_to_npio(const char * outfile,
         size_t nel_total = 0;
         while((nel_read = fread(rbuf, sizeof(f32), buff_elements, fin)) > 0)
         {
-                for(size_t kk = 0; kk < nel_read; kk++)
-                {
-                    wbuf[kk] = nearbyintf((float) rbuf[kk] * scaling);
-                }
+            for(size_t kk = 0; kk < nel_read; kk++)
+            {
+                wbuf[kk] = nearbyintf((float) rbuf[kk] * scaling);
+            }
 
             size_t nwritten = fwrite(wbuf, sizeof(u16), nel_read, fout);
             if(nwritten != nel_read)
@@ -377,8 +454,8 @@ void dw_show_iter(dw_opts * s, int it, int nIter, float err)
 
 
 char * gen_iterdump_name(
-                         __attribute__((unused)) const dw_opts * s,
-                         int it)
+    __attribute__((unused)) const dw_opts * s,
+    int it)
 {
     // Generate a name for the an iterdump file
     // at iteration it
@@ -727,12 +804,179 @@ getCmdLine(int argc, char ** argv, dw_opts * s)
     return;
 }
 
+int dw_opts_validate_and_init(dw_opts * s)
+{
+
+    if(s->offset < 0)
+    {
+        printf("WARNING: A negative offset not allowed, setting it to 0\n");
+        s->offset = 0;
+    }
+
+    if(s->zcrop < 0)
+    {
+        fprintf(stderr,
+                "the zcrop value (--cz) can not be negative\n");
+        return EXIT_FAILURE;
+    }
+
+    if(s->zcrop > 0)
+    {
+        if(s->auto_zcrop > 0)
+        {
+            fprintf(stderr, "zcrop and auto_zcrop can not be combined\n");
+            return EXIT_FAILURE;
+        }
+        if(s->tiling_maxSize > 0)
+        {
+            fprintf(stderr, "zcrop can not be combined with tiling\n");
+            return EXIT_FAILURE;
+        }
+    }
+
+    if( (s->auto_zcrop > 0) && (s->tiling_maxSize > 0))
+    {
+        fprintf(stderr, "auto_zcrop can not be combined with tiling\n");
+        return EXIT_FAILURE;
+    }
+
+
+    if(s->input_image == NULL)
+    {
+        if(s->imFile == NULL)
+        {
+            fprintf(stderr, "ERROR: No image file specified\n");
+            return EXIT_FAILURE;
+        }
+    }
+
+    if(s->input_psf == NULL)
+    {
+        if(s->psfFile == NULL)
+        {
+            fprintf(stderr, "ERROR: No PSF file specified\n");
+            return EXIT_FAILURE;
+        }
+    }
+
+
+    /* Set s->outFile and s->outFolder based on s->imFile */
+    if(s->write_result_to_buffer == 0)
+    {
+        if(s->outFile == NULL)
+        {
+        s->outFile = dw_prefix_file(s->imFile, s->prefix);
+
+        char * dname = dw_dirname(s->imFile);
+        s->outFolder = malloc(strlen(dname) + 16);
+        assert(s->outFolder != NULL);
+        sprintf(s->outFolder, "%s%c", dname, FILESEP);
+        free(dname);
+        if(s->verbosity > 1)
+        {
+            printf("outFile: %s, outFolder: %s\n", s->outFile, s->outFolder);
+        }
+    } else {
+        if( dw_isdir(s->outFile) )
+        {
+            if(s->verbosity > 0)
+            {
+                printf("--out describes a folder");
+            }
+            free(s->outFolder);
+            s->outFolder = malloc(strlen(s->outFile) + 8);
+            assert(s->outFolder != NULL);
+            sprintf(s->outFolder, "%s%c", s->outFile, FILESEP);
+            free(s->outFile);
+            char * basename = dw_basename(s->imFile);
+            char * outfile0 = malloc(strlen(basename) + strlen(s->outFolder) + 8);
+            assert(outfile0 != NULL);
+            sprintf(outfile0, "%s%c%s", s->outFolder, FILESEP, basename);
+            s->outFile = dw_prefix_file(outfile0, s->prefix);
+            free(outfile0);
+        } else {
+            char * dname = dw_dirname(s->outFile);
+            free(s->outFolder);
+            s->outFolder = malloc(strlen(dname) + 16);
+            assert(s->outFolder != NULL);
+            sprintf(s->outFolder, "%s%c", dname, FILESEP);
+            free(dname);
+        }
+    }
+    }
+
+    if(s->write_result_to_buffer == 0)
+    {
+    if(! s->iterdump)
+    {
+        if( s->overwrite == 0 && dw_isfile(s->outFile))
+        {
+            printf("%s already exist. Use --overwrite to overwrite existing files.\n",
+                   s->outFile);
+            return EXIT_FAILURE;
+        }
+    }
+    }
+
+    if(s->nThreads_FFT < 1 || s->nThreads_OMP < 1)
+    {
+        printf("Invalid number of threads (%d), "
+               "please verify your command line\n", s->nThreads_FFT);
+        return EXIT_FAILURE;
+    }
+
+    if(s->log == NULL)
+    {
+    s->logFile = malloc(strlen(s->outFile) + 10);
+    assert(s->logFile != NULL);
+    sprintf(s->logFile, "%s.log.txt", s->outFile);
+    }
+
+
+    if(s->tsvFile != NULL)
+    {
+        s->tsv = fopen(s->tsvFile, "w");
+        if(s->tsv == NULL)
+        {
+            fprintf(stderr, "Failed to open %s for writing\n", s->tsvFile);
+            return EXIT_FAILURE;
+        }
+        fprintf(s->tsv, "iteration\ttime\tKL\n");
+    }
+
+    /* Set the plan to be used with fftw3 */
+    fft_set_plan(s->fftw3_planning);
+    fft_set_inplace(s->fft_inplace);
+    if(s->verbosity > 2)
+    {
+        printf("Command line arguments accepted\n");
+    }
+
+    if(s->tempFolder == NULL)
+    {
+        char * tmpdir = getenv("DW_TEMPDIR");
+        if(tmpdir)
+        {
+            s->tempFolder = strdup(tmpdir);
+        }
+    }
+
+    if(s->tempFolder != NULL)
+    {
+        if(!dw_isdir(s->tempFolder))
+        {
+            fprintf(stderr, "the temp folder '%s' does not exist\n", s->tempFolder);
+            return EXIT_FAILURE;
+            exit(1);
+        }
+    }
+    return EXIT_SUCCESS;
+}
 
 void dw_argparsing(int argc, char ** argv, dw_opts * s)
 {
 
     getCmdLine(argc, argv, s);
-
 
     struct option longopts[] = {
         { "no-inplace",no_argument,       NULL, '1' },
@@ -1028,52 +1272,6 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
         }
     }
 
-
-    if(s->offset < 0)
-    {
-        printf("WARNING: A negative offset not allowed, setting it to 0\n");
-        s->offset = 0;
-    }
-
-    if(s->zcrop < 0)
-    {
-        fprintf(stderr,
-                "the zcrop value (--cz) can not be negative\n");
-        exit(EXIT_FAILURE);
-    }
-
-    if(s->zcrop > 0)
-    {
-        if(s->auto_zcrop > 0)
-        {
-            fprintf(stderr, "zcrop and auto_zcrop can not be combined\n");
-            exit(EXIT_FAILURE);
-        }
-        if(s->tiling_maxSize > 0)
-        {
-            fprintf(stderr, "zcrop can not be combined with tiling\n");
-        }
-    }
-
-    if( (s->auto_zcrop > 0) && (s->tiling_maxSize > 0))
-    {
-        fprintf(stderr, "auto_zcrop can not be combined with tiling\n");
-        exit(EXIT_FAILURE);
-    }
-
-    if(use_gpu)
-    {
-#ifdef OPENCL
-        if(s->method == DW_METHOD_SHB)
-        {
-            s->method = DW_METHOD_SHBCL2;
-            s->fun = &deconvolve_shb_cl2;
-        }
-#else
-        printf("WARNING: dw was not compiled with GPU support\n");
-#endif
-    }
-
     /* Take care of the positional arguments */
     if(optind + 2 != argc)
     {
@@ -1089,11 +1287,6 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     s->imFile = realpath(argv[optind], 0);
 #endif
 
-    if(s->imFile == NULL)
-    {
-        fprintf(stderr, "ERROR: Can't read %s\n", argv[optind]);
-        exit(1);
-    }
 
 #ifdef WINDOWS
     s->psfFile = strdup(argv[++optind]);
@@ -1101,115 +1294,21 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     s->psfFile = realpath(argv[++optind], 0);
 #endif
 
-    if(s->psfFile == NULL)
+    if(use_gpu)
     {
-        fprintf(stderr, "ERROR: Can't read %s\n", argv[optind]);
-        exit(1);
-    }
-
-
-    /* Set s->outFile and s->outFolder based on s->imFile */
-    if(s->outFile == NULL)
-    {
-        s->outFile = dw_prefix_file(s->imFile, s->prefix);
-
-        char * dname = dw_dirname(s->imFile);
-        s->outFolder = malloc(strlen(dname) + 16);
-        assert(s->outFolder != NULL);
-        sprintf(s->outFolder, "%s%c", dname, FILESEP);
-        free(dname);
-        if(s->verbosity > 1)
+#ifdef OPENCL
+        if(s->method == DW_METHOD_SHB)
         {
-            printf("outFile: %s, outFolder: %s\n", s->outFile, s->outFolder);
+            s->method = DW_METHOD_SHBCL2;
+            s->fun = &deconvolve_shb_cl2;
         }
-    } else {
-        if( dw_isdir(s->outFile) )
-        {
-            if(s->verbosity > 0)
-            {
-                printf("--out describes a folder");
-            }
-            free(s->outFolder);
-            s->outFolder = malloc(strlen(s->outFile) + 8);
-            assert(s->outFolder != NULL);
-            sprintf(s->outFolder, "%s%c", s->outFile, FILESEP);
-            free(s->outFile);
-            char * basename = dw_basename(s->imFile);
-            char * outfile0 = malloc(strlen(basename) + strlen(s->outFolder) + 8);
-            assert(outfile0 != NULL);
-            sprintf(outfile0, "%s%c%s", s->outFolder, FILESEP, basename);
-            s->outFile = dw_prefix_file(outfile0, s->prefix);
-            free(outfile0);
-        } else {
-            char * dname = dw_dirname(s->outFile);
-            free(s->outFolder);
-            s->outFolder = malloc(strlen(dname) + 16);
-            assert(s->outFolder != NULL);
-            sprintf(s->outFolder, "%s%c", dname, FILESEP);
-            free(dname);
-        }
-    }
-
-    if(! s->iterdump)
-    {
-        if( s->overwrite == 0 && dw_isfile(s->outFile))
-        {
-            printf("%s already exist. Use --overwrite to overwrite existing files.\n",
-                   s->outFile);
-            exit(0);
-        }
-    }
-
-    if(s->nThreads_FFT < 1 || s->nThreads_OMP < 1)
-    {
-        printf("Invalid number of threads (%d), "
-               "please verify your command line\n", s->nThreads_FFT);
-        exit(EXIT_FAILURE);
-    }
-
-    s->logFile = malloc(strlen(s->outFile) + 10);
-    assert(s->logFile != NULL);
-    sprintf(s->logFile, "%s.log.txt", s->outFile);
-
-
-
-    if(s->tsvFile != NULL)
-    {
-        s->tsv = fopen(s->tsvFile, "w");
-        if(s->tsv == NULL)
-        {
-            fprintf(stderr, "Failed to open %s for writing\n", s->tsvFile);
-            exit(EXIT_FAILURE);
-        }
-        fprintf(s->tsv, "iteration\ttime\tKL\n");
-    }
-
-    /* Set the plan to be used with fftw3 */
-    fft_set_plan(s->fftw3_planning);
-    fft_set_inplace(s->fft_inplace);
-    if(s->verbosity > 2)
-    {
-        printf("Command line arguments accepted\n");
-    }
-
-    if(s->tempFolder == NULL)
-    {
-        char * tmpdir = getenv("DW_TEMPDIR");
-        if(tmpdir)
-        {
-            s->tempFolder = strdup(tmpdir);
-        }
-    }
-
-    if(s->tempFolder != NULL)
-    {
-        if(!dw_isdir(s->tempFolder))
-        {
-            fprintf(stderr, "the temp folder '%s' does not exist\n", s->tempFolder);
-            exit(1);
-        }
+#else
+        printf("WARNING: dw was not compiled with GPU support\n");
+#endif
     }
 }
+
+
 
 
 void fsetzeros(const char * fname, size_t N)
@@ -1960,7 +2059,7 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
     /* File names:
        raw_source: The image image as raw pixel data.
        raw_target: The deconvolved tiles as raw pixel data.
-     */
+    */
     char * tempdir = s->tempFolder;
     if(tempdir == NULL)
     {
@@ -2298,6 +2397,12 @@ float * psf_makeOdd(float * psf, int64_t * pM, int64_t * pN, int64_t *pP)
 
 void dcw_init_log(dw_opts * s)
 {
+    if(s->log != NULL)
+    {
+        /* Something is already initialized as the sink for the log messages */
+        return;
+    }
+
     s->log = fopen(s->logFile, "w");
     if (s->log == NULL)
     {
@@ -2317,7 +2422,10 @@ void dcw_close_log(dw_opts * s)
 {
     fprint_peak_memory(s->log);
     show_time(s->log);
-    fclose(s->log);
+    if( !s->leave_log_open )
+    {
+        fclose(s->log);
+    }
 }
 
 double get_nbg(float * I, size_t N, float bg)
@@ -2432,6 +2540,28 @@ static void dw_set_omp_threads(const dw_opts *s)
     return;
 }
 
+static float * acquire_psf(dw_opts *s, i64 * pM, i64 * pN, i64 *pP)
+{
+    if(s->input_psf != NULL)
+    {
+        *pM = s->input_psf_size.M;
+        *pN = s->input_psf_size.N;
+        *pP = s->input_psf_size.P;
+        i64 sz = *pM * *pN * *pP * sizeof(f32);
+        f32 * psf = fim_malloc(sz);
+        memcpy(psf, s->input_psf, sz);
+        return psf;
+    }
+
+    f32 * psf = fim_imread(s->psfFile, NULL, pM, pN, pP, s->verbosity);
+    if(psf == NULL)
+    {
+        fprintf(stderr, "Failed to open %s\n", s->psfFile);
+        return NULL;
+    }
+    return psf;
+}
+
 int dw_run(dw_opts * s)
 {
     struct timespec tstart, tend;
@@ -2457,15 +2587,22 @@ int dw_run(dw_opts * s)
     }
 
     int64_t M = 0, N = 0, P = 0;
-    if(fim_imread_size(s->imFile, &M, &N, &P))
+    if(s->imFile != NULL)
     {
-        printf("fim_imread_size failed to open %s\n", s->imFile);
-        return -1;
-    } else {
-        if(s->verbosity > 3)
+        if(fim_imread_size(s->imFile, &M, &N, &P))
         {
-            printf("Got image info from %s\n", s->imFile);
+            printf("fim_imread_size failed to open %s\n", s->imFile);
+            return -1;
+        } else {
+            if(s->verbosity > 3)
+            {
+                printf("Got image info from %s\n", s->imFile);
+            }
         }
+    } else {
+        M = s->input_image_size.M;
+        N = s->input_image_size.N;
+        P = s->input_image_size.P;
     }
 
     if(s->verbosity > 1)
@@ -2486,30 +2623,39 @@ int dw_run(dw_opts * s)
 
     if(tiling == 0)
     {
-        if(s->verbosity > 0 )
+        if(s->imFile != NULL)
         {
-            printf("Reading %s\n", s->imFile);
-        }
-
-        im = fim_imread(s->imFile, T, &M, &N, &P, s->verbosity);
-        if(im == NULL)
-        {
-            fprintf(stderr, "Failed to open %s\n", s->imFile);
-            exit(EXIT_FAILURE);
-        }
-
-        if(s->verbosity > 4)
-        {
-            if(M > 9)
+            if(s->verbosity > 0 )
             {
-                printf("image data: ");
-                for(size_t kk = 0; kk<10; kk++)
-                {
-                    printf("%f ", im[kk]);
-                }
-                printf("\n");
+                printf("Reading %s\n", s->imFile);
             }
-            printf("Done reading\n"); fflush(stdout);
+
+            im = fim_imread(s->imFile, T, &M, &N, &P, s->verbosity);
+            if(im == NULL)
+            {
+                fprintf(stderr, "Failed to open %s\n", s->imFile);
+                exit(EXIT_FAILURE);
+            }
+
+            if(s->verbosity > 4)
+            {
+                if(M > 9)
+                {
+                    printf("image data: ");
+                    for(size_t kk = 0; kk<10; kk++)
+                    {
+                        printf("%f ", im[kk]);
+                    }
+                    printf("\n");
+                }
+                printf("Done reading\n"); fflush(stdout);
+            }
+        }
+
+        if(s->input_image != NULL)
+        {
+            im = fim_malloc(M*N*P*sizeof(float));
+            memcpy(im, s->input_image, M*N*P*sizeof(float));
         }
 
         if(s->auto_zcrop > 0)
@@ -2629,12 +2775,9 @@ int dw_run(dw_opts * s)
     {
         printf("Reading %s\n", s->psfFile);
     }
-    psf = fim_imread(s->psfFile, NULL, &pM, &pN, &pP, s->verbosity);
-    if(psf == NULL)
-    {
-        fprintf(stderr, "Failed to open %s\n", s->psfFile);
-        exit(1);
-    }
+
+    psf = acquire_psf(s, &pM, &pN, &pP);
+
     if(s->verbosity > 4)
     {
         if(M > 9)
@@ -2729,7 +2872,9 @@ int dw_run(dw_opts * s)
             {
                 printf("Nothing to write to disk :(\n");
             }
-        } else
+        }
+
+        if(out != NULL && s->outFile != NULL)
         {
             double nZeros = get_nbg(out, M*N*P, s->bg);
             fprintf(s->log, "%f%% pixels at bg level in the output image.\n", 100*nZeros/(M*N*P));
@@ -2768,6 +2913,16 @@ int dw_run(dw_opts * s)
                 }
             }
         }
+
+        if(s->write_result_to_buffer == 1 && out != NULL)
+        {
+            s->result = malloc(M*N*P*sizeof(float));
+            memcpy(s->result, out, M*N*P*sizeof(float));
+            s->result_size.M = M;
+            s->result_size.N = N;
+            s->result_size.P = P;
+        }
+
     }
 
     ttags_free(&T);
@@ -2789,8 +2944,6 @@ int dw_run(dw_opts * s)
 
     if(s->verbosity > 0)
     { printf("Done!\n"); }
-
-    dw_opts_free(&s);
 
     return 0;
 }

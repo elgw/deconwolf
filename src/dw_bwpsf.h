@@ -71,6 +71,10 @@ typedef struct {
 /* New configuration with default settings */
 bw_conf * bw_conf_new(void);
 
+/* Check the configuration, and possibly make some minor adjustments
+ * returns EXIT_SUCCESS if the config looks valid. */
+int bw_conf_validate(bw_conf * s);
+
 /* Print out the configuration */
 void bw_conf_printf(FILE * out, bw_conf * conf);
 
