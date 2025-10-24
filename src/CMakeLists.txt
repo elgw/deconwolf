@@ -33,6 +33,9 @@ add_library( deconwolf SHARED
   tiling.c
   quickselect.c
   npio.c
+  dw_bwpsf.c
+  bw_gsl.c
+  li.c
 )
 
 set(DECONWOLF_PUBLIC_HEADERS
@@ -43,6 +46,7 @@ set(DECONWOLF_PUBLIC_HEADERS
   "ftab.h"
   "dw_version.h"
   "npio.h"
+  "dw_bwpsf.h"
 "kdtree/include/kdtree.h")
 
 #

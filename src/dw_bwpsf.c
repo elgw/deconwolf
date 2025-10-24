@@ -14,11 +14,70 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#define _USE_MATH_DEFINES
+#include <math.h>
+#include <assert.h>
+#include <complex.h>
+#include <stdlib.h>
+#include <string.h>
+#include <getopt.h>
+#include <time.h>
+#include <wchar.h>
+#include <locale.h>
+#include <gsl/gsl_integration.h>
+#include <omp.h>
+
+#include "dw_util.h"
+#include "fim_tiff.h"
+#include "dw_version.h"
+#include "lanczos.h"
+#include "li.h"
+#include "bw_gsl.h"
 
 #include "dw_bwpsf.h"
 #include "npio.h"
 
+/* Windows does not agree on the definition of complex numbers,
+ * we will call them dcomplex regardless of the underlying library
+ */
+#ifdef WINDOWS
+typedef _Dcomplex dcomplex;
+#else
+typedef double complex dcomplex;
+#endif
+
 int GLOB_N_GSL_EROUND = 0; /* Counter for GSL_EROUND */
+
+void BW_slice(float * , float z, bw_conf * conf);
+void bw_argparsing(int , char ** , bw_conf * conf);
+void * BW_thread(void * data);
+
+// Get the command line options
+void getCmdLine(int argc, char ** argv, bw_conf * s);
+
+
+/* Integration over pixel */
+typedef struct {
+    bw_conf * conf;
+    double * radprofile;
+    size_t nr;
+    int radsample;
+    double y0;
+    double y1;
+    double x;
+    gsl_integration_workspace * wspx;
+    gsl_integration_workspace * wspy;
+} pixely_t;
+
+
+#define ANSI_COLOR_RED     "\x1b[31m"
+#define ANSI_COLOR_GREEN   "\x1b[32m"
+#define ANSI_COLOR_YELLOW  "\x1b[33m"
+#define ANSI_COLOR_BLUE    "\x1b[34m"
+#define ANSI_COLOR_MAGENTA "\x1b[35m"
+#define ANSI_COLOR_CYAN    "\x1b[36m"
+#define ANSI_COLOR_RESET   "\x1b[0m"
+
 
 void dw_bw_gsl_err_handler(const char * reason,
                            const char * file,
@@ -635,7 +694,7 @@ void BW_slice(float * V, float z, bw_conf * conf)
         bw_gsl_conf->lambda = conf->lambda;
 
 
-        if(z == 0) /* Only write from the thread that processes z==0 */
+        if(z == 0 && (conf->log != NULL) ) /* Only write from the thread that processes z==0 */
         {
             fprintf(conf->log, "Settings for BW integration over Z:\n");
             bw_gsl_fprint(conf->log, bw_gsl_conf);
@@ -713,7 +772,7 @@ void unit_tests(bw_conf * conf)
     return;
 }
 
-int main(int argc, char ** argv)
+int dw_bwpsf(int argc, char ** argv)
 {
     struct timespec tstart, tend;
     dw_gettime(&tstart);
@@ -806,3 +865,11 @@ int main(int argc, char ** argv)
 
     return EXIT_SUCCESS;
 }
+
+
+#ifdef STANDALONE
+int main(int argc, char ** argv)
+{
+    return dw_bwpsf(argc, argv);
+}
+#endif

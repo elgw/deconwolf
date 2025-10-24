@@ -24,38 +24,11 @@
  */
 
 #include <stdio.h>
-#define _USE_MATH_DEFINES
-#include <math.h>
-#include <assert.h>
-#include <complex.h>
-#include <stdlib.h>
-#include <string.h>
-#include <getopt.h>
-#include <time.h>
-#include <wchar.h>
-#include <locale.h>
-#include <gsl/gsl_integration.h>
-#include <omp.h>
-
-#include "dw_util.h"
-#include "fim_tiff.h"
-#include "dw_version.h"
-#include "lanczos.h"
-#include "li.h"
-#include "bw_gsl.h"
-
-/* Windows does not agree on the definition of complex numbers,
- * we will call them dcomplex regardless of the underlying library
- */
-#ifdef WINDOWS
-typedef _Dcomplex dcomplex;
-#else
-typedef double complex dcomplex;
-#endif
 
 /* Mode for calculating the 1D integral */
-#define MODE_BW_GSL 0
-#define MODE_BW_LI 1
+typedef enum {
+    MODE_BW_GSL,
+    MODE_BW_LI } dw_bw_integral_type;
 
 typedef struct {
     int verbose;
@@ -74,60 +47,39 @@ typedef struct {
     float resAxial; // pixel size in z
 
     /* Integration options */
-    int mode_bw; /* How to calculate the 1D integral */
+    dw_bw_integral_type mode_bw; /* How to calculate the 1D integral */
     int oversampling_R; // Oversampling in radial direction
     double epsabs;
     double epsrel;
     size_t limit;
     int key;
 
-    float * V; // output image
-    // shape of output image
-    int M;
-    int N;
-    int P;
-
     // For parallel processing
     int thread;
     int nThreads;
 
     int testing;
+
+    /* Outputs */
+    float * V; // output image
+    // shape of output image
+    int M;
+    int N;
+    int P;
 } bw_conf;
 
+/* New configuration with default settings */
 bw_conf * bw_conf_new(void);
-void bw_conf_free(bw_conf ** conf);
+
+/* Print out the configuration */
 void bw_conf_printf(FILE * out, bw_conf * conf);
-void BW_slice(float * , float z, bw_conf * conf);
-void bw_argparsing(int , char ** , bw_conf * conf);
-void * BW_thread(void * data);
+
+/* Free conf and all fields that it points to and finally sets it to NULL */
+void bw_conf_free(bw_conf ** conf);
 
 /* Generate the Born-Wolf PSF
- * allocates conf->V is already allocated
  */
 void BW(bw_conf * conf);
 
-// Get the command line options
-void getCmdLine(int argc, char ** argv, bw_conf * s);
-
-
-/* Integration over pixel */
-typedef struct {
-    bw_conf * conf;
-    double * radprofile;
-    size_t nr;
-    int radsample;
-    double y0;
-    double y1;
-    double x;
-    gsl_integration_workspace * wspx;
-    gsl_integration_workspace * wspy;
-} pixely_t;
-
-
-#define ANSI_COLOR_RED     "\x1b[31m"
-#define ANSI_COLOR_GREEN   "\x1b[32m"
-#define ANSI_COLOR_YELLOW  "\x1b[33m"
-#define ANSI_COLOR_BLUE    "\x1b[34m"
-#define ANSI_COLOR_MAGENTA "\x1b[35m"
-#define ANSI_COLOR_CYAN    "\x1b[36m"
-#define ANSI_COLOR_RESET   "\x1b[0m"
+/* CLI */
+int dw_bwpsf(int argc, char ** argv);

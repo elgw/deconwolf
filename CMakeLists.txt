@@ -128,6 +128,7 @@ set(dw_bw_SOURCES
 
   add_executable(dw_bw ${dw_bw_SOURCES})
   set_target_properties(dw_bw PROPERTIES VERSION ${PROJECT_VERSION})
+  target_compile_definitions(dw_bw PUBLIC STANDALONE) # set -DSTANDALONE
 
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/dw_version.h.in
     ${CMAKE_CURRENT_SOURCE_DIR}/src/dw_version.h)
