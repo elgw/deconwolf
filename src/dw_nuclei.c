@@ -67,6 +67,7 @@ typedef struct{
 
     // basename for feature data export.
     char * fout;
+    ftif_t * ftif;
 } opts;
 
 static int ftab_to_npy(const ftab_t * FT, const char * filename)
@@ -143,6 +144,8 @@ static void opts_free(opts * s)
     {
         return;
     }
+    fim_tiff_destroy(s->ftif);
+    s->ftif = NULL;
     free(s->out);
     free(s->image);
     free(s->anno_image);
@@ -481,7 +484,7 @@ get_reduction(opts * s, const char * file)
     {
         printf("Reading tif: %s\n", file);
     }
-    float * I = fim_tiff_read(file, NULL, &M, &N, &P, s->verbose);
+    float * I = fim_tiff_read(s->ftif, file, NULL, &M, &N, &P);
     if(I == NULL)
     {
         printf("%s could not be read, unrecognizable format.\n", file);
@@ -660,7 +663,6 @@ fit(opts * s, int argc, char ** argv)
         fprintf(log, "%s ", argv[kk]);
     }
     fprintf(log, "\n");
-    fim_tiff_set_log(log);
 
     int nimages = (argc - s->optpos);
     if( nimages == 0)
@@ -824,7 +826,6 @@ fit(opts * s, int argc, char ** argv)
     trafo_save(F, s->modelfile);
     trafo_free(F);
 
-    fim_tiff_set_log(stdout);
     fclose(log);
     return EXIT_SUCCESS;
 }
@@ -917,11 +918,11 @@ init(opts * s, int argc, char ** argv)
             continue;
         }
         i64 M, N, P;
-        fim_tiff_get_size(image, &M, &N, &P);
+        fim_tiff_get_size(s->ftif, image, &M, &N, &P);
         // printf("%lu x %lu\n", M, N);
 
         fimo * Ir = get_reduction(s, image);
-        //fimo * I = fimo_tiff_read(image);
+
         //fimo * Iz = fimo_maxproj(I);
 
         //fimo_free(I);
@@ -968,15 +969,7 @@ dw_nuclei(int argc, char ** argv)
     omp_set_num_threads(s->nthreads);
 #endif
 
-    fim_tiff_init();
-    if(s->verbose > 1)
-    {
-        fim_tiff_set_log(stdout);
-    } else {
-        FILE * out = fopen("/dev/null", "w");
-        fim_tiff_set_log(out);
-    }
-
+    s->ftif = fim_tiff_new(stdout, s->verbose);
 
     if(s->verbose > 0)
     {

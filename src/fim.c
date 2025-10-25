@@ -1033,9 +1033,6 @@ void fim_shift(float * restrict A,
                const int64_t M, const int64_t N, const int64_t P,
                const float dm, const float dn, const float dp)
 {
-    int nThreads = 0;
-
-
     int sm = round(dm);
     int sn = round(dn);
     int sp = round(dp);
@@ -1563,14 +1560,16 @@ void fim_LoG_ut()
     printf("Max abs difference: %e\n", maxabs);
 
     if(1){
+        ftif_t * ftif = fim_tiff_new(stdout, 1);
         printf("Writing to V.tif\n");
-        fim_tiff_write_float("V.tif", V, NULL,  N, M, P);
+        fim_tiff_write_float(ftif, "V.tif", V, NULL,  N, M, P);
         printf("Writing to Diff.tif\n");
-        fim_tiff_write_float("Diff.tif", Delta, NULL,  N, M, P);
+        fim_tiff_write_float(ftif, "Diff.tif", Delta, NULL,  N, M, P);
         printf("Writing to LoG.tif\n");
-        fim_tiff_write_float("LoG.tif", LoG, NULL,  N, M, P);
+        fim_tiff_write_float(ftif, "LoG.tif", LoG, NULL,  N, M, P);
         printf("Writing to LoG_S.tif\n");
-        fim_tiff_write_float("LoG_S.tif", LoG2, NULL, N, M, P);
+        fim_tiff_write_float(ftif, "LoG_S.tif", LoG2, NULL, N, M, P);
+        fim_tiff_destroy(ftif);
     }
     fim_free(Delta);
 
@@ -4286,10 +4285,12 @@ ftab_t * fim_features_2d(const fimo * fI,
     printf("\n");
     if(debug)
     {
-        fim_tiff_write_float(debug_image_name,
+        ftif_t * ftif = fim_tiff_new(stdout, 1);
+        fim_tiff_write_float(ftif, debug_image_name,
                              debug_image, NULL,
                              M, N, nfeatures);
         fim_free(debug_image);
+        fim_tiff_destroy(ftif);
     }
     return T;
 }
@@ -4297,8 +4298,8 @@ ftab_t * fim_features_2d(const fimo * fI,
 fimo * fimo_tiff_read(const char * file)
 {
     i64 M, N, P;
-
-    float * V = fim_tiff_read(file, NULL, &M, &N, &P, 0);
+    ftif_t * ftif = fim_tiff_new(stdout, 1);
+    float * V = fim_tiff_read(ftif, file, NULL, &M, &N, &P);
     if(V == NULL)
     {
         return NULL;
@@ -4309,6 +4310,7 @@ fimo * fimo_tiff_read(const char * file)
     I->M = M;
     I->N = N;
     I->P = P;
+    fim_tiff_destroy(ftif);
     return I;
 }
 
@@ -4328,8 +4330,9 @@ void fim_features_2d_ut()
     int64_t M = 0;
     int64_t N = 0;
     int64_t P = 0;
-
-    float * V = fim_tiff_read(file, NULL, &M, &N, &P, 0);
+    ftif_t * ftif = fim_tiff_new(stdout, 1);
+    float * V = fim_tiff_read(ftif, file, NULL, &M, &N, &P);
+    fim_tiff_destroy(ftif);
     printf("%s is %" PRId64 " %" PRId64 " %" PRId64 " image\n", file, M, N, P);
     fimo * I = malloc(sizeof(fimo));
     assert(I != NULL);
@@ -4578,7 +4581,10 @@ fimo * fimo_transpose(const fimo * restrict A)
 
 int fimo_tiff_write(const fimo * I, const char * fName)
 {
-    return fim_tiff_write_float(fName, I->V, NULL, I->M, I->N, I->P);
+    ftif_t * ftif = fim_tiff_new(stdout, 1);
+    int ret = fim_tiff_write_float(ftif, fName, I->V, NULL, I->M, I->N, I->P);
+    fim_tiff_destroy(ftif);
+    return ret;
 }
 
 void fimo_blit_2D(fimo * A, const fimo * B, size_t x0, size_t y0)
@@ -5043,7 +5049,10 @@ fim_imread(const char * filename,
     {
         return fim_read_npy(filename, M, N, P, verbose);
     }
-    return fim_tiff_read(filename, T, M, N, P, verbose);
+    ftif_t * ftif = fim_tiff_new(stdout, verbose);
+    float * V =  fim_tiff_read(ftif, filename, T, M, N, P);
+    fim_tiff_destroy(ftif);
+    return V;
 }
 
 int
@@ -5058,7 +5067,10 @@ fim_imwrite_f32(const char * outname,
         return npio_write(outname, 3, shape, (void *) V,
                           NPIO_F32, NPIO_F32);
     }
-    return fim_tiff_write_float(outname, V, T, M, N, P);
+    ftif_t * ftif = fim_tiff_new(stdout, 1);
+    int ret = fim_tiff_write_float(ftif, outname, V, T, M, N, P);
+    fim_tiff_destroy(ftif);
+    return ret;
 }
 
 
@@ -5088,7 +5100,10 @@ fim_imwrite_u16(const char * outname,
         return npio_write(outname, 3, shape, (void *) I, NPIO_U16, NPIO_U16);
         free(I);
     }
-    return fim_tiff_write_opt(outname, V, T, M, N, P, scaling);
+    ftif_t * ftif = fim_tiff_new(stdout, 1);
+    int ret =  fim_tiff_write_opt(ftif, outname, V, T, M, N, P, scaling);
+    fim_tiff_destroy(ftif);
+    return ret;
 }
 
 int
@@ -5111,7 +5126,10 @@ fim_imread_size(const char * filename,
         *M = npy->shape[2];
         return 0;
     }
-    return fim_tiff_get_size(filename, M, N, P);
+    ftif_t * ftif = fim_tiff_new(stdout, 1);
+    int ret = fim_tiff_get_size(ftif, filename, M, N, P);
+    fim_tiff_destroy(ftif);
+    return ret;
 }
 
 
@@ -5198,7 +5216,10 @@ int fim_to_raw(const char* infile, const char* outfile)
         npio_free(meta);
         return 0;
     } else {
-        return fim_tiff_to_raw_f32(infile, outfile);
+        ftif_t * ftif = fim_tiff_new(stdout, 1);
+        int ret = fim_tiff_to_raw_f32(ftif, infile, outfile);
+        fim_tiff_destroy(ftif);
+        return ret;
     }
     return 1;
 }

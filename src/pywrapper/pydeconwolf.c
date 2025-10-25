@@ -110,12 +110,15 @@ x_imread(PyObject * UNUSED(self), PyObject *args, PyObject *keywds)
     {
         return NULL;
     }
-    fim_tiff_init();
+
 
     i64 M = 0;
     i64 N = 0;
     i64 P = 0;
-    float * V = fim_tiff_read(filename, NULL, &M, &N, &P, verbose);
+    ftif_t * ftif = fim_tiff_new(stdout, verbose);
+    float * V = fim_tiff_read(ftif, filename, NULL, &M, &N, &P);
+    fim_tiff_destroy(ftif);
+    ftif = NULL;
 
     if(V == NULL)
     {
@@ -201,8 +204,6 @@ x_imwrite(PyObject * UNUSED(self), PyObject *args, PyObject *keywds)
         return NULL;
     }
 
-    fim_tiff_init();
-
     PyArrayObject * array = (PyArrayObject*) _array;
 
     int M = PyArray_DIM(array, 1); // Py_ssize_t
@@ -215,8 +216,10 @@ x_imwrite(PyObject * UNUSED(self), PyObject *args, PyObject *keywds)
         N = PyArray_DIM(array, 1);
         P = PyArray_DIM(array, 0);
     }
-
-    fim_tiff_write_float(filename, (f32*) PyArray_DATA(array), NULL, M, N, P);
+    ftif_t * ftif = fim_tiff_new(stdout, verbose);
+    fim_tiff_write_float(ftif, filename, (f32*) PyArray_DATA(array), NULL, M, N, P);
+    fim_tiff_destroy(ftif);
+    ftif = NULL;
     Py_RETURN_NONE;
 }
 

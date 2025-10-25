@@ -61,6 +61,7 @@ typedef struct{
     int xgrid;
     /* Process at x times higher resolution and then average */
     int oversampling;
+    ftif_t * ftif;
 } opts;
 
 static opts * opts_new();
@@ -97,6 +98,7 @@ static opts * opts_new()
 
 static void opts_free(opts * s)
 {
+    fim_tiff_destroy(s->ftif);
     free(s->outfile);
     free(s->logfile);
     if(s->log != NULL)
@@ -586,7 +588,6 @@ fimo * gen_psf(opts * s, double lambda)
 
     double optical_dx = s->optical.dx/s->oversampling;
 
-    fim_tiff_init();
     fimo * PSF = fimo_zeros(s->M*s->oversampling, s->M*s->oversampling, s->P);
 
     double Fs = 1/optical_dx;
@@ -843,12 +844,12 @@ static void pinhole_convolution(opts * s, fimo * PSF)
     if(s->verbose > 2)
     {
         printf("verbose > 2: writing pinhole to pinhole.tif\n");
-        fim_tiff_write_float("pinhole.tif", P, NULL, PSF->M, PSF->N, 1);
+        fim_tiff_write_float(s->ftif, "pinhole.tif", P, NULL, PSF->M, PSF->N, 1);
     }
 
 
     fftshift2_float(P, PSF->M);;
-    //fim_tiff_write_float("pinhole_shifted.tif", P, NULL, PSF->M, PSF->N, 1);
+
 
     /* We assume that the image close to the edges will not be used */
     for(size_t pp = 0; pp<PSF->P; pp++)
@@ -913,13 +914,13 @@ static void dw_psf(opts * s)
     char * swstring = malloc(1024);
     assert(swstring != NULL);
     sprintf(swstring, "deconwolf %s", deconwolf_version);
-    ttags_set_software(T, swstring);
-    ttags_set_imagesize(T, PSF->M, PSF->N, PSF->P);
-    ttags_set_pixelsize(T, s->optical.dx, s->optical.dx, s->optical.dz);
+    ttags_set_software(s->ftif, T, swstring);
+    ttags_set_imagesize(s->ftif, T, PSF->M, PSF->N, PSF->P);
+    ttags_set_pixelsize(s->ftif, T, s->optical.dx, s->optical.dx, s->optical.dz);
     free(swstring);
 
 
-    fim_tiff_write_float(s->outfile, PSF->V,
+    fim_tiff_write_float(s->ftif, s->outfile, PSF->V,
                          T,
                          PSF->M, PSF->N, PSF->P);
     ttags_free(&T);
@@ -932,10 +933,7 @@ int dw_psf_cli(int argc, char ** argv)
     opts * s = opts_new();
     /* Parse command line and open log file etc */
     argparsing(argc, argv, s);
-    if(s->verbose > 2)
-    {
-        printf("Command lined parsed, continuing\n"); fflush(stdout);
-    }
+    s->ftif = fim_tiff_new(stdout, s->verbose);
     /* Ready to go */
     dw_psf(s);
     /* Clean up */

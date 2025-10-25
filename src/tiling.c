@@ -302,19 +302,16 @@ float * tiling_get_tile_tiff(tiling * T, const int tid, const char * fName)
     tile * t = T->tiles[tid];
     int verbosity = 1;
     int64_t M = 0; int64_t N = 0; int64_t P = 0; // Will be set to the image size
-    float * R = fim_tiff_read_sub(fName, NULL, &M, &N, &P, verbosity,
+    ftif_t * ftif = fim_tiff_new(stdout, verbosity);
+    float * R = fim_tiff_read_sub(ftif,
+                                  fName, NULL, &M, &N, &P,
                                   1,
                                   t->xpos[0], t->xpos[2], t->xpos[4], // Start pos
                                   t->xsize[0], t->xsize[1], t->xsize[2]); // size
-
+    fim_tiff_destroy(ftif);
+    ftif = NULL;
     printf("%" PRId64 " %" PRId64 " %" PRId64 "\n", t->xsize[0], t->xsize[1], t->xsize[2]);
 
-    if(0)
-    {
-        printf("Writing to tile.tif\n");
-        fim_tiff_write("tile.tif", R, NULL, t->xsize[0], t->xsize[1], t->xsize[2]);
-        printf("ok\n"); getchar();
-    }
     return R;
 }
 

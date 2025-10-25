@@ -24,6 +24,7 @@
  */
 
 #include <stdio.h>
+#include "fim_tiff.h"
 
 /* Mode for calculating the 1D integral */
 typedef enum {
@@ -66,6 +67,7 @@ typedef struct {
     int M;
     int N;
     int P;
+    ftif_t * ftif;
 } bw_conf;
 
 /* New configuration with default settings */

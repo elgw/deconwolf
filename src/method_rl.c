@@ -107,6 +107,7 @@ float * deconvolve_rl(float * restrict im, const int64_t M, const int64_t N, con
                       dw_opts * s)
 {
 
+    ftif_t * ftif = fim_tiff_new(s->log, s->verbosity);
     if(s->verbosity > 1)
     {
         printf("Deconvolving\n");
@@ -232,7 +233,7 @@ float * deconvolve_rl(float * restrict im, const int64_t M, const int64_t N, con
     if(s->fulldump)
     {
         printf("Dumping to fullPSF.tif\n");
-        fim_tiff_write_float("fulldump_PSF.tif", Z, NULL, wM, wN, wP);
+        fim_tiff_write_float(ftif, "fulldump_PSF.tif", Z, NULL, wM, wN, wP);
     }
 
     fftwf_complex * fftPSF = fft_and_free(ff, Z, wM, wN, wP);
@@ -328,9 +329,9 @@ float * deconvolve_rl(float * restrict im, const int64_t M, const int64_t N, con
                 //fulldump(s, temp, M, N, P, outname);
                 if(s->outFormat == 32)
                 {
-                    fim_tiff_write_float(outname, temp, NULL, M, N, P);
+                    fim_tiff_write_float(ftif, outname, temp, NULL, M, N, P);
                 } else {
-                    fim_tiff_write(outname, temp, NULL, M, N, P);
+                    fim_tiff_write(ftif, outname, temp, NULL, M, N, P);
                 }
                 free(outname);
                 fim_free(temp);
@@ -393,5 +394,7 @@ float * deconvolve_rl(float * restrict im, const int64_t M, const int64_t N, con
     fim_free(x);
     dw_fft_destroy(ff);
     ff = NULL;
+    fim_tiff_destroy(ftif);
+    ftif = NULL;
     return out;
 }

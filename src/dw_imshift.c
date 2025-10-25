@@ -26,6 +26,7 @@ typedef struct{
     double dy;
     double dz;
     int nthreads;
+    ftif_t * ftif;
 } opts;
 
 static opts * opts_new();
@@ -53,6 +54,7 @@ static opts * opts_new()
 
 static void opts_free(opts * s)
 {
+    fim_tiff_destroy(s->ftif);
     free(s->refImage);
     free(s->inFile);
     free(s->outFile);
@@ -164,14 +166,14 @@ int main(int argc, char ** argv)
 
 static void perform_imshift(const opts * s){
     fim_tiff_info info = {0};
-    if(fim_tiff_get_info(s->inFile, &info))
+    if(fim_tiff_get_info(s->ftif, s->inFile, &info))
     {
         fprintf(stderr, "Failed to read %s\n", s->inFile);
         return;
     }
 
     int64_t M = 0, N = 0, P = 0;
-    float * A = fim_tiff_read(s->inFile, NULL, &M, &N, &P, s->verbose);
+    float * A = fim_tiff_read(s->ftif, s->inFile, NULL, &M, &N, &P);
     if(A == NULL)
     {
         fprintf(stderr, "Failed to read %s\n", s->inFile);
@@ -182,12 +184,12 @@ static void perform_imshift(const opts * s){
     // Write without auto scaling
     if(info.BPS <= 16)
     {
-        fim_tiff_write_opt(s->outFile, A,
+        fim_tiff_write_opt(s->ftif, s->outFile, A,
                            NULL,
                            M, N, P,
                            1.0);
     } else {
-        fim_tiff_write_float(s->outFile, A,
+        fim_tiff_write_float(s->ftif, s->outFile, A,
                              NULL,
                              M, N, P);
     }
@@ -198,12 +200,11 @@ static void perform_xcorr(opts * s){
     printf("Using reference image: %s\n", s->refImage);
     int64_t M = 0, N = 0, P = 0;
     printf("reading images\n");
-    float * A = fim_tiff_read(s->inFile,
-                              NULL, &M, &N, &P, s->verbose);
+    float * A = fim_tiff_read(s->ftif, s->inFile,
+                              NULL, &M, &N, &P);
     int64_t rM = 0, rN = 0, rP = 0;
-    float * R = fim_tiff_read(s->refImage,
-                              NULL, &rM, &rN, &rP,
-                              s->verbose);
+    float * R = fim_tiff_read(s->ftif, s->refImage,
+                              NULL, &rM, &rN, &rP);
 
     if(M!=rM || N != rN || P != rP)
     {
@@ -220,7 +221,7 @@ static void perform_xcorr(opts * s){
     //float * mR = fim_maxproj(R, M, N, P);
     float * mA = fim_sumproj(A, M, N, P);
     float * mR = fim_sumproj(R, M, N, P);
-    fim_tiff_write_float("mA.tif", mA, NULL, M, N, 1);
+    fim_tiff_write_float(s->ftif, "mA.tif", mA, NULL, M, N, 1);
     free(R);
 
     if(s->verbose > 1)
@@ -259,18 +260,17 @@ static void perform_xcorr(opts * s){
     {
         printf("Writing to %s\n", s->outFile);
     }
-    fim_tiff_write(s->outFile, A, NULL, M, N, P);
+    fim_tiff_write(s->ftif, s->outFile, A, NULL, M, N, P);
     free(A);
     return;
 }
 
 int dw_imshift(int argc, char ** argv)
 {
-
-    fim_tiff_init();
     opts * s = opts_new();
 
     argparsing(argc, argv, s);
+    s->ftif = fim_tiff_new(stdout, s->verbose);
 
     if(s->inFile == NULL)
     {

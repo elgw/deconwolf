@@ -208,6 +208,8 @@ void bw_conf_free(bw_conf ** _conf)
     {
         fclose(conf->log);
     }
+    fim_tiff_destroy(conf->ftif);
+    conf->ftif = NULL;
     free(conf->outFile);
     free(conf->logFile);
     free(conf->cmd);
@@ -817,8 +819,8 @@ int dw_bwpsf(int argc, char ** argv)
         fprintf(stderr, "Failed to open %s for writing\n", conf->logFile);
         exit(-1);
     }
-    fim_tiff_init();
-    fim_tiff_set_log(conf->log);
+    conf->ftif = fim_tiff_new(conf->log, conf->verbose);
+
     fprint_time(conf->log);
     bw_conf_printf(conf->log, conf);
     fflush(conf->log);
@@ -863,12 +865,12 @@ int dw_bwpsf(int argc, char ** argv)
         char * swstring = malloc(1024);
         assert(swstring != NULL);
         sprintf(swstring, "deconwolf %s", deconwolf_version);
-        ttags_set_software(T, swstring);
-        ttags_set_imagesize(T, conf->M, conf->N, conf->P);
-        ttags_set_pixelsize(T, conf->resLateral, conf->resLateral, conf->resAxial);
+        ttags_set_software(conf->ftif, T, swstring);
+        ttags_set_imagesize(conf->ftif, T, conf->M, conf->N, conf->P);
+        ttags_set_pixelsize(conf->ftif, T, conf->resLateral, conf->resLateral, conf->resAxial);
         free(swstring);
 
-        fim_tiff_write_float(conf->outFile, conf->V, T, conf->M, conf->N, conf->P);
+        fim_tiff_write_float(conf->ftif, conf->outFile, conf->V, T, conf->M, conf->N, conf->P);
         ttags_free(&T);
     }
 

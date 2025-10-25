@@ -167,7 +167,7 @@ dw_tiff_max(int argc, char ** argv)
 
     argparsing(argc, argv, s);
 
-    fim_tiff_init();
+    ftif_t * ftif = fim_tiff_new(stdout, s->verbose);
 
     char * inFile;
 
@@ -187,7 +187,7 @@ dw_tiff_max(int argc, char ** argv)
         }
 
         fim_tiff_info info = {0};
-        fim_tiff_get_info(inFile, &info);
+        fim_tiff_get_info(ftif, inFile, &info);
         if(info.P <= 1)
         {
             printf("%s is 2D, skipping\n", inFile);
@@ -237,19 +237,19 @@ dw_tiff_max(int argc, char ** argv)
         switch(s->mode)
         {
         case MODE_MAX:
-            if(fim_tiff_maxproj(inFile, outFile))
+            if(fim_tiff_maxproj(ftif, inFile, outFile))
             {
                 exit(EXIT_FAILURE);
             }
             break;
         case MODE_MAX_XYZ:
-            fim_tiff_maxproj_XYZ(inFile, outFile);
+            fim_tiff_maxproj_XYZ(ftif, inFile, outFile);
             break;
         case MODE_GM:
             gen_gm(s, inFile, outFile);
             break;
         case MODE_SLICE:
-            fim_tiff_extract_slice(inFile, outFile, s->slice);
+            fim_tiff_extract_slice(ftif, inFile, outFile, s->slice);
             break;
         default:
             fprintf(stderr, "Unknown mode!\n");
@@ -260,6 +260,7 @@ dw_tiff_max(int argc, char ** argv)
         free(outFile);
     }
 
+    fim_tiff_destroy(ftif);
     opts_free(s);
-    return 0;
+    return EXIT_SUCCESS;
 }

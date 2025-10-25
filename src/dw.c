@@ -679,7 +679,9 @@ void fulldump(dw_opts * s, float * A, size_t M, size_t N, size_t P, char * name)
     if(A != NULL)
     {
         printf("Dumping to %s\n", name);
-        fim_tiff_write_float(name, A, NULL, M, N, P);
+        ftif_t * ftif = fim_tiff_new(stdout, s->verbosity);
+        fim_tiff_write_float(ftif, name, A, NULL, M, N, P);
+        fim_tiff_destroy(ftif);
     }
     return;
 }
@@ -2030,6 +2032,7 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
                  const float * restrict psf, const int64_t pM, const int64_t pN, const int64_t pP,
                  dw_opts * s)
 {
+    ftif_t * ftif = fim_tiff_new(s->log, s->verbosity);
 
     tiling * T = tiling_create(M,N,P, s->tiling_maxSize, s->tiling_padding);
     if( T == NULL)
@@ -2099,7 +2102,7 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
 
     if(s->verbosity > 10){
         printf("Writing to imdump.tif\n");
-        fim_tiff_imwrite_u16_from_raw("imdump.tif", M, N, P, raw_source,
+        fim_tiff_imwrite_u16_from_raw(ftif, "imdump.tif", M, N, P, raw_source,
                                       NULL, s->scaling);
     }
 
@@ -2145,7 +2148,7 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
             assert(tfname != NULL);
             sprintf(tfname, "tile%03d.tif", tt);
             printf("writing to %s\n", tfname);
-            fim_tiff_write(tfname, im_tile, NULL, tileM, tileN, tileP);
+            fim_tiff_write(ftif, tfname, im_tile, NULL, tileM, tileN, tileP);
             free(tfname);
         }
 
@@ -2192,7 +2195,7 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
     } else {
         if(s->scaling <= 0)
         {
-            float rawmax = raw_file_single_max(raw_target, (size_t) M * (size_t) N * (size_t) P );
+            float rawmax = raw_file_single_max(ftif, raw_target, (size_t) M * (size_t) N * (size_t) P );
             if(rawmax > 0)
             {
                 s->scaling = 65535/rawmax;
@@ -2215,11 +2218,11 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
     } else {
         if(s->outFormat == 32)
         {
-            fim_tiff_imwrite_f32_from_raw(s->outFile,
+            fim_tiff_imwrite_f32_from_raw(ftif, s->outFile,
                                           M, N, P,
                                           raw_target, s->imFile);
         } else {
-            fim_tiff_imwrite_u16_from_raw(s->outFile,
+            fim_tiff_imwrite_u16_from_raw(ftif, s->outFile,
                                           M, N, P,
                                           raw_target, s->imFile,
                                           s->scaling);
@@ -2244,10 +2247,13 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
     free(raw_target);
     remove(raw_source);
     free(raw_source);
+    fim_tiff_destroy(ftif);
+    ftif = NULL;
     if(s->verbosity > 2)
     {
         printf("Done with tiling\n");
     }
+
     return 0;
 }
 
@@ -2338,6 +2344,7 @@ void timings()
     printf("V[0] = %f\n", V[0]);
     free(A);
     free(V);
+
 }
 
 void dw_unittests()
@@ -2574,14 +2581,7 @@ int dw_run(dw_opts * s)
     s->verbosity > 1 ? dw_fprint_info(NULL, s) : 0;
     dw_set_omp_threads(s);
 
-    logfile = stdout;
-
-    fim_tiff_init();
-    fim_tiff_set_log(s->log);
-    if(s->verbosity > 2)
-    {
-        fim_tiff_set_log(s->log);
-    }
+    ftif_t * ftif = fim_tiff_new(stdout, s->verbosity);
 
     int64_t M = 0, N = 0, P = 0;
     if(s->imFile != NULL)
@@ -2760,7 +2760,7 @@ int dw_run(dw_opts * s)
     char * swstring = malloc(1024);
     assert(swstring != NULL);
     sprintf(swstring, "deconwolf %s", deconwolf_version);
-    ttags_set_software(T, swstring);
+    ttags_set_software(ftif, T, swstring);
     free(swstring);
 
     // fim_tiff_write("identity.tif", im, M, N, P);
@@ -2939,6 +2939,6 @@ int dw_run(dw_opts * s)
 
     if(s->verbosity > 0)
     { printf("Done!\n"); }
-
+    fim_tiff_destroy(ftif);
     return 0;
 }

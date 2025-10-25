@@ -68,7 +68,7 @@ typedef uint64_t u64;
  * rows in it.
  */
 
-FILE * fim_tiff_log = NULL;
+
 
 /*
  * Forward declarations
@@ -84,10 +84,25 @@ void readUint16(TIFF * tfile, float * V,
 
 
 
-void fim_tiff_init(void)
+ftif_t * fim_tiff_new(FILE * log, int verbose)
 {
-    fim_tiff_log = stdout;
+    ftif_t * ftif = calloc(1, sizeof(ftif_t));
+    ftif->log = log;
+    ftif->verbose = verbose;
+    return ftif;
 }
+
+void fim_tiff_destroy(ftif_t * ftif)
+{
+    free(ftif);
+    return;
+}
+
+#if 0
+TODO:
+Use the re-entrant error handlers, see:
+https://libtiff.gitlab.io/libtiff/functions/TIFFError.html
+    Previous versions used:
 
 /* Used to redirect errors from libtiff */
 void tiffErrHandler(const char* module, const char* fmt, va_list ap)
@@ -99,17 +114,9 @@ void tiffErrHandler(const char* module, const char* fmt, va_list ap)
 }
 
 
-void fim_tiff_set_log(FILE * fp)
-{
-    if(fp != NULL)
-    {
-        fim_tiff_log = fp;
-    } else {
-        fim_tiff_log = stdout;
-    }
     TIFFSetWarningHandler(tiffErrHandler);
     TIFFSetErrorHandler(tiffErrHandler);
-}
+#endif
 
 void fim_tiff_ut()
 {
@@ -140,16 +147,18 @@ void fim_tiff_ut()
     im[pos1] = 1;
     im[pos2] = 2;
     im[pos3] = 3;
-
-    fim_tiff_write(fname, im, NULL, M, N, P);
+    ftif_t * ftif = fim_tiff_new(stdout, 1);
+    fim_tiff_write(ftif, fname, im, NULL, M, N, P);
 
     int64_t M2 = 0, N2 = 0, P2 = 0;
-    float * im2 = fim_tiff_read(fname, NULL, &M2, &N2, &P2, 0);
+    float * im2 = fim_tiff_read(ftif, fname, NULL, &M2, &N2, &P2);
+
     if(im2 == NULL)
     {
         printf("Could not read back the image\n");
         free(im);
         remove(fname);
+        fim_tiff_destroy(ftif);
         return;
     }
 
@@ -160,6 +169,7 @@ void fim_tiff_ut()
                M, N, P, M2, N2, P2);
         free(im);
         free(im2);
+        fim_tiff_destroy(ftif);
         remove(fname);
         return;
     }
@@ -171,7 +181,9 @@ void fim_tiff_ut()
 
     free(im);
     free(im2);
+    fim_tiff_destroy(ftif);
     remove(fname);
+    return;
 }
 
 
@@ -489,7 +501,7 @@ void readFloat(TIFF * tfile, float * V,
     free(buf);
 }
 
-float raw_file_single_max(const char * rName, const size_t N)
+float raw_file_single_max(ftif_t * ftif, const char * rName, const size_t N)
 {
     // Get max value from raw data file with N floats
     //  printf("Getting max value from %s\n", rName);
@@ -601,7 +613,7 @@ void floattoraw(TIFF * tfile, const char * ofile,
 }
 
 
-int fim_tiff_to_raw_f32(const char * fName, const char * oName)
+int fim_tiff_to_raw_f32(ftif_t * ftif, const char * fName, const char * oName)
 {
     // Convert a tif image, fName, to a raw float image, oName
 
@@ -643,7 +655,7 @@ int fim_tiff_to_raw_f32(const char * fName, const char * oName)
         }
     }
     else {
-        fprintf(fim_tiff_log, "Warning: TIFFTAG_SAMPLEFORMAT not specified, assuming uint but that could be wrong!\n");
+        fprintf(ftif->log, "Warning: TIFFTAG_SAMPLEFORMAT not specified, assuming uint but that could be wrong!\n");
         isUint = 1;
     }
 
@@ -670,7 +682,7 @@ int fim_tiff_to_raw_f32(const char * fName, const char * oName)
 
     if(gotptag != 1)
     {
-        fprintf(fim_tiff_log, "fim_tiff: WARNING: Could not read TIFFTAG_PHOTOMETRIC, assuming minIsBlack\n");
+        fprintf(ftif->log, "fim_tiff: WARNING: Could not read TIFFTAG_PHOTOMETRIC, assuming minIsBlack\n");
         PTAG=1;
     }
     //printf("PTAG = %u\n", PTAG);
@@ -682,9 +694,9 @@ int fim_tiff_to_raw_f32(const char * fName, const char * oName)
 
     if(PTAG > 1)
     {
-        fprintf(fim_tiff_log, "fim_tiff: WARNING: Only WhiteIsZero or BlackIsZero are supported Photometric Interpretations, tag found: %u\n", PTAG);
+        fprintf(ftif->log, "fim_tiff: WARNING: Only WhiteIsZero or BlackIsZero are supported Photometric Interpretations, tag found: %u\n", PTAG);
         PTAG = 1;
-        fprintf(fim_tiff_log, "fim_tiff: Assuming min-is-black\n");
+        fprintf(ftif->log, "fim_tiff: Assuming min-is-black\n");
         fflush(stdout);
     }
 
@@ -716,7 +728,7 @@ int fim_tiff_to_raw_f32(const char * fName, const char * oName)
 
 
 int
-fim_tiff_imwrite_u16_from_raw(
+fim_tiff_imwrite_u16_from_raw(ftif_t * ftif,
     const char * fName, // Name of tiff file to be written
     int64_t M, int64_t N, int64_t P, // Image dimensions
     const char * rName,  // name of raw file
@@ -730,7 +742,7 @@ fim_tiff_imwrite_u16_from_raw(
     if(MNP*sizeof(uint16_t) >= pow(2, 32))
     {
         sprintf(formatString, "w8\n");
-        fprintf(fim_tiff_log, "fim_tiff WARNING: File is > 2 GB, using BigTIFF format\n");
+        fprintf(ftif->log, "fim_tiff WARNING: File is > 2 GB, using BigTIFF format\n");
     }
 
     ttags * tags = NULL;
@@ -740,7 +752,7 @@ fim_tiff_imwrite_u16_from_raw(
         TIFF * ref = TIFFOpen(meta_tiff_file, "r");
         if(ref)
         {
-            ttags_get(ref, tags);
+            ttags_get(ftif, ref, tags);
             TIFFClose(ref);
         }
     }
@@ -767,7 +779,7 @@ fim_tiff_imwrite_u16_from_raw(
 
     if(scaling <= 0)
     {
-        float rawmax = raw_file_single_max(rName, MNP);
+        float rawmax = raw_file_single_max(ftif, rName, MNP);
         if(rawmax > 0)
         {
             scaling = 65535/rawmax;
@@ -790,7 +802,7 @@ fim_tiff_imwrite_u16_from_raw(
     {
         if(tags)
         {
-            ttags_set(out, tags);
+            ttags_set(ftif, out, tags);
         }
 
         TIFFSetField(out, TIFFTAG_IMAGEWIDTH, M);  // set the width of the image
@@ -844,7 +856,7 @@ fim_tiff_imwrite_u16_from_raw(
 }
 
 int
-fim_tiff_imwrite_f32_from_raw(
+fim_tiff_imwrite_f32_from_raw(ftif_t * ftif,
     const char * fName, // Name of tiff file to be written
     int64_t M, int64_t N, int64_t P, // Image dimensions
     const char * rName,  // name of raw file
@@ -857,7 +869,7 @@ fim_tiff_imwrite_f32_from_raw(
     if(MNP*sizeof(uint16_t) >= pow(2, 32))
     {
         sprintf(formatString, "w8\n");
-        fprintf(fim_tiff_log, "fim_tiff WARNING: File is > 2 GB, using BigTIFF format\n");
+        fprintf(ftif->log, "fim_tiff WARNING: File is > 2 GB, using BigTIFF format\n");
     }
 
     ttags * tags = NULL;
@@ -867,7 +879,7 @@ fim_tiff_imwrite_f32_from_raw(
         TIFF * ref = TIFFOpen(meta_tiff_file, "r");
         if(ref)
         {
-            ttags_get(ref, tags);
+            ttags_get(ftif, ref, tags);
             TIFFClose(ref);
         }
     }
@@ -906,7 +918,7 @@ fim_tiff_imwrite_f32_from_raw(
     {
         if(tags)
         {
-            ttags_set(out, tags);
+            ttags_set(ftif, out, tags);
         }
 
         TIFFSetField(out, TIFFTAG_IMAGEWIDTH, M);  // set the width of the image
@@ -960,27 +972,24 @@ fim_tiff_imwrite_f32_from_raw(
 }
 
 
-int fim_tiff_write_float(const char * fName, const float * V,
+int fim_tiff_write_float(ftif_t * ftif,
+                         const char * fName, const float * V,
                          const ttags * T,
                          int64_t N, int64_t M, int64_t P)
 {
 
-    if(fim_tiff_log == NULL)
-    {
-        fim_tiff_log = stdout;
-    }
     size_t bytesPerSample = sizeof(float);
     char formatString[4] = "w";
     if(M*N*P*sizeof(uint16_t) >= pow(2, 32))
     {
         sprintf(formatString, "w8");
-        fprintf(fim_tiff_log, "fim_tiff: File is > 2 GB, using BigTIFF format\n");
+        fprintf(ftif->log, "fim_tiff: File is > 2 GB, using BigTIFF format\n");
     }
 
     TIFF* out = TIFFOpen(fName, formatString);
     if(T != NULL)
     {
-        ttags_set(out, T);
+        ttags_set(ftif, out, T);
     }
     assert(out != NULL);
 
@@ -1038,23 +1047,26 @@ int fim_tiff_write_float(const char * fName, const float * V,
     return 0;
 }
 
-int fim_tiff_write(const char * fName, const float * V,
+int fim_tiff_write(ftif_t * ftif,
+                   const char * fName, const float * V,
                    ttags * T,
                    int64_t N, int64_t M, int64_t P)
 {
     /* Default, use scaling */
-    return fim_tiff_write_opt(fName, V, T, N, M, P, -1.0);
+    return fim_tiff_write_opt(ftif, fName, V, T, N, M, P, -1.0);
 }
 
-int fim_tiff_write_noscale(const char * fName, const float * V,
+int fim_tiff_write_noscale(ftif_t * ftif,
+                           const char * fName, const float * V,
                            ttags * T,
                            int64_t N, int64_t M, int64_t P)
 {
-    return fim_tiff_write_opt(fName, V, T, N, M, P, 1);
+    return fim_tiff_write_opt(ftif, fName, V, T, N, M, P, 1);
 }
 
 
-int fim_tiff_write_opt(const char * fName, const float * V,
+int fim_tiff_write_opt(ftif_t * ftif,
+                       const char * fName, const float * V,
                        const ttags * T,
                        int64_t N, int64_t M, int64_t P, float scaling)
 {
@@ -1063,15 +1075,11 @@ int fim_tiff_write_opt(const char * fName, const float * V,
         return EXIT_FAILURE;
     }
 
-    if(fim_tiff_log == NULL)
-    {
-        fim_tiff_log = stdout;
-    }
     // if V == NULL and empty file will be written
 
     if(!isfinite(scaling))
     {
-        fprintf(fim_tiff_log, "fim_tiff WARNING: Non-finite scaling value, changing to AUTO\n");
+        fprintf(ftif->log, "fim_tiff WARNING: Non-finite scaling value, changing to AUTO\n");
         scaling = -1;
     }
 
@@ -1085,14 +1093,14 @@ int fim_tiff_write_opt(const char * fName, const float * V,
         scaling = (float) (pow(2, 16)-1) / maxval;
     }
 
-    fprintf(fim_tiff_log, "scaling: %f\n", scaling);
+    fprintf(ftif->log, "scaling: %f\n", scaling);
 
     size_t bytesPerSample = sizeof(uint16_t);
     char formatString[4] = "w";
     if(M*N*P*sizeof(uint16_t) >= pow(2, 32))
     {
         sprintf(formatString, "w8");
-        fprintf(fim_tiff_log, "tim_tiff: File is > 2 GB, using BigTIFF format\n");
+        fprintf(ftif->log, "tim_tiff: File is > 2 GB, using BigTIFF format\n");
     }
 
     errno = 0;
@@ -1107,7 +1115,7 @@ int fim_tiff_write_opt(const char * fName, const float * V,
 
     if(T)
     {
-        ttags_set(out, T);
+        ttags_set(ftif, out, T);
     }
 
     size_t linbytes = (M+N)*bytesPerSample;
@@ -1172,7 +1180,8 @@ int fim_tiff_write_opt(const char * fName, const float * V,
     return 0;
 }
 
-int fim_tiff_get_info(const char * fname,
+int fim_tiff_get_info(ftif_t * ftif,
+                      const char * fname,
                       fim_tiff_info * info)
 {
     TIFF * tiff = TIFFOpen(fname, "r");
@@ -1201,11 +1210,12 @@ int fim_tiff_get_info(const char * fname,
     return 0;
 }
 
-int fim_tiff_get_size(const char * fname,
+int fim_tiff_get_size(ftif_t * ftif,
+                      const char * fname,
                       int64_t * M, int64_t * N, int64_t * P)
 {
     fim_tiff_info info;
-    if(fim_tiff_get_info(fname, &info) == 0)
+    if(fim_tiff_get_info(ftif, fname, &info) == 0)
     {
     *M = info.M;
     *N = info.N;
@@ -1215,16 +1225,13 @@ int fim_tiff_get_size(const char * fname,
     return 1;
 }
 
-float * fim_tiff_read(const char * fName,
+float * fim_tiff_read(ftif_t * ftif,
+                      const char * fName,
                       ttags * T,
-                      int64_t * N0, int64_t * M0, int64_t * P0, int verbosity)
+                      int64_t * N0, int64_t * M0, int64_t * P0)
 {
-    if(fim_tiff_log == NULL)
-    {
-        fim_tiff_log = stdout;
-    }
-
-    return fim_tiff_read_sub(fName, T, N0, M0, P0, verbosity,
+    return fim_tiff_read_sub(ftif,
+                             fName, T, N0, M0, P0,
                              0, // sub disabled
                              0,0,0, // start
                              0,0,0); // width
@@ -1242,14 +1249,16 @@ ttags * ttags_new()
     return T;
 }
 
-void ttags_set_imagesize(ttags * T, int M, int N, int P)
+void ttags_set_imagesize(ftif_t * ftif,
+                         ttags * T, int M, int N, int P)
 {
     T->M = M;
     T->N = N;
     T->P = P;
 }
 
-void ttags_set_pixelsize(ttags * T, double xres, double yres, double zres)
+void ttags_set_pixelsize(ftif_t * ftif,
+                         ttags * T, double xres, double yres, double zres)
 {
     if(T->M == 0)
     {
@@ -1408,7 +1417,8 @@ void ttags_free(ttags ** Tp)
     free(T);
 }
 
-void ttags_set_software(ttags * T,
+void ttags_set_software(ftif_t * ftif,
+                        ttags * T,
                         const char * sw)
 {
     assert(T != NULL);
@@ -1422,7 +1432,7 @@ void ttags_set_software(ttags * T,
 }
 
 // TODO: rename
-void ttags_get(TIFF * tfile, ttags * T)
+void ttags_get(ftif_t * ftif, TIFF * tfile, ttags * T)
 {
     // https://docs.openmicroscopy.org/ome-model/5.6.3/ome-tiff/specification.html
     // a string of OME-XML metadata embedded in the ImageDescription tag of
@@ -1472,7 +1482,7 @@ void ttags_get(TIFF * tfile, ttags * T)
 }
 
 /* Copy some TIFF tags ttags to tfile */
-void ttags_set(TIFF * tfile, const ttags * T)
+void ttags_set(ftif_t * ftif, TIFF * tfile, const ttags * T)
 {
     //TIFFSetDirectory(tfile, 0);
     if(T->software != NULL)
@@ -1504,7 +1514,7 @@ void ttags_set(TIFF * tfile, const ttags * T)
     return;
 }
 
-void ttags_show(FILE * fout, ttags* T)
+void ttags_show(ftif_t * ftif, FILE * fout, ttags* T)
 {
 
     fprintf(fout, "Resolution unit: ");
@@ -1542,9 +1552,10 @@ void ttags_show(FILE * fout, ttags* T)
 
 
 
-float * fim_tiff_read_sub(const char * fName,
+float * fim_tiff_read_sub(ftif_t * ftif,
+                          const char * fName,
                           ttags * T,
-                          int64_t * M0, int64_t * N0, int64_t * P0, int verbosity,
+                          int64_t * M0, int64_t * N0, int64_t * P0,
                           int subregion,
                           int64_t sM, int64_t sN, int64_t sP, // start
                           int64_t wM, int64_t wN, int64_t wP) // width
@@ -1563,7 +1574,7 @@ float * fim_tiff_read_sub(const char * fName,
 
     if(T != NULL)
     {
-        ttags_get(tfile, T);
+        ttags_get(ftif, tfile, T);
     }
 
     // Tags: ImageWidth and ImageLength
@@ -1581,7 +1592,7 @@ float * fim_tiff_read_sub(const char * fName,
     {
         if(CMP != 1)
         {
-            fprintf(fim_tiff_log, "TIFFTAG_COMPRESSION=%u is not supported\n", CMP);
+            fprintf(ftif->log, "TIFFTAG_COMPRESSION=%u is not supported\n", CMP);
             return NULL;
         }
     }
@@ -1601,26 +1612,26 @@ float * fim_tiff_read_sub(const char * fName,
         }
     }
     else {
-        fprintf(fim_tiff_log, "Warning: TIFFTAG_SAMPLEFORMAT not specified, "
+        fprintf(ftif->log, "Warning: TIFFTAG_SAMPLEFORMAT not specified, "
                 "assuming uint but that could be wrong!\n");
         isUint = 1;
     }
 
     if(!(isUint || isFloat))
     {
-        fprintf(fim_tiff_log, "fim_tiff: Only unsigned integer and float images are supported\n");
+        fprintf(ftif->log, "fim_tiff: Only unsigned integer and float images are supported\n");
         return NULL;
     }
 
     if(isUint && !(BPS == 16 || BPS == 8))
     {
-        fprintf(fim_tiff_log, "fim_tiff: Unsigned %d-bit images are not supported, only 8 and 16.\n", BPS);
+        fprintf(ftif->log, "fim_tiff: Unsigned %d-bit images are not supported, only 8 and 16.\n", BPS);
         return NULL;
     }
 
     if(isFloat && (BPS != 32))
     {
-        fprintf(fim_tiff_log, "ERROR: For floating point images, only 32-bit "
+        fprintf(ftif->log, "ERROR: For floating point images, only 32-bit "
                 "samples are supported (this image has %u bits per sample)\n",
                 BPS);
         exit(EXIT_FAILURE);
@@ -1639,7 +1650,7 @@ float * fim_tiff_read_sub(const char * fName,
     int inverted = 0;
     if(gotptag != 1)
     {
-        fprintf(fim_tiff_log, "fim_tiff: WARNING: Could not read "
+        fprintf(ftif->log, "fim_tiff: WARNING: Could not read "
                 "TIFFTAG_PHOTOMETRIC, assuming minIsBlack\n");
         PTAG=1;
     }
@@ -1651,23 +1662,23 @@ float * fim_tiff_read_sub(const char * fName,
 
     if(PTAG > 1)
     {
-        fprintf(fim_tiff_log, "fim_tiff WARNING: Only WhiteIsZero or BlackIsZero "
+        fprintf(ftif->log, "fim_tiff WARNING: Only WhiteIsZero or BlackIsZero "
                 "are supported Photometric Interpretations, tag found: %u\n",
                 PTAG);
         PTAG = 1;
-        fprintf(fim_tiff_log, "Assuming min-is-black\n");
+        fprintf(ftif->log, "Assuming min-is-black\n");
         fflush(stdout);
     }
 
     uint16_t spp;
     if( TIFFGetField(tfile, TIFFTAG_SAMPLESPERPIXEL, &spp) == 0 )
     {
-        fprintf(fim_tiff_log, "fim_tiff WARNING: TIFFTAG_SAMPLESPERPIXEL not defined, assuming the value is 1\n");
+        fprintf(ftif->log, "fim_tiff WARNING: TIFFTAG_SAMPLESPERPIXEL not defined, assuming the value is 1\n");
         spp = 1;
     }
     if(spp > 1)
     {
-        fprintf(fim_tiff_log,
+        fprintf(ftif->log,
                 "fim_tiff ERROR: The image %s has %u samples per pixel but only one is allowed\n"
                 "                This program can not read multi-color images and will abort\n",
                 fName, spp);
@@ -1680,17 +1691,17 @@ float * fim_tiff_read_sub(const char * fName,
     P0[0] = (size_t) ndirs;
     int64_t P = P0[0];
 
-    if(verbosity > 1)
+    if(ftif->verbose > 1)
     {
         if(gotB)
         {
-            fprintf(fim_tiff_log, " TIFFTAG_IMAGEDEPTH: %u\n", B);
+            fprintf(ftif->log, " TIFFTAG_IMAGEDEPTH: %u\n", B);
         }
-        fprintf(fim_tiff_log, " TIFFTAG_BITSPERSAMPLE: %u\n", BPS);
-        fprintf(fim_tiff_log, " size: %zu x %zu, %zu bits\n", (size_t) M, (size_t) N, (size_t) BPS);
-        fprintf(fim_tiff_log, " # strips: %zu \n", (size_t) nstrips);
-        fprintf(fim_tiff_log, " strip size (ssize): %zu bytes \n", (size_t) ssize);
-        fprintf(fim_tiff_log, " # dirs (slices): %zu\n", (size_t) ndirs);
+        fprintf(ftif->log, " TIFFTAG_BITSPERSAMPLE: %u\n", BPS);
+        fprintf(ftif->log, " size: %zu x %zu, %zu bits\n", (size_t) M, (size_t) N, (size_t) BPS);
+        fprintf(ftif->log, " # strips: %zu \n", (size_t) nstrips);
+        fprintf(ftif->log, " strip size (ssize): %zu bytes \n", (size_t) ssize);
+        fprintf(ftif->log, " # dirs (slices): %zu\n", (size_t) ndirs);
     }
 
     if(TIFFIsTiled(tfile))
@@ -1715,9 +1726,9 @@ float * fim_tiff_read_sub(const char * fName,
 
     if(isFloat)
     {
-        if(verbosity > 1)
+        if(ftif->verbose > 1)
         {
-            fprintf(fim_tiff_log, "ReadFloat ...\n");
+            fprintf(ftif->log, "ReadFloat ...\n");
         }
         if(subregion)
         {
@@ -1731,15 +1742,15 @@ float * fim_tiff_read_sub(const char * fName,
     }
     if(isUint)
     {
-        if(verbosity > 1)
+        if(ftif->verbose > 1)
         {
-            fprintf(fim_tiff_log, "ReadUint ...\n");
+            fprintf(ftif->log, "ReadUint ...\n");
         }
         if(BPS == 16)
         {
             if(subregion)
             {
-                fprintf(fim_tiff_log, "%" PRId64 " %" PRId64 " %" PRId64 ", %"
+                fprintf(ftif->log, "%" PRId64 " %" PRId64 " %" PRId64 ", %"
                         PRId64 " %" PRId64 " %" PRId64 ", %" PRId64 " %"
                         PRId64 " %" PRId64 "\n",
                         M, N, P, sM, sN, sP, wM, wN, wP);
@@ -1753,7 +1764,7 @@ float * fim_tiff_read_sub(const char * fName,
         {
             if(subregion)
             {
-                fprintf(fim_tiff_log, "%" PRId64 " %" PRId64 " %" PRId64 ", %"
+                fprintf(ftif->log, "%" PRId64 " %" PRId64 " %" PRId64 ", %"
                         PRId64 " %" PRId64 " %" PRId64 ", %" PRId64 " %"
                         PRId64 " %" PRId64 "\n",
                         M, N, P, sM, sN, sP, wM, wN, wP);
@@ -1766,9 +1777,9 @@ float * fim_tiff_read_sub(const char * fName,
     }
 
     TIFFClose(tfile);
-    if(verbosity>1)
+    if(ftif->verbose > 1)
     {
-        fprintf(fim_tiff_log, "Done reading\n");
+        fprintf(ftif->log, "Done reading\n");
     }
 
     if(inverted == 1)
@@ -1803,13 +1814,15 @@ int main(int argc, char ** argv)
     }
     printf("Will read from %s and write to %s.\n", inname, outname);
 
+    ftif_t * ftif = fim_tiff_new(stdout, 1);
+
     int64_t M = 0, N = 0, P = 0;
 
     ttags * T = calloc(1, sizeof(ttags));
     assert( T!= NULL);
-    float * I = (float *) fim_tiff_read(inname, T, &M, &N, &P, 1);
+    float * I = (float *) fim_tiff_read(ftif, inname, T, &M, &N, &P);
 
-    ttags_show(stdout, T);
+    ttags_show(ftif, stdout, T);
 
     if(I == NULL)
     {
@@ -1819,14 +1832,14 @@ int main(int argc, char ** argv)
 
     floatimage_show_stats(I, M, N, P);
 
-    ttags_show(stdout, T);
+    ttags_show(ftif, stdout, T);
 
-    fim_tiff_write(outname, I, T, M, N, P);
+    fim_tiff_write(ftif, outname, I, T, M, N, P);
     ttags_free(&T);
 
     free(I);
     free(outname);
-
+    fim_tiff_destroy(ftif);
     return 0;
 }
 #endif
@@ -1948,7 +1961,7 @@ char * tiff_is_supported(TIFF * tiff)
 }
 
 
-int fim_tiff_maxproj_XYZ(const char * in, const char * out)
+int fim_tiff_maxproj_XYZ(ftif_t * ftif, const char * in, const char * out)
 {
     fimo * I = fimo_tiff_read(in);
     //printf("[%zu, %zu, %zu]\n", I->M, I->N, I->P);
@@ -2013,12 +2026,12 @@ int fim_tiff_maxproj_XYZ(const char * in, const char * out)
 
 
 /* The output will be written as a single strip */
-int fim_tiff_maxproj(const char * in, const char * out)
+int fim_tiff_maxproj(ftif_t * ftif, const char * in, const char * out)
 {
     int64_t M, N, P;
     int verbose = 0;
 
-    if(fim_tiff_get_size(in, &M, &N, &P))
+    if(fim_tiff_get_size(ftif, in, &M, &N, &P))
     {
         printf("Can't open %s to get image dimension\n", in);
         return -1;
@@ -2036,8 +2049,8 @@ int fim_tiff_maxproj(const char * in, const char * out)
 
     ttags * T = ttags_new();
 
-    ttags_get(input, T);
-    ttags_set_software(T, "deconwolf " deconwolf_version);
+    ttags_get(ftif, input, T);
+    ttags_set_software(ftif, T, "deconwolf " deconwolf_version);
     T->P = 1; /* As we will only write one plane eventually */
 
 
@@ -2068,7 +2081,7 @@ int fim_tiff_maxproj(const char * in, const char * out)
 
     ttags_fix_ij_3d_to_2d(T);
 
-    ttags_set(output, T);
+    ttags_set(ftif, output, T);
     ttags_free(&T);
 
     TIFFSetField(output, TIFFTAG_IMAGEWIDTH, M);
@@ -2201,7 +2214,7 @@ int fim_tiff_maxproj(const char * in, const char * out)
 }
 
 
-int fim_tiff_extract_slice(const char * in, const char * out, int slice)
+int fim_tiff_extract_slice(ftif_t * ftif, const char * in, const char * out, int slice)
 {
 
     if(slice < 1)
@@ -2212,7 +2225,7 @@ int fim_tiff_extract_slice(const char * in, const char * out, int slice)
 
     int64_t M, N, P;
 
-    if(fim_tiff_get_size(in, &M, &N, &P))
+    if(fim_tiff_get_size(ftif, in, &M, &N, &P))
     {
         printf("Can't open %s to get image dimension\n", in);
         return -1;

@@ -69,7 +69,6 @@ npy2tif(int argc, char ** argv)
         return EXIT_FAILURE;
     }
 
-    fim_tiff_init();
     npio_t * npy = npio_load(argv[1]);
     if(npy == NULL)
     {
@@ -153,8 +152,12 @@ npy2tif(int argc, char ** argv)
     return EXIT_FAILURE;
 
 success:
-    fim_tiff_write_float(argv[2], V, NULL,
+    ftif_t * ftif = fim_tiff_new(stdout, 1);
+    fim_tiff_write_float(ftif,
+                         argv[2], V, NULL,
                          M, N, P);
+    fim_tiff_destroy(ftif);
+    ftif = NULL;
 
     fim_free(V);
     npio_free(npy);
@@ -177,10 +180,12 @@ tif2npy(int argc, char ** argv)
         printf("%s input.tif output.npy\n", argv[0]);
         return EXIT_FAILURE;
     }
-    fim_tiff_init();
+    ftif_t * ftif = fim_tiff_new(stdout, 1);
     int64_t M, N, P;
-    float * I = fim_tiff_read(argv[1], NULL,
-                              &M, &N, &P, 1);
+    float * I = fim_tiff_read(ftif, argv[1], NULL,
+                              &M, &N, &P);
+    fim_tiff_destroy(ftif);
+    ftif = NULL;
     if(I == NULL)
     {
         printf("Failed to open %s as a tif file\n", argv[1]);

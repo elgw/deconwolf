@@ -50,6 +50,8 @@ typedef struct{
     int nscale;
     float max_rel_scale;
     float * scales;
+
+    ftif_t * ftif;
 } opts;
 
 static opts * opts_new();
@@ -77,6 +79,8 @@ static opts * opts_new()
 
 static void opts_free(opts * s)
 {
+    fim_tiff_destroy(s->ftif);
+    s->ftif = NULL;
     free(s->outfile);
     free(s->image);
     free(s->logfile);
@@ -742,7 +746,7 @@ void detect_dots(opts * s, char * inFile)
 
     fprintf(s->log, "Reading %s\n", inFile);
     int64_t M = 0, N = 0, P = 0;
-    float * A = fim_tiff_read(inFile, NULL, &M, &N, &P, s->verbose);
+    float * A = fim_tiff_read(s->ftif, inFile, NULL, &M, &N, &P);
     {
         float scaling = dw_read_scaling(inFile);
         if(scaling != 1)
@@ -814,7 +818,7 @@ void detect_dots(opts * s, char * inFile)
             {
                 printf("Writing filtered image to %s\n", s->fout);
             }
-            fim_tiff_write_float(s->fout, feature, NULL, M, N, P);
+            fim_tiff_write_float(s->ftif, s->fout, feature, NULL, M, N, P);
         }
 
         /* Detect local maxima */
@@ -984,11 +988,7 @@ void detect_dots(opts * s, char * inFile)
 
 int dw_dots(int argc, char ** argv)
 {
-
-    fim_tiff_init();
     opts * s = opts_new();
-
-
     argparsing(argc, argv, s);
 #ifdef _OPENMP
     omp_set_num_threads(s->nthreads);
@@ -997,7 +997,7 @@ int dw_dots(int argc, char ** argv)
     {
         opts_print(stdout, s);
     }
-
+    s->ftif = fim_tiff_new(stdout, s->verbose);
 
     for(size_t kk = s->optpos; kk < (size_t) argc; kk++)
     {

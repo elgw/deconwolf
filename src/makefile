@@ -122,7 +122,7 @@ fim_ut: $(fim_ut_files)
 ftab_ut: ftab.c
 	$(CC) ftab_ut.c ftab.c $(CFLAGS) -o ftab_ut
 
-fim_tiff_ut_files=fim_tiff.c fim.o fft.o dw_util.o ftab.o
+fim_tiff_ut_files=fim_tiff.c fim.o fft.o dw_util.o ftab.o quickselect.o npio.o
 fim_tiff_ut: $(fim_tiff_ut_files)
 	$(CC) $(CFLAGS) -Dunittest $(fim_tiff_ut_files) $(LDFLAGS) -o fim_tiff_ut
 

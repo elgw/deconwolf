@@ -194,6 +194,8 @@ struct _dw_opts{
 
     float alphamax;
     int cl_device; /* OpenCL device number, default 0 */
+
+    // TODO: Why are these here?
     fftwf_plan fft_plan;
     fftwf_plan ifft_plan;
     int fftw3_planning;

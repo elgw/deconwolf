@@ -48,6 +48,7 @@ typedef struct{
 
     double gamma;
     double sigma;
+    ftif_t * ftif;
 } opts;
 
 static opts * opts_new();
@@ -106,6 +107,8 @@ static opts * opts_new()
 
 static void opts_free(opts * s)
 {
+    fim_tiff_destroy(s->ftif);
+    s->ftif = NULL;
     free(s->outfile);
     free(s->logfile);
     if(s->log != NULL)
@@ -391,13 +394,14 @@ static void dw_psf_sted(opts * s)
     assert(swstring != NULL);
 
     sprintf(swstring, "deconwolf %s", deconwolf_version);
-    ttags_set_software(T, swstring);
-    ttags_set_imagesize(T, PSF->M, PSF->N, PSF->P);
+    ttags_set_software(s->ftif, T, swstring);
+    ttags_set_imagesize(s->ftif, T, PSF->M, PSF->N, PSF->P);
 
     free(swstring);
 
 
-    fim_tiff_write_float(s->outfile, PSF->V,
+    fim_tiff_write_float(s->ftif,
+                         s->outfile, PSF->V,
                          T,
                          PSF->M, PSF->N, PSF->P);
     ttags_free(&T);
@@ -410,10 +414,7 @@ int dw_psf_sted_cli(int argc, char ** argv)
     opts * s = opts_new();
     /* Parse command line and open log file etc */
     argparsing(argc, argv, s);
-    if(s->verbose > 2)
-    {
-        printf("Command lined parsed, continuing\n"); fflush(stdout);
-    }
+    s->ftif = fim_tiff_new(stdout, s->verbose);
     /* Ready to go */
     dw_psf_sted(s);
     /* Clean up */

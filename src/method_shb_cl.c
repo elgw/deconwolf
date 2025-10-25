@@ -59,6 +59,7 @@ float * deconvolve_shb_cl(float * restrict im,
         printf("psf will be freed\n");
     }
 
+    ftif_t * ftif = fim_tiff_new(s->log, s->verbosity);
 
     if(s->verbosity > 0)
     {
@@ -189,7 +190,7 @@ float * deconvolve_shb_cl(float * restrict im,
     if(s->fulldump)
     {
         printf("Dumping to fullPSF.tif\n");
-        fim_tiff_write_float("fullPSF.tif", Z, NULL, wM, wN, wP);
+        fim_tiff_write_float(ftif, "fullPSF.tif", Z, NULL, wM, wN, wP);
     }
 
     //fftwf_complex * fftPSF = fft(Z, wM, wN, wP);
@@ -259,9 +260,9 @@ float * deconvolve_shb_cl(float * restrict im,
                 //printf(" Writing current guess to %s\n", outname);
                 if(s->outFormat == 32)
                 {
-                    fim_tiff_write_float(outname, temp, NULL, M, N, P);
+                    fim_tiff_write_float(ftif, outname, temp, NULL, M, N, P);
                 } else {
-                    fim_tiff_write(outname, temp, NULL, M, N, P);
+                    fim_tiff_write(ftif, outname, temp, NULL, M, N, P);
                 }
                 free(outname);
                 free(temp);
@@ -360,7 +361,7 @@ float * deconvolve_shb_cl(float * restrict im,
     if(s->fulldump)
     {
         printf("Dumping to fulldump.tif\n");
-        fim_tiff_write("fulldump.tif", x, NULL, wM, wN, wP);
+        fim_tiff_write(ftif, "fulldump.tif", x, NULL, wM, wN, wP);
     }
 
     float * out = fim_subregion(x, wM, wN, wP, M, N, P);
@@ -371,7 +372,8 @@ float * deconvolve_shb_cl(float * restrict im,
     }
 
     clu_destroy(clu);
-
+    fim_tiff_destroy(ftif);
+    ftif=NULL;
     return out;
 }
 
