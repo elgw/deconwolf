@@ -16,7 +16,7 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "dw_util.h"
+
 #include "fft.h"
 #include "fim_tiff.h"
 #include "ftab.h"

@@ -5110,9 +5110,7 @@ int
 fim_imread_size(const char * filename,
                 int64_t * M, int64_t * N, int64_t * P)
 {
-    const size_t n = strlen(filename);
-    assert(n > 0);
-
+    assert(filename != NULL);
     if(npyfilename(filename))
     {
         npio_t * npy = npio_load_metadata(filename);

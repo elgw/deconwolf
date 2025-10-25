@@ -9,8 +9,8 @@
 
 #include "fim.h"
 #include "fim_tiff.h"
+#include "dw_util.h"
 #include "dw_version.h"
-
 #include "dw_imshift.h"
 
 

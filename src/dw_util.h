@@ -60,6 +60,18 @@
 #define strncasecmp _strnicmp
 #endif
 
+typedef int64_t i64;
+typedef uint64_t u64;
+
+#define ANSI_COLOR_RED     "\x1b[31m"
+#define ANSI_COLOR_GREEN   "\x1b[32m"
+#define ANSI_COLOR_YELLOW  "\x1b[33m"
+#define ANSI_COLOR_BLUE    "\x1b[34m"
+#define ANSI_COLOR_MAGENTA "\x1b[35m"
+#define ANSI_COLOR_CYAN    "\x1b[36m"
+#define ANSI_COLOR_RESET   "\x1b[0m"
+#define ANSI_UNDERSCORE    "\x1b[4m"
+
 /* Get the current time  */
 void dw_gettime(struct timespec *);
 

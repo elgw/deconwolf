@@ -67,7 +67,7 @@ fft_ut_files=fft_ut.o fft.o fim.o ftab.o fim_tiff.o dw_util.o
 fft_ut: $(fft_ut_files)
 	$(CC) $(fft_ut_files) $(CFLAGS) $(LDFLAGS) -o fft_ut
 
-dw_render_files=dw_render.c fim.o ftab.o fim_tiff.o dw_util.o fft.o
+dw_render_files=dw_render.c fim.o ftab.o fim_tiff.o dw_util.o fft.o npio.o quickselect.o
 dw_render: $(dw_render_files)
 	$(CC) $(CFLAGS) -DSTANDALONE $(dw_render_files) $(LDFLAGS) -o dw_render
 

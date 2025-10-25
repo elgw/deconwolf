@@ -21,13 +21,11 @@
  * - Writes tiff files as uint16 or float
  *
  * TODO
- * - Thread safe (via a state object)
- * - Remove all dependencies
+  * - Remove all dependencies
  * - Rename to vtif_* (volumetric tif)
  * - Correct imagej metadata when writing 2D images (and the metadata says 3D)
  *   I suggest parsing the IJ metadata and recrating it in a meaningful way on writing.
  * - Read individual image plane(s).
- * - config object (log, err, allocator, ...)
  * - Read and write back OME-XML metadata ?
  *
  * BUGS:
@@ -63,6 +61,7 @@
 typedef struct {
     FILE * log;
     int verbose;
+    // would make sense to include, error, stdout, allocator, ...
 } ftif_t;
 
 /* Initialization */

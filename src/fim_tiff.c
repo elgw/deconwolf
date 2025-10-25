@@ -55,8 +55,6 @@ struct _ttags {
 } _ttags;
 
 
-typedef int64_t i64;
-typedef uint64_t u64;
 
 /* see man 3 tifflib
  *

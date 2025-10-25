@@ -1,4 +1,5 @@
 #include "method_shb_cl2.h"
+#include "dw_util.h"
 
 /* Still work to do before this can be enabled */
 #define use_inplace_clfft 1

@@ -29,7 +29,8 @@
 /* Mode for calculating the 1D integral */
 typedef enum {
     MODE_BW_GSL,
-    MODE_BW_LI } dw_bw_integral_type;
+    MODE_BW_LI
+} dw_bw_integral_type;
 
 typedef struct {
     int verbose;
@@ -59,8 +60,6 @@ typedef struct {
     int thread;
     int nThreads;
 
-    int testing;
-
     /* Outputs */
     float * V; // output image
     // shape of output image
@@ -68,6 +67,9 @@ typedef struct {
     int N;
     int P;
     ftif_t * ftif;
+
+    // Random flags
+    int testing;
 } bw_conf;
 
 /* New configuration with default settings */

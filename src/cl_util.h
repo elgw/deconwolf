@@ -16,8 +16,6 @@
 #include <string.h>
 #include <time.h>
 
-#include "dw_util.h"
-
 /* VkFFT targets version 1.20 */
 #define CL_TARGET_OPENCL_VERSION 120
 

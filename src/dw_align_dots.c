@@ -13,8 +13,6 @@
 #include "qalign.h"
 #include "quickselect.h"
 
-typedef int64_t i64;
-
 typedef struct{
     int verbose;
     /* Largest shift, in pixels, to consider between
@@ -481,7 +479,7 @@ static double * get_dots(opts * s, ftab_t * T)
     if(cv >= 0)
     {
         nuse = 0;
-        for(i64 kk = 0; kk < T->nrow; kk++)
+        for(i64 kk = 0; kk < (i64) T->nrow; kk++)
         {
             float * row = T->T + kk*T->ncol;
             float value = row[cv];
@@ -507,7 +505,7 @@ static double * get_dots(opts * s, ftab_t * T)
 
     double * X = calloc(3*nuse, sizeof(double));
     assert(X != NULL);
-    for(size_t kk = 0; kk < nuse; kk++)
+    for(i64 kk = 0; kk < nuse; kk++)
     {
         float * row = T->T + kk*T->ncol;
         X[3*kk + 0] = row[cx];
@@ -1095,8 +1093,10 @@ run_qalign(opts * s,
 
 
     float scaling = qselect_f32(qconf->S, qconf->nH, qconf->nH/2);
+#if 0
     float scalingZ = qselect_f32(qconf->SZ, qconf->nH, qconf->nH/2);
-    //printf("S: %f, SZ: %f\n", scaling, scalingZ);
+    printf("S: %f, SZ: %f\n", scaling, scalingZ);
+#endif
 
     if(scaling > (1.0+1e-4) || (1.0 / scaling) > (1.0+1e-4))
     {
