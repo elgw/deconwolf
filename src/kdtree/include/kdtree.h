@@ -24,6 +24,12 @@
 /* Will only work when KDTREE_DIM=3 unless modified */
 #define KDTREE_DIM 3
 
+#ifdef WIN32
+#define PUB __declspec(dllexport)
+#else
+#define PUB __attribute__((visibility("default")))
+#endif
+
 struct pqheap;
 
 /* A tree or a leaf */
@@ -75,13 +81,13 @@ typedef struct{
  * to [1] bin size a of 4-32 elements is optimal regardless of the
  * number of dimensions
  */
-kdtree_t *
+PUB kdtree_t *
 kdtree_new(const double * X,
            size_t N, int binsize);
 
 
 /* Frees all resources associated with a tree */
-void kdtree_free(kdtree_t * T);
+PUB void kdtree_free(kdtree_t * T);
 
 /* Query one point for its k nearest neighbours.  The returned array
  * contains the index of k points, sorted according to the distance of
@@ -90,7 +96,7 @@ void kdtree_free(kdtree_t * T);
  * Important: The returned array is owned by the tree and should not
  * be freed. It will be re-used with the next call to kdtree_query_*
  */
-size_t *
+PUB size_t *
 kdtree_query_knn(kdtree_t * T,
                  const double * Q,
                  size_t k);
@@ -100,7 +106,7 @@ kdtree_query_knn(kdtree_t * T,
  * Returns a newly allocated array of indexes of length nfound
  * On failure: Returns NULL and sets nfound to 0
  */
-size_t *
+PUB size_t *
 kdtree_query_radius(const kdtree_t * T,
                     const double * Q,
                     const double radius,
@@ -117,7 +123,7 @@ kdtree_query_radius(const kdtree_t * T,
  * Cutoff: will use points up to sigma*cutoff away from the query
  * point Q. A default value will be used if cutoff == -1.
  */
-double
+PUB double
 kdtree_kde(const kdtree_t * T,
            const double * Q,
            double sigma,
@@ -136,7 +142,7 @@ kdtree_kde(const kdtree_t * T,
  * set automagically.
  */
 
-void
+PUB void
 kdtree_kde_mean(const kdtree_t *,
                 const double * Q,
                 double sigma,
@@ -152,18 +158,18 @@ gaussian ** Gfinal);
 
 
 /* Find the index of the closest point */
-size_t kdtree_query_closest(kdtree_t * T, double * X);
+PUB size_t kdtree_query_closest(kdtree_t * T, double * X);
 
-void node_print_bbx(const kdtree_node_t * N);
+PUB void node_print_bbx(const kdtree_node_t * N);
 
 /* Make a shallow copy of a kd-tree for usage by another thread */
-kdtree_t * kdtree_copy_shallow(kdtree_t * );
+PUB kdtree_t * kdtree_copy_shallow(kdtree_t * );
 
 /* Free a tree returned from kdtree_copy_shallow */
-void kdtree_free_shallow(kdtree_t * T);
+PUB void kdtree_free_shallow(kdtree_t * T);
 
 
 /* Run some self-tests */
-void kdtree_validate(kdtree_t * T);
+PUB void kdtree_validate(kdtree_t * T);
 
-void kdtree_print_info(kdtree_t * T);
+PUB void kdtree_print_info(kdtree_t * T);

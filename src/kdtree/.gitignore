@@ -1,1 +1,5 @@
+*.o
+kdtree_ut
+libkdtree.so
 libkdtree.a
+build/

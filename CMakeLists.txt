@@ -11,7 +11,10 @@
 #   cmake --build .
 #
 #   Either install directly with
-#   cmake install
+#   cmake --install .
+#   which will install into /usr/local/
+#   or possibly set the prefix yourself, using, e.g.
+#   cmake --install . --prefix='/usr/'
 #
 #   Or produce a package that can be installed with the
 #   system package manager, for example
@@ -143,7 +146,7 @@ set(dw_bw_SOURCES
   add_subdirectory("src/kdtree/")
   target_include_directories(dw PUBLIC "src/kdtree/include/")
   target_link_directories(dw PUBLIC "src/kdtree/")
-  target_link_libraries(dw PRIVATE kdtree)
+  target_link_libraries(dw PUBLIC kdtree)
 
   #
   # trafo
@@ -348,6 +351,8 @@ set(dw_bw_SOURCES
     message("Enabling IPO")
     set_property(DIRECTORY PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
   endif()
+
+  set(CMAKE_BUILD_WITH_INSTALL_RPATH 1)
 
   include(GNUInstallDirs)
   install(TARGETS dw)

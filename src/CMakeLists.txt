@@ -23,23 +23,31 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 option (ENABLE_GPU "Enable GPU/OpenCL" OFF)
 
 add_library( deconwolf SHARED
+  dw_align_dots.c
+  dw_background.c
+  dw_dots.c
+  dw_imshift.c
+  dw_maxproj.c
+  dw_png.c
+  dw_psf.c
+  dw_psf_sted.c
+  dw_tiff_merge.c
+  dw_util.c
+  fft.c
   fim.c
   fim_tiff.c
   ftab.c
-  fft.c
-  dw_util.c
   gmlfit.c
-  lanczos.c
-  tiling.c
-  quickselect.c
-  npio.c
-  dw_bwpsf.c
-  bw_gsl.c
-  li.c
-  dw.c
-  method_rl.c
   method_identity.c
+  method_rl.c
   method_shb.c
+  npio.c
+  qalign.c
+  quickselect.c
+  sparse_preprocess.c
+  sparse_preprocess_cli.c
+  tiling.c
+  dw.c
 )
 
 set(DECONWOLF_PUBLIC_HEADERS

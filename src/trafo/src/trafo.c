@@ -65,7 +65,7 @@ typedef struct {
 
 /* For storing the settings, more or less a superset of the CLI
  * configuration  */
-struct _trf {
+struct  _trf {
     /*
      * Input data
      */
