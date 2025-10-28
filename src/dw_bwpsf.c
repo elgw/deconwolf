@@ -48,12 +48,12 @@ typedef double complex dcomplex;
 
 int GLOB_N_GSL_EROUND = 0; /* Counter for GSL_EROUND */
 
-void BW_slice(float * , float z, bw_conf * conf);
-void bw_argparsing(int , char ** , bw_conf * conf);
-void * BW_thread(void * data);
+static void BW_slice(float * , float z, bw_conf * conf);
+static void bw_argparsing(int , char ** , bw_conf * conf);
+static void * BW_thread(void * data);
 
 // Get the command line options
-void getCmdLine(int argc, char ** argv, bw_conf * s);
+static void getCmdLine(int argc, char ** argv, bw_conf * s);
 
 
 /* Integration over pixel */
@@ -70,7 +70,7 @@ typedef struct {
 } pixely_t;
 
 
-void dw_bw_gsl_err_handler(const char * reason,
+static void dw_bw_gsl_err_handler(const char * reason,
                            const char * file,
                            int line,
                            int gsl_errno)
@@ -210,7 +210,7 @@ void bw_conf_free(bw_conf ** _conf)
 }
 
 
-void getCmdLine(int argc, char ** argv, bw_conf * s)
+static void getCmdLine(int argc, char ** argv, bw_conf * s)
 {
     // Copy the command line to s->cmd
     int lcmd=0;
@@ -230,7 +230,7 @@ void getCmdLine(int argc, char ** argv, bw_conf * s)
     s->cmd[pos-1] = '\0';
 }
 
-void fprint_time(FILE * f)
+static void fprint_time(FILE * f)
 {
     f == NULL ? f = stdout : 0;
     time_t now = time(NULL);
@@ -238,7 +238,7 @@ void fprint_time(FILE * f)
     fprintf(f, "%s\n", tstring);
 }
 
-void bw_version(FILE* f)
+static void bw_version(FILE* f)
 {
 #ifdef WINDOWS
     fprintf(f, "deconwolf: '%s'\n", deconwolf_version);
@@ -247,7 +247,7 @@ void bw_version(FILE* f)
 #endif
 }
 
-void usage(__attribute__((unused)) int argc, char ** argv, bw_conf * s)
+static void usage(__attribute__((unused)) int argc, char ** argv, bw_conf * s)
 {
     printf("Usage:\n");
     printf("\t%s <options> psf.tif \n", argv[0]);
@@ -344,7 +344,7 @@ int bw_conf_validate(bw_conf * s)
     return EXIT_SUCCESS;
 }
 
-void bw_argparsing(int argc, char ** argv, bw_conf * s)
+static void bw_argparsing(int argc, char ** argv, bw_conf * s)
 {
     bw_conf * defaults = calloc(1, sizeof(bw_conf));
     assert(defaults != NULL);
@@ -526,7 +526,7 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
     return;
 }
 
-double cabs2(dcomplex v)
+static double cabs2(dcomplex v)
 {
     return pow(creal(v), 2) + pow(cimag(v), 2);
 }
@@ -557,7 +557,7 @@ void BW(bw_conf * conf)
     return;
 }
 
-double pixelpointfun(double y, void * _conf)
+static double pixelpointfun(double y, void * _conf)
 {
     /* interpolate radial profile at (x,y) */
     pixely_t * iconf = (pixely_t *) _conf;
@@ -574,7 +574,7 @@ double pixelpointfun(double y, void * _conf)
     return res;
 }
 
-double pixelyfun(double x, void *_conf)
+static double pixelyfun(double x, void *_conf)
 {
     pixely_t * iconf = (pixely_t *) _conf;
     //printf("pixelyfun: iconf->nr = %zu, iconf->radsample=%d\n", iconf->nr, iconf->radsample);
@@ -594,7 +594,7 @@ double pixelyfun(double x, void *_conf)
     return result;
 }
 
-double integrate_pixel(bw_conf * conf,
+static double integrate_pixel(bw_conf * conf,
                        gsl_integration_workspace * wspx,
                        gsl_integration_workspace * wspy,
                        double * radprofile, size_t nr, int radsample,
@@ -633,7 +633,7 @@ double integrate_pixel(bw_conf * conf,
     return result/((x1-x0)*(y1-y0));
 }
 
-void BW_slice(float * V, float z, bw_conf * conf)
+static void BW_slice(float * V, float z, bw_conf * conf)
 {
     /* Calculate the PSF for a single plane/slice
      * V is a pointer to the _slice_ not the whole volume
@@ -771,7 +771,7 @@ void BW_slice(float * V, float z, bw_conf * conf)
     return;
 }
 
-void unit_tests(bw_conf * conf)
+static void unit_tests(bw_conf * conf)
 {
     printf("No unit tests to run\n");
     bw_conf_printf(stdout, conf);

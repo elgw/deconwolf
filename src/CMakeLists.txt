@@ -33,6 +33,9 @@ add_library( deconwolf SHARED
   dw_psf_sted.c
   dw_tiff_merge.c
   dw_util.c
+  dw_bwpsf.c
+  bw_gsl.c
+  li.c
   fft.c
   fim.c
   fim_tiff.c
@@ -48,6 +51,7 @@ add_library( deconwolf SHARED
   sparse_preprocess_cli.c
   tiling.c
   dw.c
+  lanczos.c
 )
 
 set(DECONWOLF_PUBLIC_HEADERS
@@ -78,6 +82,15 @@ else()
 endif()
 target_link_libraries(deconwolf FFTW::Double)
 target_link_libraries(deconwolf FFTW::Float)
+if(NOT WIN32)
+target_link_libraries(deconwolf FFTW::FloatOpenMP)
+endif()
+
+#
+# LibPNG
+#
+find_package(PNG)
+target_link_libraries(deconwolf PNG::PNG)
 
 
 #
