@@ -1,9 +1,11 @@
 # This file is to create a library out of some of the functions
 # in dw.
-# mkdir build
-# cd build
-# cmake .. -DCMAKE_INSTALL_PREFIX="/"
-# sudo make install
+# $ mkdir build
+# $ cd build
+# $ cmake ..
+# or, to change the root of the installation, use something like:
+# $ cmake .. -DCMAKE_INSTALL_PREFIX=/usr/
+# $ sudo make install
 #
 # Using some other install prefix,
 # you might want to add the path to the file
@@ -20,11 +22,13 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
-option (ENABLE_GPU "Enable GPU/OpenCL" OFF)
+option (ENABLE_GPU "Enable GPU/OpenCL" ON)
+option (PYDECONWOLF "Build Python module" ON)
 
 add_library( deconwolf SHARED
   dw_align_dots.c
   dw_background.c
+  dw_align_dots.c
   dw_dots.c
   dw_imshift.c
   dw_maxproj.c
@@ -64,7 +68,9 @@ set(DECONWOLF_PUBLIC_HEADERS
   "npio.h"
   "dw_bwpsf.h"
   "dw.h"
-"kdtree/include/kdtree.h")
+  "kdtree/include/kdtree.h")
+
+set(CMAKE_BUILD_WITH_INSTALL_RPATH 1)
 
 #
 # Gnu Scientific Library
@@ -83,7 +89,7 @@ endif()
 target_link_libraries(deconwolf FFTW::Double)
 target_link_libraries(deconwolf FFTW::Float)
 if(NOT WIN32)
-target_link_libraries(deconwolf FFTW::FloatOpenMP)
+  target_link_libraries(deconwolf FFTW::FloatOpenMP)
 endif()
 
 #
@@ -101,6 +107,13 @@ target_include_directories(deconwolf PUBLIC "kdtree/include/")
 target_link_directories(deconwolf PUBLIC "kdtree/")
 target_link_libraries(deconwolf kdtree)
 
+#
+# trafo
+#
+add_subdirectory("trafo")
+target_include_directories(deconwolf PUBLIC "trafo/src/")
+target_link_directories(deconwolf PUBLIC "trafo/")
+target_link_libraries(deconwolf trafo)
 
 #
 # OpenMP
@@ -127,12 +140,40 @@ endif()
 find_package(TIFF)
 target_link_libraries(deconwolf ${TIFF_LIBRARIES})
 
+
+#
+# OpenCL
+#
+# https://cmake.org/cmake/help/latest/module/FindOpenCL.html
+
+if (ENABLE_GPU)
+  find_package(OpenCL)
+  if(OpenCL_FOUND)
+    message("Will use OpenCL")
+    target_link_libraries(deconwolf OpenCL::OpenCL)
+    add_definitions(-DOPENCL)
+    add_definitions(-DVKFFT_BACKEND=3)
+    target_include_directories(deconwolf PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/VkFFT/vkFFT/)
+    target_sources(deconwolf PRIVATE cl_util.c)
+    target_sources(deconwolf PRIVATE method_shb_cl.c)
+    target_sources(deconwolf PRIVATE method_shb_cl2.c)
+  else()
+    message("No OpenCL :(")
+  endif()
+endif()
+
+if (PYDECONWOLF)
+  add_subdirectory(pywrapper)
+endif()
+
+
+
 include("GNUInstallDirs")
 
 set_target_properties( deconwolf PROPERTIES
-PUBLIC_HEADER "${DECONWOLF_PUBLIC_HEADERS}")
+  PUBLIC_HEADER "${DECONWOLF_PUBLIC_HEADERS}")
 
 INSTALL(TARGETS deconwolf
   PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}/deconwolf"
   LIBRARY DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR}
-  )
+)

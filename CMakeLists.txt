@@ -86,13 +86,15 @@ set(dw_SOURCES
   src/dw.c
   src/dw_background.c
   src/dw_dots.c
-  src/dw_imshift.c
+  src/dw_imshift.c # kdtree
   src/dw_maxproj.c
   src/dw_psf.c
   src/dw_psf_sted.c
   src/dw_tiff_merge.c
   src/dw_png.c
   src/dw_util.c
+  src/dw_nuclei.c # trafo
+  src/dw_align_dots.c # kdtree
   src/fim.c
   src/fim_tiff.c
   src/ftab.c
@@ -146,20 +148,15 @@ set(dw_bw_SOURCES
   add_subdirectory("src/kdtree/")
   target_include_directories(dw PUBLIC "src/kdtree/include/")
   target_link_directories(dw PUBLIC "src/kdtree/")
-  target_link_libraries(dw PUBLIC kdtree)
+  target_link_libraries(dw PRIVATE kdtree)
 
   #
   # trafo
   #
-  if(UNIX)
-    add_subdirectory("src/trafo")
-    target_include_directories(dw PUBLIC "src/trafo/src/")
-    target_link_directories(dw PUBLIC "src/trafo/")
-    target_link_libraries(dw PRIVATE trafo)
-
-  elseif(WIN32)
-
-  endif()
+  add_subdirectory("src/trafo")
+  target_include_directories(dw PUBLIC "src/trafo/src/")
+  target_link_directories(dw PUBLIC "src/trafo/")
+  target_link_libraries(dw PRIVATE trafo)
 
   #
   # Parse version number from src/dw_version.h

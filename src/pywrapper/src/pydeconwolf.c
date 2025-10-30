@@ -23,6 +23,7 @@
 #include <Python.h>
 
 #define NPY_NO_DEPRECATED_API NPY_2_0_API_VERSION
+#define NPY_TARGET_VERSION NPY_2_0_API_VERSION
 #include <numpy/ndarrayobject.h>
 #include "numpy/npy_3kcompat.h"
 
@@ -33,6 +34,7 @@
 #  define UNUSED(x) UNUSED_ ## x
 #endif
 
+#include <deconwolf/dw_util.h>
 #include <deconwolf/fim_tiff.h>
 #include <deconwolf/dw_version.h>
 #include <deconwolf/dw_bwpsf.h>
@@ -127,6 +129,17 @@ x_imread(PyObject * UNUSED(self), PyObject *args, PyObject *keywds)
         return NULL;
     }
 
+    float scaling = dw_read_scaling(filename);
+    if(verbose > 0)
+    {
+        printf("Scaling by %f\n", 1.0/scaling);
+    }
+
+    if(scaling != 1)
+    {
+        fim_mult_scalar(V, M*N*P, 1.0/scaling);
+    }
+
     const npy_intp outsize[3] = {P, N, M};
     PyObject * result_obj =
         PyArray_SimpleNewFromData(3, outsize, NPY_FLOAT32, V);
@@ -180,6 +193,50 @@ x_bw(PyObject * UNUSED(self), PyObject *args, PyObject *keywds)
         PyArray_SimpleNewFromData(3, outsize, NPY_FLOAT32, conf->V);
     bw_conf_free(&conf);
     return result_obj;
+}
+
+
+static PyObject *
+x_gsmooth(PyObject * UNUSED(self), PyObject *args, PyObject *keywds)
+{
+    int verbose = 0;
+    float sigmaxy = 0;
+    float sigmaz = 0;
+    PyObject * _array;
+    static char *kwlist[] = {"image", "sigmaxy", "sigmaz", "verbose", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, keywds, "O|ffi", kwlist,
+                                     &_array, &sigmaxy, &sigmaz, &verbose))
+    {
+        PyErr_SetString(pydw_error,
+                        "Error parsing the arguments\n");
+        return NULL;
+    }
+    if(check_matrix_argument(_array, 2, 3))
+    {
+        PyErr_SetString(pydw_error,
+                        "Not a valid image array\n");
+        return NULL;
+    }
+
+    PyArrayObject * array = (PyArrayObject*) _array;
+
+    int M = PyArray_DIM(array, 1); // Py_ssize_t
+    int N = PyArray_DIM(array, 0);
+    int P = 1;
+
+    if(PyArray_NDIM(array) == 3)
+    {
+        M = PyArray_DIM(array, 2);
+        N = PyArray_DIM(array, 1);
+        P = PyArray_DIM(array, 0);
+    }
+    if(verbose > 0)
+    {
+        printf("sigmaxy = %f, sigmaz = %f\n", sigmaxy, sigmaz);
+    }
+    fim_gsmooth_aniso((f32*) PyArray_DATA(array), M, N, P, sigmaxy, sigmaz);
+
+    Py_RETURN_NONE;
 }
 
 
@@ -248,6 +305,7 @@ x_deconvolve(PyObject * UNUSED(self), PyObject *args, PyObject *keywds)
         return NULL;
     }
 
+    printf("use_gpu=%d\n", use_gpu);
     if(use_gpu)
     {
         dw_opts_enable_gpu(config);
@@ -339,10 +397,11 @@ x_deconvolve(PyObject * UNUSED(self), PyObject *args, PyObject *keywds)
 
 // The 2nd element is allowed to be a PyCFunctionWithKeywords
 static PyMethodDef pydeconwolf_methods[] = {
-    {"imread",      (PyCFunction) x_imread,    METH_VARARGS | METH_KEYWORDS, imread__doc__},
-    {"imwrite",     (PyCFunction) x_imwrite,   METH_VARARGS | METH_KEYWORDS, imwrite__doc__},
-    {"gen_psf_bw",  (PyCFunction) x_bw,        METH_VARARGS | METH_KEYWORDS, bw__doc__},
+    {"imread",      (PyCFunction) x_imread,     METH_VARARGS | METH_KEYWORDS, imread__doc__},
+    {"imwrite",     (PyCFunction) x_imwrite,    METH_VARARGS | METH_KEYWORDS, imwrite__doc__},
+    {"gen_psf_bw",  (PyCFunction) x_bw,         METH_VARARGS | METH_KEYWORDS, bw__doc__},
     {"deconvolve",  (PyCFunction) x_deconvolve, METH_VARARGS | METH_KEYWORDS, deconvolve__doc__},
+    {"gsmooth",     (PyCFunction) x_gsmooth,    METH_VARARGS | METH_KEYWORDS, gsmooth__doc__},
     {NULL, NULL, 0, NULL},
 };
 
