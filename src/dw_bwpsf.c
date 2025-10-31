@@ -153,7 +153,7 @@ void bw_conf_printf(FILE * out, bw_conf * conf)
 
 bw_conf * bw_conf_new()
 {
-    bw_conf * conf = malloc(sizeof(bw_conf));
+    bw_conf * conf = calloc(1, sizeof(bw_conf));
     assert(conf != NULL);
 
     /* Physical settings */
@@ -199,8 +199,11 @@ void bw_conf_free(bw_conf ** _conf)
     {
         fclose(conf->log);
     }
-    fim_tiff_destroy(conf->ftif);
-    conf->ftif = NULL;
+    if(conf->ftif != NULL)
+    {
+        fim_tiff_destroy(conf->ftif);
+        conf->ftif = NULL;
+    }
     free(conf->outFile);
     free(conf->logFile);
     free(conf->cmd);
