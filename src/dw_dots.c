@@ -59,6 +59,8 @@ typedef struct{
 
     int circularity; /* Set to 1 to enable circularity estimation */
 
+    char * bgimage;
+
     /* For multi scale dot detection.
      *For single scale paths,
      * scales[0] is also used to scale up filter sizes if set. */
@@ -118,6 +120,10 @@ static void opts_print(FILE * f, opts * s)
     if(s->image != NULL)
     {
         fprintf(f, "image: %s\n", s->image);
+    }
+    if(s->bgimage != NULL)
+    {
+        fprintf(f, "background image: %s\n", s->bgimage);
     }
     if(s->outfile != NULL)
     {
@@ -195,6 +201,8 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
            "Number of dots to export (default M x N x 0.005)\n");
     printf("\n");
     printf("Additional options\n");
+    printf("  --background file.tif\n\t"
+           "Background model, input image will be divided by this\n");
     printf("  --nscale n\n\t"
            "set the number of scales to use\n");
     printf("  --swell f\n\t"
@@ -274,6 +282,7 @@ static void argparsing(int argc, char ** argv, opts * s)
 
     struct option longopts[] = {
         {"log_as", required_argument, NULL, 'a'},
+        {"background", required_argument, NULL, 'b'},
         {"fit_as", required_argument, NULL, 'A'},
         {"csv",    no_argument, NULL, 'c'},
         {"circularity", no_argument, NULL, 'C'},
@@ -298,7 +307,7 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"ni",     required_argument, NULL, '6'},
         {NULL, 0, NULL, 0}};
     int ch;
-    while((ch = getopt_long(argc, argv, "1:3:4:5:6:L:a:A:cCF:hi:l:L:m:n:N:op:r:s:v:w:", longopts, NULL)) != -1)
+    while((ch = getopt_long(argc, argv, "1:3:4:5:6:L:a:A:b:cCF:hi:l:L:m:n:N:op:r:s:v:w:", longopts, NULL)) != -1)
     {
         switch(ch){
         case '1':
@@ -321,6 +330,10 @@ static void argparsing(int argc, char ** argv, opts * s)
             break;
         case 'A':
             s->fit_asigma = atof(optarg);
+            break;
+        case 'b':
+            free(s->bgimage);
+            s->bgimage = strdup(optarg);
             break;
         case 'c':
             s->write_csv = 1;
@@ -774,6 +787,46 @@ void detect_dots(opts * s, char * inFile)
             }
         } else {
             fprintf(s->log, "Could not read a scaling value from %s.log.txt\n", inFile);
+        }
+    }
+
+    if(s->bgimage == NULL)
+    {
+        if(s->verbose > 1)
+        {
+            printf("No background image provided\n");
+        }
+        fprintf(s->log, "No background image provided\n");
+    } else {
+        fprintf(s->log, "Loading background image: %s\n", s->bgimage);
+        if(s->verbose > 1)
+        {
+            printf("Loading background image: %s\n", s->bgimage);
+        }
+        i64 bM, bN, bP;
+        float * B = fim_tiff_read(s->ftif, s->bgimage, NULL, &bM, &bN, &bP);
+        if(B == NULL)
+        {
+            fprintf(s->log, "Unable to load background image\n");
+        } else {
+            float bmax = fim_max(B, bM*bN*bP);
+            if(bmax != 1.0)
+            {
+                fim_mult_scalar(B, bM*bN*bP, 1.0/bmax);
+            }
+            float bmin = fim_min(B, bM*bN*bP);
+            bmax = fim_max(B, bM*bN*bP);
+            if(s->verbose > 1)
+            {
+                printf("Background in range [%.2f, %.2f]\n", bmin, bmax);
+            }
+            if(fim_div_background(A, M, N, P,
+                                  B, bM, bN, bP))
+            {
+                fprintf(s->log, "Unable to use the provided background image, dimensions mismatch\n");
+            }
+            free(B);
+            B = NULL;
         }
     }
 

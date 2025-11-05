@@ -423,6 +423,55 @@ void fim_div(float * restrict  A,
     return;
 }
 
+int fim_div_background(float * restrict  A,
+                       i64 M, i64 N, i64 P,
+                       const float * restrict B,
+                       i64 bM, i64 bN, i64 bP)
+/* A = A/B
+ * If A is 3D and B is 2D, then
+ * A[:, :, kk] = A[:, :, :] / B
+ */
+{
+    size_t kk = 0;
+
+    if(M != bM)
+    {
+        return EXIT_FAILURE;
+    }
+
+    if(N != bN)
+    {
+        return EXIT_FAILURE;
+    }
+
+    if(P == bP)
+    {
+        i64 nel = M*N*P;
+#pragma omp parallel for
+        for(kk = 0; kk< nel; kk++)
+        {
+            A[kk]/=B[kk];
+        }
+        return EXIT_SUCCESS;
+    }
+
+    /* Background is 2D, image is 3D */
+    if(bP == 1)
+    {
+        for(i64 pp = 0; pp < P; pp++)
+        {
+            i64 nel = M*N;
+            for(i64 kk = 0; kk < nel; kk++)
+            {
+                A[pp*M*N + kk]/= B[kk];
+            }
+        }
+        return EXIT_SUCCESS;
+    }
+
+    return EXIT_FAILURE;
+}
+
 
 
 void fim_minus(float * restrict  A,
