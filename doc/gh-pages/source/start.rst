@@ -170,21 +170,26 @@ image <https://bigwww.epfl.ch/deconvolution/data/microtubules/>`__ using
 the accompanying PSF. Please note that it does not simulate “real” wide
 field data very well since it is created by periodic convolution.
 
-System: Ubuntu 22.04.4 LTS, AMD Ryzen 7 3700X 8-Core Processor, 64 GB
+System 1: Ubuntu 22.04.4 LTS, AMD Ryzen 7 3700X 8-Core Processor, 64 GB
 RAM, 12 GB RX 6700 XT GPU. Iterations: 115.
 
-========================= ======== ============= ============
-software                  time (s) self-mem (Mb) sys-mem (Mb)
-========================= ======== ============= ============
-DeconvolutionLab2         1,025    1,582         48,511
-DeconvolutionLab2 + FFTW2 862      1,353         47,387
-MATLAB/deconvlucy         104                    5,270
-dw 1.3.7 –threads 1       52                     344
-dw 1.3.7 –threads 2       32                     419
-dw 1.3.7 –threads 4       21                     566
-dw 1.3.7 –threads 8       18                     1,124
-dw 1.3.7 –gpu             3                      5,085
-========================= ======== ============= ============
+System 2: Mac Mini M4, 24 GB RAM, 10-cores.
+
+========================= ======== ============= ============ ======
+software                  time (s) self-mem (Mb) sys-mem (Mb) system
+========================= ======== ============= ============ ======
+DeconvolutionLab2         1,025    1,582         48,511        1
+DeconvolutionLab2 + FFTW2 862      1,353         47,387        1
+MATLAB/deconvlucy         104                    5,270         1
+dw 1.3.7 –threads 1       52                     344           1
+dw 1.3.7 –threads 2       32                     419           1
+dw 1.3.7 –threads 4       21                     566           1
+dw 1.3.7 –threads 8       18                     1,124         1
+dw 1.3.7 –gpu             3                      5,085         1
+dw 0.4.6 --threads 1      53                                   2
+dw 0.4.6 --threads 10     11                                   2
+dw 0.4.6 --gpu            6                                    2
+========================= ======== ============= ============ ======
 
 Notes:
 

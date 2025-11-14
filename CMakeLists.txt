@@ -54,7 +54,7 @@ project(deconwolf
   VERSION 0.4.6
   LANGUAGES C)
 
-set (CMAKE_C_STANDARD 11)
+set (CMAKE_C_STANDARD 99)
 
 option (ENABLE_GPU "Enable GPU/OpenCL" ON)
 option (ENABLE_NATIVE_OPTIMIZATION "Enable non-portable optimizations" OFF)
@@ -312,15 +312,6 @@ set(dw_bw_SOURCES
     message("Found OpenMP")
     target_link_libraries(dw PRIVATE OpenMP::OpenMP_C)
     target_link_libraries(dw_bw PRIVATE OpenMP::OpenMP_C)
-  else()
-    message("OpenMP not found automatically, trying manual")
-
-    set(
-      CMAKE_C_FLAGS
-      "${CMAKE_C_FLAGS} -fopenmp=omp /openmp"
-    )
-    SET(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} -fopenmp=omp -lomp")
-
   endif()
 
   #
