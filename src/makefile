@@ -71,6 +71,10 @@ dw_render_files=dw_render.c fim.o ftab.o fim_tiff.o dw_util.o fft.o npio.o quick
 dw_render: $(dw_render_files)
 	$(CC) $(CFLAGS) -DSTANDALONE $(dw_render_files) $(LDFLAGS) -o dw_render
 
+dw_esp_files=dw_esp.c fim.o fim_tiff.o npio.o dw_util.c ftab.o fft.o quickselect.o
+dw_esp: $(dw_esp_files)
+	$(CC) $(CFLAGS) -DSTANDALONE $(dw_esp_files) $(LDFLAGS) -o dw_esp
+
 ## Note: prf_* and qsort comes from pixel_random_forest repo
 
 dw_nuclei_files=dw_nuclei.c fim.o ftab.o fim_tiff.o dw_util.o npio.o\
