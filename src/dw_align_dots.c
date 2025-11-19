@@ -222,26 +222,29 @@ static void usage(void)
     printf("  --append, -a\n"
            "\tAppend to the output file\n");
     printf("  --sigma s\n"
-           "\tSet the size of the KDE used to identify the peak\n"
-           "\tShould be set approximately to the localization accurracy in the lateral plane\n"
+           "\tSet the size of the KDE used to identify the peak. \n"
+           "\tShould be set approximately to the localization accurracy in the\n"
+           "\tlateral plane\n"
            "\tDefault value: %.2f\n", dopts->sigma);
     printf("  --npoint n\n"
-           "\tset the maximum number of points to use from each file"
+           "\tset the maximum number of points to use from each file\n"
            "\tDefault value: %zu\n", dopts->npoint);
     printf("  --mag1 f\n"
-           "\tMultiplicative magnification factor for the 1st point set in the lateral plane\n"
-           "\tDots coordinates will be multiplied with this factor directly after loading\n"
-           "\tUnless either --mag1 and/or --mag2 is set the algorithm will be more restrictive\n"
-           "\tlooking for correspondences\n");
+           "\tMultiplicative magnification factor for the 1st point set in the lateral\n"
+           "\tplane. Dots coordinates will be multiplied with this factor directly\n"
+           "\tafter loading\n"
+           "\tUnless either --mag1 and/or --mag2 is set the algorithm will be more\n"
+           "\trestrictive looking for correspondences\n");
     printf("  --mag2 f\n"
            "\tMultiplicative magnification factor for the 2nd point set\n");
     printf("  --rotz d\n"
            "\tRotation around the z-axis at (x,y)=(0,0), hence\n"
            "\tonly small rotations like +/- 0.0001 are meaningful\n");
-    printf(" --weightz w\n"
+    printf("  --weightz w\n"
            "\tSet the weight/scaling of the z-component of the dot coordinates\n"
            "\tDefault value: %.2f\n"
-           "\tSet so this so that the localization accuracy in the lateral and axial planes conincide\n",
+           "\tSet so this so that the localization accuracy in the lateral and axial\n"
+           "\tplanes conincide\n",
            dopts->weightz);
     printf("\n");
     printf("Depreciated options, that only applies to the fallback/brute force algorithm:\n");

@@ -214,7 +214,19 @@ struct _dw_opts{
 dw_opts * dw_opts_new(void);
 void dw_argparsing(int argc, char ** argv, dw_opts * s);
 /* Check that the settings make sense, derive secondary settings etc */
-int dw_opts_validate_and_init(dw_opts * s);
+
+typedef enum {
+    // Ready to go
+    dw_ok,
+    // Something went wrong but not bad enough to return
+    // EXIT_FAILURE
+    dw_warning,
+    // Things went wrong, please return EXIT_FAILURE
+    dw_error
+} dw_init_status;
+
+dw_init_status dw_opts_validate_and_init(dw_opts * s);
+
 int dw_opts_enable_gpu(dw_opts * s);
 void dw_opts_fprint(FILE *f, dw_opts * s);
 void dw_opts_free(dw_opts ** sp);

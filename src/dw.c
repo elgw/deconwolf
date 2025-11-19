@@ -795,7 +795,7 @@ getCmdLine(int argc, char ** argv, dw_opts * s)
     return;
 }
 
-int dw_opts_validate_and_init(dw_opts * s)
+dw_init_status dw_opts_validate_and_init(dw_opts * s)
 {
 
     if(s->offset < 0)

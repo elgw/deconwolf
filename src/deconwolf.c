@@ -302,11 +302,22 @@ int main(int argc, char ** argv)
 
     dw_opts * s = dw_opts_new(); /* Load default settings and initialize */
     dw_argparsing(argc, argv, s); /* Parse command line */
-    if(dw_opts_validate_and_init(s))
+
+    dw_init_status dw_stat = dw_opts_validate_and_init(s);
+    switch(dw_stat)
     {
+    case dw_ok:
+        break;
+    case dw_warning:
+        dw_opts_free(&s);
+        return EXIT_SUCCESS;
+        break;
+    case dw_error:
         dw_opts_free(&s);
         return EXIT_FAILURE;
+        break;
     }
+
 
     int ret = dw_run(s); /* And do the job */
     dw_opts_free(&s);
