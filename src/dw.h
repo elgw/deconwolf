@@ -217,7 +217,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s);
 
 typedef enum {
     // Ready to go
-    dw_ok,
+    dw_ok = 0,
     // Something went wrong but not bad enough to return
     // EXIT_FAILURE
     dw_warning,
