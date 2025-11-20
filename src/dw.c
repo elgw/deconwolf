@@ -1280,21 +1280,34 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     {
         printf("Deconwolf: To few input arguments.\n");
         printf("See `%s --help` or `man dw`.\n", argv[0]);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
 #ifdef WINDOWS
     /* TODO, see GetFullPathNameA in fileapi.h */
     s->imFile = strdup(argv[optind]);
-#else
-    s->imFile = realpath(argv[optind], 0);
-#endif
-
-
-#ifdef WINDOWS
     s->psfFile = strdup(argv[++optind]);
 #else
+    
+    errno = 0;
+    s->imFile = realpath(argv[optind], 0);
+    if(s->imFile == NULL)
+    {
+        int err = errno;
+        printf("Can't use %s as input image\n", argv[optind]);
+        printf("Error %d : %s\n", err, strerror(err));
+        exit(EXIT_FAILURE);
+    }
+
+    errno = 0;
     s->psfFile = realpath(argv[++optind], 0);
+    if(s->psfFile == NULL)
+    {
+        int err = errno;
+        printf("Can't use %s as psf\n", argv[optind]);
+        printf("Error %d : %s\n", err, strerror(err));
+        exit(EXIT_FAILURE);
+    }
 #endif
 }
 
@@ -1660,7 +1673,9 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
            "Disable in-place FFTs (for fftw3), uses more\n\t"
            "memory but could potentially be faster for some problem sizes.\n");
     printf("  --tempdir\n\t"
-           "Specify the folder where temporary files should be written\n");
+           "Specify the folder where temporary files should be written\n\t"
+           "Can also be specified via the environmental variable DW_TEMPDIR\n");
+    
     printf("\n");
 
     printf("Additional commands with separate help sections:\n");
