@@ -11,7 +11,10 @@
 #   cmake --build .
 #
 #   Either install directly with
-#   cmake install
+#   cmake --install .
+#   which will install into /usr/local/
+#   or possibly set the prefix yourself, using, e.g.
+#   cmake --install . --prefix='/usr/'
 #
 #   Or produce a package that can be installed with the
 #   system package manager, for example
@@ -48,10 +51,10 @@ cmake_minimum_required(VERSION 3.9)
 
 project(deconwolf
   DESCRIPTION "Deconvolution of wide field images"
-  VERSION 0.4.5
+  VERSION 0.4.6
   LANGUAGES C)
 
-set (CMAKE_C_STANDARD 11)
+set (CMAKE_C_STANDARD 99)
 
 option (ENABLE_GPU "Enable GPU/OpenCL" ON)
 option (ENABLE_NATIVE_OPTIMIZATION "Enable non-portable optimizations" OFF)
@@ -74,19 +77,24 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
+if (NOT CMAKE_BUILD_TYPE MATCHES Debug)
+  add_definitions(-DNDEBUG)
+endif()
 
 set(dw_SOURCES
   src/deconwolf.c
   src/dw.c
   src/dw_background.c
   src/dw_dots.c
-  src/dw_imshift.c
+  src/dw_imshift.c # kdtree
   src/dw_maxproj.c
   src/dw_psf.c
   src/dw_psf_sted.c
   src/dw_tiff_merge.c
   src/dw_png.c
   src/dw_util.c
+  src/dw_nuclei.c # trafo
+  src/dw_align_dots.c # kdtree
   src/fim.c
   src/fim_tiff.c
   src/ftab.c
@@ -100,7 +108,8 @@ set(dw_SOURCES
   src/sparse_preprocess_cli.c
   src/quickselect.c
   src/dw_align_dots.c
-  src/npio.c)
+  src/npio.c
+  src/qalign.c)
 
 set(dw_bw_SOURCES
     src/bw_gsl.c
@@ -124,6 +133,7 @@ set(dw_bw_SOURCES
 
   add_executable(dw_bw ${dw_bw_SOURCES})
   set_target_properties(dw_bw PROPERTIES VERSION ${PROJECT_VERSION})
+  target_compile_definitions(dw_bw PUBLIC STANDALONE) # set -DSTANDALONE
 
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/dw_version.h.in
     ${CMAKE_CURRENT_SOURCE_DIR}/src/dw_version.h)
@@ -138,20 +148,15 @@ set(dw_bw_SOURCES
   add_subdirectory("src/kdtree/")
   target_include_directories(dw PUBLIC "src/kdtree/include/")
   target_link_directories(dw PUBLIC "src/kdtree/")
-  target_link_libraries(dw kdtree)
+  target_link_libraries(dw PRIVATE kdtree)
 
   #
   # trafo
   #
-  if(UNIX)
-    add_subdirectory("src/trafo")
-    target_include_directories(dw PUBLIC "src/trafo/src/")
-    target_link_directories(dw PUBLIC "src/trafo/")
-    target_link_libraries(dw trafo)
-
-  elseif(WIN32)
-
-  endif()
+  add_subdirectory("src/trafo")
+  target_include_directories(dw PUBLIC "src/trafo/src/")
+  target_link_directories(dw PUBLIC "src/trafo/")
+  target_link_libraries(dw PRIVATE trafo)
 
   #
   # Parse version number from src/dw_version.h
@@ -233,15 +238,15 @@ set(dw_bw_SOURCES
   else()
     find_package(FFTW REQUIRED FLOAT_LIB)
   endif()
-  target_link_libraries(dw FFTW::Double)
-  target_link_libraries(dw FFTW::Float)
+  target_link_libraries(dw PRIVATE FFTW::Double)
+  target_link_libraries(dw PRIVATE FFTW::Float)
 
 
-  target_link_libraries(dw_bw FFTW::Float)
+  target_link_libraries(dw_bw PRIVATE FFTW::Float)
 
   if(UNIX)
-    target_link_libraries(dw_bw FFTW::FloatOpenMP)
-    target_link_libraries(dw FFTW::FloatOpenMP)
+    target_link_libraries(dw_bw PRIVATE FFTW::FloatOpenMP)
+    target_link_libraries(dw PRIVATE FFTW::FloatOpenMP)
   endif()
 
 
@@ -249,7 +254,7 @@ set(dw_bw_SOURCES
   # on windows, multicore support should be baked
   # into the basic library.
   if(NOT WIN32)
-    target_link_libraries(dw FFTW::FloatOpenMP)
+    target_link_libraries(dw PRIVATE FFTW::FloatOpenMP)
   endif()
 
   #
@@ -258,23 +263,23 @@ set(dw_bw_SOURCES
 
   find_library(MATH_LIBRARY m)
   if(MATH_LIBRARY)
-    target_link_libraries(dw ${MATH_LIBRARY})
-    target_link_libraries(dw_bw ${MATH_LIBRARY})
+    target_link_libraries(dw PRIVATE ${MATH_LIBRARY})
+    target_link_libraries(dw_bw PRIVATE ${MATH_LIBRARY})
   endif()
 
   #
   # TIFF
   #
   find_package(TIFF)
-  target_link_libraries(dw ${TIFF_LIBRARIES})
-  target_link_libraries(dw_bw ${TIFF_LIBRARIES})
+  target_link_libraries(dw PRIVATE ${TIFF_LIBRARIES})
+  target_link_libraries(dw_bw PRIVATE ${TIFF_LIBRARIES})
 
   #
   # Gnu Scientific Library
   #
   find_package(GSL)
-  target_link_libraries(dw ${GSL_LIBRARIES})
-  target_link_libraries(dw_bw ${GSL_LIBRARIES})
+  target_link_libraries(dw PRIVATE ${GSL_LIBRARIES})
+  target_link_libraries(dw_bw PRIVATE ${GSL_LIBRARIES})
 
   #
   # OpenCL
@@ -285,8 +290,7 @@ set(dw_bw_SOURCES
     find_package(OpenCL)
     if(OpenCL_FOUND)
       message("Will use OpenCL")
-      target_link_libraries(dw ${OpenCL_LIBRARIES})
-      target_include_directories(dw PRIVATE ${OpenCL_INCLUDE_DIRS})
+      target_link_libraries(dw PRIVATE OpenCL::OpenCL)
       add_definitions(-DOPENCL)
       add_definitions(-DVKFFT_BACKEND=3)
       target_include_directories(dw PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/VkFFT/vkFFT/)
@@ -306,31 +310,25 @@ set(dw_bw_SOURCES
   find_package(OpenMP)
   if(OpenMP_C_FOUND)
     message("Found OpenMP")
-    target_link_libraries(dw OpenMP::OpenMP_C)
-    target_link_libraries(dw_bw OpenMP::OpenMP_C)
-  else()
-    message("OpenMP not found automatically, trying manual")
-
-    set(
-      CMAKE_C_FLAGS
-      "${CMAKE_C_FLAGS} -fopenmp=omp /openmp"
-    )
-    SET(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} -fopenmp=omp -lomp")
-
+    target_link_libraries(dw PRIVATE OpenMP::OpenMP_C)
+    target_link_libraries(dw_bw PRIVATE OpenMP::OpenMP_C)
   endif()
 
   #
   # LibPNG
   #
+  find_package(PNG)
+  target_link_libraries(dw PRIVATE PNG::PNG)
 
-  include(FindPNG)
-  if(PNG_FOUND)
-    message("Found libPNG")
-    target_link_libraries(dw ${PNG_LIBRARIES})
-    target_include_directories(dw PRIVATE ${PNG_INCLUDE_DIRS})
-  else()
-    message("libPNG not found")
-  endif()
+
+  #include(FindPNG)
+  #if(PNG_FOUND)
+  #  message("Found libPNG")
+  #  target_link_libraries(dw PRIVATE ${PNG_LIBRARIES})
+  #  target_include_directories(dw PRIVATE ${PNG_INCLUDE_DIRS})
+  #else()
+  #  message("libPNG not found")
+  #endif()
 
 
 
@@ -341,6 +339,8 @@ set(dw_bw_SOURCES
     message("Enabling IPO")
     set_property(DIRECTORY PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
   endif()
+
+  set(CMAKE_BUILD_WITH_INSTALL_RPATH 1)
 
   include(GNUInstallDirs)
   install(TARGETS dw)

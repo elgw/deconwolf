@@ -67,9 +67,13 @@ fft_ut_files=fft_ut.o fft.o fim.o ftab.o fim_tiff.o dw_util.o
 fft_ut: $(fft_ut_files)
 	$(CC) $(fft_ut_files) $(CFLAGS) $(LDFLAGS) -o fft_ut
 
-dw_render_files=dw_render.c fim.o ftab.o fim_tiff.o dw_util.o fft.o
+dw_render_files=dw_render.c fim.o ftab.o fim_tiff.o dw_util.o fft.o npio.o quickselect.o
 dw_render: $(dw_render_files)
 	$(CC) $(CFLAGS) -DSTANDALONE $(dw_render_files) $(LDFLAGS) -o dw_render
+
+dw_esp_files=dw_esp.c fim.o fim_tiff.o npio.o dw_util.c ftab.o fft.o quickselect.o
+dw_esp: $(dw_esp_files)
+	$(CC) $(CFLAGS) -DSTANDALONE $(dw_esp_files) $(LDFLAGS) -o dw_esp
 
 ## Note: prf_* and qsort comes from pixel_random_forest repo
 
@@ -80,7 +84,7 @@ dw_nuclei: $(dw_nuclei_files)
 	$(CC) $(CFLAGS) -DSTANDALONE $(dw_nuclei_files) $(LDFLAGS) -o dw_nuclei
 
 dw_bg_files=dw_background.c fim.o ftab.o fim_tiff.o dw_util.o quickselect.o \
-fft.o
+fft.o npio.o
 
 dw_background: $(dw_bg_files)
 	$(CC) $(CFLAGS) -DSTANDALONE $(dw_bg_files) $(LDFLAGS) -o dw_background
@@ -92,6 +96,11 @@ dw_png_ut: $(dw_png_ut_files)
 dw_dots_files=dw_dots.c fim.o ftab.o fim_tiff.o  dw_util.o fft.o gmlfit.o
 dw_dots: $(dw_dots_files)
 	$(CC) $(CFLAGS) -DSTANDALONE $(dw_dots_files) $(LDFLAGS) -o dw_dots
+
+dw_align_dots_files=dw_align_dots.c fim.o ftab.o fim_tiff.o  dw_util.o fft.o gmlfit.o qalign.c npio.c quickselect.o kdtree/kdtree.o
+dw_align_dots: $(dw_align_dots_files)
+	$(CC) $(CFLAGS) -DSTANDALONE $(dw_align_dots_files) $(LDFLAGS) -o dw_align_dots
+
 
 psf_files = dw_psf.c fim.o ftab.o fim_tiff.o  dw_util.o fft.o
 dw_psf: $(psf_files)
@@ -117,7 +126,7 @@ fim_ut: $(fim_ut_files)
 ftab_ut: ftab.c
 	$(CC) ftab_ut.c ftab.c $(CFLAGS) -o ftab_ut
 
-fim_tiff_ut_files=fim_tiff.c fim.o fft.o dw_util.o ftab.o
+fim_tiff_ut_files=fim_tiff.c fim.o fft.o dw_util.o ftab.o quickselect.o npio.o
 fim_tiff_ut: $(fim_tiff_ut_files)
 	$(CC) $(CFLAGS) -Dunittest $(fim_tiff_ut_files) $(LDFLAGS) -o fim_tiff_ut
 

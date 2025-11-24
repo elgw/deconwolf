@@ -423,6 +423,55 @@ void fim_div(float * restrict  A,
     return;
 }
 
+int fim_div_background(float * restrict  A,
+                       i64 M, i64 N, i64 P,
+                       const float * restrict B,
+                       i64 bM, i64 bN, i64 bP)
+/* A = A/B
+ * If A is 3D and B is 2D, then
+ * A[:, :, kk] = A[:, :, :] / B
+ */
+{
+    size_t kk = 0;
+
+    if(M != bM)
+    {
+        return EXIT_FAILURE;
+    }
+
+    if(N != bN)
+    {
+        return EXIT_FAILURE;
+    }
+
+    if(P == bP)
+    {
+        i64 nel = M*N*P;
+#pragma omp parallel for
+        for(kk = 0; kk< nel; kk++)
+        {
+            A[kk]/=B[kk];
+        }
+        return EXIT_SUCCESS;
+    }
+
+    /* Background is 2D, image is 3D */
+    if(bP == 1)
+    {
+        for(i64 pp = 0; pp < P; pp++)
+        {
+            i64 nel = M*N;
+            for(i64 kk = 0; kk < nel; kk++)
+            {
+                A[pp*M*N + kk]/= B[kk];
+            }
+        }
+        return EXIT_SUCCESS;
+    }
+
+    return EXIT_FAILURE;
+}
+
 
 
 void fim_minus(float * restrict  A,
@@ -1007,7 +1056,7 @@ void fim_circshift(float * restrict A,
     return;
 }
 
-/* A linear interpolation kernel for -1<delta<1 */
+/* A linear interpolation kernel for -1 < delta < 1 */
 static float * kernel_linear_shift(float delta, int * _N)
 {
     if(delta == 0)
@@ -1033,9 +1082,6 @@ void fim_shift(float * restrict A,
                const int64_t M, const int64_t N, const int64_t P,
                const float dm, const float dn, const float dp)
 {
-    int nThreads = 0;
-
-
     int sm = round(dm);
     int sn = round(dn);
     int sp = round(dp);
@@ -1056,66 +1102,61 @@ void fim_shift(float * restrict A,
 
     /* Start a parallel region to figure out how many threads that will be used
        and how much memory to allocate for the buffers */
+
 #pragma omp parallel
     {
-        nThreads = omp_get_num_threads();
-    }
 
-    const size_t bsize = fmax(fmax(M, N), P);
-    float * restrict buf = fim_malloc(bsize*sizeof(float)*nThreads);
-    assert(buf != NULL);
+        const size_t bsize = fmax(fmax(M, N), P);
+        float * restrict tbuf = fim_malloc(bsize*sizeof(float));
+        assert(tbuf != NULL);
 
 
-    /* Dimension 1 */
-#pragma omp parallel for
-    for(int64_t cc = 0; cc<P; cc++)
-    {
-        float * tbuf = buf + bsize*omp_get_thread_num();
+        /* Dimension 1 */
+#pragma omp for
+        for(int64_t cc = 0; cc<P; cc++)
+        {
+            for(int64_t bb = 0; bb<N; bb++)
+            {
+                shift_vector_float_buf(A + bb*M + cc*M*N, // start
+                                       1, // stride
+                                       M, // number of elements
+                                       sm, // shift
+                                       kernelx,
+                                       nkernelx,
+                                       tbuf); // buffer
+            }
+        }
+
+        /* Dimension 2 */
+#pragma omp for
+        for(int64_t cc = 0; cc<P; cc++)
+        {
+            for(int64_t aa = 0; aa<M; aa++)
+            {
+                //shift_vector(A + aa+cc*M*N, M, N, sn);
+                shift_vector_float_buf(A + aa+cc*M*N,
+                                       M,
+                                       N,
+                                       sn, kernely, nkernely, tbuf);
+            }
+        }
+
+        /* Dimension 3 */
+#pragma omp for
         for(int64_t bb = 0; bb<N; bb++)
         {
-            //shift_vector(A + bb*M + cc*M*N, 1, M, sm);
-            shift_vector_float_buf(A + bb*M + cc*M*N, // start
-                                   1, // stride
-                                   M, // number of elements
-                                   sm, // shift
-                                   kernelx,
-                                   nkernelx,
-                                   tbuf); // buffer
+            for(int64_t aa = 0; aa<M; aa++)
+            {
+                //shift_vector(A + aa+bb*M, M*N, P, sp);
+                shift_vector_float_buf(A + aa+bb*M,
+                                       M*N,
+                                       P,
+                                       sp, kernelz, nkernelz, tbuf);
+            }
         }
-    }
 
-    /* Dimension 2 */
-#pragma omp parallel for
-    for(int64_t cc = 0; cc<P; cc++)
-    {
-        float * tbuf = buf + bsize*omp_get_thread_num();
-        //printf("Thread num: %d\n", omp_get_thread_num());
-        for(int64_t aa = 0; aa<M; aa++)
-        {
-            //shift_vector(A + aa+cc*M*N, M, N, sn);
-            shift_vector_float_buf(A + aa+cc*M*N,
-                                   M,
-                                   N,
-                                   sn, kernely, nkernely, tbuf);
-        }
+        fim_free(tbuf);
     }
-
-    /* Dimension 3 */
-#pragma omp parallel for
-    for(int64_t bb = 0; bb<N; bb++)
-    {
-        float * tbuf = buf + bsize*omp_get_thread_num();
-        for(int64_t aa = 0; aa<M; aa++)
-        {
-            //shift_vector(A + aa+bb*M, M*N, P, sp);
-            shift_vector_float_buf(A + aa+bb*M,
-                                   M*N,
-                                   P,
-                                   sp, kernelz, nkernelz, tbuf);
-        }
-    }
-
-    fim_free(buf);
 
     fim_free(kernelx);
     fim_free(kernely);
@@ -1151,9 +1192,6 @@ void shift_vector_float_buf(float * restrict V, // data
                             float * restrict buffer)
 {
     // 1. Sub pixel shift by convolution (conv1) of signal and kernel
-    // 2. Integer part of the shift
-    /* TODO: Interpolation here ... by interpolation kernel?*/
-    /* First integer part and then sub pixel? */
     if(kernel == NULL)
     {
         for(size_t pp = 0; pp < (size_t) N; pp++)
@@ -1164,9 +1202,10 @@ void shift_vector_float_buf(float * restrict V, // data
         fim_conv1_vector(V, S, buffer, N, kernel, nkernel, 1);
     }
 
+    // 2. Integer part of the shift
     for(size_t pp = 0; pp<(size_t) N; pp++)
     {
-        int q = pp+n;
+        int q = pp+n; // Integer shift
         if(q>= 0 && q<N)
         {
             buffer[pp] = V[q*S];
@@ -1570,14 +1609,16 @@ void fim_LoG_ut()
     printf("Max abs difference: %e\n", maxabs);
 
     if(1){
+        ftif_t * ftif = fim_tiff_new(stdout, 1);
         printf("Writing to V.tif\n");
-        fim_tiff_write_float("V.tif", V, NULL,  N, M, P);
+        fim_tiff_write_float(ftif, "V.tif", V, NULL,  N, M, P);
         printf("Writing to Diff.tif\n");
-        fim_tiff_write_float("Diff.tif", Delta, NULL,  N, M, P);
+        fim_tiff_write_float(ftif, "Diff.tif", Delta, NULL,  N, M, P);
         printf("Writing to LoG.tif\n");
-        fim_tiff_write_float("LoG.tif", LoG, NULL,  N, M, P);
+        fim_tiff_write_float(ftif, "LoG.tif", LoG, NULL,  N, M, P);
         printf("Writing to LoG_S.tif\n");
-        fim_tiff_write_float("LoG_S.tif", LoG2, NULL, N, M, P);
+        fim_tiff_write_float(ftif, "LoG_S.tif", LoG2, NULL, N, M, P);
+        fim_tiff_destroy(ftif);
     }
     fim_free(Delta);
 
@@ -1899,19 +1940,15 @@ void fim_conv1(float * restrict V, const size_t nV, const int stride,
     return;
 }
 
-void fim_conv1_vector(float * restrict V, const int stride, float * restrict W,
-                      const size_t nV,
-                      const float * restrict K, const size_t nKu, const int normalized)
+void
+fim_conv1_vector(float * restrict V, const int stride,
+                 float * restrict W, /* Optional buffer to avoid malloc */
+                 const size_t nV,
+                 const float * restrict K, const size_t nKu,
+                 const int normalized)
 {
     if(V == NULL || K == NULL)
     {
-        return;
-    }
-
-    if(nKu > nV)
-    {
-        fprintf(stderr,
-                "fim_conv1_vector: error - kernel can't be longer than data\n");
         return;
     }
 
@@ -2217,9 +2254,16 @@ void fim_gsmooth_aniso(float * restrict V,
     if(asigma > 0 && P > 1)
     {
         size_t nKa = 0;
-        float * Ka = gaussian_kernel(asigma, &nKa);
+        float * Ka0 = gaussian_kernel(asigma, &nKa);
+        float * Ka = Ka0;
+        // Trim the kernel if larger than needed
+        while(nKa > 2*P-1)
+        {
+            Ka = Ka + 1;
+            nKa -= 2;
+        }
         fim_convn1(V, M, N, P, Ka, nKa, 2, 1);
-        fim_free(Ka);
+        fim_free(Ka0);
     }
 
     return;
@@ -2390,9 +2434,8 @@ float * fim_xcorr2(const float * T, const float * A,
     size_t wM = 2*M-1;
     size_t wN = 2*N-1;
 
-    fft_train(wM, wN, 1,
-              1, 0,
-              stdout);
+    // TODO: Number of threads missing here.
+    dw_fft * ff = dw_fft_new(2, 1, stdout, wM, wN, 1, FFTW_ESTIMATE);
 
     float * xA = fim_zeros(wM*wN);
     fim_insert(xA, wM, wN, 1,
@@ -2413,13 +2456,15 @@ float * fim_xcorr2(const float * T, const float * A,
     fim_free(temp);
     temp = NULL;
 
-    fftwf_complex * fxT = fft(xA, wM, wN, 1);
+    fftwf_complex * fxT = fft(ff, xA, wM, wN, 1);
     fim_free(xA);
-    fftwf_complex * fxA = fft(xT, wM, wN, 1);
+    fftwf_complex * fxA = fft(ff, xT, wM, wN, 1);
     fim_free(xT);
-    float * C = fft_convolve_cc(fxT, fxA, wM, wN, 1);
+    float * C = fft_convolve_cc(ff, fxT, fxA, wM, wN, 1);
     // TODO fft_convolve_cc_conj instead?
     //fim_tiff_write_float("C.tif", C, NULL, wM, wN, 1);
+    dw_fft_destroy(ff);
+    ff = NULL;
     fim_free(fxT);
     fim_free(fxA);
 
@@ -4289,10 +4334,12 @@ ftab_t * fim_features_2d(const fimo * fI,
     printf("\n");
     if(debug)
     {
-        fim_tiff_write_float(debug_image_name,
+        ftif_t * ftif = fim_tiff_new(stdout, 1);
+        fim_tiff_write_float(ftif, debug_image_name,
                              debug_image, NULL,
                              M, N, nfeatures);
         fim_free(debug_image);
+        fim_tiff_destroy(ftif);
     }
     return T;
 }
@@ -4300,8 +4347,8 @@ ftab_t * fim_features_2d(const fimo * fI,
 fimo * fimo_tiff_read(const char * file)
 {
     i64 M, N, P;
-
-    float * V = fim_tiff_read(file, NULL, &M, &N, &P, 0);
+    ftif_t * ftif = fim_tiff_new(stdout, 1);
+    float * V = fim_tiff_read(ftif, file, NULL, &M, &N, &P);
     if(V == NULL)
     {
         return NULL;
@@ -4312,6 +4359,7 @@ fimo * fimo_tiff_read(const char * file)
     I->M = M;
     I->N = N;
     I->P = P;
+    fim_tiff_destroy(ftif);
     return I;
 }
 
@@ -4331,8 +4379,9 @@ void fim_features_2d_ut()
     int64_t M = 0;
     int64_t N = 0;
     int64_t P = 0;
-
-    float * V = fim_tiff_read(file, NULL, &M, &N, &P, 0);
+    ftif_t * ftif = fim_tiff_new(stdout, 1);
+    float * V = fim_tiff_read(ftif, file, NULL, &M, &N, &P);
+    fim_tiff_destroy(ftif);
     printf("%s is %" PRId64 " %" PRId64 " %" PRId64 " image\n", file, M, N, P);
     fimo * I = malloc(sizeof(fimo));
     assert(I != NULL);
@@ -4581,7 +4630,10 @@ fimo * fimo_transpose(const fimo * restrict A)
 
 int fimo_tiff_write(const fimo * I, const char * fName)
 {
-    return fim_tiff_write_float(fName, I->V, NULL, I->M, I->N, I->P);
+    ftif_t * ftif = fim_tiff_new(stdout, 1);
+    int ret = fim_tiff_write_float(ftif, fName, I->V, NULL, I->M, I->N, I->P);
+    fim_tiff_destroy(ftif);
+    return ret;
 }
 
 void fimo_blit_2D(fimo * A, const fimo * B, size_t x0, size_t y0)
@@ -4892,12 +4944,12 @@ static void fim_DoH_ut(void)
 
 void fim_ut()
 {
-    #ifdef NDEBUG
+#ifdef NDEBUG
     fprintf(stderr, "ERROR: NDEBUG is defined and asserts disabled\n"
             "please re-compile with asserts enabled\n");
-    #else
+#else
     printf("-> asserts are on\n");
-    #endif
+#endif
     printf("-> npyfilename\n");
     assert(npyfilename(".npy") == 1);
     assert(npyfilename("npy") == 0);
@@ -4960,9 +5012,9 @@ void fim_ut()
     fim_cumsum_ut();
     fim_local_sum_ut();
     //exit(EXIT_FAILURE);
-    myfftw_start(1, 1, stdout);
+
     fim_xcorr2_ut();
-    myfftw_stop();
+
     printf("-> All tests passed\n");
 }
 
@@ -5046,7 +5098,10 @@ fim_imread(const char * filename,
     {
         return fim_read_npy(filename, M, N, P, verbose);
     }
-    return fim_tiff_read(filename, T, M, N, P, verbose);
+    ftif_t * ftif = fim_tiff_new(stdout, verbose);
+    float * V =  fim_tiff_read(ftif, filename, T, M, N, P);
+    fim_tiff_destroy(ftif);
+    return V;
 }
 
 int
@@ -5061,7 +5116,10 @@ fim_imwrite_f32(const char * outname,
         return npio_write(outname, 3, shape, (void *) V,
                           NPIO_F32, NPIO_F32);
     }
-    return fim_tiff_write_float(outname, V, T, M, N, P);
+    ftif_t * ftif = fim_tiff_new(stdout, 1);
+    int ret = fim_tiff_write_float(ftif, outname, V, T, M, N, P);
+    fim_tiff_destroy(ftif);
+    return ret;
 }
 
 
@@ -5091,16 +5149,17 @@ fim_imwrite_u16(const char * outname,
         return npio_write(outname, 3, shape, (void *) I, NPIO_U16, NPIO_U16);
         free(I);
     }
-    return fim_tiff_write_opt(outname, V, T, M, N, P, scaling);
+    ftif_t * ftif = fim_tiff_new(stdout, 1);
+    int ret =  fim_tiff_write_opt(ftif, outname, V, T, M, N, P, scaling);
+    fim_tiff_destroy(ftif);
+    return ret;
 }
 
 int
 fim_imread_size(const char * filename,
                 int64_t * M, int64_t * N, int64_t * P)
 {
-    const size_t n = strlen(filename);
-    assert(n > 0);
-
+    assert(filename != NULL);
     if(npyfilename(filename))
     {
         npio_t * npy = npio_load_metadata(filename);
@@ -5114,7 +5173,10 @@ fim_imread_size(const char * filename,
         *M = npy->shape[2];
         return 0;
     }
-    return fim_tiff_get_size(filename, M, N, P);
+    ftif_t * ftif = fim_tiff_new(stdout, 1);
+    int ret = fim_tiff_get_size(ftif, filename, M, N, P);
+    fim_tiff_destroy(ftif);
+    return ret;
 }
 
 
@@ -5201,7 +5263,10 @@ int fim_to_raw(const char* infile, const char* outfile)
         npio_free(meta);
         return 0;
     } else {
-        return fim_tiff_to_raw_f32(infile, outfile);
+        ftif_t * ftif = fim_tiff_new(stdout, 1);
+        int ret = fim_tiff_to_raw_f32(ftif, infile, outfile);
+        fim_tiff_destroy(ftif);
+        return ret;
     }
     return 1;
 }

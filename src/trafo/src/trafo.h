@@ -34,7 +34,13 @@
 extern "C" {
 #endif
 
-/* To do: enable support for building for float */
+#ifdef WIN32
+#define trafo_public __declspec(dllexport)
+#else
+#define trafo_public __attribute__((visibility("default")))
+#endif
+
+    /* To do: enable support for building for float */
 #ifdef TRAFO_FLOAT32
 #define C(x) x##f
 #define fpnumber float
@@ -43,101 +49,105 @@ extern "C" {
 #define fpnumber double
 #endif
 
-typedef struct {
-    const fpnumber * F_col_major;
-    const fpnumber * F_row_major;
-    const uint32_t * label;
-    uint32_t n_tree;
-    uint32_t n_sample;
-    uint32_t n_feature;
+    typedef  struct {
+        const fpnumber * F_col_major;
+        const fpnumber * F_row_major;
+        const uint32_t * label;
+        uint32_t n_tree;
+        uint32_t n_sample;
+        uint32_t n_feature;
 
-    /* Optional settings that have defaults */
+        /* Optional settings that have defaults */
 
-    /* Minimum number of samples per node which converts it into a
-     * leaf. I.e. nodes are not split if their number of samples are
-     * less or equal to min_samples_leaf
+        /* Minimum number of samples per node which converts it into a
+         * leaf. I.e. nodes are not split if their number of samples are
+         * less or equal to min_samples_leaf
+         *
+         * Default: 1 will be used if this is set to 0.
+         */
+        uint32_t min_samples_leaf;
+
+        /* Fraction of samples to use for each tree
+         *
+         * Valid settings: ]0, 1]. The actual number of samples per tree
+         * will be rounded to be in the integer interval [1, n_sample]
+         *
+         * Default: will be set to 0.632 if set to 0
+         */
+        float tree_f_sample;
+
+        /* Number of feature per tree.
+         *
+         * Default: sqrt(n_feature) will be used if this parameter is set to 0
+         */
+        uint32_t tree_n_feature;
+        uint32_t verbose;
+        int entropy; // Split criterion: 0 = gini, 1 = entropy
+
+    } trafo_settings;
+
+    typedef struct _trf trf;
+
+    /* Train and return a forest using the supplied settings. Both the
+     * settings and all the data that it points to can be freed after this
+     * call as the function copies what it needs.
      *
-     * Default: 1 will be used if this is set to 0.
+     * Return NULL if the settings are invalid or on failure
      */
-    uint32_t min_samples_leaf;
+    trafo_public trf *
+    trafo_fit(trafo_settings * settings);
 
-    /* Fraction of samples to use for each tree
+    /* Free up all memory associated with T */
+    trafo_public void
+    trafo_free(trf * T);
+
+    /* Predict the class for each point/sample in X. It is the
+     * responsibility of the caller to free the returned array.
      *
-     * Valid settings: ]0, 1]. The actual number of samples per tree
-     * will be rounded to be in the integer interval [1, n_sample]
+     * Could return NULL on failure.
+     **/
+    trafo_public uint32_t *
+    trafo_predict(trf * T,
+                  const fpnumber * X_cm,
+                  const fpnumber * X_rm,
+                  uint64_t n_point);
+
+    /* Print out a summary of the settings */
+    trafo_public void
+    trafo_print(FILE * fid, const trf * s);
+
+    /* Return a vector with the importance for each feature. Returns NULL
+     * if this information is not available.
      *
-     * Default: will be set to 0.632 if set to 0
+     * When splitting by Gini
+     * at each successful split the importance is increased by
+     * importance(feature) += n*G_0 - (n_left+G_left + n_right*G_right)
+     *
+     * When splitting by Entroty
+     * at each successful split the importance is increased by
+     * importance(feature) += E_0 - (E_left + E_right)
+     *
+     * Please note that the feature importance will be diluted for forests
+     * since each tree normally contain only a subset of the features
+     *
+     * The caller is responsible for freeing the returned memory
      */
-    float tree_f_sample;
-
-    /* Number of feature per tree.
-     *
-     * Default: sqrt(n_feature) will be used if this parameter is set to 0
-     */
-    uint32_t tree_n_feature;
-    uint32_t verbose;
-    int entropy; // Split criterion: 0 = gini, 1 = entropy
-
-} trafo_settings;
-
-typedef struct _trf trf;
-
-/* Train and return a forest using the supplied settings. Both the
- * settings and all the data that it points to can be freed after this
- * call as the function copies what it needs.
- *
- * Return NULL if the settings are invalid or on failure
- */
-trf * trafo_fit(trafo_settings * settings);
-
-/* Free up all memory associated with T */
-void trafo_free(trf * T);
-
-/* Predict the class for each point/sample in X. It is the
- * responsibility of the caller to free the returned array.
- *
- * Could return NULL on failure.
- **/
-uint32_t * trafo_predict(trf * T,
-                       const fpnumber * X_cm,
-                       const fpnumber * X_rm,
-                       uint64_t n_point);
-
-/* Print out a summary of the settings */
-void
-trafo_print(FILE * fid, const trf * s);
-
-/* Return a vector with the importance for each feature. Returns NULL
- * if this information is not available.
- *
- * When splitting by Gini
- * at each successful split the importance is increased by
- * importance(feature) += n*G_0 - (n_left+G_left + n_right*G_right)
- *
- * When splitting by Entroty
- * at each successful split the importance is increased by
- * importance(feature) += E_0 - (E_left + E_right)
- *
- * Please note that the feature importance will be diluted for forests
- * since each tree normally contain only a subset of the features
- *
- * The caller is responsible for freeing the returned memory
- */
-fpnumber *
-trafo_importance(trf * T);
+    trafo_public fpnumber *
+    trafo_importance(trf * T);
 
 
-/* Save to disk */
-int trafo_save(trf * s,
-             const char * filename);
+    /* Save to disk */
+    trafo_public int
+    trafo_save(trf * s,
+               const char * filename);
 
-/* Load from disk */
-trf *
-trafo_load(const char * filename);
+    /* Load from disk */
+    trafo_public trf *
+    trafo_load(const char * filename);
 
-/* Run some unit tests */
-int
-trafo_ut(void);
+    /* Run some unit tests */
+    trafo_public int
+    trafo_ut(void);
 
 #ifdef __cplusplus
 }

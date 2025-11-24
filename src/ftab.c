@@ -31,11 +31,12 @@
 #endif
 
 #include "ftab.h"
-
+#include "ftab_config.h"
 
 typedef uint8_t u8;
 typedef uint32_t u32;
 typedef uint64_t u64;
+typedef int64_t i64;
 typedef double f64;
 typedef float f32;
 
@@ -379,7 +380,7 @@ parse_col_names(ftab_t * T,
         char * token = strsep(&line, dlm);
         T->colnames[kk] = strdup(token);
         trim_whitespace(T->colnames[kk]);
-        printf("read colnames: '%s'\n", T->colnames[kk]);
+        // printf("read colnames: '%s'\n", T->colnames[kk]);
     }
 
     if(0){
@@ -462,8 +463,8 @@ ftab_from_dlm(const char * fname,
     // Get number of columns
     char * line = NULL;
     size_t len = 0;
-    int read = getline(&line, &len, fid);
-    if(strlen(line) == 0)
+    i64 nread = getline(&line, &len, fid);
+    if(nread <= 0)
     {
         fprintf(stderr, "Empty header line\n");
         free(line);
@@ -487,7 +488,7 @@ ftab_from_dlm(const char * fname,
 
     // Read
     int row = 0;
-    while ((read = getline(&line, &len, fid)) != -1)
+    while( getline(&line, &len, fid) > 0)
     {
         if(strlen(line) == 0)
         {
@@ -646,7 +647,7 @@ ftab_t * ftab_copy(const ftab_t * T)
     C->T = calloc(C->nrow*C->ncol, sizeof(float));
     if(C->T == NULL)
     {
-        return NULL;
+        goto teardown;
     }
 
     memcpy(C->T, T->T, C->nrow*C->ncol*sizeof(float));
@@ -660,11 +661,18 @@ ftab_t * ftab_copy(const ftab_t * T)
             if(T->colnames[kk] != NULL)
             {
                 C->colnames[kk] = strdup(T->colnames[kk]);
-                // TODO: gracefully tear down if NULL was returned.
+                if(C->colnames[kk] == NULL)
+                {
+                    goto teardown;
+                }
             }
         }
     }
     return C;
+
+ teardown:
+    ftab_free(C);
+    return NULL;
 }
 
 ftab_t * ftab_concatenate_columns(const ftab_t * L , const ftab_t * R)
@@ -861,11 +869,12 @@ int ftab_compare(const ftab_t * A, const ftab_t * B)
 
 int ftab_ut(int argc, char ** argv)
 {
+    printf("ftab version %s\n\n", ftab_version());
     if(argc == 1)
     {
         printf("Running some self tests.\n");
         printf("To test on a specific file, use:\n");
-        printf("%s file.csv\n", argv[1]);
+        printf("%s file.csv\n", argv[0]);
         printf("\n");
     }
     if(argc > 1)
@@ -1029,4 +1038,24 @@ ftab_get_data_u32(const ftab_t * T)
         C[kk] = (u32) T->T[kk];
     }
     return C;
+}
+
+const char * ftab_version(void)
+{
+    return FTAB_VERSION;
+}
+
+int ftab_version_major(void)
+{
+    return atoi(FTAB_VERSION_MAJOR);
+}
+
+int ftab_version_minor(void)
+{
+    return atoi(FTAB_VERSION_MINOR);
+}
+
+int ftab_version_patch(void)
+{
+    return atoi(FTAB_VERSION_PATCH);
 }

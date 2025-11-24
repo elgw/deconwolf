@@ -1,4 +1,19 @@
+#include <getopt.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#include "dw_util.h"
+#include "fim.h"
+#include "fim_tiff.h"
+#include "ftab.h"
+#include "dw_version.h"
+#include "gmlfit.h"
+
+
 #include "dw_dots.h"
+
 
 // TODO:
 // - '--multiscale' as the only option for multiscaling ...
@@ -44,12 +59,16 @@ typedef struct{
 
     int circularity; /* Set to 1 to enable circularity estimation */
 
+    char * bgimage;
+
     /* For multi scale dot detection.
      *For single scale paths,
      * scales[0] is also used to scale up filter sizes if set. */
     int nscale;
     float max_rel_scale;
     float * scales;
+
+    ftif_t * ftif;
 } opts;
 
 static opts * opts_new();
@@ -77,6 +96,8 @@ static opts * opts_new()
 
 static void opts_free(opts * s)
 {
+    fim_tiff_destroy(s->ftif);
+    s->ftif = NULL;
     free(s->outfile);
     free(s->image);
     free(s->logfile);
@@ -99,6 +120,10 @@ static void opts_print(FILE * f, opts * s)
     if(s->image != NULL)
     {
         fprintf(f, "image: %s\n", s->image);
+    }
+    if(s->bgimage != NULL)
+    {
+        fprintf(f, "background image: %s\n", s->bgimage);
     }
     if(s->outfile != NULL)
     {
@@ -162,55 +187,57 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
     printf("usage: %s [<options>] input.tif input2.tif ...\n", argv[0]);
     printf("\n");
     printf("Recommended/required arguments:\n");
-    printf(" --NA NA\n\t"
+    printf("  --NA NA\n\t"
            "Set numerical aperture\n");
-    printf(" --ni ni\n\t"
+    printf("  --ni ni\n\t"
            "Set refractive index\n");
-    printf(" --dx dx\n\t"
+    printf("  --dx dx\n\t"
            "Lateral pixel size [nm]\n");
-    printf(" --dz dz\n\t"
+    printf("  --dz dz\n\t"
            "Axial pixel size [nm]\n");
-    printf(" --lambda l\n\t"
+    printf("  --lambda l\n\t"
            "Emission wave length [nm]\n");
-    printf(" --ndots n\n\t"
+    printf("  --ndots n\n\t"
            "Number of dots to export (default M x N x 0.005)\n");
     printf("\n");
     printf("Additional options\n");
-    printf(" --nscale n\n\t"
+    printf("  --background file.tif\n\t"
+           "Background model, input image will be divided by this\n");
+    printf("  --nscale n\n\t"
            "set the number of scales to use\n");
-    printf(" --swell f\n\t"
+    printf("  --swell f\n\t"
            "Tell the program how much larger the dots are compared to\n"
            "the diffraction limit. Default = 1, i.e. diffraction limited dots\n"
            "For some experiments values up to 2 makes sense\n");
-    printf(" --overwrite\n\t"
+    printf("  --overwrite\n\t"
            "Overwrite existing files (default %d)\n",
            s->overwrite);
-    printf(" --help\n\t"
+    printf("  --help\n\t"
            "Show this message\n");
-    printf(" --logfile file.txt\n\t"
+    printf("  --logfile file.txt\n\t"
            "Specify where the log file should be written\n");
 
-    printf(" --verbose v\n\t"
+    printf("  --verbose v\n\t"
            "Verbosity level (default %d)\n", s->verbose);
-    printf(" --nthreads n\n\t"
+    printf("  --nthreads n\n\t"
            "Set the number of computational threads\n");
-    printf(" --fout file.tif\n\t"
+    printf("  --fout file.tif\n\t"
            "Write filtered image -- for debugging\n");
     printf("\n");
     printf("If you want to control the filter sizes, skip the optical parameters\n"
            "above and set the filter sizes manually by:\n");
-    printf(" --dog_ls s\n\t"
+    printf("  --log_ls s\n\t"
            "Lateral sigma (location of zero-crossing)\n");
-    printf(" --dog_as s\n\t"
+    printf("  --log_as s\n\t"
            "Axial sigma (location of zero-crossing)\n");
-    printf(" --fit_ls\n\t"
+    printf("  --fit_ls\n\t"
            "Lateral sigma, initial guess for the dot fitting\n");
-    printf(" --fit_as\n\t"
+    printf("  --fit_as\n\t"
            "Axial sigma, initial guess for the dot fitting");
     printf("\n");
     printf("Notes:\n");
-    printf(" - Log messages will be written to [input file].log.txt\n");
-    printf(" - Dots will be exported to [input file].dots.tsv\n");
+    printf("  - Log messages will be written to [input file].log.txt\n");
+    printf("  - Dots will be exported to [input file].dots.tsv\n");
     printf("\n");
     printf(" See the man page for more information.\n");
     free(s);
@@ -255,6 +282,7 @@ static void argparsing(int argc, char ** argv, opts * s)
 
     struct option longopts[] = {
         {"log_as", required_argument, NULL, 'a'},
+        {"background", required_argument, NULL, 'b'},
         {"fit_as", required_argument, NULL, 'A'},
         {"csv",    no_argument, NULL, 'c'},
         {"circularity", no_argument, NULL, 'C'},
@@ -279,7 +307,7 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"ni",     required_argument, NULL, '6'},
         {NULL, 0, NULL, 0}};
     int ch;
-    while((ch = getopt_long(argc, argv, "1:3:4:5:6:L:a:A:cCF:hi:l:L:m:n:N:op:r:s:v:w:", longopts, NULL)) != -1)
+    while((ch = getopt_long(argc, argv, "1:3:4:5:6:L:a:A:b:cCF:hi:l:L:m:n:N:op:r:s:v:w:", longopts, NULL)) != -1)
     {
         switch(ch){
         case '1':
@@ -302,6 +330,10 @@ static void argparsing(int argc, char ** argv, opts * s)
             break;
         case 'A':
             s->fit_asigma = atof(optarg);
+            break;
+        case 'b':
+            free(s->bgimage);
+            s->bgimage = strdup(optarg);
             break;
         case 'c':
             s->write_csv = 1;
@@ -742,7 +774,7 @@ void detect_dots(opts * s, char * inFile)
 
     fprintf(s->log, "Reading %s\n", inFile);
     int64_t M = 0, N = 0, P = 0;
-    float * A = fim_tiff_read(inFile, NULL, &M, &N, &P, s->verbose);
+    float * A = fim_tiff_read(s->ftif, inFile, NULL, &M, &N, &P);
     {
         float scaling = dw_read_scaling(inFile);
         if(scaling != 1)
@@ -750,8 +782,51 @@ void detect_dots(opts * s, char * inFile)
             if(s->verbose > 0)
             {
                 printf("Scaling by %f\n", 1.0/scaling);
+                fprintf(s->log, "Scaling by %f\n", 1.0/scaling);
                 fim_mult_scalar(A, M*N*P, 1.0/scaling);
             }
+        } else {
+            fprintf(s->log, "Could not read a scaling value from %s.log.txt\n", inFile);
+        }
+    }
+
+    if(s->bgimage == NULL)
+    {
+        if(s->verbose > 1)
+        {
+            printf("No background image provided\n");
+        }
+        fprintf(s->log, "No background image provided\n");
+    } else {
+        fprintf(s->log, "Loading background image: %s\n", s->bgimage);
+        if(s->verbose > 1)
+        {
+            printf("Loading background image: %s\n", s->bgimage);
+        }
+        i64 bM, bN, bP;
+        float * B = fim_tiff_read(s->ftif, s->bgimage, NULL, &bM, &bN, &bP);
+        if(B == NULL)
+        {
+            fprintf(s->log, "Unable to load background image\n");
+        } else {
+            float bmax = fim_max(B, bM*bN*bP);
+            if(bmax != 1.0)
+            {
+                fim_mult_scalar(B, bM*bN*bP, 1.0/bmax);
+            }
+            float bmin = fim_min(B, bM*bN*bP);
+            bmax = fim_max(B, bM*bN*bP);
+            if(s->verbose > 1)
+            {
+                printf("Background in range [%.2f, %.2f]\n", bmin, bmax);
+            }
+            if(fim_div_background(A, M, N, P,
+                                  B, bM, bN, bP))
+            {
+                fprintf(s->log, "Unable to use the provided background image, dimensions mismatch\n");
+            }
+            free(B);
+            B = NULL;
         }
     }
 
@@ -811,7 +886,7 @@ void detect_dots(opts * s, char * inFile)
             {
                 printf("Writing filtered image to %s\n", s->fout);
             }
-            fim_tiff_write_float(s->fout, feature, NULL, M, N, P);
+            fim_tiff_write_float(s->ftif, s->fout, feature, NULL, M, N, P);
         }
 
         /* Detect local maxima */
@@ -981,11 +1056,7 @@ void detect_dots(opts * s, char * inFile)
 
 int dw_dots(int argc, char ** argv)
 {
-
-    fim_tiff_init();
     opts * s = opts_new();
-
-
     argparsing(argc, argv, s);
 #ifdef _OPENMP
     omp_set_num_threads(s->nthreads);
@@ -994,7 +1065,7 @@ int dw_dots(int argc, char ** argv)
     {
         opts_print(stdout, s);
     }
-
+    s->ftif = fim_tiff_new(stdout, s->verbose);
 
     for(size_t kk = s->optpos; kk < (size_t) argc; kk++)
     {

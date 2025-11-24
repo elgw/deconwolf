@@ -48,6 +48,7 @@ typedef struct{
 
     double gamma;
     double sigma;
+    ftif_t * ftif;
 } opts;
 
 static opts * opts_new();
@@ -106,6 +107,8 @@ static opts * opts_new()
 
 static void opts_free(opts * s)
 {
+    fim_tiff_destroy(s->ftif);
+    s->ftif = NULL;
     free(s->outfile);
     free(s->logfile);
     if(s->log != NULL)
@@ -148,20 +151,20 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
     printf("Deconwolf %s STED PSF generator.\n", deconwolf_version);
     printf("usage: %s [<options>] output.tif\n", argv[0]);
     printf("Options:\n");
-    printf(" --lateral l\n\t"
+    printf("  --lateral l\n\t"
            "Lateral FWHM in pixels\n");
-    printf(" --axial l\n\t"
+    printf("  --axial l\n\t"
            "Axial FWHM in pixels\n");
-    printf(" --size N\n\t"
+    printf("  --size N\n\t"
            "Set number of pixels along lateral dimensions\n");
-    printf(" --nslice P\n\t"
+    printf("  --nslice P\n\t"
            "Set number of pixels along axial dimension\n");
     printf("General:\n");
-    printf(" --overwrite\n\t"
+    printf("  --overwrite\n\t"
            "Overwrite existing files\n");
-    printf(" --help\n\t"
+    printf("  --help\n\t"
            "Show this message\n");
-    printf(" --verbose v\n\t"
+    printf("  --verbose v\n\t"
            "Verbosity level\n");
     printf("\n");
     opts_free(s);
@@ -391,13 +394,14 @@ static void dw_psf_sted(opts * s)
     assert(swstring != NULL);
 
     sprintf(swstring, "deconwolf %s", deconwolf_version);
-    ttags_set_software(T, swstring);
-    ttags_set_imagesize(T, PSF->M, PSF->N, PSF->P);
+    ttags_set_software(s->ftif, T, swstring);
+    ttags_set_imagesize(s->ftif, T, PSF->M, PSF->N, PSF->P);
 
     free(swstring);
 
 
-    fim_tiff_write_float(s->outfile, PSF->V,
+    fim_tiff_write_float(s->ftif,
+                         s->outfile, PSF->V,
                          T,
                          PSF->M, PSF->N, PSF->P);
     ttags_free(&T);
@@ -410,10 +414,7 @@ int dw_psf_sted_cli(int argc, char ** argv)
     opts * s = opts_new();
     /* Parse command line and open log file etc */
     argparsing(argc, argv, s);
-    if(s->verbose > 2)
-    {
-        printf("Command lined parsed, continuing\n"); fflush(stdout);
-    }
+    s->ftif = fim_tiff_new(stdout, s->verbose);
     /* Ready to go */
     dw_psf_sted(s);
     /* Clean up */

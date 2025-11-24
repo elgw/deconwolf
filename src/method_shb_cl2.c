@@ -1,4 +1,5 @@
 #include "method_shb_cl2.h"
+#include "dw_util.h"
 
 /* Still work to do before this can be enabled */
 #define use_inplace_clfft 1
@@ -8,11 +9,11 @@
 #define here(x) ;
 
 
-static void fimcl_to_tiff(fimcl_t * I_gpu, char * filename)
+static void fimcl_to_tiff(ftif_t * ftif, fimcl_t * I_gpu, char * filename)
 {
     float * I = fimcl_download(I_gpu);
     printf("Writing to %s\n", filename);
-    fim_tiff_write_float(filename, I, NULL, I_gpu->M, I_gpu->N, I_gpu->P);
+    fim_tiff_write_float(ftif, filename, I, NULL, I_gpu->M, I_gpu->N, I_gpu->P);
     fim_free(I);
 }
 
@@ -29,7 +30,7 @@ fft_block_of_ones(clu_env_t * clu,
 
     float * one = fim_zeros(wM*wN*wP);
 
-#pragma omp parallel for shared(one)
+#pragma omp parallel for shared(one) collapse(2)
     for(int64_t cc = 0; cc < P; cc++) {
         for(int64_t bb = 0; bb < N; bb++) {
             for(int64_t aa = 0; aa < M; aa++) {
@@ -182,7 +183,7 @@ float * deconvolve_shb_cl2(float * restrict im,
     fprintf(s->log, "Deconvolving with shbcl2\n");
     struct timespec t_deconvolution_start, t_deconvolution_end;
     dw_gettime(&t_deconvolution_start);
-
+    ftif_t * ftif = fim_tiff_new(s->log, s->verbosity);
 
     if(s->nIter == 0)
     {
@@ -280,7 +281,7 @@ float * deconvolve_shb_cl2(float * restrict im,
             fimcl_t * gi = fimcl_new(clu, fimcl_real, im, M, N, P);
             float * _gi = fimcl_download(gi);
             fimcl_free(gi);
-            fim_tiff_write_float("copy.tif", _gi, NULL, M, N, P);
+            fim_tiff_write_float(ftif, "copy.tif", _gi, NULL, M, N, P);
             fim_free(_gi);
         }
 
@@ -291,7 +292,7 @@ float * deconvolve_shb_cl2(float * restrict im,
             fimcl_ifft_inplace(gi);
             float * _gi = fimcl_download(gi);
             fimcl_free(gi);
-            fim_tiff_write_float("copy_ipFFT_ipIFFT.tif", _gi, NULL, M, N, P);
+            fim_tiff_write_float(ftif, "copy_ipFFT_ipIFFT.tif", _gi, NULL, M, N, P);
             fim_free(_gi);
         }
 
@@ -305,7 +306,7 @@ float * deconvolve_shb_cl2(float * restrict im,
             fimcl_free(FFTgi);
             float * _gi = fimcl_download(IFFT_FFT_gi);
             fimcl_free(IFFT_FFT_gi);
-            fim_tiff_write_float("copy_FFT_IFFT.tif", _gi, NULL, M, N, P);
+            fim_tiff_write_float(ftif, "copy_FFT_IFFT.tif", _gi, NULL, M, N, P);
             fim_free(_gi);
         }
 
@@ -318,7 +319,7 @@ float * deconvolve_shb_cl2(float * restrict im,
             fimcl_free(gi);
             float * _gi = fimcl_download(igi);
             fimcl_free(igi);
-            fim_tiff_write_float("copy_ipFFT_IFFT.tif", _gi, NULL, M, N, P);
+            fim_tiff_write_float(ftif, "copy_ipFFT_IFFT.tif", _gi, NULL, M, N, P);
             fim_free(_gi);
         }
 
@@ -330,7 +331,7 @@ float * deconvolve_shb_cl2(float * restrict im,
             fimcl_ifft_inplace(Fgi);
             float * _gi = fimcl_download(Fgi);
             fimcl_free(Fgi);
-            fim_tiff_write_float("copy_ipFFT_ipIFFT.tif", _gi, NULL, M, N, P);
+            fim_tiff_write_float(ftif, "copy_ipFFT_ipIFFT.tif", _gi, NULL, M, N, P);
             free(_gi);
         }
 
@@ -377,7 +378,7 @@ float * deconvolve_shb_cl2(float * restrict im,
     if(s->fulldump)
     {
         printf("Dumping to fullPSF.tif\n");
-        fim_tiff_write_float("fullPSF.tif", Z, NULL, wM, wN, wP);
+        fim_tiff_write_float(ftif, "fullPSF.tif", Z, NULL, wM, wN, wP);
     }
 
     fimcl_t * PSF_gpu = fimcl_new(clu, fimcl_real,
@@ -418,7 +419,7 @@ float * deconvolve_shb_cl2(float * restrict im,
         float * im_filt_cropped = fim_subregion(im_filt, wM, wN, wP, M, N, P);
         fim_free(im_filt);
         im_gpu = fimcl_new(clu, fimcl_real, im_filt_cropped, M, N, P);
-        fimcl_to_tiff(im_gpu, "ifft_fft_input.tif");
+        fimcl_to_tiff(ftif, im_gpu, "ifft_fft_input.tif");
         fim_free(im_filt_cropped);
     }
 
@@ -579,7 +580,7 @@ float * deconvolve_shb_cl2(float * restrict im,
     if(s->fulldump)
     {
         printf("Dumping to fulldump.tif\n");
-        fim_tiff_write("fulldump.tif", out_full, NULL, wM, wN, wP);
+        fim_tiff_write(ftif, "fulldump.tif", out_full, NULL, wM, wN, wP);
     }
 
     here();
@@ -595,6 +596,7 @@ float * deconvolve_shb_cl2(float * restrict im,
     float dt_deconvolution = clockdiff(&t_deconvolution_end,
                                        &t_deconvolution_start);
     fprintf(s->log, "Deconvolution took %.2f s\n", dt_deconvolution);
-
+    fim_tiff_destroy(ftif);
+    ftif = NULL;
     return out;
 }

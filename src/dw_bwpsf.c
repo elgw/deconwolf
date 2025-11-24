@@ -14,13 +14,63 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#define _USE_MATH_DEFINES
+#include <math.h>
+#include <assert.h>
+#include <complex.h>
+#include <stdlib.h>
+#include <string.h>
+#include <getopt.h>
+#include <time.h>
+#include <wchar.h>
+#include <locale.h>
+#include <gsl/gsl_integration.h>
+#include <omp.h>
+
+#include "dw_util.h"
+#include "fim_tiff.h"
+#include "dw_version.h"
+#include "lanczos.h"
+#include "li.h"
+#include "bw_gsl.h"
 
 #include "dw_bwpsf.h"
 #include "npio.h"
 
-volatile int GLOB_N_GSL_EROUND = 0; /* Counter for GSL_EROUND */
+/* Windows does not agree on the definition of complex numbers,
+ * we will call them dcomplex regardless of the underlying library
+ */
+#ifdef WINDOWS
+typedef _Dcomplex dcomplex;
+#else
+typedef double complex dcomplex;
+#endif
 
-void dw_bw_gsl_err_handler(const char * reason,
+int GLOB_N_GSL_EROUND = 0; /* Counter for GSL_EROUND */
+
+static void BW_slice(float * , float z, bw_conf * conf);
+static void bw_argparsing(int , char ** , bw_conf * conf);
+static void * BW_thread(void * data);
+
+// Get the command line options
+static void getCmdLine(int argc, char ** argv, bw_conf * s);
+
+
+/* Integration over pixel */
+typedef struct {
+    bw_conf * conf;
+    double * radprofile;
+    size_t nr;
+    int radsample;
+    double y0;
+    double y1;
+    double x;
+    gsl_integration_workspace * wspx;
+    gsl_integration_workspace * wspy;
+} pixely_t;
+
+
+static void dw_bw_gsl_err_handler(const char * reason,
                            const char * file,
                            int line,
                            int gsl_errno)
@@ -103,7 +153,7 @@ void bw_conf_printf(FILE * out, bw_conf * conf)
 
 bw_conf * bw_conf_new()
 {
-    bw_conf * conf = malloc(sizeof(bw_conf));
+    bw_conf * conf = calloc(1, sizeof(bw_conf));
     assert(conf != NULL);
 
     /* Physical settings */
@@ -149,6 +199,11 @@ void bw_conf_free(bw_conf ** _conf)
     {
         fclose(conf->log);
     }
+    if(conf->ftif != NULL)
+    {
+        fim_tiff_destroy(conf->ftif);
+        conf->ftif = NULL;
+    }
     free(conf->outFile);
     free(conf->logFile);
     free(conf->cmd);
@@ -158,7 +213,7 @@ void bw_conf_free(bw_conf ** _conf)
 }
 
 
-void getCmdLine(int argc, char ** argv, bw_conf * s)
+static void getCmdLine(int argc, char ** argv, bw_conf * s)
 {
     // Copy the command line to s->cmd
     int lcmd=0;
@@ -178,7 +233,7 @@ void getCmdLine(int argc, char ** argv, bw_conf * s)
     s->cmd[pos-1] = '\0';
 }
 
-void fprint_time(FILE * f)
+static void fprint_time(FILE * f)
 {
     f == NULL ? f = stdout : 0;
     time_t now = time(NULL);
@@ -186,7 +241,7 @@ void fprint_time(FILE * f)
     fprintf(f, "%s\n", tstring);
 }
 
-void bw_version(FILE* f)
+static void bw_version(FILE* f)
 {
 #ifdef WINDOWS
     fprintf(f, "deconwolf: '%s'\n", deconwolf_version);
@@ -195,7 +250,7 @@ void bw_version(FILE* f)
 #endif
 }
 
-void usage(__attribute__((unused)) int argc, char ** argv, bw_conf * s)
+static void usage(__attribute__((unused)) int argc, char ** argv, bw_conf * s)
 {
     printf("Usage:\n");
     printf("\t%s <options> psf.tif \n", argv[0]);
@@ -248,7 +303,51 @@ void usage(__attribute__((unused)) int argc, char ** argv, bw_conf * s)
     return;
 }
 
-void bw_argparsing(int argc, char ** argv, bw_conf * s)
+/* Returns 0 on success */
+int bw_conf_validate(bw_conf * s)
+{
+    if(s->lambda < 50)
+    {
+        fprintf(stderr, "Error: lambda has be be at least 50 nm\n");
+        return EXIT_FAILURE;
+    }
+
+    if(s->lambda > 2000)
+    {
+        fprintf(stderr, "Error lambda can be at most 2000 nm\n");
+        return EXIT_FAILURE;
+    }
+
+    if(s->M % 2 == 0)
+    {
+        if(s->verbose > 0)
+        {
+            printf("Warning: The size has to be odd, 1, 3, ...\n");
+            printf("Changing from %d to %d.\n", s->M, s->M+1);
+        }
+        s->M++;
+        s->N++;
+    }
+
+    if(s->P % 2 == 0)
+    {
+        if(s->verbose > 0)
+        {
+            printf("Warning: The number of slices has to be odd, 1, 3, ...\n");
+            printf("          Changing from %d to %d.\n", s->P, s->P+1);
+        }
+        s->P++;
+    }
+
+    /* Not more threads than slices */
+    if(s->nThreads > s->P)
+    {
+        s->nThreads = s->P;
+    }
+    return EXIT_SUCCESS;
+}
+
+static void bw_argparsing(int argc, char ** argv, bw_conf * s)
 {
     bw_conf * defaults = calloc(1, sizeof(bw_conf));
     assert(defaults != NULL);
@@ -394,32 +493,6 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
         exit(EXIT_FAILURE);
     }
 
-    if(s->lambda < 50)
-    {
-        fprintf(stderr, "Error: lambda has be be at least 50 nm\n");
-        exit(-1);
-    }
-
-    if(s->lambda > 2000)
-    {
-        fprintf(stderr, "Error lambda can be at most 2000 nm\n");
-        exit(-1);
-    }
-
-    if(s->M % 2 == 0)
-    {
-        printf("Warning: The size has to be odd, 1, 3, ...\n");
-        printf("Changing from %d to %d.\n", s->M, s->M+1);
-        s->M++;
-        s->N++;
-    }
-
-    if(s->P % 2 == 0)
-    {
-        printf("Warning: The number of slices has to be odd, 1, 3, ...\n");
-        printf("          Changing from %d to %d.\n", s->P, s->P+1);
-        s->P++;
-    }
 
     if(Pset == 0)
     {
@@ -452,21 +525,11 @@ void bw_argparsing(int argc, char ** argv, bw_conf * s)
     assert(s->logFile != NULL);
     sprintf(s->logFile, "%s.log.txt", s->outFile);
 
-    /* Not more threads than slices */
-    if(s->nThreads > s->P)
-    {
-        s->nThreads = s->P;
-    }
-    if(s->nThreads < 1)
-    {
-	s->nThreads = 1;
-    }
-    omp_set_num_threads(s->nThreads);
 
     return;
 }
 
-double cabs2(dcomplex v)
+static double cabs2(dcomplex v)
 {
     return pow(creal(v), 2) + pow(cimag(v), 2);
 }
@@ -498,7 +561,7 @@ void BW(bw_conf * conf)
     return;
 }
 
-double pixelpointfun(double y, void * _conf)
+static double pixelpointfun(double y, void * _conf)
 {
     /* interpolate radial profile at (x,y) */
     pixely_t * iconf = (pixely_t *) _conf;
@@ -515,7 +578,7 @@ double pixelpointfun(double y, void * _conf)
     return res;
 }
 
-double pixelyfun(double x, void *_conf)
+static double pixelyfun(double x, void *_conf)
 {
     pixely_t * iconf = (pixely_t *) _conf;
     //printf("pixelyfun: iconf->nr = %zu, iconf->radsample=%d\n", iconf->nr, iconf->radsample);
@@ -535,7 +598,7 @@ double pixelyfun(double x, void *_conf)
     return result;
 }
 
-double integrate_pixel(bw_conf * conf,
+static double integrate_pixel(bw_conf * conf,
                        gsl_integration_workspace * wspx,
                        gsl_integration_workspace * wspy,
                        double * radprofile, size_t nr, int radsample,
@@ -574,7 +637,7 @@ double integrate_pixel(bw_conf * conf,
     return result/((x1-x0)*(y1-y0));
 }
 
-void BW_slice(float * V, float z, bw_conf * conf)
+static void BW_slice(float * V, float z, bw_conf * conf)
 {
     /* Calculate the PSF for a single plane/slice
      * V is a pointer to the _slice_ not the whole volume
@@ -641,7 +704,7 @@ void BW_slice(float * V, float z, bw_conf * conf)
         bw_gsl_conf->lambda = conf->lambda;
 
 
-        if(z == 0) /* Only write from the thread that processes z==0 */
+        if(z == 0 && (conf->log != NULL) ) /* Only write from the thread that processes z==0 */
         {
             fprintf(conf->log, "Settings for BW integration over Z:\n");
             bw_gsl_fprint(conf->log, bw_gsl_conf);
@@ -712,20 +775,26 @@ void BW_slice(float * V, float z, bw_conf * conf)
     return;
 }
 
-void unit_tests(bw_conf * conf)
+static void unit_tests(bw_conf * conf)
 {
     printf("No unit tests to run\n");
     bw_conf_printf(stdout, conf);
     return;
 }
 
-int main(int argc, char ** argv)
+int dw_bwpsf(int argc, char ** argv)
 {
     struct timespec tstart, tend;
     dw_gettime(&tstart);
 
     bw_conf * conf = bw_conf_new();
     bw_argparsing(argc, argv, conf);
+
+    if(bw_conf_validate(conf))
+    {
+        printf("Can't continue with the provided settings\n");
+        return EXIT_FAILURE;
+    }
 
     if( conf->overwrite == 0 && dw_isfile(conf->outFile))
     {
@@ -745,8 +814,8 @@ int main(int argc, char ** argv)
         fprintf(stderr, "Failed to open %s for writing\n", conf->logFile);
         exit(-1);
     }
-    fim_tiff_init();
-    fim_tiff_set_log(conf->log);
+    conf->ftif = fim_tiff_new(conf->log, conf->verbose);
+
     fprint_time(conf->log);
     bw_conf_printf(conf->log, conf);
     fflush(conf->log);
@@ -791,12 +860,12 @@ int main(int argc, char ** argv)
         char * swstring = malloc(1024);
         assert(swstring != NULL);
         sprintf(swstring, "deconwolf %s", deconwolf_version);
-        ttags_set_software(T, swstring);
-        ttags_set_imagesize(T, conf->M, conf->N, conf->P);
-        ttags_set_pixelsize(T, conf->resLateral, conf->resLateral, conf->resAxial);
+        ttags_set_software(conf->ftif, T, swstring);
+        ttags_set_imagesize(conf->ftif, T, conf->M, conf->N, conf->P);
+        ttags_set_pixelsize(conf->ftif, T, conf->resLateral, conf->resLateral, conf->resAxial);
         free(swstring);
 
-        fim_tiff_write_float(conf->outFile, conf->V, T, conf->M, conf->N, conf->P);
+        fim_tiff_write_float(conf->ftif, conf->outFile, conf->V, T, conf->M, conf->N, conf->P);
         ttags_free(&T);
     }
 
@@ -804,6 +873,7 @@ int main(int argc, char ** argv)
     dw_gettime(&tend);
     fprint_peak_memory(conf->log);
     fprintf(conf->log, "Took: %f s\n", timespec_diff(&tend, &tstart));
+    fprint_peak_memory(conf->log);
     fprintf(conf->log, "done!\n");
 
     if(conf->verbose > 1)
@@ -817,3 +887,11 @@ int main(int argc, char ** argv)
 
     return EXIT_SUCCESS;
 }
+
+
+#ifdef STANDALONE
+int main(int argc, char ** argv)
+{
+    return dw_bwpsf(argc, argv);
+}
+#endif

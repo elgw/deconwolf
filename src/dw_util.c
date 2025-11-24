@@ -327,7 +327,7 @@ float dw_read_scaling(const char * file)
 
     free(line);
     fclose(fid);
- leave:
+leave:
     free(logfile);
     return scaling;
 }
@@ -403,7 +403,7 @@ dw_prefix_file(const char * inFile, const char * prefix)
         dir,
         fname,
         ext
-    );
+        );
 
     char* pre_fname = calloc(strlen(fname) + strlen(prefix) + 16, 1);
     sprintf(pre_fname, "%s_%s", prefix, fname);
@@ -415,7 +415,7 @@ dw_prefix_file(const char * inFile, const char * prefix)
         dir,
         pre_fname,
         ext
-    );
+        );
 
     free(drive);
     free(dir);
@@ -475,11 +475,11 @@ float_arg_max(const float * v, size_t N)
 int dw_fseek(FILE *fid, int64_t offset, int origin)
 {
     int ret = 0;
-    #ifdef WINDOWS
+#ifdef WINDOWS
     ret =  _fseeki64(fid, offset, origin);
-    #else
+#else
     ret = fseek(fid, offset, origin);
-    #endif
+#endif
     if(ret)
     {
         perror("dw_fseek error:");
@@ -507,4 +507,63 @@ int npyfilename(const char * filename)
         return 1;
     }
     return 0;
+}
+
+
+char * dw_tempfile(const char * folder)
+{
+    if(folder == NULL)
+    {
+        return dw_tempfile("./");
+    }
+
+#ifdef _WIN32
+    char* template = calloc(strlen(folder) + 16+16, 1);
+    if (template == NULL)
+    {
+        printf("Failed to allocate for template\n"); fflush(stdout);
+        return NULL;
+    }
+    sprintf(template, "%s/dw_XXXXXX", folder);
+    if(_mktemp_s(template, strlen(template)+16))
+    {
+        printf("Unable to generate template\n"); fflush(stdout);
+        free(template);
+        return NULL;
+    }
+    FILE * fid = fopen(template, "wb");
+    if (fid == NULL)
+    {
+        printf("Error opening temp file '%s'\n", template);
+        return NULL;
+    }
+    fclose(fid);
+    return template;
+#else
+    char * template = calloc(strlen(folder) + 16, 1);
+    if(template == NULL)
+    {
+        return NULL;
+    }
+    sprintf(template, "%s/dw_XXXXXX", folder);
+    int file = mkstemp(template);
+    if(file == -1)
+    {
+        free(template);
+        return NULL;
+    }
+    close(file);
+
+    return template;
+#endif
+}
+
+const char * dw_yes_no(int value)
+{
+    if(value == 1)
+    {
+        return "yes";
+    } else {
+        return "no";
+    }
 }

@@ -9,6 +9,13 @@ if(WIN32)
   add_definitions(-DWINDOWS)
 endif()
 
+add_definitions(-D_DEFAULT_SOURCE)
+option(BUILD_SHARED_LIBS "Build shared library" ON)
+# To build static:  -DBUILD_SHARED_LIBS=OFF
+
+set(CMAKE_C_VISIBILITY_PRESET "hidden")
+set(CMAKE_VISIBILITY_INLINES_HIDDEN TRUE)
+
 #
 # Default build type is RELEASE
 #
@@ -17,11 +24,11 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
-# Don't install to /usr/local/ use /usr/
-#set( CMAKE_INSTALL_PREFIX
-#  /usr )
+if (NOT CMAKE_BUILD_TYPE MATCHES Debug)
+  add_definitions(-DNDEBUG)
+endif()
 
-add_library(trafo SHARED
+add_library(trafo
   src/entropy.c
   src/ftab.c
   src/gini.c
@@ -31,6 +38,7 @@ add_library(trafo SHARED
   src/qsort.c)
 
 add_executable(trafo_cli
+  src/trafo_cli.c
   src/entropy.c
   src/ftab.c
   src/gini.c
@@ -39,9 +47,6 @@ add_executable(trafo_cli
   src/trafo.c
   src/trafo_cli.c
   src/trafo_util.c)
-
-target_link_libraries(trafo_cli
-  trafo)
 
 set_target_properties(trafo_cli
   PROPERTIES INSTALL_RPATH "$ORIGIN")
@@ -53,26 +58,6 @@ find_library(MATH_LIBRARY m)
 if(MATH_LIBRARY)
   target_link_libraries(trafo ${MATH_LIBRARY})
   target_link_libraries(trafo_cli ${MATH_LIBRARY})
-endif()
-
-
-include(CheckCSourceCompiles)
-check_c_source_compiles(
-  "
-        #include <stdlib.h>
-        static void f(void) __attribute__ ((visibility(\"hidden\")));
-        int main(void) {return 0;}
-    "
-  HAVE___ATTRIBUTE__VISIBILITY_HIDDEN
-)
-
-if(HAVE___ATTRIBUTE__VISIBILITY_HIDDEN)
-  target_compile_options(trafo PUBLIC -DHAVE___ATTRIBUTE__VISIBILITY_HIDDEN -fvisibility=hidden)
-  #target_compile_options(trafo PRIVATE -DHAVE___ATTRIBUTE__VISIBILITY_HIDDEN)
-  set_target_properties(trafo PROPERTIES C_VISIBILITY_PRESET hidden)
-  message(" HAVE___ATTRIBUTE__VISIBILITY_HIDDEN ")
-else()
-  message("NO  HAVE___ATTRIBUTE__VISIBILITY_HIDDEN ")
 endif()
 
 #
@@ -115,8 +100,8 @@ else()
   message(WARNING "IPO is not supported: ${output}")
 endif()
 
-include("GNUInstallDirs")
 
+include("GNUInstallDirs")
 INSTALL(TARGETS trafo
   PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}

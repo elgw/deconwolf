@@ -14,7 +14,14 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include <inttypes.h>
+
 #include "method_identity.h"
+#include "fim.h"
+#include "fft.h"
 
  float * deconvolve_identity(float * restrict im, const int64_t M, const int64_t N, const int64_t P,
                         float * restrict psf, const int64_t pM, const int64_t pN, const int64_t pP,

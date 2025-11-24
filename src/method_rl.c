@@ -14,10 +14,18 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <assert.h>
+
+#include "dw.h"
 #include "method_rl.h"
+#include "fft.h"
+#include "fim.h"
 
 /* One RL iteration */
-float iter_rl(
+float iter_rl(dw_fft * ff,
               float ** xp, // Output, f_(t+1) xkp1
               const float * restrict im, // Input image
               fftwf_complex * restrict fftPSF,
@@ -29,9 +37,9 @@ float iter_rl(
 {
     const size_t wMNP = wM*wN*wP;
 
-    fftwf_complex * F = fft(f, wM, wN, wP); /* FFT#1 */
+    fftwf_complex * F = fft(ff, f, wM, wN, wP); /* FFT#1 */
     putdot(s);
-    float * y = fft_convolve_cc_f2(fftPSF, F, wM, wN, wP); /* FFT#2 */
+    float * y = fft_convolve_cc_f2(ff, fftPSF, F, wM, wN, wP); /* FFT#2 */
     putdot(s);
     float error = getError(y, im, M, N, P, wM, wN, wP, s->metric);
 
@@ -67,10 +75,10 @@ float iter_rl(
     }
 
 
-    fftwf_complex * F_sn = fft_and_free(y, wM, wN, wP); /* FFT#3 */
+    fftwf_complex * F_sn = fft_and_free(ff, y, wM, wN, wP); /* FFT#3 */
 
     putdot(s);
-    float * x = fft_convolve_cc_conj_f2(fftPSF, F_sn, wM, wN, wP); /* FFT#4 */
+    float * x = fft_convolve_cc_conj_f2(ff, fftPSF, F_sn, wM, wN, wP); /* FFT#4 */
     putdot(s);
 
     /* Eq. 18 in Bertero */
@@ -99,6 +107,7 @@ float * deconvolve_rl(float * restrict im, const int64_t M, const int64_t N, con
                       dw_opts * s)
 {
 
+    ftif_t * ftif = fim_tiff_new(s->log, s->verbosity);
     if(s->verbosity > 1)
     {
         printf("Deconvolving\n");
@@ -191,9 +200,8 @@ float * deconvolve_rl(float * restrict im, const int64_t M, const int64_t N, con
             M, N, P, pM, pN, pP, wM, wN, wP, wMNP);
     fflush(s->log);
 
-    fft_train(wM, wN, wP,
-              s->verbosity, s->nThreads_FFT,
-              s->log);
+    dw_fft * ff = dw_fft_new(s->nThreads_FFT, s->verbosity, s->log,
+                             wM, wN, wP, s->fftw3_planning);
 
     if(s->verbosity > 0)
     {
@@ -225,10 +233,10 @@ float * deconvolve_rl(float * restrict im, const int64_t M, const int64_t N, con
     if(s->fulldump)
     {
         printf("Dumping to fullPSF.tif\n");
-        fim_tiff_write_float("fulldump_PSF.tif", Z, NULL, wM, wN, wP);
+        fim_tiff_write_float(ftif, "fulldump_PSF.tif", Z, NULL, wM, wN, wP);
     }
 
-    fftwf_complex * fftPSF = fft_and_free(Z, wM, wN, wP);
+    fftwf_complex * fftPSF = fft_and_free(ff, Z, wM, wN, wP);
 
     putdot(s);
 
@@ -238,9 +246,9 @@ float * deconvolve_rl(float * restrict im, const int64_t M, const int64_t N, con
     if(s->borderQuality > 0)
     {
         /* F_one is 1 over the image domain */
-        fftwf_complex * F_one = initial_guess(M, N, P, wM, wN, wP);
+        fftwf_complex * F_one = initial_guess(ff, M, N, P, wM, wN, wP);
         /* Bertero, Eq. 15 */
-        W = fft_convolve_cc_conj_f2(fftPSF, F_one, wM, wN, wP);
+        W = fft_convolve_cc_conj_f2(ff, fftPSF, F_one, wM, wN, wP);
         F_one = NULL; /* Freed by the call above */
 
         /* Sigma in Bertero's paper, introduced for Eq. 17 */
@@ -321,9 +329,9 @@ float * deconvolve_rl(float * restrict im, const int64_t M, const int64_t N, con
                 //fulldump(s, temp, M, N, P, outname);
                 if(s->outFormat == 32)
                 {
-                    fim_tiff_write_float(outname, temp, NULL, M, N, P);
+                    fim_tiff_write_float(ftif, outname, temp, NULL, M, N, P);
                 } else {
-                    fim_tiff_write(outname, temp, NULL, M, N, P);
+                    fim_tiff_write(ftif, outname, temp, NULL, M, N, P);
                 }
                 free(outname);
                 fim_free(temp);
@@ -333,7 +341,7 @@ float * deconvolve_rl(float * restrict im, const int64_t M, const int64_t N, con
 
         putdot(s);
 
-        double err = iter_rl(
+        double err = iter_rl(ff,
                              &x, // xp is updated to the next guess
                              im,
                              fftPSF,
@@ -384,6 +392,9 @@ float * deconvolve_rl(float * restrict im, const int64_t M, const int64_t N, con
     /* Extract the observed region from the last iteration */
     float * out = fim_subregion(x, wM, wN, wP, M, N, P);
     fim_free(x);
-
+    dw_fft_destroy(ff);
+    ff = NULL;
+    fim_tiff_destroy(ftif);
+    ftif = NULL;
     return out;
 }

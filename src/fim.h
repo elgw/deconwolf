@@ -16,7 +16,7 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "dw_util.h"
+
 #include "fft.h"
 #include "fim_tiff.h"
 #include "ftab.h"
@@ -205,6 +205,15 @@ void fim_div(float * restrict  A,
              const float * restrict B,
              const float * restrict C,
              const size_t N);
+
+/* A = A/B
+ * If A is 3D and B is 2D, then
+ * A[:, :, kk] = A[:, :, kk] / B for all planes
+ */
+int fim_div_background(float * restrict  A,
+                       int64_t M, int64_t N, int64_t P,
+                       const float * restrict B,
+                       int64_t bM, int64_t bN, int64_t bP);
 
 /* A[kk] += B[kk] */
 void fim_add(float * restrict A,

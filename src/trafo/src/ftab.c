@@ -14,25 +14,41 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "ftab.h"
+
+#define _USE_MATH_DEFINES
 
 #include <assert.h>
-#include <inttypes.h>
-#define _USE_MATH_DEFINES
 #include <math.h>
-
-
+#include <errno.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include <time.h>
+
 #ifndef WINDOWS
 #include <unistd.h>
 #endif
 
+#include "ftab.h"
+#include "ftab_config.h"
+
+typedef uint8_t u8;
+typedef uint32_t u32;
+typedef uint64_t u64;
+typedef int64_t i64;
+typedef double f64;
+typedef float f32;
+
+/*                     WINDOWS SPECIFIC CODE
+ *                     =====================
+ */
+
 #ifdef WINDOWS
+#define _CRT_SECURE_NO_WARNINGS
+
 // https://unixpapa.com/incnote/string.html
-char * strsep(char **sp, char *sep)
+static char * strsep(char **sp, char *sep)
 {
     char *p, *s;
     if (sp == NULL || *sp == NULL || **sp == '\0') return(NULL);
@@ -48,15 +64,11 @@ char * strsep(char **sp, char *sep)
 /* Modifications, public domain as well, by Antti Haapala, 11/10/17
    - Switched to getc on 5/23/19 */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <stdint.h>
-
 // if typedef doesn't exist (msvc, blah)
 typedef intptr_t ssize_t;
 
-ssize_t getline(char **lineptr, size_t *n, FILE *stream) {
+static ssize_t
+getline(char **lineptr, size_t *n, FILE *stream) {
     size_t pos;
     int c;
 
@@ -105,8 +117,31 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream) {
 }
 #endif
 
-typedef uint8_t u8;
-typedef uint64_t u64;
+/*                   END OF WINDOWS SPECIFIC CODE
+*                    ============================
+*/
+
+int ftab_has_data(const ftab_t * T)
+{
+    if(T == NULL)
+    {
+        return 0;
+    }
+    if(T->T == NULL)
+    {
+        return 0;
+    }
+    if(T->nrow == 0)
+    {
+        return 0;
+    }
+    if(T->ncol == 0)
+    {
+        return 0;
+    }
+    return 1;
+}
+
 
 /* Count the number of newlines in a file */
 static size_t count_newlines(const char * fname)
@@ -428,8 +463,8 @@ ftab_from_dlm(const char * fname,
     // Get number of columns
     char * line = NULL;
     size_t len = 0;
-    int read = getline(&line, &len, fid);
-    if(strlen(line) == 0)
+    i64 nread = getline(&line, &len, fid);
+    if(nread <= 0)
     {
         fprintf(stderr, "Empty header line\n");
         free(line);
@@ -453,7 +488,7 @@ ftab_from_dlm(const char * fname,
 
     // Read
     int row = 0;
-    while ((read = getline(&line, &len, fid)) != -1)
+    while( getline(&line, &len, fid) > 0)
     {
         if(strlen(line) == 0)
         {
@@ -612,7 +647,7 @@ ftab_t * ftab_copy(const ftab_t * T)
     C->T = calloc(C->nrow*C->ncol, sizeof(float));
     if(C->T == NULL)
     {
-        return NULL;
+        goto teardown;
     }
 
     memcpy(C->T, T->T, C->nrow*C->ncol*sizeof(float));
@@ -626,11 +661,18 @@ ftab_t * ftab_copy(const ftab_t * T)
             if(T->colnames[kk] != NULL)
             {
                 C->colnames[kk] = strdup(T->colnames[kk]);
-                // TODO: gracefully tear down if NULL was returned.
+                if(C->colnames[kk] == NULL)
+                {
+                    goto teardown;
+                }
             }
         }
     }
     return C;
+
+ teardown:
+    ftab_free(C);
+    return NULL;
 }
 
 ftab_t * ftab_concatenate_columns(const ftab_t * L , const ftab_t * R)
@@ -752,7 +794,7 @@ ftab_new_from_data(int nrow, int ncol, const float * data)
     return T;
 }
 
-char * tempfilename()
+char * tempfilename(void)
 {
     char * fname = calloc(1024, 1);
     assert(fname != NULL);
@@ -806,9 +848,9 @@ int ftab_compare(const ftab_t * A, const ftab_t * B)
     {
         for(size_t kk = 0; kk<A->ncol; kk++)
         {
-             if(strcmp(A->colnames[kk], A->colnames[kk]))
-             {
-                 equal_colnames = 0;
+            if(strcmp(A->colnames[kk], A->colnames[kk]))
+            {
+                equal_colnames = 0;
             }
         }
     }
@@ -827,11 +869,12 @@ int ftab_compare(const ftab_t * A, const ftab_t * B)
 
 int ftab_ut(int argc, char ** argv)
 {
+    printf("ftab version %s\n\n", ftab_version());
     if(argc == 1)
     {
         printf("Running some self tests.\n");
         printf("To test on a specific file, use:\n");
-        printf("%s file.csv\n", argv[1]);
+        printf("%s file.csv\n", argv[0]);
         printf("\n");
     }
     if(argc > 1)
@@ -944,4 +987,75 @@ ftab_subselect_rows(ftab_t * tab, const u8 * selection)
     }
     tab->nrow = nsel;
     return;
+}
+
+
+double * ftab_get_data_f64(const ftab_t * T)
+{
+    if(!ftab_has_data(T))
+    {
+        return NULL;
+    }
+    u64 n = ftab_nel(T);
+    double * C = calloc(n, sizeof(double));
+    if(C == NULL)
+    {
+        return NULL;
+    }
+    for(u64 kk = 0; kk < n; kk++)
+    {
+        C[kk] = T->T[kk];
+    }
+    return C;
+}
+
+u64 ftab_nel(const ftab_t * T)
+{
+    if(ftab_has_data(T))
+    {
+        return T->nrow*T->ncol;
+    } else {
+        return 0;
+    }
+}
+
+
+u32 *
+ftab_get_data_u32(const ftab_t * T)
+{
+    if(!ftab_has_data(T))
+    {
+        return NULL;
+    }
+    u64 n = ftab_nel(T);
+    u32 * C = calloc(n, sizeof(u32));
+    if(C == NULL)
+    {
+        return NULL;
+    }
+    for(u64 kk = 0; kk < n; kk++)
+    {
+        C[kk] = (u32) T->T[kk];
+    }
+    return C;
+}
+
+const char * ftab_version(void)
+{
+    return FTAB_VERSION;
+}
+
+int ftab_version_major(void)
+{
+    return atoi(FTAB_VERSION_MAJOR);
+}
+
+int ftab_version_minor(void)
+{
+    return atoi(FTAB_VERSION_MINOR);
+}
+
+int ftab_version_patch(void)
+{
+    return atoi(FTAB_VERSION_PATCH);
 }

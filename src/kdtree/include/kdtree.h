@@ -1,4 +1,19 @@
 #pragma once
+
+/* A space partitioning K-d tree, like described on
+ * https://en.wikipedia.org/wiki/K-d_tree
+ *
+ * This particular implementation is hard coded for 3D data. You can
+ * of course use 1D and 2D data as well by setting the coordinates of
+ * the unused dimensions to 0.
+ *
+ * Usage:
+ * Acquire a kdtree_t* by  kdtree_new and free it with kdtree_free.
+ *
+ * link with -kdtree -lm
+ */
+
+
 #include <stdint.h>
 #include <stddef.h>
 
@@ -8,6 +23,12 @@
 
 /* Will only work when KDTREE_DIM=3 unless modified */
 #define KDTREE_DIM 3
+
+#ifdef WIN32
+#define PUB __declspec(dllexport)
+#else
+#define PUB __attribute__((visibility("default")))
+#endif
 
 struct pqheap;
 
@@ -54,16 +75,19 @@ typedef struct{
     size_t result_alloc; /* number of elements allocated for result */
 } kdtree_t;
 
-/* Construct a new tree based on the N points in X
+/* Construct a new tree based on the N points stored in X
  *
- * According to [1] a binsize (max_leaf_size) of 4-32 elements is optimal
- * regardless of k and the number of dimensions */
-kdtree_t * kdtree_new(const double * X,
-                      size_t N, int binsize);
+ * binsize (or max_leaf_size) is an algorithmic parameter. According
+ * to [1] bin size a of 4-32 elements is optimal regardless of the
+ * number of dimensions
+ */
+PUB kdtree_t *
+kdtree_new(const double * X,
+           size_t N, int binsize);
 
 
 /* Frees all resources associated with a tree */
-void kdtree_free(kdtree_t * T);
+PUB void kdtree_free(kdtree_t * T);
 
 /* Query one point for its k nearest neighbours.  The returned array
  * contains the index of k points, sorted according to the distance of
@@ -72,14 +96,17 @@ void kdtree_free(kdtree_t * T);
  * Important: The returned array is owned by the tree and should not
  * be freed. It will be re-used with the next call to kdtree_query_*
  */
-size_t * kdtree_query_knn(kdtree_t * T, const double * Q, size_t k);
+PUB size_t *
+kdtree_query_knn(kdtree_t * T,
+                 const double * Q,
+                 size_t k);
 
 /* TODO
  * Find all points within some radius of Q
  * Returns a newly allocated array of indexes of length nfound
  * On failure: Returns NULL and sets nfound to 0
-*/
-size_t *
+ */
+PUB size_t *
 kdtree_query_radius(const kdtree_t * T,
                     const double * Q,
                     const double radius,
@@ -94,28 +121,55 @@ kdtree_query_radius(const kdtree_t * T,
  * the KDE based on the found points.
  *
  * Cutoff: will use points up to sigma*cutoff away from the query
- * point Q. A default value will be used if cutoff <= 0.
+ * point Q. A default value will be used if cutoff == -1.
  */
-double
+PUB double
 kdtree_kde(const kdtree_t * T,
            const double * Q,
            double sigma,
            double cutoff);
 
+/* Calculate the weighted mean position of a Gaussian KDE at the point
+ * Q as the following sum over all the neighbors
+ *
+ * m(x) = \frac{ \sum K(x_i-x) x_i }{\sum K(x_i -x)}
+ *
+ * returns: m -- the weighted mean position. Will be Q if no neighbours found.
+ *
+ * This is an ingredient of the mean shift algorithm. Please not that
+ * using a Gaussian kernel a quite large radius contributes to the
+ * kde, set cutoff to you liking. A cutoff of 0 means that it will be
+ * set automagically.
+ */
+
+PUB void
+kdtree_kde_mean(const kdtree_t *,
+                const double * Q,
+                double sigma,
+                double cutoff,
+                double * mean);
+
+/* Wanted: Expectation Maximization (EM) with Gaussian Mixture Model (GMM)
+void kdtree_emgmm(const kdtree_t * T,
+const gaussian ** G0,
+gaussian ** Gfinal);
+ */
+
+
 
 /* Find the index of the closest point */
-size_t kdtree_query_closest(kdtree_t * T, double * X);
+PUB size_t kdtree_query_closest(kdtree_t * T, double * X);
 
-void node_print_bbx(const kdtree_node_t * N);
+PUB void node_print_bbx(const kdtree_node_t * N);
 
 /* Make a shallow copy of a kd-tree for usage by another thread */
-kdtree_t * kdtree_copy_shallow(kdtree_t * );
+PUB kdtree_t * kdtree_copy_shallow(kdtree_t * );
 
 /* Free a tree returned from kdtree_copy_shallow */
-void kdtree_free_shallow(kdtree_t * T);
+PUB void kdtree_free_shallow(kdtree_t * T);
 
 
 /* Run some self-tests */
-void kdtree_validate(kdtree_t * T);
+PUB void kdtree_validate(kdtree_t * T);
 
-void kdtree_print_info(kdtree_t * T);
+PUB void kdtree_print_info(kdtree_t * T);

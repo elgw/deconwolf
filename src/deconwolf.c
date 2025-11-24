@@ -19,6 +19,38 @@
 /* Extra modules can be enabled by un-commenting in
  * the header file. */
 #include "dw.h"
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <assert.h>
+
+
+#include "dw_util.h"
+#include "dw_maxproj.h"
+#include "dw_tiff_merge.h"
+#include "dw_imshift.h"
+#include "dw_version.h"
+#ifndef WINDOWS
+#include "dw_nuclei.h"
+#endif
+#include "dw_background.h"
+
+/* Uncomment to include, requires linking with libpng and libz
+ * can be build separately by the makefile in the src folder
+ */
+// #include "dw_otsu.h"
+#ifndef WINDOWS
+#include "dw_dots.h"
+#include "dw_psf.h"
+#include "dw_psf_sted.h"
+#include "dw_align_dots.h"
+#endif
+
+#include "fim.h"
+#include "fim_tiff.h"
+#include "fft.h"
+#include "tiling.h"
+#include "sparse_preprocess_cli.h"
 
 
 static int
@@ -37,7 +69,6 @@ npy2tif(int argc, char ** argv)
         return EXIT_FAILURE;
     }
 
-    fim_tiff_init();
     npio_t * npy = npio_load(argv[1]);
     if(npy == NULL)
     {
@@ -121,8 +152,12 @@ npy2tif(int argc, char ** argv)
     return EXIT_FAILURE;
 
 success:
-    fim_tiff_write_float(argv[2], V, NULL,
+    ftif_t * ftif = fim_tiff_new(stdout, 1);
+    fim_tiff_write_float(ftif,
+                         argv[2], V, NULL,
                          M, N, P);
+    fim_tiff_destroy(ftif);
+    ftif = NULL;
 
     fim_free(V);
     npio_free(npy);
@@ -145,10 +180,12 @@ tif2npy(int argc, char ** argv)
         printf("%s input.tif output.npy\n", argv[0]);
         return EXIT_FAILURE;
     }
-    fim_tiff_init();
+    ftif_t * ftif = fim_tiff_new(stdout, 1);
     int64_t M, N, P;
-    float * I = fim_tiff_read(argv[1], NULL,
-                              &M, &N, &P, 1);
+    float * I = fim_tiff_read(ftif, argv[1], NULL,
+                              &M, &N, &P);
+    fim_tiff_destroy(ftif);
+    ftif = NULL;
     if(I == NULL)
     {
         printf("Failed to open %s as a tif file\n", argv[1]);
@@ -265,5 +302,24 @@ int main(int argc, char ** argv)
 
     dw_opts * s = dw_opts_new(); /* Load default settings and initialize */
     dw_argparsing(argc, argv, s); /* Parse command line */
-    return dw_run(s); /* And do the job */
+
+    dw_init_status dw_stat = dw_opts_validate_and_init(s);
+    switch(dw_stat)
+    {
+    case dw_ok:
+        break;
+    case dw_warning:
+        dw_opts_free(&s);
+        return EXIT_SUCCESS;
+        break;
+    case dw_error:
+        dw_opts_free(&s);
+        return EXIT_FAILURE;
+        break;
+    }
+
+
+    int ret = dw_run(s); /* And do the job */
+    dw_opts_free(&s);
+    return ret;
 }

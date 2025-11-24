@@ -23,6 +23,7 @@ typedef struct {
     int verbose;
     int periodic;
     int directions;
+    ftif_t * ftif;
 } sparse_settings_t;
 
 static void sparse_settings_write(sparse_settings_t * s, FILE * fid)
@@ -54,6 +55,8 @@ static sparse_settings_t * sparse_settings_new()
 static void
 sparse_settings_free(sparse_settings_t * conf)
 {
+    fim_tiff_destroy(conf->ftif);
+    conf->ftif = NULL;
     free(conf->prefix);
     free(conf);
 }
@@ -191,7 +194,7 @@ int sparse_preprocess_cli(int argc, char ** argv)
         goto fail;
     }
 
-    fim_tiff_init();
+    conf->ftif = fim_tiff_new(stdout, conf->verbose);
 
     char * inFile;
 
@@ -226,10 +229,10 @@ int sparse_preprocess_cli(int argc, char ** argv)
         }
         ttags * T = ttags_new();
         int64_t M, N, P;
-        float * I = fim_tiff_read(inFile,
+        float * I = fim_tiff_read(conf->ftif, inFile,
                                   T,
-                                  &M, &N, &P,
-                                  conf->verbose);
+                                  &M, &N, &P);
+
         if(I == NULL)
         {
             fprintf(stderr, "Can't read %s. Does not look like a tif file\n", inFile);
@@ -281,7 +284,7 @@ int sparse_preprocess_cli(int argc, char ** argv)
                                       conf->iter, conf->verbose, log);
 
         free(I);
-        fim_tiff_write_float(outfile, J,
+        fim_tiff_write_float(conf->ftif, outfile, J,
                        T, M, N, P);
         ttags_free(&T);
         free(J);

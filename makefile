@@ -387,7 +387,8 @@ dw_OBJECTS += fim.o \
 tiling.o \
 fft.o \
 fim_tiff.o \
-dw.o deconwolf.o \
+dw.o \
+deconwolf.o \
 dw_maxproj.o \
 dw_util.o \
 method_identity.o \
@@ -408,11 +409,11 @@ dw_nuclei.o \
 dw_png.o \
 quickselect.o \
 dw_background.o \
-npio.o
+npio.o \
+qalign.o
 
 dwbw_OBJECTS = fim.o \
 fim_tiff.o \
-dw_bwpsf.o \
 bw_gsl.o \
 lanczos.o \
 li.o fft.o \
@@ -429,7 +430,7 @@ $(dw): $(dw_OBJECTS) $(dw_DEPENDS)
 	$(CC) $(CFLAGS) -o $@ $^ $(dw_LIBRARIES)
 
 $(dwbw): $(dwbw_OBJECTS)
-	$(CC) $(CFLAGS) -o $@ $^ $(dwbw_LIBRARIES)
+	$(CC) $(CFLAGS) -DSTANDALONE src/dw_bwpsf.c -o $@ $^ $(dwbw_LIBRARIES)
 
 %.o: $(SRCDIR)%.c
 	$(CC) $(CFLAGS) -c $<

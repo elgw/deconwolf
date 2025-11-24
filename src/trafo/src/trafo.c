@@ -65,7 +65,7 @@ typedef struct {
 
 /* For storing the settings, more or less a superset of the CLI
  * configuration  */
-struct _trf {
+struct  _trf {
     /*
      * Input data
      */
@@ -199,11 +199,12 @@ ttable_grow(ttable * T)
 {
     size_t new_size = T->nalloc*1.2;
     tnode * old_location = T->nodes;
-    #if defined(WINDOWS) || (defined(__GLIBC__) && (__GLIBC__ < 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ < 26)))
+
     T->nodes = realloc(T->nodes, new_size*sizeof(tnode));
-    #else
-    T->nodes = reallocarray(T->nodes, new_size, sizeof(tnode));
-    #endif
+
+    // Note: reallocarray is for a few lucky systems only
+    // T->nodes = reallocarray(T->nodes, new_size, sizeof(tnode));
+
     assert(T->nodes != NULL);
     /* "If the new size is larger than the old size, the
        added memory will not be initialized".
@@ -709,6 +710,7 @@ trafo_fit(trafo_settings * conf)
     if(trafo_check(s))
     {
         printf("Invalid settings, unable to continue\n");
+        trafo_free(s);
         return NULL;
     }
 

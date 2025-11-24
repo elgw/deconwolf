@@ -1,7 +1,79 @@
 #include "method_shb.h"
 
+
+#include "fim.h"
+#include "fft.h"
+
 //#define here() printf("\n%s %s %d\n", __FILE__, __FUNCTION__, __LINE__);
 #define here() ;
+
+static float iter_shb(dw_fft * ff,
+    float ** xp, // Output, f_(t+1)
+    const float * restrict im, // Input image
+    fftwf_complex * restrict cK, // fft(psf)
+    float * restrict pk, // p_k, estimation of the gradient
+    float * restrict W, // Bertero Weights
+    const int64_t wM, const int64_t wN, const int64_t wP, // expanded size
+    const int64_t M, const int64_t N, const int64_t P, // input image size
+    __attribute__((unused)) const dw_opts * s)
+{
+    const size_t wMNP = wM*wN*wP;
+
+    fftwf_complex * Pk = fft(ff, pk, wM, wN, wP);
+
+    putdot(s);
+    float * y = fft_convolve_cc_f2(ff, cK, Pk, wM, wN, wP); // Pk is freed
+
+    float error = getError(y, im, M, N, P, wM, wN, wP, s->metric);
+    putdot(s);
+
+
+    const double mindiv = 1e-6; /* Smallest allowed divisor */
+#pragma omp parallel for shared(y, im) collapse(2)
+    for(size_t cc =0; cc < (size_t) wP; cc++){
+        for(size_t bb = 0; bb < (size_t) wN; bb++){
+            for(size_t aa = 0; aa < (size_t) wM; aa++){
+                size_t yidx = aa + bb*wM + cc*wM*wN;
+                size_t imidx = aa + bb*M + cc*M*N;
+                if(aa < (size_t) M && bb < (size_t) N && cc < (size_t) P)
+                {
+                    /* abs and sign */
+                    fabs(y[yidx]) < mindiv ? y[yidx] = copysign(mindiv, y[yidx]) : 0;
+                    y[yidx] = im[imidx]/y[yidx];
+                } else {
+                    y[yidx]=0;
+                }
+            }
+        }
+    }
+
+    here();
+    fftwf_complex * Y = fft_and_free(ff, y, wM, wN, wP);
+    here();
+    float * x = fft_convolve_cc_conj_f2(ff, cK, Y, wM, wN, wP); // Y is freed
+    here();
+    /* Eq. 18 in Bertero */
+    if(W != NULL)
+    {
+#pragma omp parallel for shared(x, pk, W)
+        for(size_t cc = 0; cc<wMNP; cc++)
+        {
+            x[cc] *= pk[cc]*W[cc];
+        }
+    } else {
+#pragma omp parallel for shared(x, pk)
+        for(size_t cc = 0; cc<wMNP; cc++)
+        {
+            x[cc] *= pk[cc];
+        }
+    }
+    fim_free(pk);
+    here();
+    xp[0] = x;
+    return error;
+}
+
+
 float * deconvolve_shb(float * restrict im,
                        const int64_t M, const int64_t N, const int64_t P,
                        float * restrict psf,
@@ -18,6 +90,7 @@ float * deconvolve_shb(float * restrict im,
         printf("psf will be freed\n");
     }
 
+    ftif_t * ftif = fim_tiff_new(s->log, s->verbosity);
 
     if(s->verbosity > 1)
     {
@@ -101,9 +174,7 @@ float * deconvolve_shb(float * restrict im,
 
     //myfftw_stop(); nope that was not the problem
     //myfftw_start(s->nThreads_FFT, s->verbosity, s->log);
-    fft_train(wM, wN, wP,
-              s->verbosity, s->nThreads_FFT,
-              s->log);
+    dw_fft * ff = dw_fft_new(s->nThreads_FFT, s->verbosity, s->log, wM, wN, wP, s->fftw3_planning);
 
     if(s->verbosity > 0)
     {
@@ -134,11 +205,11 @@ float * deconvolve_shb(float * restrict im,
     if(s->fulldump)
     {
         printf("Dumping to fullPSF.tif\n");
-        fim_tiff_write_float("fullPSF.tif", Z, NULL, wM, wN, wP);
+        fim_tiff_write_float(ftif, "fullPSF.tif", Z, NULL, wM, wN, wP);
     }
 
     here();
-    fftwf_complex * cK = fft_and_free(Z, wM, wN, wP);
+    fftwf_complex * cK = fft_and_free(ff, Z, wM, wN, wP);
     here();
     putdot(s);
 
@@ -146,9 +217,9 @@ float * deconvolve_shb(float * restrict im,
     /* Sigma in Bertero's paper, introduced for Eq. 17 */
     if(s->borderQuality > 0)
     {
-        fftwf_complex * F_one = initial_guess(M, N, P, wM, wN, wP);
+        fftwf_complex * F_one = initial_guess(ff, M, N, P, wM, wN, wP);
         here();
-        float * P1 = fft_convolve_cc_conj_f2(cK, F_one, wM, wN, wP);
+        float * P1 = fft_convolve_cc_conj_f2(ff, cK, F_one, wM, wN, wP);
         here();
         float sigma = 0.01; // Until 2021.11.25 used 0.001
 #pragma omp parallel for shared(P1)
@@ -238,9 +309,9 @@ float * deconvolve_shb(float * restrict im,
                 //printf(" Writing current guess to %s\n", outname);
                 if(s->outFormat == 32)
                 {
-                    fim_tiff_write_float(outname, temp, NULL, M, N, P);
+                    fim_tiff_write_float(ftif, outname, temp, NULL, M, N, P);
                 } else {
-                    fim_tiff_write(outname, temp, NULL, M, N, P);
+                    fim_tiff_write(ftif, outname, temp, NULL, M, N, P);
                 }
                 free(outname);
                 fim_free(temp);
@@ -267,7 +338,7 @@ float * deconvolve_shb(float * restrict im,
 
         putdot(s);
 
-        double err = iter_shb(
+        double err = iter_shb(ff,
             &xp, // xp is updated to the next guess
             im,
             cK, // FFT of PSF
@@ -333,7 +404,7 @@ float * deconvolve_shb(float * restrict im,
     if(s->fulldump)
     {
         printf("Dumping to fulldump.tif\n");
-        fim_tiff_write("fulldump.tif", x, NULL, wM, wN, wP);
+        fim_tiff_write(ftif, "fulldump.tif", x, NULL, wM, wN, wP);
     }
 
     float * out = fim_subregion(x, wM, wN, wP, M, N, P);
@@ -343,74 +414,8 @@ float * deconvolve_shb(float * restrict im,
         fim_free(x);
     }
 
-
-
+    dw_fft_destroy(ff);
+    ff = NULL;
+    fim_tiff_destroy(ftif);
     return out;
-}
-
-
-float iter_shb(
-    float ** xp, // Output, f_(t+1)
-    const float * restrict im, // Input image
-    fftwf_complex * restrict cK, // fft(psf)
-    float * restrict pk, // p_k, estimation of the gradient
-    float * restrict W, // Bertero Weights
-    const int64_t wM, const int64_t wN, const int64_t wP, // expanded size
-    const int64_t M, const int64_t N, const int64_t P, // input image size
-    __attribute__((unused)) const dw_opts * s)
-{
-    const size_t wMNP = wM*wN*wP;
-
-    fftwf_complex * Pk = fft(pk, wM, wN, wP);
-
-    putdot(s);
-    float * y = fft_convolve_cc_f2(cK, Pk, wM, wN, wP); // Pk is freed
-
-    float error = getError(y, im, M, N, P, wM, wN, wP, s->metric);
-    putdot(s);
-
-
-    const double mindiv = 1e-6; /* Smallest allowed divisor */
-#pragma omp parallel for shared(y, im)
-    for(size_t cc =0; cc < (size_t) wP; cc++){
-        for(size_t bb = 0; bb < (size_t) wN; bb++){
-            for(size_t aa = 0; aa < (size_t) wM; aa++){
-                size_t yidx = aa + bb*wM + cc*wM*wN;
-                size_t imidx = aa + bb*M + cc*M*N;
-                if(aa < (size_t) M && bb < (size_t) N && cc < (size_t) P)
-                {
-                    /* abs and sign */
-                    fabs(y[yidx]) < mindiv ? y[yidx] = copysign(mindiv, y[yidx]) : 0;
-                    y[yidx] = im[imidx]/y[yidx];
-                } else {
-                    y[yidx]=0;
-                }
-            }
-        }
-    }
-
-    here();
-    fftwf_complex * Y = fft_and_free(y, wM, wN, wP);
-    here();
-    float * x = fft_convolve_cc_conj_f2(cK, Y, wM, wN, wP); // Y is freed
-    here();
-    /* Eq. 18 in Bertero */
-    if(W != NULL)
-    {
-#pragma omp parallel for shared(x, pk, W)
-        for(size_t cc = 0; cc<wMNP; cc++)
-        {
-            x[cc] *= pk[cc]*W[cc];
-        }
-    } else {
-#pragma omp parallel for shared(x, pk)
-        for(size_t cc = 0; cc<wMNP; cc++)
-        {
-            x[cc] *= pk[cc];
-        }
-    }
-    fim_free(pk);
-    here();
-    xp[0] = x;
-    return error;
 }

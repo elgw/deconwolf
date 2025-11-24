@@ -46,7 +46,7 @@ Load a classifier and apply it to some data
 #include <trafo.h>
 
 trf * T = trafo_load("classifier.trafo");
-uint32_t * class = trafo_predict(T, features, NULL, n_features);
+uint32_t * class = trafo_predict(T, samples, NULL, n_samples);
 trafo_free(T);
 ```
 

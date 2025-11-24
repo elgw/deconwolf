@@ -61,6 +61,7 @@ typedef struct{
     int xgrid;
     /* Process at x times higher resolution and then average */
     int oversampling;
+    ftif_t * ftif;
 } opts;
 
 static opts * opts_new();
@@ -97,6 +98,7 @@ static opts * opts_new()
 
 static void opts_free(opts * s)
 {
+    fim_tiff_destroy(s->ftif);
     free(s->outfile);
     free(s->logfile);
     if(s->log != NULL)
@@ -140,36 +142,36 @@ static void usage(__attribute__((unused)) int argc, char ** argv)
     opts * s = opts_new();
     printf("usage: %s [<options>] output.tif\n", argv[0]);
     printf("Options:\n");
-    printf(" --NA NA\n\t"
+    printf("  --NA NA\n\t"
            "Set numerical aperture\n");
-    printf(" --ni ni\n\t"
+    printf("  --ni ni\n\t"
            "Set refractive index\n");
-    printf(" --dx dx\n\t"
+    printf("  --dx dx\n\t"
            "Lateral pixel size\n");
-    printf(" --dz dz\n\t"
+    printf("  --dz dz\n\t"
            "Axial pixel size\n");
-    printf(" --lambda l\n\t"
+    printf("  --lambda l\n\t"
            "Emission wave length\n");
-    printf(" --lambda2 l\n\t"
+    printf("  --lambda2 l\n\t"
            "Excitation wave length\n");
-    printf(" --pinhole p\n\t"
+    printf("  --pinhole p\n\t"
            "Pinhole size in AU\n");
-    printf(" --pinhole_disk \n\t"
+    printf("  --pinhole_disk \n\t"
            "Set the pinhole shape to a disk, default is square\n");
-    printf(" --size s\n\t"
+    printf("  --size s\n\t"
            "Set the lateral size (pixels). Default: %d\n", s->M);
-    printf(" --nslice p\n\t"
+    printf("  --nslice p\n\t"
            "Set the number of planes (pixels). Default: %d\n", s->P);
-    printf(" --xgrid x\n\t"
+    printf("  --xgrid x\n\t"
            "Set the factor for lateral image padding. Default: %d\n", s->xgrid);
-    printf(" --oversample x\n\t"
+    printf("  --oversample x\n\t"
            "Process the PSF at x times higher resolution. Default: %d\n", s->oversampling);
     printf("General:\n");
-    printf(" --overwrite\n\t"
+    printf("  --overwrite\n\t"
            "Overwrite existing files\n");
-    printf(" --help\n\t"
+    printf("  --help\n\t"
            "Show this message\n");
-    printf(" --verbose v\n\t"
+    printf("  --verbose v\n\t"
            "Verbosity level\n");
     printf("\n");
     opts_free(s);
@@ -586,7 +588,6 @@ fimo * gen_psf(opts * s, double lambda)
 
     double optical_dx = s->optical.dx/s->oversampling;
 
-    fim_tiff_init();
     fimo * PSF = fimo_zeros(s->M*s->oversampling, s->M*s->oversampling, s->P);
 
     double Fs = 1/optical_dx;
@@ -843,12 +844,12 @@ static void pinhole_convolution(opts * s, fimo * PSF)
     if(s->verbose > 2)
     {
         printf("verbose > 2: writing pinhole to pinhole.tif\n");
-        fim_tiff_write_float("pinhole.tif", P, NULL, PSF->M, PSF->N, 1);
+        fim_tiff_write_float(s->ftif, "pinhole.tif", P, NULL, PSF->M, PSF->N, 1);
     }
 
 
     fftshift2_float(P, PSF->M);;
-    //fim_tiff_write_float("pinhole_shifted.tif", P, NULL, PSF->M, PSF->N, 1);
+
 
     /* We assume that the image close to the edges will not be used */
     for(size_t pp = 0; pp<PSF->P; pp++)
@@ -913,13 +914,13 @@ static void dw_psf(opts * s)
     char * swstring = malloc(1024);
     assert(swstring != NULL);
     sprintf(swstring, "deconwolf %s", deconwolf_version);
-    ttags_set_software(T, swstring);
-    ttags_set_imagesize(T, PSF->M, PSF->N, PSF->P);
-    ttags_set_pixelsize(T, s->optical.dx, s->optical.dx, s->optical.dz);
+    ttags_set_software(s->ftif, T, swstring);
+    ttags_set_imagesize(s->ftif, T, PSF->M, PSF->N, PSF->P);
+    ttags_set_pixelsize(s->ftif, T, s->optical.dx, s->optical.dx, s->optical.dz);
     free(swstring);
 
 
-    fim_tiff_write_float(s->outfile, PSF->V,
+    fim_tiff_write_float(s->ftif, s->outfile, PSF->V,
                          T,
                          PSF->M, PSF->N, PSF->P);
     ttags_free(&T);
@@ -932,10 +933,7 @@ int dw_psf_cli(int argc, char ** argv)
     opts * s = opts_new();
     /* Parse command line and open log file etc */
     argparsing(argc, argv, s);
-    if(s->verbose > 2)
-    {
-        printf("Command lined parsed, continuing\n"); fflush(stdout);
-    }
+    s->ftif = fim_tiff_new(stdout, s->verbose);
     /* Ready to go */
     dw_psf(s);
 

@@ -1,4 +1,5 @@
 #include "cl_util.h"
+
 #include "clext.h"
 
 #include "kernels/cl_complex_mul.h"
@@ -13,6 +14,8 @@
 #include "kernels/cl_preprocess_image.h"
 #include "kernels/cl_idiv_kernel.h"
 #include "kernels/cl_update_y_kernel.h"
+
+#include "dw_util.h"
 
 #define check_CL(x) if(x != CL_SUCCESS)                         \
     {                                                           \

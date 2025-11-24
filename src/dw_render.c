@@ -1,5 +1,21 @@
 #include "dw_render.h"
 
+#include <getopt.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <cairo.h>
+#include <cairo-svg.h>
+#include <omp.h>
+
+#include "fim.h"
+#include "ftab.h"
+#include "fim_tiff.h"
+#include "dw_version.h"
+#include "dw_util.h"
+
+
 enum DOT_MODE { DOT_MODE_AUTO, DOT_MODE_TH, DOT_MODE_NDOTS};
 
 typedef struct{
@@ -18,6 +34,7 @@ typedef struct{
     float phigh; /* Higher percentile for image mapping */
     float th; /* Dot threshold, only used when --th is specified */
     int drawtext;
+    ftif_t * ftif;
 } opts;
 
 static opts * opts_new();
@@ -54,6 +71,8 @@ static opts * opts_new()
 
 static void opts_free(opts * s)
 {
+    fim_tiff_destroy(s->ftif);
+    s->ftif = NULL;
     free(s->outfile);
     free(s->image);
     free(s->dotfile);
@@ -422,10 +441,11 @@ void render(opts * s, const fimo * I, ftab_t * T)
 int dw_render(int argc, char ** argv)
 {
 
-    fim_tiff_init();
     opts * s = opts_new();
 
     argparsing(argc, argv, s);
+
+    s->ftif = fim_tiff_new(stdout, s->verbose);
 
     #ifdef _OPENMP
     omp_set_num_threads(s->nthreads);
@@ -464,7 +484,7 @@ int dw_render(int argc, char ** argv)
     printf("Will write to %s\n", outFile);
 
     int64_t M = 0, N = 0, P = 0;
-    float * A = fim_tiff_read(inFile, NULL, &M, &N, &P, s->verbose);
+    float * A = fim_tiff_read(s->ftif, inFile, NULL, &M, &N, &P);
     fimo * I = fim_image_from_array(A, M, N, P);
     free(A);
 

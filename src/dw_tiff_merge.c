@@ -15,6 +15,7 @@ typedef struct {
     int verbose;
     int optind; /* Where the first non-consumed argument is stored */
     int test;
+    ftif_t * ftif;
 } tm_config_t;
 
 tm_config_t * tm_config_new()
@@ -29,6 +30,8 @@ tm_config_t * tm_config_new()
 
 void tm_config_free(tm_config_t * conf)
 {
+    fim_tiff_destroy(conf->ftif);
+    conf->ftif = NULL;
     free(conf);
 }
 
@@ -38,11 +41,11 @@ void usage()
     printf("Usage for subcommand 'merge'\n");
     printf("dw merge [merge] output.tif input1.tif input2.tif ...\n");
     printf("Options:\n");
-    printf("--help\n\t"
+    printf("  --help\n\t"
            "Show this help message and quit\n");
-    printf("--verbose v\n\t"
+    printf("  --verbose v\n\t"
            "Set verbosity level to v\n");
-    printf("--overwrite\n\t"
+    printf("  --overwrite\n\t"
            "Overwrite output image if it already exists\n");
     return;
 }
@@ -91,7 +94,7 @@ int dw_tiff_merge(int argc, char ** argv)
     tm_config_t * conf = tm_config_new();
 
     argparsing(argc, argv, conf);
-
+    conf->ftif = fim_tiff_new(stdout, conf->verbose);
     if(argc < 3)
     {
         usage();
@@ -111,8 +114,6 @@ int dw_tiff_merge(int argc, char ** argv)
         }
     }
 
-    fim_tiff_init();
-
     int64_t M = 0;
     int64_t N = 0;
     int64_t P = 0;
@@ -124,10 +125,9 @@ int dw_tiff_merge(int argc, char ** argv)
 
     for(int kk = conf->optind+1 ; kk<argc; kk++)
     {
-
         if(kk > 1)
         {
-            fim_tiff_get_size(argv[kk], &M, &N, &P);
+            fim_tiff_get_size(conf->ftif, argv[kk], &M, &N, &P);
             //printf(" %" PRId64 " x %" PRId64 " x %" PRId64 "", M, N, P);
             if(kk == optind+1)
             {
@@ -164,7 +164,7 @@ int dw_tiff_merge(int argc, char ** argv)
         printf("Reading %s\n", argv[kk]); fflush(stdout);
         if(!conf->test)
         {
-            float * im = fim_tiff_read(argv[kk], NULL, &M, &N, &P, conf->verbose);
+            float * im = fim_tiff_read(conf->ftif, argv[kk], NULL, &M, &N, &P);
             assert(im != NULL);
             memcpy(im_out + plane*M_out*N_out,
                    im, M*N*P*sizeof(float));
@@ -175,7 +175,8 @@ int dw_tiff_merge(int argc, char ** argv)
     printf("Writing to %s\n", outfile);
     if(! conf->test)
     {
-        fim_tiff_write_float(outfile, im_out,
+        fim_tiff_write_float(conf->ftif,
+                             outfile, im_out,
                              NULL, // tiff tags, TODO
                              M_out, N_out, P_out);
     }

@@ -17,9 +17,7 @@
  */
 
 #include <assert.h>
-#ifndef WINDOWS
-#include <dirent.h>
-#endif
+
 #include <errno.h>
 #include <fcntl.h>
 #define _USE_MATH_DEFINES
@@ -32,12 +30,17 @@
 #include <sys/types.h>
 #include <time.h>
 #ifdef WINDOWS
+
 #include <io.h>
 #include <tchar.h>
 #include <direct.h>
+
 #else
+
 #include <libgen.h>
 #include <unistd.h>
+#include <dirent.h>
+
 #endif
 
 #include <string.h>
@@ -56,6 +59,18 @@
 #ifdef WINDOWS
 #define strncasecmp _strnicmp
 #endif
+
+typedef int64_t i64;
+typedef uint64_t u64;
+
+#define ANSI_COLOR_RED     "\x1b[31m"
+#define ANSI_COLOR_GREEN   "\x1b[32m"
+#define ANSI_COLOR_YELLOW  "\x1b[33m"
+#define ANSI_COLOR_BLUE    "\x1b[34m"
+#define ANSI_COLOR_MAGENTA "\x1b[35m"
+#define ANSI_COLOR_CYAN    "\x1b[36m"
+#define ANSI_COLOR_RESET   "\x1b[0m"
+#define ANSI_UNDERSCORE    "\x1b[4m"
 
 /* Get the current time  */
 void dw_gettime(struct timespec *);
@@ -155,3 +170,9 @@ int dw_fseek(FILE *, int64_t offset, int whence);
 
 /* Check if a file name ends with .npy while ignoring case */
 int npyfilename(const char * filename);
+
+/* Create a empty file in a given folder and return the name */
+char * dw_tempfile(const char * folder);
+
+/* Return "yes" or "no" if value is 1 or something else */
+const char * dw_yes_no(int value);

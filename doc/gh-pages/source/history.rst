@@ -1,6 +1,33 @@
 Version History
 ===============
 
+Planned/todo
+------------
+
+? Updated man pages built with sphinx?
+? GPU accelerated dot detection/fitting?
+? Disabling color output etc when `isatty` returns 0.
+? Use transpositions instead of strided convolutions for `fim_gmsooth` etc.
+
+0.4.6
+-----
+- ``dw align-dots``: accepts separate magnification/scaling values for
+  the dots tables. The scaling is only applied in the lateral plane
+  (previous versions applied it also to the z-coordinate)
+
+- Enhancement: the command line argument ``--tempdir`` can be used to
+  specify where the temporary files (used by tiling) are stored. If
+  that is not specified dw will look for the environmental variable
+  ``DW_TEMPDIR``. If that is not specified dw will use the folder of
+  the output file.
+- Fixed errors in the ``--help`` for ``dw dots``.
+- Fixed: ``f_corr`` values from ``dw dots`` are no longer `NaN` for
+  points close the image boundaries.
+- Change: ``dw imshift`` does not scale the output images any more. If
+  the input is f32 the output will be f32, else u16.
+- Change: ``dw maxproj`` will skip over 2D images.
+- Fixed: ``dw --start_lp ...`` does no longer fail for images with few z-planes.
+
 0.4.5
 -----
 
