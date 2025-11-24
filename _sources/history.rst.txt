@@ -1,6 +1,32 @@
 Version History
 ===============
 
+0.4.6
+-----
+- ``dw align-dots`` accepts separate magnification/scaling values for
+  the dots tables. The scaling is only applied in the lateral plane
+  (previous versions applied it also to the z-coordinate).
+- Enhancement: the command line argument ``--tempdir`` can be used to
+  specify where the temporary files (used by tiling) are stored. If
+  that is not specified dw will look for the environmental variable
+  ``DW_TEMPDIR``. If that is not specified dw will use the folder of
+  the output file.
+- Fixed errors in the ``--help`` for ``dw dots``.
+- Fixed: ``f_corr`` values from ``dw dots`` are no longer `NaN` for
+  points close the image boundaries.
+- Change: ``dw imshift`` does not scale the intensity of the output
+  images any more. If the input is f32 the output will be f32, else
+  u16.
+- Change: ``dw maxproj`` will skip over 2D images.
+- Fixed: ``dw --start_lp ...`` does no longer fail for images with few z-planes.
+- Some initial changes in the code base to facilitate building a python
+  module.
+- ``util/test_dw.py`` will be checked before the next update. Any
+  expected behavior should be documented there.
+- Confirmed to build on macOS 15.7.2 (mac mini M4) with working GPU
+  acceleration, although the install process might requires some
+  manual intervention.
+
 0.4.5
 -----
 
@@ -100,8 +126,14 @@ Windows specific updates:
 
 .. _section-4:
 
-0.4.0
+
+Older
 -----
+
+.. _section-5:
+
+0.4.0
+^^^^^
 
 **TLDR** New features and bug fixes. Update if you are on version 0.3.7
 or below.
@@ -117,10 +149,6 @@ using a 3D Gaussian while minimizing the :math:`-\log` likelihood
 assuming Poissonian noise. For this purpose the
 Broyden-Fletcher-Goldfarb-Shanno algoritm (bfgs2 in GSL) is used.
 
-Older
------
-
-.. _section-5:
 
 0.3.9
 ^^^^^
@@ -501,3 +529,11 @@ Results when testing on the microtubules image shown below.
    accuracy of the pixels in the PSF.
 -  Stared to use GSL for numerical integration. It remains to change the
    double integral over x-y into something more dynamic.
+
+Planned/todo
+------------
+
+- Updated man pages built with sphinx?
+- GPU accelerated dot detection/fitting?
+- Disabling color output etc when `isatty` returns 0.
+- Use transpositions instead of strided convolutions for `fim_gmsooth` etc.

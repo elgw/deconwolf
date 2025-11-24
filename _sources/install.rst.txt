@@ -33,6 +33,8 @@ To build:
    cd builddir
    cmake ..
    cmake --build .
+   # change the prefix depending on where you want to install the program
+   cmake --install . --prefix /usr
 
 Without GPU acceleration:
 -------------------------
@@ -96,22 +98,54 @@ GPU Acceleration via OpenCL
 Platform specific hints
 -----------------------
 
-macOS Big Sur
-^^^^^^^^^^^^^
+macOS 15.7.2 (mac mini M4)
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-For building you will need XCode from the App Store and
-`brew <https://brew.sh/>`__.
+deconwolf works with GPU acceleration out of the box. The
+following was required for a build on a fresh system:
 
-Then set up XCode and install the required packages:
+Install `homebrew <https://brew.sh/>`__. Then, in the terminal install
+the additional dependencies:
 
 .. code:: shell
 
-   xcode-select --install
-   brew install libopenmpt # Not sure if this is needed
-   brew install libomp
-   brew install libtiff
-   brew install fftw
-   brew install gsl
+   brew install cmake fftw libpng gsl libtiff libomp
+
+When you install ``libomp`` please note that it is recommended that you set
+the following to ``~/.zshrc``
+
+.. code:: shell
+
+   export OpenMP_ROOT=$(brew --prefix)/opt/libomp
+   export LDFLAGS="$LDFLAGS -L${OpenMP_ROOT}/lib"
+
+With that set, follow the general build instructions.
+
+Nerd info:
+
+.. code:: shell
+
+    % otool -L ./dw
+    ./dw:
+        @rpath/libkdtree.dylib (compatibility version 0.0.0, current version 0.0.0)
+        @rpath/libtrafo.dylib (compatibility version 0.0.0, current version 0.0.0)
+        /usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1351.0.0)
+        /opt/homebrew/opt/libtiff/lib/libtiff.6.dylib (compatibility version 9.0.0, current version 9.0.0)
+        /opt/homebrew/opt/gsl/lib/libgsl.28.dylib (compatibility version 29.0.0, current version 29.0.0)
+        /System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/vecLib.framework/Versions/A/libBLAS.dylib (compatibility version 1.0.0, current version 1.0.0)
+        /opt/homebrew/opt/libpng/lib/libpng16.16.dylib (compatibility version 67.0.0, current version 67.0.0)
+        /opt/homebrew/opt/fftw/lib/libfftw3.3.dylib (compatibility version 10.0.0, current version 10.10.0)
+        /opt/homebrew/opt/fftw/lib/libfftw3f.3.dylib (compatibility version 10.0.0, current version 10.10.0)
+        /opt/homebrew/opt/fftw/lib/libfftw3f_omp.3.dylib (compatibility version 10.0.0, current version 10.10.0)
+        /System/Library/Frameworks/OpenCL.framework/Versions/A/OpenCL (compatibility version 1.0.0, current version 1.0.0)
+        /opt/homebrew/opt/libomp/lib/libomp.dylib (compatibility version 5.0.0, current version 5.0.0)
+        /usr/lib/libz.1.dylib (compatibility version 1.0.0, current version 1.2.12)
+
+TODO
+
+The ``CMakeLists.txt`` needs some attention. As it stands and
+installation with ``make install`` leads to ``dyld[11935]: Library not
+loaded: @rpath/libkdtree.dylib``.
 
 Windows 10/11
 ^^^^^^^^^^^^^

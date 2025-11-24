@@ -53,7 +53,7 @@
 <li class="toctree-l2"><a class="reference internal" href="#system-wide-installation">System wide installation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#gpu-acceleration-via-opencl">GPU Acceleration via OpenCL</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#platform-specific-hints">Platform specific hints</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#macos-big-sur">macOS Big Sur</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#macos-15-7-2-mac-mini-m4">macOS 15.7.2 (mac mini M4)</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#windows-10-11">Windows 10/11</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#freebsd-14-4">FreeBSD 14.4</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#centos">CentOS</a></li>
@@ -76,6 +76,7 @@
 <li class="toctree-l1"><a class="reference internal" href="shifts.html">Spot-based image alignment</a></li>
 <li class="toctree-l1"><a class="reference internal" href="segmentation.html">Ilastic-like segmentation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="history.html">Version History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="man/index.html">Man pages</a></li>
 <li class="toctree-l1"><a class="reference internal" href="license.html">GNU General Public License</a></li>
 </ul>
 
@@ -128,6 +129,8 @@
 <span class="nb">cd</span><span class="w"> </span>builddir
 cmake<span class="w"> </span>..
 cmake<span class="w"> </span>--build<span class="w"> </span>.
+<span class="c1"># change the prefix depending on where you want to install the program</span>
+cmake<span class="w"> </span>--install<span class="w"> </span>.<span class="w"> </span>--prefix<span class="w"> </span>/usr
 </pre></div>
 </div>
 </section>
@@ -184,19 +187,44 @@ can work in the future.</p></li>
 </section>
 <section id="platform-specific-hints">
 <h2>Platform specific hints<a class="headerlink" href="#platform-specific-hints" title="Link to this heading"></a></h2>
-<section id="macos-big-sur">
-<h3>macOS Big Sur<a class="headerlink" href="#macos-big-sur" title="Link to this heading"></a></h3>
-<p>For building you will need XCode from the App Store and
-<a class="reference external" href="https://brew.sh/">brew</a>.</p>
-<p>Then set up XCode and install the required packages:</p>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>xcode-select<span class="w"> </span>--install
-brew<span class="w"> </span>install<span class="w"> </span>libopenmpt<span class="w"> </span><span class="c1"># Not sure if this is needed</span>
-brew<span class="w"> </span>install<span class="w"> </span>libomp
-brew<span class="w"> </span>install<span class="w"> </span>libtiff
-brew<span class="w"> </span>install<span class="w"> </span>fftw
-brew<span class="w"> </span>install<span class="w"> </span>gsl
+<section id="macos-15-7-2-mac-mini-m4">
+<h3>macOS 15.7.2 (mac mini M4)<a class="headerlink" href="#macos-15-7-2-mac-mini-m4" title="Link to this heading"></a></h3>
+<p>deconwolf works with GPU acceleration out of the box. The
+following was required for a build on a fresh system:</p>
+<p>Install <a class="reference external" href="https://brew.sh/">homebrew</a>. Then, in the terminal install
+the additional dependencies:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>brew<span class="w"> </span>install<span class="w"> </span>cmake<span class="w"> </span>fftw<span class="w"> </span>libpng<span class="w"> </span>gsl<span class="w"> </span>libtiff<span class="w"> </span>libomp
 </pre></div>
 </div>
+<p>When you install <code class="docutils literal notranslate"><span class="pre">libomp</span></code> please note that it is recommended that you set
+the following to <code class="docutils literal notranslate"><span class="pre">~/.zshrc</span></code></p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">OpenMP_ROOT</span><span class="o">=</span><span class="k">$(</span>brew<span class="w"> </span>--prefix<span class="k">)</span>/opt/libomp
+<span class="nb">export</span><span class="w"> </span><span class="nv">LDFLAGS</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$LDFLAGS</span><span class="s2"> -L</span><span class="si">${</span><span class="nv">OpenMP_ROOT</span><span class="si">}</span><span class="s2">/lib&quot;</span>
+</pre></div>
+</div>
+<p>With that set, follow the general build instructions.</p>
+<p>Nerd info:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>%<span class="w"> </span>otool<span class="w"> </span>-L<span class="w"> </span>./dw
+./dw:
+<span class="w">    </span>@rpath/libkdtree.dylib<span class="w"> </span><span class="o">(</span>compatibility<span class="w"> </span>version<span class="w"> </span><span class="m">0</span>.0.0,<span class="w"> </span>current<span class="w"> </span>version<span class="w"> </span><span class="m">0</span>.0.0<span class="o">)</span>
+<span class="w">    </span>@rpath/libtrafo.dylib<span class="w"> </span><span class="o">(</span>compatibility<span class="w"> </span>version<span class="w"> </span><span class="m">0</span>.0.0,<span class="w"> </span>current<span class="w"> </span>version<span class="w"> </span><span class="m">0</span>.0.0<span class="o">)</span>
+<span class="w">    </span>/usr/lib/libSystem.B.dylib<span class="w"> </span><span class="o">(</span>compatibility<span class="w"> </span>version<span class="w"> </span><span class="m">1</span>.0.0,<span class="w"> </span>current<span class="w"> </span>version<span class="w"> </span><span class="m">1351</span>.0.0<span class="o">)</span>
+<span class="w">    </span>/opt/homebrew/opt/libtiff/lib/libtiff.6.dylib<span class="w"> </span><span class="o">(</span>compatibility<span class="w"> </span>version<span class="w"> </span><span class="m">9</span>.0.0,<span class="w"> </span>current<span class="w"> </span>version<span class="w"> </span><span class="m">9</span>.0.0<span class="o">)</span>
+<span class="w">    </span>/opt/homebrew/opt/gsl/lib/libgsl.28.dylib<span class="w"> </span><span class="o">(</span>compatibility<span class="w"> </span>version<span class="w"> </span><span class="m">29</span>.0.0,<span class="w"> </span>current<span class="w"> </span>version<span class="w"> </span><span class="m">29</span>.0.0<span class="o">)</span>
+<span class="w">    </span>/System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/vecLib.framework/Versions/A/libBLAS.dylib<span class="w"> </span><span class="o">(</span>compatibility<span class="w"> </span>version<span class="w"> </span><span class="m">1</span>.0.0,<span class="w"> </span>current<span class="w"> </span>version<span class="w"> </span><span class="m">1</span>.0.0<span class="o">)</span>
+<span class="w">    </span>/opt/homebrew/opt/libpng/lib/libpng16.16.dylib<span class="w"> </span><span class="o">(</span>compatibility<span class="w"> </span>version<span class="w"> </span><span class="m">67</span>.0.0,<span class="w"> </span>current<span class="w"> </span>version<span class="w"> </span><span class="m">67</span>.0.0<span class="o">)</span>
+<span class="w">    </span>/opt/homebrew/opt/fftw/lib/libfftw3.3.dylib<span class="w"> </span><span class="o">(</span>compatibility<span class="w"> </span>version<span class="w"> </span><span class="m">10</span>.0.0,<span class="w"> </span>current<span class="w"> </span>version<span class="w"> </span><span class="m">10</span>.10.0<span class="o">)</span>
+<span class="w">    </span>/opt/homebrew/opt/fftw/lib/libfftw3f.3.dylib<span class="w"> </span><span class="o">(</span>compatibility<span class="w"> </span>version<span class="w"> </span><span class="m">10</span>.0.0,<span class="w"> </span>current<span class="w"> </span>version<span class="w"> </span><span class="m">10</span>.10.0<span class="o">)</span>
+<span class="w">    </span>/opt/homebrew/opt/fftw/lib/libfftw3f_omp.3.dylib<span class="w"> </span><span class="o">(</span>compatibility<span class="w"> </span>version<span class="w"> </span><span class="m">10</span>.0.0,<span class="w"> </span>current<span class="w"> </span>version<span class="w"> </span><span class="m">10</span>.10.0<span class="o">)</span>
+<span class="w">    </span>/System/Library/Frameworks/OpenCL.framework/Versions/A/OpenCL<span class="w"> </span><span class="o">(</span>compatibility<span class="w"> </span>version<span class="w"> </span><span class="m">1</span>.0.0,<span class="w"> </span>current<span class="w"> </span>version<span class="w"> </span><span class="m">1</span>.0.0<span class="o">)</span>
+<span class="w">    </span>/opt/homebrew/opt/libomp/lib/libomp.dylib<span class="w"> </span><span class="o">(</span>compatibility<span class="w"> </span>version<span class="w"> </span><span class="m">5</span>.0.0,<span class="w"> </span>current<span class="w"> </span>version<span class="w"> </span><span class="m">5</span>.0.0<span class="o">)</span>
+<span class="w">    </span>/usr/lib/libz.1.dylib<span class="w"> </span><span class="o">(</span>compatibility<span class="w"> </span>version<span class="w"> </span><span class="m">1</span>.0.0,<span class="w"> </span>current<span class="w"> </span>version<span class="w"> </span><span class="m">1</span>.2.12<span class="o">)</span>
+</pre></div>
+</div>
+<p>TODO</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">CMakeLists.txt</span></code> needs some attention. As it stands and
+installation with <code class="docutils literal notranslate"><span class="pre">make</span> <span class="pre">install</span></code> leads to <code class="docutils literal notranslate"><span class="pre">dyld[11935]:</span> <span class="pre">Library</span> <span class="pre">not</span>
+<span class="pre">loaded:</span> <span class="pre">&#64;rpath/libkdtree.dylib</span></code>.</p>
 </section>
 <section id="windows-10-11">
 <h3>Windows 10/11<a class="headerlink" href="#windows-10-11" title="Link to this heading"></a></h3>
