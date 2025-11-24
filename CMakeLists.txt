@@ -51,7 +51,7 @@ cmake_minimum_required(VERSION 3.9)
 
 project(deconwolf
   DESCRIPTION "Deconvolution of wide field images"
-  VERSION 0.4.6
+  VERSION 0.4.7
   LANGUAGES C)
 
 set (CMAKE_C_STANDARD 99)
