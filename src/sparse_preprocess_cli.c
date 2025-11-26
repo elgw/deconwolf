@@ -256,6 +256,7 @@ int sparse_preprocess_cli(int argc, char ** argv)
         if(log == NULL)
         {
             fprintf(stderr, "Unable to open %s\n", logfile);
+            free(logfile);
             free(I);
             continue;
         }

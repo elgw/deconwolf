@@ -382,6 +382,7 @@ kdtree_new(const double * X,
         printf("kdtree_new: Memory allocation failed. Tried to allocate for %zu nodes\n"
                "            but couldn't get it from the system\n",
                T->n_nodes_alloc);
+        kdtree_free(T);
         return NULL;
     }
 

@@ -186,9 +186,9 @@ static double timespec_diff(struct timespec* end, struct timespec * start)
 #ifdef __APPLE__
 size_t get_peakMemoryKB(void)
 {
-  struct rusage r_usage;
-  getrusage(RUSAGE_SELF, &r_usage);
-  return (size_t) round((double) r_usage.ru_maxrss/1024.0);
+    struct rusage r_usage;
+    getrusage(RUSAGE_SELF, &r_usage);
+    return (size_t) round((double) r_usage.ru_maxrss/1024.0);
 }
 #endif
 
@@ -197,67 +197,68 @@ size_t get_peakMemoryKB(void)
 {
     char * statfile = calloc(100, sizeof(char));
     assert(statfile != NULL);
-  sprintf(statfile, "/proc/%d/status", getpid());
-  FILE * sf = fopen(statfile, "r");
-  if(sf == NULL)
-  {
-    fprintf(stderr, "Failed to open %s\n", statfile);
-    free(statfile);
-    return 0;
-  }
-
-  char * peakline = NULL;
-
-  char * line = NULL;
-  size_t len = 0;
-
-  while( getline(&line, &len, sf) > 0)
-  {
-    if(strlen(line) > 6)
+    sprintf(statfile, "/proc/%d/status", getpid());
+    FILE * sf = fopen(statfile, "r");
+    if(sf == NULL)
     {
-      if(strncmp(line, "VmPeak", 6) == 0)
-      {
-        peakline = strdup(line);
-        assert(peakline != NULL);
-      }
+        fprintf(stderr, "Failed to open %s\n", statfile);
+        free(statfile);
+        return 0;
     }
-  }
-  free(line);
-  fclose(sf);
-  free(statfile);
 
-  // Parse the line starting with "VmPeak"
-  // Seems like it is always in kB
-  // (reference: fs/proc/task_mmu.c)
-  // actually in kiB i.e., 1024 bytes
-  // since the last three characters are ' kb' we can skip them and parse in between
-  size_t peakMemoryKB = 0;
-  //  printf("peakline: '%s'\n", peakline);
-  if(peakline == NULL)
-  {
-      return 0;
-  }
-  if(strlen(peakline) > 11)
-  {
-    peakline[strlen(peakline) -4] = '\0';
+    char * peakline = NULL;
 
-    //    printf("peakline: '%s'\n", peakline+7);
-    peakMemoryKB = (size_t) atol(peakline+7);
-  }
+    char * line = NULL;
+    size_t len = 0;
 
-  free(peakline);
-  return peakMemoryKB;
+    while( getline(&line, &len, sf) > 0)
+    {
+        if(strlen(line) > 6)
+        {
+            if(strncmp(line, "VmPeak", 6) == 0)
+            {
+                free(peakline);
+                peakline = strdup(line);
+                assert(peakline != NULL);
+            }
+        }
+    }
+    free(line);
+    fclose(sf);
+    free(statfile);
+
+    // Parse the line starting with "VmPeak"
+    // Seems like it is always in kB
+    // (reference: fs/proc/task_mmu.c)
+    // actually in kiB i.e., 1024 bytes
+    // since the last three characters are ' kb' we can skip them and parse in between
+    size_t peakMemoryKB = 0;
+    //  printf("peakline: '%s'\n", peakline);
+    if(peakline == NULL)
+    {
+        return 0;
+    }
+    if(strlen(peakline) > 11)
+    {
+        peakline[strlen(peakline) -4] = '\0';
+
+        //    printf("peakline: '%s'\n", peakline+7);
+        peakMemoryKB = (size_t) atol(peakline+7);
+    }
+
+    free(peakline);
+    return peakMemoryKB;
 }
 #endif
 
 void fprint_peakMemory(FILE * fout)
 {
-  size_t pm = get_peakMemoryKB();
+    size_t pm = get_peakMemoryKB();
 
-  if(fout == NULL) fout = stdout;
-  fprintf(fout, "peakMemory: %zu kiB\n", pm);
+    if(fout == NULL) fout = stdout;
+    fprintf(fout, "peakMemory: %zu kiB\n", pm);
 
-  return;
+    return;
 }
 
 
@@ -284,9 +285,9 @@ bool is_unique(const size_t * N, const int k)
         for(int ll = kk+1; ll < k; ll++)
         {
             if( N[kk] == N[ll] )
-        {
-            return false;
-        }
+            {
+                return false;
+            }
         }
     }
     return true;
@@ -467,9 +468,9 @@ void test_kdtree_kde_mean(size_t N, int max_leaf_size)
 
 
 void print_query_and_result(const double * X,
-                       const double * Q,
-                       const size_t * idx,
-                       size_t k)
+                            const double * Q,
+                            const size_t * idx,
+                            size_t k)
 {
     printf("Query point: (%f, %f, %f)\n", Q[0], Q[1], Q[2]);
     for(size_t kk = 0; kk< k; kk++)
@@ -562,26 +563,26 @@ void test_align_dots(size_t N)
     double rs = 2*sigma; // Region size
     while(rs > 1e-3)
     {
-    double center[3];
-    memcpy(center, maxpos, 3*sizeof(double));
-    for(double x = -rs; x <= rs; x+= rs/5.0) {
-        for(double y = -rs; y <= rs; y+= rs/5.0) {
-            for(double z = -rs; z <= rs; z+= rs/5.0) {
-                double P[] = {
-                    x+center[0],
-                    y+center[1],
-                    z+center[2]};
-                double v = kdtree_kde(TD, P, sigma, 0);
-                //printf("%f, %f, %f -> %f\n", P[0], P[1], P[2], v);
-                if(v > maxkde)
-                {
-                    maxkde = v;
-                    memcpy(maxpos, P, 3*sizeof(double));
+        double center[3];
+        memcpy(center, maxpos, 3*sizeof(double));
+        for(double x = -rs; x <= rs; x+= rs/5.0) {
+            for(double y = -rs; y <= rs; y+= rs/5.0) {
+                for(double z = -rs; z <= rs; z+= rs/5.0) {
+                    double P[] = {
+                        x+center[0],
+                        y+center[1],
+                        z+center[2]};
+                    double v = kdtree_kde(TD, P, sigma, 0);
+                    //printf("%f, %f, %f -> %f\n", P[0], P[1], P[2], v);
+                    if(v > maxkde)
+                    {
+                        maxkde = v;
+                        memcpy(maxpos, P, 3*sizeof(double));
+                    }
                 }
             }
         }
-    }
-    rs /= 2.0;
+        rs /= 2.0;
     }
 
     printf("Refined position: (%.2f, %.2f, %.2f) (kde=%.1f)\n",
@@ -665,19 +666,20 @@ void benchmark(size_t N, int k, int binsize)
 
     clock_gettime(CLOCK_REALTIME, &tstart);
     printf("-> %d-NN, all vs all\n", k);
+    size_t dummy = 0;
     for(size_t kk = 0; kk<N; kk++)
     {
         //printf("\n-> Q: %zu (%f, %f)\n", kk, X[2*kk], X[2*kk+1]);
         size_t * knn = kdtree_query_knn(T, X+DIM*kk, k);
-        if(0){
-            for(int kk = 0; kk<3; kk++)
-            {
-                printf("%zu ", knn[kk]);
-            }
-            printf("\n");
+
+        for(int kk = 0; kk<3; kk++)
+        {
+            dummy += knn[kk];
+            //printf("%zu ", knn[kk]);
         }
-        //getchar();
+        //printf("\n");
     }
+    assert(dummy > 0);
 
     clock_gettime(CLOCK_REALTIME, &tend);
     double t_all_knn = timespec_diff(&tend, &tstart);
@@ -729,7 +731,7 @@ void benchmark(size_t N, int k, int binsize)
         }
     }
     printf("\r %zu / %zu\n", N, N);
-    #endif
+#endif
     kdtree_free(T);
     free(X);
 

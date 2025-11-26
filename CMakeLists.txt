@@ -51,7 +51,7 @@ cmake_minimum_required(VERSION 3.9)
 
 project(deconwolf
   DESCRIPTION "Deconvolution of wide field images"
-  VERSION 0.4.6
+  VERSION 0.4.7
   LANGUAGES C)
 
 set (CMAKE_C_STANDARD 99)
@@ -82,7 +82,7 @@ if (NOT CMAKE_BUILD_TYPE MATCHES Debug)
 endif()
 
 set(dw_SOURCES
-  src/deconwolf.c
+  src/deconwolf_cli.c
   src/dw.c
   src/dw_background.c
   src/dw_dots.c

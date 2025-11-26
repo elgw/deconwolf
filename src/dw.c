@@ -648,12 +648,6 @@ void dw_opts_fprint(FILE *f, dw_opts * s)
     return;
 }
 
-void warning(FILE * fid)
-{
-    //fprintf(fid, ANSI_UNDERSCORE " ! " ANSI_COLOR_RESET );
-    fprintf(fid, " ! ");
-    return;
-}
 
 
 void fulldump(dw_opts * s, float * A, size_t M, size_t N, size_t P, char * name)
@@ -1288,7 +1282,7 @@ void dw_argparsing(int argc, char ** argv, dw_opts * s)
     s->imFile = strdup(argv[optind]);
     s->psfFile = strdup(argv[++optind]);
 #else
-    
+
     errno = 0;
     s->imFile = realpath(argv[optind], 0);
     if(s->imFile == NULL)
@@ -1582,7 +1576,6 @@ float getError_ref(const float * restrict y,
 
 void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opts * s)
 {
-    printf("deconwolf: %s\n", deconwolf_version);
     printf("usage: %s [<options>] image.tif psf.tif\n", argv[0]);
 
     printf("\n");
@@ -1675,36 +1668,7 @@ void dw_usage(__attribute__((unused)) const int argc, char ** argv, const dw_opt
     printf("  --tempdir\n\t"
            "Specify the folder where temporary files should be written\n\t"
            "Can also be specified via the environmental variable DW_TEMPDIR\n");
-    
-    printf("\n");
-
-    printf("Additional commands with separate help sections:\n");
-    printf("   maxproj      maximum Z-projections\n");
-    printf("   merge        merge individual slices to volume\n");
-#ifdef dw_module_dots
-    printf("   dots         detect dots with sub pixel precision\n");
-#endif
-#ifdef dw_module_psf
-    printf("   psf          generate PSFs for Widefield and Confocal\n");
-#endif
-#ifdef dw_module_psf_sted
-    printf("   psf-STED     PSFs for 3D STED\n");
-#endif
-#ifdef dw_module_nuclei
-    printf("   nuclei       pixel classifier\n");
-#endif
-#ifdef dw_module_background
-    printf("   background   vignetting/background estimation\n");
-#endif
-    printf("   align-dots   Estimate alignment between dot\n");
-    printf("   imshift      Shift/translate tif images\n");
-    printf("   tif2npy      convert a tif file to a Numpy .npy file\n");
-    printf("   npy2tif      convert a Numpy .npy file to a tif file\n");
-    printf("\n");
-    printf("see: %s [command] --help\n", argv[0]);
-    printf("\n");
-
-    printf("Web page: https://www.github.com/elgw/deconwolf/\n");
+    return;
 }
 
 
@@ -1830,7 +1794,7 @@ float * psf_autocrop_byImage(float * psf,/* psf and size */
 
     if(p < popt)
     {
-        warning(stdout);
+        dw_print_warning(stdout);
         fprintf(stdout, "The PSF has only %" PRId64
                 " slices, %" PRId64 " would be better.\n", p, popt);
         fprintf(s->log, "WARNING: The PSF has only %" PRId64 " slices, %" PRId64 " would be better.\n", p, popt);
@@ -2232,7 +2196,8 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
                                           M, N, P,
                                           raw_target, s->imFile,
                                           s->scaling);
-        }}
+        }
+    }
 
     if(s->verbosity > 1)
     {
@@ -2260,7 +2225,7 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
         printf("Done with tiling\n");
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 
@@ -2453,30 +2418,54 @@ double get_nbg(float * I, size_t N, float bg)
 }
 
 
-void flatfieldCorrection(dw_opts * s, float * im, int64_t M, int64_t N, int64_t P)
+int flatfieldCorrection(dw_opts * s, float * im, int64_t M, int64_t N, int64_t P)
 {
-    printf("Experimental: applying flat field correction using %s\n",
+    assert(M > 0);
+    assert(N > 0);
+    assert(P > 0);
+
+    if(im == NULL || s == NULL)
+    {
+        fprintf(stderr, "flatfieldCorrection: called with NULL input\n");
+        return EXIT_FAILURE;
+    }
+
+    if(s->flatfieldFile == NULL)
+    {
+        fprintf(stderr, "flatfieldCorrection: flatfieldFile is NULL\n");
+        return EXIT_FAILURE;
+    }
+
+    printf("Applying flat field correction using %s\n",
            s->flatfieldFile);
     ttags * T = ttags_new();
     int64_t m = 0, n = 0, p = 0;
     float * C = fim_imread(s->flatfieldFile, T, &m, &n, &p, s->verbosity);
     ttags_free(&T);
 
-    assert(m == M);
-    assert(n == N);
-    assert(p == 1);
-
-    // TODO:
-    // check that it is positive
-
-    for(int64_t zz = 0; zz<P; zz++)
+    if(! ( (m==M) & (n==N) & (p==1) ) )
     {
-        for(size_t pos = 0; pos < (size_t) M*N; pos++)
+        fprintf(stderr, "flatfieldCorrection: Image dimensions mismatch");
+        return EXIT_FAILURE;
+    }
+
+    float minC = fim_min(C, m*n*p);
+    if(minC <= 0)
+    {
+        fprintf(stderr, "flatfieldCorrection: %s contain value(s) <= 0. That is not allowed\n", s->flatfieldFile);
+        return EXIT_FAILURE;
+    }
+
+    for(i64 zz = 0; zz<P; zz++)
+    {
+        for(i64 pos = 0; pos < M*N; pos++)
         {
             im[M*N*zz + pos] /= C[pos];
         }
     }
     free(C);
+
+    return EXIT_SUCCESS;
 }
 
 
@@ -2799,7 +2788,7 @@ int dw_run(dw_opts * s)
         /* It might still be centered between pixels */
         if(s->verbosity > 0)
         {
-            warning(stdout);
+            dw_print_warning(stdout);
             printf("The PSF is not centered!\n");
         }
         fprintf(s->log, " ! The PSF is not centered\n");
@@ -2826,7 +2815,7 @@ int dw_run(dw_opts * s)
     {
         if(s->flatfieldFile != NULL)
         {
-            warning(stdout);
+            dw_print_warning(stdout);
             printf("Flat-field correction can't be used in tiled mode\n");
         }
         deconvolve_tiles(M, N, P,
@@ -2944,7 +2933,35 @@ int dw_run(dw_opts * s)
     { fprint_peak_memory(stdout); }
 
     if(s->verbosity > 0)
-    { printf("Done!\n"); }
+    {
+        printf("Done!\n");
+    }
     fim_tiff_destroy(ftif);
-    return 0;
+    return EXIT_SUCCESS;
+}
+
+int dw_deconvolve_cli(int argc, char ** argv)
+{
+    dw_opts * s = dw_opts_new(); /* Load default settings and initialize */
+    dw_argparsing(argc, argv, s); /* Parse command line */
+
+    dw_init_status dw_stat = dw_opts_validate_and_init(s);
+    switch(dw_stat)
+    {
+    case dw_ok:
+        break;
+    case dw_warning:
+        dw_opts_free(&s);
+        return EXIT_SUCCESS;
+        break;
+    case dw_error:
+        dw_opts_free(&s);
+        return EXIT_FAILURE;
+        break;
+    }
+
+
+    int ret = dw_run(s); /* And do the job */
+    dw_opts_free(&s);
+    return ret;
 }

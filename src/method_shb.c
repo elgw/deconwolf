@@ -287,9 +287,12 @@ float * deconvolve_shb(float * restrict im,
     }
 
 
+    if( x == NULL || xp == NULL)
+    {
+        fprintf(stderr, "Internal error in %s %d\n", __FILE__, __LINE__);
+        exit(EXIT_FAILURE);
+    }
 
-    assert(x != NULL);
-    assert(xp != NULL);
 
 
     dw_iterator_t * it = dw_iterator_new(s);

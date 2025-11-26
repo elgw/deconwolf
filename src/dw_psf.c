@@ -72,8 +72,11 @@ static void argparsing(int argc, char ** argv, opts * s);
 
 static opts * opts_new()
 {
-    opts * s = malloc(sizeof(opts));
-    assert(s != NULL);
+    opts * s = calloc(1, sizeof(opts));
+    if(s == NULL)
+    {
+        return NULL;
+    }
     s->overwrite = 0;
     s->verbose = 1;
     s->outfile = NULL;
@@ -140,6 +143,10 @@ static void opts_print(FILE * f, opts * s)
 static void usage(__attribute__((unused)) int argc, char ** argv)
 {
     opts * s = opts_new();
+    if(s == NULL)
+    {
+        return;
+    }
     printf("usage: %s [<options>] output.tif\n", argv[0]);
     printf("Options:\n");
     printf("  --NA NA\n\t"
@@ -392,6 +399,7 @@ static void argparsing(int argc, char ** argv, opts * s)
 
 void shift_double(double * V, int N, int stride, int shift)
 {
+    assert(N > 0);
     double * buff = malloc(N*sizeof(double));
     assert(buff != NULL);
     for(int kk = 0; kk<N; kk++)
@@ -443,6 +451,7 @@ void shift_float(float * V, int N, int stride, int shift)
 
 void shift_complex(fftw_complex * V, int N, int stride, int shift)
 {
+    assert(N > 0);
     fftw_complex * buff = malloc(N*sizeof(fftw_complex));
     assert(buff != NULL);
     for(int kk = 0; kk<N; kk++)
@@ -556,7 +565,7 @@ static void downsample_integrate(float * A, float * B, int nA, int nB)
     //printf("Integrating over %dx%d pixels\n", factor, factor);
     /* Reset A */
     memset(A, 0, nA*nA*sizeof(float));
-
+    assert(factor > 0);
     float * K = malloc(sizeof(float)*factor);
     assert(K != NULL);
     for(int kk = 0; kk<factor; kk++)
@@ -599,6 +608,7 @@ fimo * gen_psf(opts * s, double lambda)
 
     /* Phase of Phase Propagator */
     if(s->verbose > 2) { printf("Setting up phase propagator\n"); fflush(stdout); }
+    assert(XM*XM > 0);
     double * ph = malloc(XM*XM*sizeof(double));
     assert(ph != NULL);
     memset(ph, 0, XM*XM*sizeof(double));
@@ -625,6 +635,7 @@ fimo * gen_psf(opts * s, double lambda)
     if(s->verbose > 2) { printf("Setting up pupil function\n"); fflush(stdout); }
 
     /* Pupil function, limited by the NA */
+    assert(XM*XM > 0);
     fftw_complex * pu = fim_malloc(XM*XM*sizeof(fftw_complex));
 
     double pur2 = pow(s->optical.NA/lambda, 2);
@@ -656,7 +667,7 @@ fimo * gen_psf(opts * s, double lambda)
 
 
     if(s->verbose > 2) { printf("Calculating\n"); fflush(stdout); }
-
+    assert(XM*XM > 0);
     fftw_complex * h = fim_malloc(XM*XM*sizeof(fftw_complex));
     assert(h != NULL);
     fftw_complex * H = fim_malloc(XM*XM*sizeof(fftw_complex));
@@ -707,6 +718,9 @@ fimo * gen_psf(opts * s, double lambda)
 
     if(s->oversampling > 1)
     {
+        assert(s->M > 0);
+        assert(s->N > 0);
+        assert(s->P > 0);
         float * Vout = calloc(s->M*s->M*s->P, sizeof(float));
         assert(Vout != NULL);
         for(int pp = 0; pp< (int) PSF->P; pp++)
@@ -763,6 +777,8 @@ double square_overlap(double x0, double x1, double y0, double y1,
 static float * conv2d_float(float * A, float * B,
                             size_t M, size_t N)
 {
+    assert(M > 0);
+    assert(N > 0);
     fftwf_complex * FA = fim_malloc(M*N*sizeof(fftwf_complex));
 
     fftwf_complex * FB = fim_malloc(M*N*sizeof(fftwf_complex));
@@ -810,9 +826,19 @@ static void pinhole_convolution(opts * s, fimo * PSF)
     double pinhole_px = pinhole_nm / s->optical.dx;
     printf("Pinhole size: %.2f AU / %.0f nm / %.1f pixels\n",
            s->optical.pinhole, pinhole_nm, pinhole_px);
-    assert(PSF->M*PSF->N > 0);
+    if( (PSF->M <= 0) | (PSF->N <= 0) )
+    {
+        printf("Invalid PSF size %s %d\n", __FILE__, __LINE__);
+        return;
+    }
+
     float * P = calloc(PSF->M*PSF->N, sizeof(float));
     assert(P != NULL);
+    if(P == NULL)
+    {
+        fprintf(stderr, "Internal error %s %d\n", __FILE__, __LINE__);
+        return;
+    }
     for(int aa = 0; aa < (int) PSF->M; aa++)
     {
         for(int bb = 0; bb < (int) PSF->N; bb++)
@@ -879,6 +905,11 @@ static void dw_psf(opts * s)
     }
 
     fimo * PSF = gen_psf(s, s->optical.lambda);
+    if(PSF == NULL)
+    {
+        printf("Internal error %s %d\n", __FILE__, __LINE__);
+        return;
+    }
     if(s->optical.lambda2 != 0)
     {
         /* We will generate a PSF for a confocal microscope with
@@ -931,6 +962,10 @@ int dw_psf_cli(int argc, char ** argv)
 {
     /* Get default settings */
     opts * s = opts_new();
+    if(s == NULL)
+    {
+        return EXIT_FAILURE;
+    }
     /* Parse command line and open log file etc */
     argparsing(argc, argv, s);
     s->ftif = fim_tiff_new(stdout, s->verbose);
@@ -940,11 +975,11 @@ int dw_psf_cli(int argc, char ** argv)
     if(s->verbose > 1)
     {
         fprint_peak_memory(stdout);
-    }    
+    }
     /* Clean up */
     opts_free(s);
-    
-    return 0;
+
+    return EXIT_SUCCESS;
 }
 
 #ifdef STANDALONE

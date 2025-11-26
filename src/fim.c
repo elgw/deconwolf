@@ -5146,8 +5146,9 @@ fim_imwrite_u16(const char * outname,
             I[kk] = V[kk]*scaling;
         }
         int shape[3] = {P, N, M};
-        return npio_write(outname, 3, shape, (void *) I, NPIO_U16, NPIO_U16);
+        int ret = npio_write(outname, 3, shape, (void *) I, NPIO_U16, NPIO_U16);
         free(I);
+        return ret;
     }
     ftif_t * ftif = fim_tiff_new(stdout, 1);
     int ret =  fim_tiff_write_opt(ftif, outname, V, T, M, N, P, scaling);
@@ -5202,15 +5203,21 @@ int fim_to_raw(const char* infile, const char* outfile)
             if(fout == NULL)
             {
                 fprintf(stderr, "Unable to open %s for writing\n", outfile);
+                goto npio_fail;
             }
             FILE * fin = fopen(infile, "rb");
             if(fin == NULL)
             {
                 fprintf(stderr, "Unable to open %s for reading\n", infile);
+                fclose(fout);
+                goto npio_fail;
             }
             if(fseek(fin, meta->data_offset, SEEK_SET))
             {
                 fprintf(stderr, "Unable to use %s\n", infile);
+                fclose(fin);
+                fclose(fout);
+                goto npio_fail;
             }
 
             size_t buff_elements = 262144;
