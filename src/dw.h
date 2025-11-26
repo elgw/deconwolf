@@ -293,8 +293,6 @@ void benchmark_write(dw_opts * s, int iter, double fMSE, const float * x,
 
 
 
-/* "WARNING" in some formatting */
-void warning(FILE * fid);
 
 
 typedef struct{
@@ -312,3 +310,6 @@ int dw_iterator_next(dw_iterator_t * );
 void dw_iterator_set_error(dw_iterator_t *, float);
 void dw_iterator_show(dw_iterator_t *, const dw_opts *);
 void dw_iterator_free(dw_iterator_t * );
+
+/* Command line interface  */
+int dw_deconvolve_cli(int argc, char ** argv);

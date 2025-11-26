@@ -52,6 +52,47 @@
 #include "tiling.h"
 #include "sparse_preprocess_cli.h"
 
+static int
+deconwolf_cli_help(int argc, char ** argv)
+{
+    printf("usage: %s [--version] <command> [<options>]\n", argv[0]);
+    printf("\n");
+    printf("main commands\n");
+    printf("   deconvolve   deconvolve 3D images\n");
+    printf("   maxproj      Z-projections of 3D images\n");
+#ifdef dw_module_dots
+    printf("   dots         detect dots with sub pixel precision\n");
+#endif
+    printf("\n");
+    printf("also available\n");
+    printf("   merge        merge individual slices to volume\n");
+#ifdef dw_module_psf
+    printf("   psf          generate PSFs for Widefield and Confocal\n");
+#endif
+#ifdef dw_module_psf_sted
+    printf("   psf-STED     PSFs for 3D STED\n");
+#endif
+#ifdef dw_module_nuclei
+    printf("   nuclei       pixel classifier\n");
+#endif
+#ifdef dw_module_background
+    printf("   background   vignetting/background estimation\n");
+#endif
+    printf("   align-dots   Estimate alignment between dot\n");
+    printf("   imshift      Shift/translate tif images\n");
+    printf("   tif2npy      convert a tif file to a Numpy .npy file\n");
+    printf("   npy2tif      convert a Numpy .npy file to a tif file\n");
+    printf("\n");
+    printf("Web page: https://www.github.com/elgw/deconwolf/\n");
+    return EXIT_SUCCESS;
+}
+
+static int
+deconwolf_cli_version(int argc, char ** argv)
+{
+    printf("deconwolf version %s\n", deconwolf_version);
+    return EXIT_SUCCESS;
+}
 
 static int
 npy2tif(int argc, char ** argv)
@@ -206,120 +247,116 @@ tif2npy(int argc, char ** argv)
 
 int main(int argc, char ** argv)
 {
-    // setlocale(LC_ALL, NULL);
-    if(argc > 1)
+    /* Most of the commands can be compiled into separate programs.
+
+       If the command is not recognized, the 'deconvolve' command will
+       be assumed.
+    */
+
+    if(argc <= 1)
     {
-        if(strcmp(argv[1], "maxproj") == 0)
-        {
-            return dw_tiff_max(argc-1, argv+1);
-        }
-        if(strcmp(argv[1], "imshift") == 0)
-        {
-            return dw_imshift(argc-1, argv+1);
-        }
-        if(strcmp(argv[1], "merge") == 0)
-        {
-            return dw_tiff_merge(argc-1, argv+1);
-        }
-
-        if(strcmp(argv[1], "nuclei") == 0)
-        {
-#ifdef dw_module_nuclei
-            return dw_nuclei(argc-1, argv+1);
-#else
-            fprintf(stderr, "dw was built without the 'nuclei' module\n");
-            exit(EXIT_FAILURE);
-#endif
-        }
-
-        if(strcmp(argv[1], "dots") == 0)
-        {
-#ifdef dw_module_dots
-            return dw_dots(argc-1, argv+1);
-#else
-            fprintf(stderr, "dw was built without the 'dots' module\n");
-            exit(EXIT_FAILURE);
-#endif
-        }
-
-        if(strcmp(argv[1], "psf") == 0)
-        {
-#ifdef dw_module_psf
-            return dw_psf_cli(argc-1, argv+1);
-#else
-            fprintf(stderr, "dw was built without the 'psf' module\n");
-            exit(EXIT_FAILURE);
-#endif
-        }
-
-        if(strcmp(argv[1], "psf-STED") == 0)
-        {
-#ifdef dw_module_psf_sted
-            return dw_psf_sted_cli(argc-1, argv+1);
-#else
-            fprintf(stderr, "dw was built without the 'psf-STED' module\n");
-            exit(EXIT_FAILURE);
-#endif
-        }
-
-        if(strcmp(argv[1], "noise1") == 0)
-        {
-            return sparse_preprocess_cli(argc-1, argv+1);
-        }
-
-        if( strcmp(argv[1], "align-dots") == 0)
-        {
-#ifdef dw_module_align_dots
-            return dw_align_dots(argc-1, argv+1);
-#else
-            fprintf(stderr, "dw was not built with the 'align-dots' module\n");
-            exit(EXIT_FAILURE);
-#endif
-        }
-
-        if( strcmp(argv[1], "background") == 0)
-        {
-#ifdef dw_module_background
-            return dw_background(argc-1, argv+1);
-#else
-            fprintf(stderr, "dw was not built with the 'background' module\n");
-            exit(EXIT_FAILURE);
-#endif
-        }
-
-
-        if( strcmp(argv[1], "tif2npy") == 0)
-        {
-            return tif2npy(argc-1, argv+1);
-        }
-
-        if( strcmp(argv[1], "npy2tif") == 0)
-        {
-            return npy2tif(argc-1, argv+1);
-        }
-
-    } // argc
-
-    dw_opts * s = dw_opts_new(); /* Load default settings and initialize */
-    dw_argparsing(argc, argv, s); /* Parse command line */
-
-    dw_init_status dw_stat = dw_opts_validate_and_init(s);
-    switch(dw_stat)
-    {
-    case dw_ok:
-        break;
-    case dw_warning:
-        dw_opts_free(&s);
-        return EXIT_SUCCESS;
-        break;
-    case dw_error:
-        dw_opts_free(&s);
-        return EXIT_FAILURE;
-        break;
+        return deconwolf_cli_help(argc, argv);
     }
 
+    assert(argc > 1);
 
-    int ret = dw_run(s); /* And do the job */
-    dw_opts_free(&s);
-    return ret;
+    if(strcmp(argv[1], "--version") == 0)
+    {
+        return deconwolf_cli_version(argc, argv);
+    }
+
+    if(strcmp(argv[1], "deconvolve") == 0)
+    {
+        return dw_deconvolve_cli(argc-1, argv+1);
+    }
+    if(strcmp(argv[1], "maxproj") == 0)
+    {
+        return dw_tiff_max(argc-1, argv+1);
+    }
+    if(strcmp(argv[1], "imshift") == 0)
+    {
+        return dw_imshift(argc-1, argv+1);
+    }
+    if(strcmp(argv[1], "merge") == 0)
+    {
+        return dw_tiff_merge(argc-1, argv+1);
+    }
+
+    if(strcmp(argv[1], "nuclei") == 0)
+    {
+#ifdef dw_module_nuclei
+        return dw_nuclei(argc-1, argv+1);
+#else
+        fprintf(stderr, "dw was built without the 'nuclei' module\n");
+        exit(EXIT_FAILURE);
+#endif
+    }
+
+    if(strcmp(argv[1], "dots") == 0)
+    {
+#ifdef dw_module_dots
+        return dw_dots(argc-1, argv+1);
+#else
+        fprintf(stderr, "dw was built without the 'dots' module\n");
+        exit(EXIT_FAILURE);
+#endif
+    }
+
+    if(strcmp(argv[1], "psf") == 0)
+    {
+#ifdef dw_module_psf
+        return dw_psf_cli(argc-1, argv+1);
+#else
+        fprintf(stderr, "dw was built without the 'psf' module\n");
+        exit(EXIT_FAILURE);
+#endif
+    }
+
+    if(strcmp(argv[1], "psf-STED") == 0)
+    {
+#ifdef dw_module_psf_sted
+        return dw_psf_sted_cli(argc-1, argv+1);
+#else
+        fprintf(stderr, "dw was built without the 'psf-STED' module\n");
+        exit(EXIT_FAILURE);
+#endif
+    }
+
+    if(strcmp(argv[1], "noise1") == 0)
+    {
+        return sparse_preprocess_cli(argc-1, argv+1);
+    }
+
+    if( strcmp(argv[1], "align-dots") == 0)
+    {
+#ifdef dw_module_align_dots
+        return dw_align_dots(argc-1, argv+1);
+#else
+        fprintf(stderr, "dw was not built with the 'align-dots' module\n");
+        exit(EXIT_FAILURE);
+#endif
+    }
+
+    if( strcmp(argv[1], "background") == 0)
+    {
+#ifdef dw_module_background
+        return dw_background(argc-1, argv+1);
+#else
+        fprintf(stderr, "dw was not built with the 'background' module\n");
+        exit(EXIT_FAILURE);
+#endif
+    }
+
+    if( strcmp(argv[1], "tif2npy") == 0)
+    {
+        return tif2npy(argc-1, argv+1);
+    }
+
+    if( strcmp(argv[1], "npy2tif") == 0)
+    {
+        return npy2tif(argc-1, argv+1);
+    }
+
+    // Fallback to 'deconvolve' if no command was specified
+    return dw_deconvolve_cli(argc, argv);
 }

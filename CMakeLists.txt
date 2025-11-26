@@ -82,7 +82,7 @@ if (NOT CMAKE_BUILD_TYPE MATCHES Debug)
 endif()
 
 set(dw_SOURCES
-  src/deconwolf.c
+  src/deconwolf_cli.c
   src/dw.c
   src/dw_background.c
   src/dw_dots.c

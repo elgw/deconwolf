@@ -567,3 +567,11 @@ const char * dw_yes_no(int value)
         return "no";
     }
 }
+
+void dw_print_warning(FILE * fid)
+{
+    // TODO: use colors if writing to terminal etc
+    //fprintf(fid, ANSI_UNDERSCORE " ! " ANSI_COLOR_RESET );
+    fprintf(fid, " ! ");
+    return;
+}
