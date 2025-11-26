@@ -2196,7 +2196,8 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
                                           M, N, P,
                                           raw_target, s->imFile,
                                           s->scaling);
-        }}
+        }
+    }
 
     if(s->verbosity > 1)
     {
@@ -2224,7 +2225,7 @@ deconvolve_tiles(const int64_t M, const int64_t N, const int64_t P,
         printf("Done with tiling\n");
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 
@@ -2932,9 +2933,11 @@ int dw_run(dw_opts * s)
     { fprint_peak_memory(stdout); }
 
     if(s->verbosity > 0)
-    { printf("Done!\n"); }
+    {
+        printf("Done!\n");
+    }
     fim_tiff_destroy(ftif);
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 int dw_deconvolve_cli(int argc, char ** argv)
