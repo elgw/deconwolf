@@ -655,9 +655,20 @@ fit(opts * s, int argc, char ** argv)
     }
 
     char * logfile = calloc(strlen(s->modelfile) + 16, 1);
-    assert(logfile != NULL);
+    if(logfile == NULL)
+    {
+        return EXIT_FAILURE;
+    }
     sprintf(logfile, "%s.log.txt", s->modelfile);
     FILE * log = fopen(logfile, "w");
+    if(log == NULL)
+    {
+        fprintf(stderr, "Unable to open %s\n", logfile);
+        free(logfile);
+        return EXIT_FAILURE;
+    }
+    free(logfile);
+
     for(int kk = 0; kk < argc; kk++)
     {
         fprintf(log, "%s ", argv[kk]);

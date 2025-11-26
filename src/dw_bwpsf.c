@@ -50,7 +50,6 @@ int GLOB_N_GSL_EROUND = 0; /* Counter for GSL_EROUND */
 
 static void BW_slice(float * , float z, bw_conf * conf);
 static void bw_argparsing(int , char ** , bw_conf * conf);
-static void * BW_thread(void * data);
 
 // Get the command line options
 static void getCmdLine(int argc, char ** argv, bw_conf * s);

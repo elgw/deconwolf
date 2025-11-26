@@ -506,6 +506,12 @@ static double * get_dots(opts * s, ftab_t * T)
         }
     }
 
+    if(nuse <= 0)
+    {
+        printf("No dots!\n");
+        return NULL;
+    }
+
     double * X = calloc(3*nuse, sizeof(double));
     assert(X != NULL);
     for(i64 kk = 0; kk < nuse; kk++)
@@ -1230,12 +1236,14 @@ int dw_align_dots(int argc, char ** argv)
     }
 
     double * XA = get_dots(s, TA);
-    size_t nXA = TA->nrow;
-    ftab_free(TA); TA = NULL;
     if(XA == NULL)
     {
+        ftab_free(TA);
+        opts_free(s);
         return EXIT_FAILURE;
     }
+    size_t nXA = TA->nrow;
+    ftab_free(TA); TA = NULL;
 
     if(s->verbose > 1)
     {
@@ -1249,14 +1257,17 @@ int dw_align_dots(int argc, char ** argv)
         exit(EXIT_FAILURE);
     }
     double * XB = get_dots(s, TB);
-
+    if(XB == NULL)
+    {
+        free(XA);
+        opts_free(s);
+        ftab_free(TB);
+        return EXIT_FAILURE;
+    }
 
     size_t nXB = TB->nrow;
     ftab_free(TB); TB = NULL;
-    if(XB == NULL)
-    {
-        return EXIT_FAILURE;
-    }
+
 
     /* Limit the number of dots to use? */
     if(s->npoint > 0)

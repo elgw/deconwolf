@@ -2417,30 +2417,54 @@ double get_nbg(float * I, size_t N, float bg)
 }
 
 
-void flatfieldCorrection(dw_opts * s, float * im, int64_t M, int64_t N, int64_t P)
+int flatfieldCorrection(dw_opts * s, float * im, int64_t M, int64_t N, int64_t P)
 {
-    printf("Experimental: applying flat field correction using %s\n",
+    assert(M > 0);
+    assert(N > 0);
+    assert(P > 0);
+
+    if(im == NULL || s == NULL)
+    {
+        fprintf(stderr, "flatfieldCorrection: called with NULL input\n");
+        return EXIT_FAILURE;
+    }
+
+    if(s->flatfieldFile == NULL)
+    {
+        fprintf(stderr, "flatfieldCorrection: flatfieldFile is NULL\n");
+        return EXIT_FAILURE;
+    }
+
+    printf("Applying flat field correction using %s\n",
            s->flatfieldFile);
     ttags * T = ttags_new();
     int64_t m = 0, n = 0, p = 0;
     float * C = fim_imread(s->flatfieldFile, T, &m, &n, &p, s->verbosity);
     ttags_free(&T);
 
-    assert(m == M);
-    assert(n == N);
-    assert(p == 1);
-
-    // TODO:
-    // check that it is positive
-
-    for(int64_t zz = 0; zz<P; zz++)
+    if(! ( (m==M) & (n==N) & (p==1) ) )
     {
-        for(size_t pos = 0; pos < (size_t) M*N; pos++)
+        fprintf(stderr, "flatfieldCorrection: Image dimensions mismatch");
+        return EXIT_FAILURE;
+    }
+
+    float minC = fim_min(C, m*n*p);
+    if(minC <= 0)
+    {
+        fprintf(stderr, "flatfieldCorrection: %s contain value(s) <= 0. That is not allowed\n", s->flatfieldFile);
+        return EXIT_FAILURE;
+    }
+
+    for(i64 zz = 0; zz<P; zz++)
+    {
+        for(i64 pos = 0; pos < M*N; pos++)
         {
             im[M*N*zz + pos] /= C[pos];
         }
     }
     free(C);
+
+    return EXIT_SUCCESS;
 }
 
 
@@ -2936,4 +2960,5 @@ int dw_deconvolve_cli(int argc, char ** argv)
 
     int ret = dw_run(s); /* And do the job */
     dw_opts_free(&s);
+    return ret;
 }

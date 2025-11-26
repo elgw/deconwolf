@@ -229,6 +229,7 @@ int qalign(qalign_config * conf)
     qalign_pair * pB = malloc(npB*sizeof(qalign_pair));
     if(pB == NULL)
     {
+        free(pA);
         return EXIT_FAILURE;
     }
 
@@ -253,13 +254,16 @@ int qalign(qalign_config * conf)
     i64 nH_alloc = 1000;
     i64 nH = 0;
     qalign_pair * H = malloc(nH_alloc*sizeof(qalign_pair));
-    conf->S = malloc(nH_alloc*sizeof(float));
-    conf->SZ = malloc(nH_alloc*sizeof(float));
-    conf->H = H;
     if(H == NULL)
     {
         goto cleanup;
     }
+    conf->H = H;
+
+    conf->S = malloc(nH_alloc*sizeof(float));
+    conf->SZ = malloc(nH_alloc*sizeof(float));
+
+
 
     if(conf->verbose > 1)
     {

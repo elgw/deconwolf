@@ -388,7 +388,7 @@ tiling.o \
 fft.o \
 fim_tiff.o \
 dw.o \
-deconwolf.o \
+deconwolf_cli.o \
 dw_maxproj.o \
 dw_util.o \
 method_identity.o \

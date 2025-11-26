@@ -129,6 +129,9 @@ rgb_from_png(const char * filename,
             free(buffer);
             return NULL;
         }
+    } else {
+        printf("png error: can't read from %s\n", filename);
+        return NULL;
     }
 
     if(image.warning_or_error)
@@ -137,6 +140,7 @@ rgb_from_png(const char * filename,
         free(buffer);
         return NULL;
     }
+
     assert(buffer != NULL);
 
     int known_format = 1;
