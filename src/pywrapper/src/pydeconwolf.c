@@ -34,12 +34,12 @@
 #  define UNUSED(x) UNUSED_ ## x
 #endif
 
-#include <deconwolf/dw_util.h>
-#include <deconwolf/fim_tiff.h>
-#include <deconwolf/dw_version.h>
-#include <deconwolf/dw_bwpsf.h>
-#include <deconwolf/dw.h>
-#include <deconwolf/fim.h>
+#include "../../dw_util.h"
+#include "../../fim_tiff.h"
+#include "../../dw_version.h"
+#include "../../dw_bwpsf.h"
+#include "../../dw.h"
+#include "../../fim.h"
 
 typedef int64_t i64;
 typedef float f32;
