@@ -1,0 +1,76 @@
+This module can be used to detect of diffraction limited spots in 3D images,
+and also to localize them with sub pixel precision (--fitting) and measure
+some properties of the detected spots.
+
+Initial spot detection is performed using a Laplacian of Gaussian filter.
+
+The optional fitting performs a maximum likelihood fitting of each spot
+against a Gaussian model.
+
+It is not intended for 2D images.
+
+The input is always a single tif images. If the input file starts with 'dw_',
+then the program will look for the corresponding log file written by deconwolf
+to parse the scaling value, which will be used to scale the image.
+
+usage: dots [<options>] input.tif input2.tif ...
+
+Recommended/required arguments:
+  --NA NA
+	Set numerical aperture
+  --ni ni
+	Set refractive index
+  --dx dx
+	Lateral pixel size [nm]
+  --dz dz
+	Axial pixel size [nm]
+  --lambda l
+	Emission wave length [nm]
+  --ndots n
+	Number of dots to export (default M x N x 0.005)
+  --fitting
+        Enable fitting of detected spots. Obviously this will option will
+        prolong the run-time.
+
+Additional options
+  --background file.tif
+	A multiplicative background model. The input image will be divided by
+        this image. If the background is a 2D image, each plane of the input
+        image will be divided by the background model image.
+  --nscale n
+	Set the number of scales to use, i.e., this enables
+        multi-scale spot detection. Default value = 1.
+  --swell f
+	Tell the program how much larger the dots are compared to
+        the diffraction limit. Default = 1, i.e. diffraction limited dots
+        For some experiments values up to 2 makes sense
+  --overwrite
+	Overwrite existing files (default 0)
+  --help
+	Show this message
+  --logfile file.txt
+	Specify where the log file should be written
+  --verbose v
+	Verbosity level (default 1)
+  --nthreads n
+	Set the number of computational threads
+  --fout file.tif
+	Write filtered image -- for debugging
+
+If you want to control the filter sizes, skip the optical parameters
+above and set the filter sizes manually by:
+
+  --log_ls s
+	Lateral sigma (location of zero-crossing)
+  --log_as s
+	Axial sigma (location of zero-crossing)
+  --fit_ls
+	Lateral sigma, initial guess for the dot fitting
+  --fit_as
+	Axial sigma, initial guess for the dot fitting
+
+Notes:
+  - Log messages will be written to [input file].log.txt
+  - Dots will be exported to [input file].dots.tsv
+
+ See the man page for more information.
