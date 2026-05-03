@@ -2528,18 +2528,81 @@ float * fim_xcorr2(const float * T, const float * A,
     return C;
 }
 
-
-float fim_std(const float * V, size_t N)
+// A faster alternative to fim_std_ref, which might be more
+// affected by cancellations. Timings for n = 1024*1024*60
+// "fim_std"    0.004566 s
+// "fim_std_ref" 0.011998 s
+float
+fim_std(const float * V, const size_t n)
 {
+    if(n < 2)
+    {
+        return 0;
+    }
+    double s = 0;
+    double ss = 0;
+#pragma omp parallel for reduction(+:s, ss)
+    for(size_t kk = 0; kk<n; kk++)
+    {
+        s += V[kk];
+        ss += pow(V[kk], 2);
+    }
+    double nf = (double) n;
+    return (float) sqrt(ss/(nf-1) - (s/nf)*(s/(nf-1.0)));
+}
 
-    float mean = fim_sum(V, N)/N;
+
+float
+fim_std_masked(const float * restrict V,
+               const uint8_t * restrict mask,
+               size_t n_total)
+{
+    if(n_total < 2)
+    {
+        return 0;
+    }
+    if(mask == NULL)
+    {
+        return fim_std(V, n_total);
+    }
+
+    double s = 0;
+    double ss = 0;
+
+    size_t n = 0;
+#pragma omp parallel for reduction(+:s, ss, n)
+    for(size_t kk = 0; kk<n_total; kk++)
+    {
+        if(mask[kk] == 1)
+        {
+            s += V[kk];
+            ss += pow(V[kk], 2);
+            n++;
+        }
+    }
+    if(n < 2)
+    {
+        return 0;
+    }
+    double nf = (double) n;
+    return (float) sqrt(ss/(nf-1) - (s/nf)*(s/(nf-1.0)));
+}
+
+
+float
+fim_std_ref(const float * V, const size_t N)
+{
+    if(N < 2)
+    {
+        return 0;
+    }
+    double mean = fim_sum(V, N)/ (double) N;
     double s = 0;
 #pragma omp parallel for reduction(+:s)
     for(size_t kk = 0; kk<N; kk++)
     {
         s += pow(V[kk]-mean, 2);
     }
-
     return (float) sqrt(s/ (double) (N - 1.0) );
 }
 
@@ -4942,6 +5005,45 @@ static void fim_DoH_ut(void)
     return;
 }
 
+static void
+fim_std_ut(void)
+{
+
+    i64 n = 1024*1024*60;
+    f32 * V = calloc(n, sizeof(f32));
+    u8 * mask = calloc(n, sizeof(u8));
+    V[0] = 1;
+    V[1] = 2;
+    assert(fim_std(V, 0) == 0);
+    assert(fim_std(V, 1) == 0);
+    assert(fabs(fim_std(V, 2) - 0.707106781) < 1e-6 );
+    V[2] = 3.3;
+    assert(fabs(fim_std(V, 3) - 1.153256259) < 1e-6 );
+    assert(fabs(fim_std(V, n) - 0.000502558) < 1e-6);
+
+    // The mask is null, i.e. all elements should be used
+    assert(fabs(fim_std_masked(V, NULL, n) - 0.000502558) < 1e-6);
+    // mask = [0, 0, ...] so we should get 0
+    assert(fabs(fim_std_masked(V, mask, n)) == 0);
+    for(int kk = 0; kk < 3; kk++)
+    {
+        mask[kk] = 1;
+    }
+    // Only the three first elements should be used
+    assert(fabs(fim_std_masked(V, mask, n) - 1.153256259) < 1e-6 );
+
+    tictoc
+    tic
+    double t = fim_std(V, n);
+    toc("fim_std")
+    tic
+    t = fim_std_ref(V, n);
+    toc("fim_std_ref")
+    printf("t=%f\n", t);
+    free(V);
+    free(mask);
+}
+
 void fim_ut()
 {
 #ifdef NDEBUG
@@ -4955,6 +5057,9 @@ void fim_ut()
     assert(npyfilename("npy") == 0);
     assert(npyfilename(NULL) == 0);
     assert(npyfilename(".npy.tif") == 0);
+
+    printf("-> std_ut\n");
+    fim_std_ut();
 
     printf("-> DoH_ut\n");
     fim_DoH_ut();

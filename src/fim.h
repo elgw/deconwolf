@@ -180,10 +180,26 @@ float fim_percentile(const float * restrict A, size_t N, float prct);
  * using quickselect */
 float fimo_percentile(fimo * A, float prct);
 
-/* Standard deviation, normalizing by (N-1) */
-float fim_std(const float * V, size_t N);
+// Standard deviation, normalizing by (n-1)
+//
+//
+// Inputs:
+// V: input data
+// n: number of elements
+//
+// Returns:
+// sqrt(sum( (V-mean(V))^2 )/(n-1) )
+// or 0 if n < 2
+float
+fim_std(const float * V,
+        size_t n);
 
-
+// Like fim_std but also accepts a mask,
+// elements where mask != 1 are ignored
+float
+fim_std_masked(const float * restrict V,
+               const uint8_t * restrict mask,
+               size_t n);
 
 float * fim_maxproj(const float * A, size_t M, size_t N, size_t P);
 
@@ -267,13 +283,14 @@ void fim_insert_ref(float * T, int64_t t1, int64_t t2, int64_t t3,
  * @returns A copy of A in the region [m0,m1] x [n0, n1] x [p0, p1]
  */
 
-float * fim_get_cuboid(float * restrict A,
-                       const int64_t M, const int64_t N, const int64_t P,
-                       const int64_t m0, const int64_t m1,
-                       const int64_t n0, const int64_t n1,
-                       const int64_t p0, const int64_t p1);
+float *
+fim_get_cuboid(float * restrict A,
+               const int64_t M, const int64_t N, const int64_t P,
+               const int64_t m0, const int64_t m1,
+               const int64_t n0, const int64_t n1,
+               const int64_t p0, const int64_t p1);
 
-/** @brief Crop an image from the 0-cornder
+/** @brief Crop an image from the 0-corner
  *
  * In MATLAB this would correspond to:
  * Y = A(1:m, 1:n, 1:p);
@@ -282,9 +299,10 @@ float * fim_get_cuboid(float * restrict A,
  *         [0, m-1], [0, n-1], [0, p-1] from the original image.
  */
 
-float * fim_subregion(const float * restrict A,
-                      const int64_t M, const int64_t N, const int64_t P,
-                      const int64_t m, const int64_t n, const int64_t p);
+float *
+fim_subregion(const float * restrict A,
+              const int64_t M, const int64_t N, const int64_t P,
+              const int64_t m, const int64_t n, const int64_t p);
 
 /** @brief  reference implementation of fim_subregion
  */

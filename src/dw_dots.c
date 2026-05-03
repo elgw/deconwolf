@@ -569,6 +569,95 @@ append_circularity(opts * s, ftab_t * T, const float * restrict I,
     return TT;
 }
 
+static float snr1(const float * I,
+                  const i64 M, const i64 N, const i64 P,
+                  const float x, const float y, const float z,
+                  const int lateral_r0, const int lateral_r1,
+                  const int axial_r0, const int axial_r1)
+{
+    // returns (signal - bg ) / std(bg)
+    // where signal is the value at (x, y, z)
+    // background are the pixels, p, where ||d-X|| > r0 and ||d-X|| > r1
+
+    // TODO
+    return 0;
+}
+
+static ftab_t *
+append_snr1(opts * s, ftab_t * T, const float * restrict I,
+                   size_t M, size_t N, size_t P)
+{
+    if(s->verbose > 2)
+    {
+        printf("append_snr1()\n");
+    }
+
+    int xcol = ftab_get_col(T, "f_x");
+    int ycol = ftab_get_col(T, "f_y");
+    int zcol = ftab_get_col(T, "f_z");
+
+    if(xcol < 0)
+    {
+        if(s->verbose > 0)
+        {
+            printf(
+                   "Error: no sub pixel locations available for snr1, using the "
+                   "pixel locations\n");
+        }
+
+        xcol = ftab_get_col(T, "x");
+        ycol = ftab_get_col(T, "y");
+        zcol = ftab_get_col(T, "z");
+    }
+
+    if(xcol < 0 | ycol < 0 | zcol < 0)
+    {
+        fprintf(stderr, "Error: No pixel coordinates available to append_snr1\n");
+        return T;
+    }
+
+    ftab_t * TC = ftab_new(1);
+    ftab_set_colname(TC, 0, "snr1");
+    free(TC->T);
+    TC->nrow = T->nrow;
+    TC->T = calloc(T->nrow, sizeof(float));
+    assert(TC->T != NULL);
+
+    // maybe better to pass a list of coordinates of a
+    // spheroid... which means we need to know which pixels that the
+    // spheroid intersects.
+    // x^2/rl^2 + y^2/rl^2 + z^2/ra^2 = 1
+
+    int lateral_r0 = ceil(s->fit_lsigma*2);
+    int lateral_r1 = ceil(s->fit_lsigma*3);
+    int axial_r0 = ceil(s->fit_asigma*2);
+    int axial_r1 = ceil(s->fit_asigma*3);
+
+    #pragma omp parallel for
+    for(size_t kk = 0; kk < T->nrow; kk++)
+    {
+        float * row = T->T + kk*T->ncol;
+        double x = row[xcol];
+        double y = row[ycol];
+        double z = row[zcol];
+
+        TC->T[kk] = snr1(I, M, N, P,
+                         x,y,z,
+                         lateral_r0, lateral_r1,
+                         axial_r0, axial_r1);
+    }
+
+
+    ftab_t * TT = ftab_concatenate_columns(T, TC);
+
+    ftab_free(T);
+    ftab_free(TC);
+
+
+    return TT;
+}
+
+
 static ftab_t * append_fitting(opts * s, ftab_t * T, float * I,
                                size_t M, size_t N, size_t P)
 {

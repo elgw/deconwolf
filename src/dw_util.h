@@ -60,8 +60,10 @@
 #define strncasecmp _strnicmp
 #endif
 
+typedef uint8_t u8;
 typedef int64_t i64;
 typedef uint64_t u64;
+typedef float f32;
 
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"
