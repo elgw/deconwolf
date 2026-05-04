@@ -56,6 +56,18 @@ Additional options
 	Set the number of computational threads
   --fout file.tif
 	Write filtered image -- for debugging
+  --test
+        Run some self-tests.
+  --snr1
+        Toggles calculation of 'snr1' using the spots detected in the current
+        image, but using the pixel value from the image given by --orig
+  --orig file.tif
+         The origin of the image, i.e. if the program is run on a deconvolved,
+         image, this would be the non-deconvolved file. Currently only used to
+         calculate the 'snr1_orig' feature when combined with --snr1.
+         Note1: Will not work when processing more than one file.
+         Note2: If the file contains 'dw_' the program automatically look
+                for an orig file without that prefix.
 
 If you want to control the filter sizes, skip the optical parameters
 above and set the filter sizes manually by:

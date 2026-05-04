@@ -155,6 +155,8 @@ char * dw_getcwd(char * buf, size_t size);
  **/
 char * dw_prefix_file(const char * file, const char * prefix);
 
+char * dw_unprefix_file(const char * file, const char * prefix);
+
 #ifdef WINDOWS
 int getline(char **lineptr, size_t *n, FILE *stream);
 #endif

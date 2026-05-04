@@ -194,12 +194,16 @@ float
 fim_std(const float * V,
         size_t n);
 
-// Like fim_std but also accepts a mask,
+// fim_std but with a binary mask
 // elements where mask != 1 are ignored
-float
+// returns 0 on success or -1 on errors
+//
+// the mask can be NULL
+int
 fim_std_masked(const float * restrict V,
                const uint8_t * restrict mask,
-               size_t n);
+               size_t n,
+               double * mean_out, double * std_out);
 
 float * fim_maxproj(const float * A, size_t M, size_t N, size_t P);
 
@@ -289,6 +293,23 @@ fim_get_cuboid(float * restrict A,
                const int64_t m0, const int64_t m1,
                const int64_t n0, const int64_t n1,
                const int64_t p0, const int64_t p1);
+
+// Extract a sub region into a buffer with a known shape,
+// but indicate when the pixel was outside of the source buffer
+//
+// patch = S[m0:m1, n0:n1, p0:p1]
+// and mask is set to 0 whenever a pixel is outside of P, else it is left unchanged
+//
+int
+fim_get_cuboid_masked(float * restrict patch,
+                      uint8_t * restrict mask,
+                      const int64_t mM, const int64_t mN, const int64_t mP,
+                      const float * restrict S,
+                      const int64_t M, const int64_t N, const int64_t P,
+                      const int64_t m0, const int64_t m1,
+                      const int64_t n0, const int64_t n1,
+                      const int64_t p0, const int64_t p1);
+
 
 /** @brief Crop an image from the 0-corner
  *
@@ -624,6 +645,51 @@ fim_dot_lateral_circularity(const float * ,
                             size_t M, size_t N, size_t P,
                             double x, double y, double z,
                             double sigma);
+
+// Signal to noise ratio of a spot/dot
+// by the formula \mu / \sigma
+//
+// where \mu is the value of the central pixel
+// after subtraction of the mean of the background.
+// \sigma is the standard deviation of the background.
+//
+// Please note that there are multiple definitions in use
+// for the SNR of a spot. For example (\mu / \sigma)^2.
+//
+// Inputs:
+// V: an array of size MxNxP. The central pixel is by
+//    definition the "signal"
+// mask: and array of size MxNxP. Pixels where
+//     mask == 1 are defined as the background pixels.
+//
+// The function returns NaN on errors which could be:
+// - The dimensions of V are not odd, i.e. there is no
+//   central pixel.
+// - V or mask is NULL.
+// - To few elements in mask set to 1 (at least 2 required)
+
+float
+fim_dot_snr1(const float * restrict V,
+             const uint8_t * restrict mask,
+             int64_t M, int64_t N, int64_t P);
+
+
+// Generate a spheroid mask
+//
+// Returns
+// A mask of size M x N x P where the pixels with a center inside the spheroid
+// are set to 1, other pixels set to 0. Distances are measured with respect to
+// the center of the mask.
+//
+// r0, r1, r2 : length of axes
+//
+// f(X) = x^2/r0^2 + y^2/r1^2 + z^2/r2^2 - 1
+// M(X) = 1, f(X) <= 0
+// M(X) = 0, f(X)  > 0
+
+float *
+fim_gen_spheroid(int64_t M, int64_t N, int64_t P,
+                 float r0, float r1, float r2);
 
 /* Read an image and return the data as float, possibly after
  * conversion. The ttags argument can be set to NULL if not

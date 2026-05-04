@@ -13,7 +13,7 @@
 
 
 #include "dw_dots.h"
-
+#include "txt/dw_dots_help.txt.h"
 
 // TODO:
 // - '--multiscale' as the only option for multiscaling ...
@@ -29,6 +29,7 @@ typedef struct{
     int verbose;
     int optpos;
     char * image; /* Image to analyze */
+    char * image_orig; // non-deconvolved image (optional)
     char * outfile; /* Where to write the tsv output */
     char * fout; /* Where to (optionally) write the filtered image */
     int nthreads;
@@ -58,6 +59,7 @@ typedef struct{
     int write_csv;
 
     int circularity; /* Set to 1 to enable circularity estimation */
+    int snr1; // set to 1 to add a snr1 table
 
     char * bgimage;
 
@@ -71,10 +73,17 @@ typedef struct{
     ftif_t * ftif;
 } opts;
 
+// Forward declarations
 static opts * opts_new();
 static void opts_free(opts * s);
 static void usage(__attribute__((unused)) int argc, char ** argv);
 static void argparsing(int argc, char ** argv, opts * s);
+
+static u8 *
+gen_spheroid_shell_mask(i64 M, i64 N, i64 P,
+                        const float r0x, const float r0y, const float r0z,
+                        const float r1x, const float r1y, const float r1z);
+// End of forward declarations
 
 static opts * opts_new()
 {
@@ -107,6 +116,7 @@ static void opts_free(opts * s)
     }
     free(s->cmdline);
     free(s->scales);
+    free(s->image_orig);
     free(s);
 }
 
@@ -120,6 +130,10 @@ static void opts_print(FILE * f, opts * s)
     if(s->image != NULL)
     {
         fprintf(f, "image: %s\n", s->image);
+    }
+    if(s->image_orig)
+    {
+        fprintf(f, "orig image: %s\n", s->image_orig);
     }
     if(s->bgimage != NULL)
     {
@@ -176,71 +190,9 @@ static void opts_print(FILE * f, opts * s)
     return;
 }
 
-static void usage(__attribute__((unused)) int argc, char ** argv)
+static void usage(__attribute__((unused)) int argc, __attribute__((unused)) char ** argv)
 {
-    opts * s = opts_new();
-    printf("Detection of diffraction limited dots in 3D images\n"
-           "using a Laplacian of Gaussian filter. Optional fitting\n"
-           "using a Gaussian model\n"
-           "Limited functionality for 2D images\n");
-    printf("\n");
-    printf("usage: %s [<options>] input.tif input2.tif ...\n", argv[0]);
-    printf("\n");
-    printf("Recommended/required arguments:\n");
-    printf("  --NA NA\n\t"
-           "Set numerical aperture\n");
-    printf("  --ni ni\n\t"
-           "Set refractive index\n");
-    printf("  --dx dx\n\t"
-           "Lateral pixel size [nm]\n");
-    printf("  --dz dz\n\t"
-           "Axial pixel size [nm]\n");
-    printf("  --lambda l\n\t"
-           "Emission wave length [nm]\n");
-    printf("  --ndots n\n\t"
-           "Number of dots to export (default M x N x 0.005)\n");
-    printf("\n");
-    printf("Additional options\n");
-    printf("  --background file.tif\n\t"
-           "Background model, input image will be divided by this\n");
-    printf("  --nscale n\n\t"
-           "set the number of scales to use\n");
-    printf("  --swell f\n\t"
-           "Tell the program how much larger the dots are compared to\n"
-           "the diffraction limit. Default = 1, i.e. diffraction limited dots\n"
-           "For some experiments values up to 2 makes sense\n");
-    printf("  --overwrite\n\t"
-           "Overwrite existing files (default %d)\n",
-           s->overwrite);
-    printf("  --help\n\t"
-           "Show this message\n");
-    printf("  --logfile file.txt\n\t"
-           "Specify where the log file should be written\n");
-
-    printf("  --verbose v\n\t"
-           "Verbosity level (default %d)\n", s->verbose);
-    printf("  --nthreads n\n\t"
-           "Set the number of computational threads\n");
-    printf("  --fout file.tif\n\t"
-           "Write filtered image -- for debugging\n");
-    printf("\n");
-    printf("If you want to control the filter sizes, skip the optical parameters\n"
-           "above and set the filter sizes manually by:\n");
-    printf("  --log_ls s\n\t"
-           "Lateral sigma (location of zero-crossing)\n");
-    printf("  --log_as s\n\t"
-           "Axial sigma (location of zero-crossing)\n");
-    printf("  --fit_ls\n\t"
-           "Lateral sigma, initial guess for the dot fitting\n");
-    printf("  --fit_as\n\t"
-           "Axial sigma, initial guess for the dot fitting");
-    printf("\n");
-    printf("Notes:\n");
-    printf("  - Log messages will be written to [input file].log.txt\n");
-    printf("  - Dots will be exported to [input file].dots.tsv\n");
-    printf("\n");
-    printf(" See the man page for more information.\n");
-    free(s);
+    printf("%s\n", dw_dots_help_txt);
 }
 
 ftab_t * ftab_insert_col(ftab_t * T, float * C, const char * cname)
@@ -265,6 +217,30 @@ ftab_t * ftab_insert_col(ftab_t * T, float * C, const char * cname)
     return T2;
 }
 
+static void dw_dots_test(void)
+{
+    printf("-> dw_dots_test\n");
+
+    printf("-> gen_sheroid_shell_mask\n");
+    // Nothing automated here but you can open the npy file
+    // and check if it makes sense.
+    const char outname[] = "spheroid_shell_mask.npy";
+    int dims[3] = {51, 51, 51};
+    float r0x = 9, r0y = 9, r0z = 12;
+    float r1x = 18, r1y = 18, r1z = 24;
+    printf("Generating %s [%d x %d x %d]\n", outname, dims[0], dims[1], dims[2]);
+    printf("Inner shape: %f, %f, %f\n", r0x, r0y, r0z);
+    printf("Outer shape: %f, %f, %f\n", r1x, r1y, r1z);
+
+    u8 * mask = gen_spheroid_shell_mask(dims[0], dims[1], dims[2],
+                                        r0x, r0y, r0z,
+                                        r1x, r1y, r1z);
+    npio_write(outname, 3, dims, mask, NPIO_I8, NPIO_I8);
+    free(mask);
+
+    return;
+}
+
 static void argparsing(int argc, char ** argv, opts * s)
 {
     size_t cmdline_size = 2 + 3*argc;
@@ -286,20 +262,23 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"fit_as", required_argument, NULL, 'A'},
         {"csv",    no_argument, NULL, 'c'},
         {"circularity", no_argument, NULL, 'C'},
-        {"logfile", required_argument, NULL, 'w'},
-        {"out", required_argument, NULL, 'O'},
-        {"log_ls", required_argument, NULL, 'L'},
-        {"fit_ls", required_argument, NULL, 'l'},
         {"fitting", no_argument, NULL, 'F'},
         {"help", no_argument, NULL, 'h'},
+        {"log_ls", required_argument, NULL, 'L'},
+        {"fit_ls", required_argument, NULL, 'l'},
         {"max_scale", required_argument, NULL, 'm'},
         {"ndots",   required_argument, NULL, 'n'},
         {"nscale",  required_argument, NULL, 'N'},
         {"overwrite", no_argument, NULL, 'o'},
+        {"out", required_argument, NULL, 'O'},
         {"fout",     required_argument, NULL, 'p'},
+        {"orig", required_argument, NULL, 'r'},
         {"swell",   required_argument, NULL, 's'},
+        {"snr1",     no_argument, NULL,      'S'},
         {"threads", required_argument, NULL, 't'},
+        {"test",    no_argument,       NULL, 'T'},
         {"verbose", required_argument, NULL, 'v'},
+        {"logfile", required_argument, NULL, 'w'},
         {"lambda", required_argument, NULL, '1'},
         {"NA",     required_argument, NULL, '3'},
         {"dx",     required_argument, NULL, '4'},
@@ -307,7 +286,7 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"ni",     required_argument, NULL, '6'},
         {NULL, 0, NULL, 0}};
     int ch;
-    while((ch = getopt_long(argc, argv, "1:3:4:5:6:L:a:A:b:cCF:hi:l:L:m:n:N:op:r:s:v:w:", longopts, NULL)) != -1)
+    while((ch = getopt_long(argc, argv, "1:3:4:5:6:L:a:A:b:cCF:hi:l:L:m:n:N:oO:p:r:s:STv:w:", longopts, NULL)) != -1)
     {
         switch(ch){
         case '1':
@@ -372,8 +351,13 @@ static void argparsing(int argc, char ** argv, opts * s)
             assert(s->outfile != NULL);
             break;
         case 'p':
+            free(s->fout);
             s->fout = strdup(optarg);
             assert(s->fout != NULL);
+            break;
+        case 'r':
+            free(s->image_orig);
+            s->image_orig = strdup(optarg);
             break;
         case 's':
             free(s->scales);
@@ -382,9 +366,15 @@ static void argparsing(int argc, char ** argv, opts * s)
             s->scales[0] = atof(optarg);
             s->nscale = 1;
             break;
+        case 'S':
+            s->snr1 = 1;
+            break;
         case 't':
             s->nthreads = atoi(optarg);
             break;
+        case 'T':
+            dw_dots_test();
+            exit(EXIT_SUCCESS);
         case 'v':
             s->verbose = atoi(optarg);
             break;
@@ -512,6 +502,8 @@ static void argparsing(int argc, char ** argv, opts * s)
         }
     }
 
+
+
     s->optpos = optind;
     return;
 }
@@ -545,7 +537,7 @@ append_circularity(opts * s, ftab_t * T, const float * restrict I,
     TC->T = calloc(T->nrow, sizeof(float));
     assert(TC->T != NULL);
 
-    #pragma omp parallel for
+#pragma omp parallel for
     for(size_t kk = 0; kk < T->nrow; kk++)
     {
         float * row = T->T + kk*T->ncol;
@@ -569,23 +561,83 @@ append_circularity(opts * s, ftab_t * T, const float * restrict I,
     return TT;
 }
 
-static float snr1(const float * I,
-                  const i64 M, const i64 N, const i64 P,
-                  const float x, const float y, const float z,
-                  const int lateral_r0, const int lateral_r1,
-                  const int axial_r0, const int axial_r1)
+static u8 *
+gen_spheroid_shell_mask(i64 M, i64 N, i64 P,
+                        const float r0x, const float r0y, const float r0z,
+                        const float r1x, const float r1y, const float r1z)
+{
+    float * inner = fim_gen_spheroid(M, N, P,
+                                     r0x, r0y, r0z);
+    assert(inner != NULL);
+    float * outer = fim_gen_spheroid(M, N, P,
+                                     r1x, r1y, r1z);
+    assert(outer != NULL);
+    u8 * mask = calloc(M*N*P, sizeof(u8));
+    assert(mask != NULL);
+    i64 n = M*N*P;
+    for(i64 kk = 0; kk < n; kk++) {
+        if(inner[kk] == 0) {
+            if(outer[kk] == 1) {
+                mask[kk] = 1;
+            }
+        }
+    }
+    free(inner);
+    free(outer);
+    return mask;
+}
+
+static float
+snr1(opts * s,
+     const float * restrict I,
+     const i64 M, const i64 N, const i64 P,
+     const float x, const float y, const float z,
+     const i64 mM, const i64 mN, const i64 mP,
+     const u8 * restrict mask,
+     u8 * restrict tmask, f32 * restrict tpatch) // buffers
 {
     // returns (signal - bg ) / std(bg)
     // where signal is the value at (x, y, z)
     // background are the pixels, p, where ||d-X|| > r0 and ||d-X|| > r1
 
-    // TODO
-    return 0;
+    // tmask = mask.copy()
+    memcpy(tmask, mask, mM*mM*mP);
+
+    // Extract patch and set mask to 0 where outside of the
+    // image
+    i64 m0 = round(x) - (mM-1)/2;
+    i64 m1 = round(x) + (mM-1)/2;
+    i64 n0 = round(y) - (mN-1)/2;
+    i64 n1 = round(y) + (mN-1)/2;
+    i64 p0 = round(z) - (mP-1)/2;
+    i64 p1 = round(z) + (mP-1)/2;
+    memset(tpatch, 0, mM*mN*mP*sizeof(f32));
+    fim_get_cuboid_masked(tpatch, tmask,
+                          mM, mN, mP,
+                          I, M, N, P,
+                          m0, m1,
+                          n0, n1,
+                          p0, p1);
+    float snr = fim_dot_snr1(tpatch, tmask, mM, mN, mP);
+#if 0
+    printf("Got patch\n"); fflush(stdout);
+    ftif_t * tif = fim_tiff_new(stdout, 1);
+    fim_tiff_write_noscale(tif,
+                           "tpatch.tif", tpatch,
+                           NULL,
+                           mM, mN, mP);
+    fim_tiff_destroy(tif);
+
+    printf("Wrote tpatch.tif for %f, %f, %f\n", x, y, z);
+    printf("snr = %f\n", snr);
+    getchar();
+#endif
+    return snr;
 }
 
 static ftab_t *
 append_snr1(opts * s, ftab_t * T, const float * restrict I,
-                   size_t M, size_t N, size_t P)
+            size_t M, size_t N, size_t P)
 {
     if(s->verbose > 2)
     {
@@ -610,14 +662,14 @@ append_snr1(opts * s, ftab_t * T, const float * restrict I,
         zcol = ftab_get_col(T, "z");
     }
 
-    if(xcol < 0 | ycol < 0 | zcol < 0)
+    if((xcol < 0) | (ycol < 0) | (zcol < 0))
     {
         fprintf(stderr, "Error: No pixel coordinates available to append_snr1\n");
         return T;
     }
 
     ftab_t * TC = ftab_new(1);
-    ftab_set_colname(TC, 0, "snr1");
+    ftab_set_colname(TC, 0, "snr1_orig");
     free(TC->T);
     TC->nrow = T->nrow;
     TC->T = calloc(T->nrow, sizeof(float));
@@ -628,30 +680,81 @@ append_snr1(opts * s, ftab_t * T, const float * restrict I,
     // spheroid intersects.
     // x^2/rl^2 + y^2/rl^2 + z^2/ra^2 = 1
 
-    int lateral_r0 = ceil(s->fit_lsigma*2);
-    int lateral_r1 = ceil(s->fit_lsigma*3);
-    int axial_r0 = ceil(s->fit_asigma*2);
-    int axial_r1 = ceil(s->fit_asigma*3);
+    float lateral_r0 = s->fit_lsigma*2.0;
+    float lateral_r1 = s->fit_lsigma*4.0;
+    float axial_r0 =   s->fit_asigma*2.0;
+    float axial_r1 =   s->fit_asigma*4.0;
 
-    #pragma omp parallel for
-    for(size_t kk = 0; kk < T->nrow; kk++)
+    if(s->verbose > 1)
     {
-        float * row = T->T + kk*T->ncol;
-        double x = row[xcol];
-        double y = row[ycol];
-        double z = row[zcol];
-
-        TC->T[kk] = snr1(I, M, N, P,
-                         x,y,z,
-                         lateral_r0, lateral_r1,
-                         axial_r0, axial_r1);
+        printf("snr1, inner ellipsoid: %f, %f, %f \n", lateral_r0, lateral_r0, axial_r0);
+        printf("snr1, outer ellipsoid: %f, %f, %f \n", lateral_r1, lateral_r1, axial_r1);
     }
 
 
+    // Size of masks and subregions
+    int mM = 2*ceil(lateral_r1) + 1;
+    int mN = 2*ceil(lateral_r1) + 1;
+    int mP = 2*ceil(axial_r1) + 1;
+
+    u8 * mask = gen_spheroid_shell_mask(mM, mN, mP,
+                                        lateral_r0, lateral_r0, axial_r0,
+                                        lateral_r1, lateral_r1, axial_r1);
+
+    i64 nmask = 0;
+
+    //float * fmask = fim_zeros(mM*mN*mP);
+    for(i64 kk = 0; kk < mM*mN*mP; kk++) {
+        nmask += mask[kk];
+        //  fmask[kk] = mask[kk];
+    }
+
+    //    fim_tiff_write(s->ftif, "debug_mask.tif", fmask,
+    //             NULL,
+    //             mM, mN, mP);
+    //fim_free(fmask);
+    if(s->verbose > 1) {
+        printf("%ld mask elements set to 1\n", nmask);
+    }
+
+    struct timespec t0, t1;
+    dw_gettime(&t0);
+
+#pragma omp parallel
+    {
+        u8 * tmask = malloc(mM*mN*mP*sizeof(u8));
+        f32 * tpatch = malloc(mM*mN*mP*sizeof(f32));
+#pragma omp for
+        for(size_t kk = 0; kk < T->nrow; kk++)  {
+            float * row = T->T + kk*T->ncol;
+            double x = row[xcol];
+            double y = row[ycol];
+            double z = row[zcol];
+
+            TC->T[kk] = snr1(s,
+                             I, M, N, P,
+                             x,y,z,
+                             mM, mN, mP,
+                             mask,
+                             tmask, tpatch);
+        }
+
+        free(tpatch);
+        free(tmask);
+    }
+
+    dw_gettime(&t1);
+    if(s->verbose > 1)
+    {
+        printf("snr1 took %f s\n", timespec_diff(&t1, &t0));
+    }
+
+    free(mask);
     ftab_t * TT = ftab_concatenate_columns(T, TC);
 
     ftab_free(T);
     ftab_free(TC);
+
 
 
     return TT;
@@ -796,7 +899,7 @@ static ftab_t * append_fitting(opts * s, ftab_t * T, float * I,
     return TT;
 
 
-fail1: ;
+ fail1: ;
     return T;
 }
 
@@ -808,13 +911,14 @@ int main(int argc, char ** argv)
 }
 #endif
 
-void detect_dots(opts * s, char * inFile)
+void detect_dots(opts * s, char * inFile, char * origFile)
 {
     if(!dw_isfile(inFile))
     {
         fprintf(stderr, "Can't open %s!\n", inFile);
         return;
     }
+
 
     assert(inFile != NULL);
     free(s->image);
@@ -1110,6 +1214,26 @@ void detect_dots(opts * s, char * inFile)
         T = append_circularity(s, T, A, M, N, P);
     }
 
+    if((s->snr1 == 1) & (origFile != NULL))
+    {
+        i64 M0, N0, P0;
+        float * I_orig = fim_tiff_read(s->ftif, origFile,
+                                       NULL, &M0, &N0, &P0);
+        if(I_orig == NULL)
+        {
+            fprintf(stderr, "Unable to open %s (--orig)\n", origFile);
+            exit(EXIT_FAILURE);
+        }
+        if( (M!=N0) | (N!=N0) | (P!=P0))
+        {
+            fprintf(stderr, "Image size mismatch between %s and %s\n",
+                    s->image, origFile);
+            exit(EXIT_FAILURE);
+        }
+        T = append_snr1(s, T, I_orig, M, N, P);
+        fim_free(I_orig);
+    }
+
     free(A);
 
 
@@ -1158,14 +1282,21 @@ int dw_dots(int argc, char ** argv)
 
     for(size_t kk = s->optpos; kk < (size_t) argc; kk++)
     {
+        char * orig_file = dw_unprefix_file(argv[kk], "dw_");
         if(s->verbose > 0)
         {
-            printf("Processing file %d/%d : %s\n",
+            printf("Processing file %d/%d : %s",
                    (int) (kk - s->optpos + 1),
                    argc - (int) s->optpos,
                    argv[kk]);
+            if(orig_file != NULL) {
+                printf(" (orig: %s)", orig_file);
+            }
+            printf("\n");
         }
-        detect_dots(s, argv[kk]);
+
+        detect_dots(s, argv[kk], orig_file);
+        free(orig_file);
     }
 
     if(s->verbose > 1)

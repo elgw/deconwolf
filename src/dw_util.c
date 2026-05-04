@@ -445,6 +445,91 @@ dw_prefix_file(const char * inFile, const char * prefix)
 #endif
 }
 
+char *
+dw_unprefix_file(const char * inFile, const char * prefix)
+{
+    assert(inFile != NULL);
+    if(prefix == NULL)
+    {
+        return strdup(inFile);
+    }
+
+    if(strlen(prefix) == 0)
+    {
+        return strdup(inFile);
+    }
+
+#ifdef WINDOWS
+    fprintf(stderr, "ERROR: dw_unprefix file not implemented for Windows\n");
+    exit(EXIT_FAILURE);
+    char* drive = calloc(strlen(inFile) + 16, 1);
+    char* dir = calloc(strlen(inFile) + 16, 1);
+    char* fname = calloc(strlen(inFile) + 16, 1);
+    char* ext = calloc(strlen(inFile) + 16, 1);
+
+    _splitpath(
+        inFile,
+        drive,
+        dir,
+        fname,
+        ext
+        );
+
+    char* pre_fname = calloc(strlen(fname) + strlen(prefix) + 16, 1);
+    sprintf(pre_fname, "%s_%s", prefix, fname);
+    char* outFile = calloc(strlen(inFile) + strlen(prefix) + 128, 1);
+
+    _makepath(
+        outFile,
+        drive,
+        dir,
+        pre_fname,
+        ext
+        );
+
+    free(drive);
+    free(dir);
+    free(fname);
+    free(pre_fname);
+    free(ext);
+    return outFile;
+#else
+    char * dname = dw_dirname(inFile);
+    assert(dname != NULL);
+    char * fname = dw_basename(inFile);
+    assert(fname != NULL);
+    char * outFile = calloc(strlen(inFile)+1, 1);
+    assert(outFile != NULL);
+
+    if(strlen(prefix) >= strlen(fname))
+    {
+        free(outFile);
+        outFile = NULL;
+        goto leave;
+    }
+
+    if(strncmp(fname, prefix, strlen(prefix)) != 0) {
+        free(outFile);
+        outFile = NULL;
+        goto leave;
+    }
+
+    if(strlen(dname) > 0)
+    {
+        sprintf(outFile, "%s%c%s", dname, FILESEP, fname+strlen(prefix));
+    } else {
+        sprintf(outFile, "%s", fname+strlen(prefix));
+    }
+
+leave:
+    free(dname);
+    free(fname);
+
+    return outFile;
+#endif
+}
+
+
 float abbe_res_xy(float lambda, float NA)
 {
     return lambda/(2.0*NA);
