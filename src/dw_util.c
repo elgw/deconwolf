@@ -565,32 +565,29 @@ int dw_fseek(FILE *fid, int64_t offset, int origin)
 #else
     ret = fseek(fid, offset, origin);
 #endif
-    if(ret)
-    {
-        perror("dw_fseek error:");
+    if(ret) {
+        perror("dw_fseek");
+        exit(EXIT_FAILURE);
     }
     return ret;
 }
 
 int npyfilename(const char * filename)
 {
-    // version 1
-    if(filename == NULL)
-    {
+    if(filename == NULL) {
         return 0;
     }
 
     size_t n = strlen(filename);
 
-    if(n < 4)
-    {
+    if(n < 4) {
         return 0;
     }
 
-    if(strncasecmp(&filename[n-4], ".npy", 4) == 0)
-    {
+    if(strncasecmp(&filename[n-4], ".npy", 4) == 0) {
         return 1;
     }
+
     return 0;
 }
 
@@ -643,7 +640,8 @@ char * dw_tempfile(const char * folder)
 #endif
 }
 
-const char * dw_yes_no(int value)
+const char *
+dw_yes_no(const int value)
 {
     if(value == 1)
     {
@@ -653,7 +651,8 @@ const char * dw_yes_no(int value)
     }
 }
 
-void dw_print_warning(FILE * fid)
+void
+dw_print_warning(FILE * fid)
 {
     // TODO: use colors if writing to terminal etc
     //fprintf(fid, ANSI_UNDERSCORE " ! " ANSI_COLOR_RESET );

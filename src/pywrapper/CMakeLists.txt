@@ -16,6 +16,9 @@ set(CMAKE_INSTALL_RPATH "./")
 
 # Prefer that Python use whatever environment that
 # is active. Especially the system version of Numpy can old.
+# sudo dnf install python3.13-devel
+# or install cmake via pip?
+# why not numpy-config and python3.13-config ?
 set (Python_FIND_VIRTUALENV FIRST) # Note: Python, not Python3 here
 find_package(Python3 3.8 REQUIRED
   COMPONENTS Development.Module NumPy)

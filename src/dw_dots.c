@@ -561,34 +561,98 @@ append_circularity(opts * s, ftab_t * T, const float * restrict I,
     return TT;
 }
 
+// Generate a binary mask defined by two spheroids:
+// inner: S1(r0x, r0y, r0z), outer: S2(r1x, r1y, r1z)
+// The output is set to be 1 for points covered by S1 but not S0
+// B = 1: S1==1, S2 == 0
+// B = 0: All other cases
+// I.e., S2 should be larger than S1
+// The size arguments, M, N, P need to have odd values
+// the central pixel is always set to 0
+//
+// Returns NULL on failure, possible reasons:
+// - M, N, or P is an even number
+// - memory allocation failures
+// - the mask has 0 elements set to 1
+
 static u8 *
-gen_spheroid_shell_mask(i64 M, i64 N, i64 P,
+gen_spheroid_shell_mask(const i64 M, const i64 N, const i64 P,
                         const float r0x, const float r0y, const float r0z,
                         const float r1x, const float r1y, const float r1z)
 {
+    if( ((M % 2) == 0) | ((N % 2) == 0) | ((P % 2) == 0) ) {
+        return NULL;
+    }
+
     float * inner = fim_gen_spheroid(M, N, P,
                                      r0x, r0y, r0z);
-    assert(inner != NULL);
+    if(inner == NULL) {
+        return NULL;
+    }
+
     float * outer = fim_gen_spheroid(M, N, P,
                                      r1x, r1y, r1z);
-    assert(outer != NULL);
-    u8 * mask = calloc(M*N*P, sizeof(u8));
-    assert(mask != NULL);
-    i64 n = M*N*P;
+    if(outer == NULL) {
+        free(inner);
+        return NULL;
+    }
+    const i64 n = M*N*P;
+
+    u8 * mask = calloc(n, sizeof(u8));
+    if(mask == NULL) {
+        free(outer);
+        free(inner);
+        return NULL;
+    }
+    i64 nset = 0;
     for(i64 kk = 0; kk < n; kk++) {
         if(inner[kk] == 0) {
             if(outer[kk] == 1) {
                 mask[kk] = 1;
+                nset++;
             }
         }
     }
+    // mid pixel
+    const i64 mid = (M-1)/2 + (N-1)/2*M + (P-1)/2*M*N;
+    if(mask[mid] == 1)
+    {
+        mask[mid] = 0;
+        nset--;
+    }
+
     free(inner);
     free(outer);
-    return mask;
+
+    if(nset > 0) {
+        return mask;
+    } else {
+        free(mask);
+        return NULL;
+    }
 }
 
+// calculates snr1 for a single location, i.e.
+// returns (signal - bg ) / std(bg)
+// where signal is the value at (x, y, z)
+// background are the pixels, p, where ||d-X|| > r0 and ||d-X|| > r1
+//
+// Input arguments:
+// I : the image to extract the local patch from
+// M, N, P : the size of I
+// x, y, z : the coordinate of the spot
+// mM, mN, mN : the size of the patch to measure in
+// mask : a binary mask that points out the background pixels
+// tmask : temporary buffer of the same size as mask
+// tpach : temporary buffer of the same dimension as mask
+//
+// On failure: returns NAN
+// Possible reasons:
+// - The point (x,y,z) is outside of the image
+// - The background pixels has a standard deviation equal to 0
+
 static float
-snr1(opts * s,
+snr1(const opts * s,
      const float * restrict I,
      const i64 M, const i64 N, const i64 P,
      const float x, const float y, const float z,
@@ -596,11 +660,11 @@ snr1(opts * s,
      const u8 * restrict mask,
      u8 * restrict tmask, f32 * restrict tpatch) // buffers
 {
-    // returns (signal - bg ) / std(bg)
-    // where signal is the value at (x, y, z)
-    // background are the pixels, p, where ||d-X|| > r0 and ||d-X|| > r1
+    if(s->verbose > 2)
+    {
+        printf("snr1()\n");
+    }
 
-    // tmask = mask.copy()
     memcpy(tmask, mask, mM*mM*mP);
 
     // Extract patch and set mask to 0 where outside of the
@@ -635,9 +699,19 @@ snr1(opts * s,
     return snr;
 }
 
+// estimate snr1 for all the spots in T,
+// Returns a new table which is the contenation of
+// T with a new column named 'snr1_orig'
+//
+// Will use f_x, f_y, f_z if available, or revert to
+// the x, y, z columns.
+//
+// Frees T on success
+//
+// Returns NULL on failure or crashes.
 static ftab_t *
-append_snr1(opts * s, ftab_t * T, const float * restrict I,
-            size_t M, size_t N, size_t P)
+append_snr1(const opts * s, ftab_t * T, const float * restrict I,
+            const size_t M, const size_t N, const size_t P)
 {
     if(s->verbose > 2)
     {
@@ -754,8 +828,6 @@ append_snr1(opts * s, ftab_t * T, const float * restrict I,
 
     ftab_free(T);
     ftab_free(TC);
-
-
 
     return TT;
 }
