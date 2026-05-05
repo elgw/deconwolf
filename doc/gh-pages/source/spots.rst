@@ -167,3 +167,69 @@ Properties returned from the fitting routine:
 * *f_corr* the correlation between the pixel values and the fitted
   model. This information is really useful to reject spot candidates
   that are found on line- and edge- like structures in images.
+
+Signal to Noise Ratio (SNR)
+---------------------------
+
+Several definitions of SNR can be found in the literature. When used
+with `-\-snr1` deconwolf outputs the following column to the result table:
+
+* *snr1_orig*
+
+which is defined as
+
+.. math::
+   \mbox{SNR} = \frac{c}{\sigma_b}
+
+where :math:`\sigma_b` is the standard deviation of the local
+background and :math:`c` is the contrast of the spot defined as
+
+.. math::
+   \mbox{c} = \mbox{peak value} - \mu_b
+
+and :math:`\mu_b` is the mean value of the background.
+
+This method is quite noisy since it depends on a single pixel value
+for the peak signal. Also the background definition is tricky since
+there could be other signals close to the signals of interest. This
+implementation does not account for that.
+
+The background is defined to be the pixels which are between two
+spheroids: :math:`S_1` which is the outside and :math:`S_0` which is
+the inside and cuts out the signal, each defined by an implicit
+surface:
+
+.. math::
+   S : \frac{x^2}{r_{x^2}} + \frac{y^2}{r_{y^2}} + \frac{x^2}{r_{x^2}} = 1
+
+For :math:`S_1` we set :math:`r_x=r_y=4\sigma_l`, and
+:math:`r_z=4\sigma_a`. For :math:`S_0` we set
+:math:`r_x=r_y=2\sigma_l`, and :math:`r_z=2\sigma_a`
+
+This measurement should be run on non-deconvolved images but with the
+locations found in the deconvolved images. As long as the input images
+to `dw dots` are prefixed with `dw_`, the program will look for
+corresponding files without the prefix and perform this analysis on
+them, i.e. the non-deconvolved images.
+
+Example: The following command will output `dw_cy5_*.tif.dots.tsv`
+with a column named *snr_orig* only if there exist files called
+`cy5_*.tif` in the same folder.
+
+.. code:: shell
+
+   dw dots [optical parameters] --fitting --snr1 dw_cy5_*.tif
+
+
+For other naming convention, it is only possible to run
+`dw dots` on one pair of files at a time with this syntax:
+
+
+.. code:: shell
+
+   dw dots [optical parameters] --fitting --snr1 --orig original.tif deconvolved.tif
+
+
+The **snr1_orig** is similar to what can be found in `FISH-quant
+<https://fq-imjoy.readthedocs.io/en/latest/snr/>`__, which use cuboids
+to define the background.

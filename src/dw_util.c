@@ -659,3 +659,26 @@ dw_print_warning(FILE * fid)
     fprintf(fid, " ! ");
     return;
 }
+
+char *
+dw_copy_cmd_line(const int argc, char ** argv)
+{
+    // Make room for quoting and spaces
+    size_t cmdline_size = 2 + 3*argc;
+    for(int kk = 0; kk < argc; kk++) {
+        cmdline_size += strlen(argv[kk]);
+    }
+
+    char * cmdline = calloc(cmdline_size, 1);
+    if(cmdline == NULL) {
+        perror("dw_copy_cmd_line");
+        return NULL;
+    }
+
+    for(int kk = 0; kk < argc; kk++) {
+        strncat(cmdline, "'", cmdline_size);
+        strncat(cmdline, argv[kk], cmdline_size);
+        strncat(cmdline, "' ", cmdline_size);
+    }
+    return cmdline;
+}

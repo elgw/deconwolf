@@ -244,18 +244,7 @@ static void dw_dots_test(void)
 
 static void argparsing(int argc, char ** argv, opts * s)
 {
-    size_t cmdline_size = 2 + 3*argc;
-    for(int kk = 0; kk < argc; kk++)
-    { cmdline_size += strlen(argv[kk]); }
-    s->cmdline = calloc(cmdline_size, 1);
-    assert(s->cmdline != NULL);
-    for(int kk = 0; kk < argc; kk++)
-    {
-        strncat(s->cmdline, "'", cmdline_size);
-        strncat(s->cmdline, argv[kk], cmdline_size);
-        strncat(s->cmdline, "' ", cmdline_size);
-    }
-
+    s->cmdline = dw_copy_cmd_line(argc, argv);
 
     struct option longopts[] = {
         {"log_as", required_argument, NULL, 'a'},
@@ -286,8 +275,11 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"dz",     required_argument, NULL, '5'},
         {"ni",     required_argument, NULL, '6'},
         {NULL, 0, NULL, 0}};
+
     int ch;
-    while((ch = getopt_long(argc, argv, "1:3:4:5:6:L:a:A:b:cCF:hi:l:L:m:n:N:oO:p:r:s:STv:w:", longopts, NULL)) != -1)
+    while((ch = getopt_long(argc, argv,
+                            "1:3:4:5:6:L:a:A:b:cCF:hi:l:L:m:n:N:oO:p:r:s:STv:w:",
+                            longopts, NULL)) != -1)
     {
         switch(ch){
         case '1':
@@ -389,16 +381,12 @@ static void argparsing(int argc, char ** argv, opts * s)
         }
     }
 
-    if(s->verbose > 1)
-    {
-        printf("VERBOSE>1: Printing out the settings just before validation:\n");
+    if(s->verbose > 1) {
         opts_print(stdout, s);
     }
 
-
-    if(s->NA*s->ni*s->dx*s->dz*s->lambda > 0)
-    {
-        float fwhm_pixels = abbe_res_xy(s->lambda, s->NA)/s->dx;
+    if(s->NA*s->ni*s->dx*s->dz*s->lambda > 0) {
+        float fwhm_pixels = abbe_res_xy(s->lambda, s->NA) / s->dx;
         float fwhm_pixels_z = abbe_res_z(s->lambda, s->NA) / s->dz;
         /* To determine the initial guess for the fitting,
          * we assume a Gaussian signal and convert the
@@ -414,30 +402,13 @@ static void argparsing(int argc, char ** argv, opts * s)
         s->log_asigma = s->fit_asigma*sqrt(2.0);
     }
 
-
-    if( (s->log_asigma)*(s->log_lsigma) <= 0 )
-    {
-        fprintf(stderr, "ERROR: "
-                "Not enough parameters specified to determine the LoG filter size\n");
-        fprintf(stderr, "Please specify\n");
-        fprintf(stderr, "          --log_ls and --log_as\n");
-        fprintf(stderr, "      OR\n");
-        fprintf(stderr, "          --NA, --ni, --lambda, --dx and --dz\n");
-        exit(EXIT_FAILURE);
+    if( (s->log_asigma)*(s->log_lsigma) <= 0 ) {
+        goto size_parameters_missing;
     }
 
-    if(s->fitting)
-    {
-        if( (s->fit_asigma)*(s->fit_lsigma) <= 0)
-        {
-            fprintf(stderr, "ERROR: "
-                    "Not enough parameters specified to determine the initial spot size for fitting\n");
-            fprintf(stderr, "Please specify\n");
-            fprintf(stderr, "Please specify\n");
-            fprintf(stderr, "          --fit_ls and --fit_as\n");
-            fprintf(stderr, "      OR\n");
-            fprintf(stderr, "          --NA, --ni, --lambda, --dx and --dz\n");
-            exit(EXIT_FAILURE);
+    if(s->fitting) {
+        if( (s->fit_asigma)*(s->fit_lsigma) <= 0) {
+            goto size_parameters_missing;
         }
     }
 
@@ -503,10 +474,28 @@ static void argparsing(int argc, char ** argv, opts * s)
         }
     }
 
-
-
     s->optpos = optind;
+
+    int nremain = argc - s->optpos;
+    if(s->image_orig != 0) {
+        if(nremain > 1) {
+            fprintf(stderr, "ERROR: --orig can only be used with one file at a time\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+
     return;
+
+ size_parameters_missing:
+    fprintf(stderr,
+            "ERROR: \n"
+            "How large are the spots?\n"
+            "\n"
+            "Please specify either\n"
+            "   --fit_ls and --fit_as\n"
+            "or\n"
+            "   --NA, --ni, --lambda, --dx and --dz\n");
+    exit(EXIT_FAILURE);
 }
 
 static ftab_t *

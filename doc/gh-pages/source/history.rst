@@ -1,13 +1,10 @@
 Version History
 ===============
 
-Planned/todo
-------------
+0.4.8
+-----
+- Added the ``--snr1``option to ``dw dots``.
 
-? Updated man pages built with sphinx?
-? GPU accelerated dot detection/fitting?
-? Disabling color output etc when `isatty` returns 0.
-? Use transpositions instead of strided convolutions for `fim_gmsooth` etc.
 
 0.4.6
 -----

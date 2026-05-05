@@ -43,6 +43,14 @@ It is probably also a good idea to set:
   initial dot detection, especially if the dots are large (in terms of
   pixels).
 
+**\--snr1**
+: Measure SNR according to the formula
+  `(max(signal)-mean(bg))/std(bg)` for each spot. `max(signal)` is
+  defined as the central pixel value. The background is defined by a
+  spheroid of size `$4\sigma_{xy}$` in the lateral plane and
+  `$2\sigma_{z}` in the axial direction, from which the central part
+  is removed by another spheroid with half the length of the axes.
+
 **\--ndots**
 : Specify the max amount of dots that should be exported (and possiby
   fitted). It is recommended that this is set manually when fitting is

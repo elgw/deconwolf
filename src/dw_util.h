@@ -183,3 +183,8 @@ const char * dw_yes_no(int value);
 
 /* Print something that catches attention */
 void dw_print_warning(FILE * fid);
+
+// Copy the command line to a single string using quoting
+// Example: ["./a.out", "--help"] -> "'./' '--help'"
+char *
+dw_copy_cmd_line(const int argc, char ** argv);
