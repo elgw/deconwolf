@@ -11,8 +11,8 @@
 #include "dw_version.h"
 #include "gmlfit.h"
 
-
 #include "dw_dots.h"
+#include "txt/dw_dots_help.txt.h"
 
 
 // TODO:
@@ -176,71 +176,10 @@ static void opts_print(FILE * f, opts * s)
     return;
 }
 
-static void usage(__attribute__((unused)) int argc, char ** argv)
+static void usage(__attribute__((unused)) int argc,
+                  __attribute__((unused)) char ** argv)
 {
-    opts * s = opts_new();
-    printf("Detection of diffraction limited dots in 3D images\n"
-           "using a Laplacian of Gaussian filter. Optional fitting\n"
-           "using a Gaussian model\n"
-           "Limited functionality for 2D images\n");
-    printf("\n");
-    printf("usage: %s [<options>] input.tif input2.tif ...\n", argv[0]);
-    printf("\n");
-    printf("Recommended/required arguments:\n");
-    printf("  --NA NA\n\t"
-           "Set numerical aperture\n");
-    printf("  --ni ni\n\t"
-           "Set refractive index\n");
-    printf("  --dx dx\n\t"
-           "Lateral pixel size [nm]\n");
-    printf("  --dz dz\n\t"
-           "Axial pixel size [nm]\n");
-    printf("  --lambda l\n\t"
-           "Emission wave length [nm]\n");
-    printf("  --ndots n\n\t"
-           "Number of dots to export (default M x N x 0.005)\n");
-    printf("\n");
-    printf("Additional options\n");
-    printf("  --background file.tif\n\t"
-           "Background model, input image will be divided by this\n");
-    printf("  --nscale n\n\t"
-           "set the number of scales to use\n");
-    printf("  --swell f\n\t"
-           "Tell the program how much larger the dots are compared to\n"
-           "the diffraction limit. Default = 1, i.e. diffraction limited dots\n"
-           "For some experiments values up to 2 makes sense\n");
-    printf("  --overwrite\n\t"
-           "Overwrite existing files (default %d)\n",
-           s->overwrite);
-    printf("  --help\n\t"
-           "Show this message\n");
-    printf("  --logfile file.txt\n\t"
-           "Specify where the log file should be written\n");
-
-    printf("  --verbose v\n\t"
-           "Verbosity level (default %d)\n", s->verbose);
-    printf("  --nthreads n\n\t"
-           "Set the number of computational threads\n");
-    printf("  --fout file.tif\n\t"
-           "Write filtered image -- for debugging\n");
-    printf("\n");
-    printf("If you want to control the filter sizes, skip the optical parameters\n"
-           "above and set the filter sizes manually by:\n");
-    printf("  --log_ls s\n\t"
-           "Lateral sigma (location of zero-crossing)\n");
-    printf("  --log_as s\n\t"
-           "Axial sigma (location of zero-crossing)\n");
-    printf("  --fit_ls\n\t"
-           "Lateral sigma, initial guess for the dot fitting\n");
-    printf("  --fit_as\n\t"
-           "Axial sigma, initial guess for the dot fitting");
-    printf("\n");
-    printf("Notes:\n");
-    printf("  - Log messages will be written to [input file].log.txt\n");
-    printf("  - Dots will be exported to [input file].dots.tsv\n");
-    printf("\n");
-    printf(" See the man page for more information.\n");
-    free(s);
+    printf("%s", dw_dots_help_txt);
 }
 
 ftab_t * ftab_insert_col(ftab_t * T, float * C, const char * cname)
