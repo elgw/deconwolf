@@ -212,6 +212,9 @@ to `dw dots` are prefixed with `dw_`, the program will look for
 corresponding files without the prefix and perform this analysis on
 them, i.e. the non-deconvolved images.
 
+Please note that the ``--background`` images is not applied for this
+measurement.
+
 Example: The following command will output `dw_cy5_*.tif.dots.tsv`
 with a column named *snr_orig* only if there exist files called
 `cy5_*.tif` in the same folder.

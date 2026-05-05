@@ -4,10 +4,10 @@ some properties of the detected spots.
 
 Initial spot detection is performed using a Laplacian of Gaussian filter.
 
-The optional fitting performs a maximum likelihood fitting of each spot
-against a Gaussian model.
+The optional fitting (--fitting) enables a maximum likelihood fitting of each
+spot against a Gaussian model.
 
-It is not intended for 2D images.
+It is not intended for 2D images but can probably handle that as well.
 
 The input is always a single tif images. If the input file starts with 'dw_',
 then the program will look for the corresponding log file written by deconwolf
@@ -15,7 +15,10 @@ to parse the scaling value, which will be used to scale the image.
 
 usage: dots [<options>] input.tif input2.tif ...
 
-Recommended/required arguments:
+The program needs to know how large the spots are,
+specify that either by the optical parameters below
+or by --sigma_l and --sigma_a
+
   --NA NA
 	Set numerical aperture
   --ni ni
@@ -26,6 +29,14 @@ Recommended/required arguments:
 	Axial pixel size [nm]
   --lambda l
 	Emission wave length [nm]
+
+Alternative to the 5 parameters above:
+  --sigma_a sigma
+        Axial size of spots when fitted to a Gaussian [pixels]
+  --sigma_l sigma
+        Lateral size of spots when fitted to a Gaussian [pixels]
+
+Recommended arguments:
   --ndots n
 	Number of dots to export (default M x N x 0.005)
   --fitting
@@ -50,6 +61,7 @@ Additional options
 	Show this message
   --logfile file.txt
 	Specify where the log file should be written
+        (default <input file>.log.txt)
   --verbose v
 	Verbosity level (default 1)
   --nthreads n
@@ -60,29 +72,31 @@ Additional options
         Run some self-tests.
   --snr1
         Toggles calculation of 'snr1' using the spots detected in the current
-        image, but using the pixel value from the image given by --orig
+        image, but using the pixel value from the image with the same name but
+        without the dw_ prefix. If the file name does not start with dw_, you
+        can specify the image to apply the operation on with the --orig flag.
+        Note: The --background correction is not applied before this measurement
+              since we are after the inherent spot quality.
   --orig file.tif
-         The origin of the image, i.e. if the program is run on a deconvolved,
-         image, this would be the non-deconvolved file. Currently only used to
-         calculate the 'snr1_orig' feature when combined with --snr1.
-         Note1: Will not work when processing more than one file.
-         Note2: If the file contains 'dw_' the program automatically look
-                for an orig file without that prefix.
+        The origin of the image, i.e. if the program is run on a deconvolved,
+        image, this would be the non-deconvolved file. Currently only used to
+        calculate the 'snr1_orig' feature when combined with --snr1.
+        Note1: Will not work when processing more than one file.
+        Note2: If the file contains 'dw_' the program automatically look
+               for an orig file without that prefix. Making this argument
+               superfluous.
 
-If you want to control the filter sizes, skip the optical parameters
-above and set the filter sizes manually by:
 
-  --log_ls s
+If you want to control the filter size for the Laplacian of Gaussian,
+skip the optical parameters above and set the filter sizes manually by:
+
+  --log_ls sigma
 	Lateral sigma (location of zero-crossing)
-  --log_as s
+  --log_as sigma
 	Axial sigma (location of zero-crossing)
-  --fit_ls
-	Lateral sigma, initial guess for the dot fitting
-  --fit_as
-	Axial sigma, initial guess for the dot fitting
 
-Notes:
+Outputs:
   - Log messages will be written to [input file].log.txt
   - Dots will be exported to [input file].dots.tsv
 
- See the man page for more information.
+See the man page for more information or the online documentation.

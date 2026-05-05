@@ -250,11 +250,13 @@ static void argparsing(int argc, char ** argv, opts * s)
         {"log_as", required_argument, NULL, 'a'},
         {"background", required_argument, NULL, 'b'},
         {"fit_as", required_argument, NULL, 'A'},
+        {"sigma_a", required_argument, NULL, 'A'},
         {"csv",    no_argument, NULL, 'c'},
         {"circularity", no_argument, NULL, 'C'},
         {"fitting", no_argument, NULL, 'F'},
         {"help", no_argument, NULL, 'h'},
         {"log_ls", required_argument, NULL, 'L'},
+        {"sigma_l", required_argument, NULL, 'l'},
         {"fit_ls", required_argument, NULL, 'l'},
         {"max_scale", required_argument, NULL, 'm'},
         {"ndots",   required_argument, NULL, 'n'},
@@ -385,6 +387,7 @@ static void argparsing(int argc, char ** argv, opts * s)
         opts_print(stdout, s);
     }
 
+    int optical_parameters = 0;
     if(s->NA*s->ni*s->dx*s->dz*s->lambda > 0) {
         float fwhm_pixels = abbe_res_xy(s->lambda, s->NA) / s->dx;
         float fwhm_pixels_z = abbe_res_z(s->lambda, s->NA) / s->dz;
@@ -400,16 +403,27 @@ static void argparsing(int argc, char ** argv, opts * s)
          */
         s->log_lsigma = s->fit_lsigma*sqrt(2.0);
         s->log_asigma = s->fit_asigma*sqrt(2.0);
+        optical_parameters = 1;
     }
 
-    if( (s->log_asigma)*(s->log_lsigma) <= 0 ) {
-        goto size_parameters_missing;
-    }
-
-    if(s->fitting) {
-        if( (s->fit_asigma)*(s->fit_lsigma) <= 0) {
-            goto size_parameters_missing;
+    if(optical_parameters == 0){
+        if((s->fit_lsigma > 0) & (s->fit_asigma > 0)) {
+            s->log_lsigma = s->fit_lsigma*sqrt(2.0);
+            s->log_asigma = s->fit_asigma*sqrt(2.0);
         }
+        optical_parameters = 1;
+    }
+
+    if( optical_parameters == 0) {
+        fprintf(stderr,
+                "ERROR: \n"
+                "How large are the spots?\n"
+                "\n"
+                "Please specify either\n"
+                "   --sigma_a and --sigma_l\n"
+                "or\n"
+                "   --NA, --ni, --lambda, --dx and --dz\n");
+        exit(EXIT_FAILURE);
     }
 
     // TODO: if s->multiscale. Also scale factor as a parameter.
@@ -485,17 +499,6 @@ static void argparsing(int argc, char ** argv, opts * s)
     }
 
     return;
-
- size_parameters_missing:
-    fprintf(stderr,
-            "ERROR: \n"
-            "How large are the spots?\n"
-            "\n"
-            "Please specify either\n"
-            "   --fit_ls and --fit_as\n"
-            "or\n"
-            "   --NA, --ni, --lambda, --dx and --dz\n");
-    exit(EXIT_FAILURE);
 }
 
 static ftab_t *
