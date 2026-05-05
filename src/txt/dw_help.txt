@@ -1,0 +1,88 @@
+usage: ./dw [<options>] image.tif psf.tif
+
+ Options:
+  --version
+	Show version info
+  --help
+	Show this message
+  --out file
+	Specify output image name. If not set the input image will be prefixed
+	with dw_.
+  --iter N
+	Specify the number of iterations to use (default: 1)
+  --gpu
+	Use GPU processing
+  --cldevice n
+	Use OpenCL device #n
+  --threads N
+	Specify the number of CPU threads to use
+  --verbose N
+	Set verbosity level (default: 1)
+  --test
+	Run unit tests
+  --tilesize N
+	Enables tiling mode and sets the largest tile size
+	to N voxels in x and y.
+  --tilepad N
+	Sets the tiles to overlap by N voxels in tile mode
+	(default: 20)
+  --prefix str
+	Set the prefix of the output files (default: 'dw')
+  --overwrite
+	Allows deconwolf to overwrite already existing output files
+  --psigma s
+	Pre filter the image with a Gaussian filter of sigma=s while Anscombe
+	transformed
+  --cz n
+	remove n zplanes from the top and bottom of the image.
+	has no effect when tiling is used
+  --az n
+	Automatically crop the image to n z-planes. The plane with the largest
+	will be placed in the centre.
+	has no effect when tiling is used
+  --bq Q
+	Set border handling to
+	0 'none' i.e. periodic
+	1 'compromise', or
+	2 'normal' which is default
+  --periodic
+	Equivalent to --bq 0
+  --scale s
+	Set the scaling factor for the output image manually to s.
+	Warning: Might cause clipping or discretization artifacts
+	This option is only used when the output format is 16-bit (i.e.
+	not with --float)
+  --float
+	Set output format to 32-bit float (default is 16-bit
+	int) and disable scaling
+  --bg l
+	Set background level, l
+  --offset l
+	Set a positive offset that will be added to the image during
+	processing and remove before saving to disk. Can help to mitigate
+	some of the detector noise (non-Poissonian)
+  --flatfield image.tif
+	Use a flat field correction image. Deconwolf will divide each plane of
+	the input image, pixel by pixel, by this correction image.
+  --lookahead N
+	Try to do a speed-for-memory trade off by using a N pixels larger
+	job size that is better suited for FFT.
+  --method name
+	Select what method to use. Valid options: rl, shb, shbcl2
+  --start_id
+	Set the input image as the initial guess
+  --start_flat
+	Use the average of the input image as the initial guess. Default
+  --start_lp
+	Use a low passed version of the input image as the initial guess.
+  --noplan
+	Don't use any planning optimization for fftw3
+  --no-inplace
+	Disable in-place FFTs (for fftw3), uses more
+	memory but could potentially be faster for some problem sizes.
+  --tempdir
+	Specify the folder where temporary files should be written
+	Can also be specified via the environmental variable DW_TEMPDIR
+
+For an overview of other modules, please run dw with no arguments, i.e.,
+without --help.

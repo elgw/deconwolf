@@ -656,8 +656,43 @@ void fim_insert_ref(float * T, int64_t t1, int64_t t2, int64_t t3,
 }
 
 
-float * fim_get_cuboid(float * restrict A, const int64_t M, const int64_t N, const int64_t P,
-                       const int64_t m0, const int64_t m1, const int64_t n0, const int64_t n1, const int64_t p0, const int64_t p1)
+float *
+fim_gen_spheroid(int64_t M, int64_t N, int64_t P,
+                 float r0, float r1, float r2)
+{
+    size_t n = M*N*P;
+    float * mask = fim_zeros(n);
+    if(mask == NULL)
+    {
+        return NULL;
+    }
+    for(i64 pp = 0; pp < P; pp++)
+    {
+        float z = pp - (P-1)/2;
+        for(i64 nn = 0; nn < N; nn++)
+        {
+            float y = nn - (N-1)/2;
+            for(i64 mm = 0; mm < M; mm++)
+            {
+                float x = mm - (M-1)/2;
+                float v = pow(x/r0, 2) + pow(y/r1, 2) + pow(z/r2, 2) - 1.0;
+                if(v <= 0)
+                {
+                    mask[mm + nn*M + pp*M*N] = 1;
+                }
+            }
+        }
+    }
+    return mask;
+}
+
+
+float *
+fim_get_cuboid(float * restrict A,
+               const int64_t M, const int64_t N, const int64_t P,
+               const int64_t m0, const int64_t m1,
+               const int64_t n0, const int64_t n1,
+               const int64_t p0, const int64_t p1)
 {
 
 
@@ -692,7 +727,52 @@ float * fim_get_cuboid(float * restrict A, const int64_t M, const int64_t N, con
     return C;
 }
 
-float * fim_subregion(const float * restrict A, const int64_t M, const int64_t N, const int64_t P, const int64_t m, const int64_t n, const int64_t p)
+int
+fim_get_cuboid_masked(float * restrict patch,
+                      uint8_t * restrict mask,
+                      const int64_t mM, const int64_t mN, const int64_t mP,
+                      const float * restrict S,
+                      const int64_t M, const int64_t N, const int64_t P,
+                      const int64_t m0, const int64_t m1,
+                      const int64_t n0, const int64_t n1,
+                      const int64_t p0, const int64_t p1)
+{
+    // the size of the buffer must match the size of the
+    // region that is asked for
+    assert(m1-m0 + 1 == mM);
+    assert(n1-n0 + 1 == mN);
+    assert(p1-p0 + 1 == mP);
+    //printf("M, N, P = %ld, %ld, %ld\n", M, N, P);
+    //printf("mM, mN, mP = %ld, %ld, %ld\n", mM, mN, mP);
+    //for(i64 kk = 0; kk < mM*mN*mP; kk++) { patch[kk] = 0; }
+#pragma omp parallel for
+    for(int64_t pp = 0; pp < mP; pp++) { // loop over output pos
+        for(int64_t nn = 0; nn < mN; nn++) {
+            for(int64_t mm = 0; mm < mM; mm++) {
+                // source coordinates
+                i64 sm = m0 + mm;
+                i64 sn = n0 + nn;
+                i64 sp = p0 + pp;
+                if( (sm >= 0) & (sm < M) &
+                    (sn >= 0) & (sn < N) &
+                    (sp >= 0) & (sp < P))
+                {
+                    patch[mm + nn*mM + pp*mM*mN] = S[sm + sn*M + sp*M*N];
+                } else {
+                    mask[mm + nn*mM + pp*mM*mN] = 0;
+                    patch[mm + nn*mM + pp*mM*mN] = NAN;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+
+float *
+fim_subregion(const float * restrict A,
+              const int64_t M, const int64_t N, const int64_t P,
+              const int64_t m, const int64_t n, const int64_t p)
 {
     ((void) P);
 
@@ -2528,18 +2608,126 @@ float * fim_xcorr2(const float * T, const float * A,
     return C;
 }
 
-
-float fim_std(const float * V, size_t N)
+// A faster alternative to fim_std_ref, which might be more
+// affected by cancellations. Timings for n = 1024*1024*60
+// "fim_std"    0.004566 s
+// "fim_std_ref" 0.011998 s
+float
+fim_std(const float * V, const size_t n)
 {
+    if(n < 2)
+    {
+        return 0;
+    }
+    double s = 0;
+    double ss = 0;
+#pragma omp parallel for reduction(+:s, ss)
+    for(size_t kk = 0; kk<n; kk++)
+    {
+        s += V[kk];
+        ss += pow(V[kk], 2);
+    }
+    double nf = (double) n;
+    return (float) sqrt(ss/(nf-1) - (s/nf)*(s/(nf-1.0)));
+}
 
-    float mean = fim_sum(V, N)/N;
+
+int
+fim_std_masked(const float * restrict V,
+               const uint8_t * restrict mask,
+               size_t n_total,
+               double * mean_out, double * std_out)
+{
+    if(n_total < 2)
+    {
+        return -1;
+    }
+
+    double s = 0;
+    double ss = 0;
+
+    size_t n = 0;
+    if(mask == NULL)
+    {
+        n = n_total;
+#pragma omp parallel for reduction(+:s, ss)
+        for(size_t kk = 0; kk<n_total; kk++)
+        {
+                s += V[kk];
+                ss += pow(V[kk], 2);
+        }
+    } else {
+#pragma omp parallel for reduction(+:s, ss, n)
+    for(size_t kk = 0; kk<n_total; kk++)
+    {
+        if(mask[kk] == 1)
+        {
+            s += V[kk];
+            ss += pow(V[kk], 2);
+            n++;
+        }
+    }
+    }
+    if(n < 2)
+    {
+        return -1;
+    }
+    double nf = (double) n;
+    *mean_out = s/nf;
+    *std_out = sqrt(ss/(nf-1) - (s/nf)*(s/(nf-1.0)));
+    return 0;
+}
+
+float
+fim_dot_snr1(const float * restrict V,
+             const uint8_t * restrict mask,
+             i64 M, i64 N, i64 P)
+{
+    if( (M < 1) | (N < 1) | (P < 1))
+    {
+        return NAN;
+    }
+    if((M % 2 == 0) | (N % 2 == 0) | (P % 2 == 0) )
+    {
+        return NAN;
+    }
+
+    if( (V == NULL) | (mask == NULL) )
+    {
+        return NAN;
+    }
+
+    double mean = 0, std = 0;
+    if(fim_std_masked(V, mask, M*N*P, &mean, &std))
+    {
+        return NAN;
+    }
+    if(std == 0)
+    {
+        return NAN;
+    }
+    i64 m = (M-1)/2;
+    i64 n = (N-1)/2;
+    i64 p = (P-1)/2;
+    double signal = V[m + n*M + p*M*N];
+    //printf("%f, %f, %f\n", signal, mean, std);
+    return (signal - mean) / std;
+}
+
+float
+fim_std_ref(const float * V, const size_t N)
+{
+    if(N < 2)
+    {
+        return 0;
+    }
+    double mean = fim_sum(V, N)/ (double) N;
     double s = 0;
 #pragma omp parallel for reduction(+:s)
     for(size_t kk = 0; kk<N; kk++)
     {
         s += pow(V[kk]-mean, 2);
     }
-
     return (float) sqrt(s/ (double) (N - 1.0) );
 }
 
@@ -4942,6 +5130,82 @@ static void fim_DoH_ut(void)
     return;
 }
 
+static void
+fim_std_ut(void)
+{
+
+    i64 n = 1024*1024*60;
+    f32 * V = calloc(n, sizeof(f32));
+    u8 * mask = calloc(n, sizeof(u8));
+    V[0] = 1;
+    V[1] = 2;
+    assert(fim_std(V, 0) == 0);
+    assert(fim_std(V, 1) == 0);
+    assert(fabs(fim_std(V, 2) - 0.707106781) < 1e-6 );
+    V[2] = 3.3;
+    assert(fabs(fim_std(V, 3) - 1.153256259) < 1e-6 );
+    assert(fabs(fim_std(V, n) - 0.000502558) < 1e-6);
+
+    // The mask is null, i.e. all elements should be used
+    double mean, std;
+    assert(fim_std_masked(V, NULL, n, &mean, &std) == 0);
+    assert(fabs(std - 0.000502558) < 1e-6);
+
+    // mask = [0, 0, ...] so there are not enough elements
+    // to calculate the std
+
+    assert(fim_std_masked(V, mask, n, &mean, &std) != 0);
+
+    for(int kk = 0; kk < 3; kk++)
+    {
+        mask[kk] = 1;
+    }
+    // Only the three first elements should be used
+    assert(fim_std_masked(V, mask, n, &mean, &std) == 0);
+    assert(fabs(std - 1.153256259) < 1e-6 );
+
+    tictoc
+    tic
+    double t = fim_std(V, n);
+    toc("fim_std")
+    tic
+    t = fim_std_ref(V, n);
+    toc("fim_std_ref")
+    printf("t=%f\n", t);
+    free(V);
+    free(mask);
+}
+
+void fim_dot_snr1_ut(void)
+{
+    i64 M = 3, N = 1, P = 1;
+    i64 n = M*N*P;
+    f32 * V = calloc(n, sizeof(f32));
+    u8 * mask = calloc(n, sizeof(u8));
+    double snr = fim_dot_snr1(V, mask, M, N, P);
+    // zero pixels marked as background
+    assert(isnan(snr));
+    for(int kk = 0; kk < n; kk++)
+    {
+        mask[kk] = 1;
+    }
+    // std = 0, i.e. infinite SNR, that is not allowed
+    // so we should get a NAN reply
+    snr = fim_dot_snr1(V, mask, M, N, P);
+    assert(isnan(snr));
+    // The central pixels, i.e. the signal is not background
+    mask[(n-1)/2] = 0;
+    V[0] = 1; V[1] = 3; V[2] = 2;
+    // signal = 3, mean_bg = 1.5, std_bg = 0.7071
+    // (signal - mean_bg) / std_bg
+    snr = fim_dot_snr1(V, mask, M, N, P);
+    assert(fabs(snr - 2.121320344) < 1e-6);
+
+
+    free(V);
+    free(mask);
+}
+
 void fim_ut()
 {
 #ifdef NDEBUG
@@ -4955,6 +5219,12 @@ void fim_ut()
     assert(npyfilename("npy") == 0);
     assert(npyfilename(NULL) == 0);
     assert(npyfilename(".npy.tif") == 0);
+
+    printf("-> std_ut\n");
+    fim_std_ut();
+
+    printf("-> fim_dot_snr1_ut\n");
+    fim_dot_snr1_ut();
 
     printf("-> DoH_ut\n");
     fim_DoH_ut();

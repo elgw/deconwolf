@@ -445,6 +445,91 @@ dw_prefix_file(const char * inFile, const char * prefix)
 #endif
 }
 
+char *
+dw_unprefix_file(const char * inFile, const char * prefix)
+{
+    assert(inFile != NULL);
+    if(prefix == NULL)
+    {
+        return strdup(inFile);
+    }
+
+    if(strlen(prefix) == 0)
+    {
+        return strdup(inFile);
+    }
+
+#ifdef WINDOWS
+    fprintf(stderr, "ERROR: dw_unprefix file not implemented for Windows\n");
+    exit(EXIT_FAILURE);
+    char* drive = calloc(strlen(inFile) + 16, 1);
+    char* dir = calloc(strlen(inFile) + 16, 1);
+    char* fname = calloc(strlen(inFile) + 16, 1);
+    char* ext = calloc(strlen(inFile) + 16, 1);
+
+    _splitpath(
+        inFile,
+        drive,
+        dir,
+        fname,
+        ext
+        );
+
+    char* pre_fname = calloc(strlen(fname) + strlen(prefix) + 16, 1);
+    sprintf(pre_fname, "%s_%s", prefix, fname);
+    char* outFile = calloc(strlen(inFile) + strlen(prefix) + 128, 1);
+
+    _makepath(
+        outFile,
+        drive,
+        dir,
+        pre_fname,
+        ext
+        );
+
+    free(drive);
+    free(dir);
+    free(fname);
+    free(pre_fname);
+    free(ext);
+    return outFile;
+#else
+    char * dname = dw_dirname(inFile);
+    assert(dname != NULL);
+    char * fname = dw_basename(inFile);
+    assert(fname != NULL);
+    char * outFile = calloc(strlen(inFile)+1, 1);
+    assert(outFile != NULL);
+
+    if(strlen(prefix) >= strlen(fname))
+    {
+        free(outFile);
+        outFile = NULL;
+        goto leave;
+    }
+
+    if(strncmp(fname, prefix, strlen(prefix)) != 0) {
+        free(outFile);
+        outFile = NULL;
+        goto leave;
+    }
+
+    if(strlen(dname) > 0)
+    {
+        sprintf(outFile, "%s%c%s", dname, FILESEP, fname+strlen(prefix));
+    } else {
+        sprintf(outFile, "%s", fname+strlen(prefix));
+    }
+
+leave:
+    free(dname);
+    free(fname);
+
+    return outFile;
+#endif
+}
+
+
 float abbe_res_xy(float lambda, float NA)
 {
     return lambda/(2.0*NA);
@@ -480,32 +565,29 @@ int dw_fseek(FILE *fid, int64_t offset, int origin)
 #else
     ret = fseek(fid, offset, origin);
 #endif
-    if(ret)
-    {
-        perror("dw_fseek error:");
+    if(ret) {
+        perror("dw_fseek");
+        exit(EXIT_FAILURE);
     }
     return ret;
 }
 
 int npyfilename(const char * filename)
 {
-    // version 1
-    if(filename == NULL)
-    {
+    if(filename == NULL) {
         return 0;
     }
 
     size_t n = strlen(filename);
 
-    if(n < 4)
-    {
+    if(n < 4) {
         return 0;
     }
 
-    if(strncasecmp(&filename[n-4], ".npy", 4) == 0)
-    {
+    if(strncasecmp(&filename[n-4], ".npy", 4) == 0) {
         return 1;
     }
+
     return 0;
 }
 
@@ -558,7 +640,8 @@ char * dw_tempfile(const char * folder)
 #endif
 }
 
-const char * dw_yes_no(int value)
+const char *
+dw_yes_no(const int value)
 {
     if(value == 1)
     {
@@ -568,7 +651,8 @@ const char * dw_yes_no(int value)
     }
 }
 
-void dw_print_warning(FILE * fid)
+void
+dw_print_warning(FILE * fid)
 {
     // TODO: use colors if writing to terminal etc
     //fprintf(fid, ANSI_UNDERSCORE " ! " ANSI_COLOR_RESET );

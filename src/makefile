@@ -93,7 +93,7 @@ dw_png_ut_files = dw_png.c dw_png_ut.c
 dw_png_ut: $(dw_png_ut_files)
 	$(CC) $(CFLAGS) $(dw_png_ut_files) $(LDFLAGS) -o dw_png_ut
 
-dw_dots_files=dw_dots.c fim.o ftab.o fim_tiff.o  dw_util.o fft.o gmlfit.o
+dw_dots_files=dw_dots.c fim.o ftab.o fim_tiff.o  dw_util.o fft.o gmlfit.o npio.o quickselect.o
 dw_dots: $(dw_dots_files)
 	$(CC) $(CFLAGS) -DSTANDALONE $(dw_dots_files) $(LDFLAGS) -o dw_dots
 

@@ -60,8 +60,10 @@
 #define strncasecmp _strnicmp
 #endif
 
+typedef uint8_t u8;
 typedef int64_t i64;
 typedef uint64_t u64;
+typedef float f32;
 
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"
@@ -152,6 +154,8 @@ char * dw_getcwd(char * buf, size_t size);
  * this command is equivalent to strdup
  **/
 char * dw_prefix_file(const char * file, const char * prefix);
+
+char * dw_unprefix_file(const char * file, const char * prefix);
 
 #ifdef WINDOWS
 int getline(char **lineptr, size_t *n, FILE *stream);
