@@ -99,4 +99,4 @@ Outputs:
   - Log messages will be written to [input file].log.txt
   - Dots will be exported to [input file].dots.tsv
 
-See the man page for more information or the online documentation.
+See the man page or the online documentation for more information.

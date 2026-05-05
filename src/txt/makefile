@@ -5,5 +5,5 @@ targets = $(patsubst %.txt,%.txt.h,$(sources))
 	$(info $< -> $@)
 	xxd -i "$<" > "$@"
 
-build: $(OUTPUTS)
+build: $(targets)
 	$(info done)
