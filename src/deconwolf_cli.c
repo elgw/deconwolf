@@ -193,6 +193,7 @@ npy2tif(int argc, char ** argv)
     return EXIT_FAILURE;
 
 success:
+    ;
     ftif_t * ftif = fim_tiff_new(stdout, 1);
     fim_tiff_write_float(ftif,
                          argv[2], V, NULL,
