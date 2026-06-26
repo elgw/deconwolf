@@ -658,7 +658,18 @@ snr1(const opts * s,
         printf("snr1()\n");
     }
 
-    memcpy(tmask, mask, mM*mM*mP);
+    memcpy(tmask, mask, mM*mN*mP);
+
+    if(0){
+#pragma omp single
+        {
+        float * tmaskf = malloc(mM*mN*mP*sizeof(float));
+        for(i64 kk = 0; kk < mM*mN*mP; kk++) { tmaskf[kk] = (float) tmask[kk];}
+        fim_tiff_write_float(s->ftif, "tmaskf.tif", tmaskf, NULL, mM, mN, mP);
+        free(tmaskf);
+        }
+    }
+
 
     // Extract patch and set mask to 0 where outside of the
     // image
@@ -675,6 +686,14 @@ snr1(const opts * s,
                           m0, m1,
                           n0, n1,
                           p0, p1);
+    if(0){
+        #pragma omp single
+        {
+            char outname[1024];
+            sprintf(outname, "tpatch_%03d_%03d.tif", (int) x, (int) y);
+            fim_tiff_write_float(s->ftif, outname, tpatch, NULL, mM, mN, mP);
+        }
+    }
     float snr = fim_dot_snr1(tpatch, tmask, mM, mN, mP);
 #if 0
     printf("Got patch\n"); fflush(stdout);
@@ -747,10 +766,10 @@ append_snr1(const opts * s, ftab_t * T, const float * restrict I,
     // spheroid intersects.
     // x^2/rl^2 + y^2/rl^2 + z^2/ra^2 = 1
 
-    float lateral_r0 = s->fit_lsigma*2.0;
-    float lateral_r1 = s->fit_lsigma*4.0;
-    float axial_r0 =   s->fit_asigma*2.0;
-    float axial_r1 =   s->fit_asigma*4.0;
+    float lateral_r0 = s->fit_lsigma*4.0;
+    float lateral_r1 = lateral_r0 + 2.0;
+    float axial_r0 =   s->fit_asigma*4.0;
+    float axial_r1 =   axial_r0 + 2.0;
 
     if(s->verbose > 1)
     {
