@@ -181,7 +181,7 @@ float fim_percentile(const float * restrict A, size_t N, float prct);
 float fimo_percentile(fimo * A, float prct);
 
 // Standard deviation, normalizing by (n-1)
-//
+// https://en.wikipedia.org/wiki/Bessel%27s_correction
 //
 // Inputs:
 // V: input data
