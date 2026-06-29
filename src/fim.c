@@ -75,25 +75,6 @@ void * __attribute__((__aligned__(FIM_ALIGNMENT))) fim_malloc(size_t nbytes)
         exit(EXIT_FAILURE);
     }
 
-#if 0
-    const size_t HPAGE_SIZE  = (1 << 21); // 2 Mb
-    if(FIM_ALIGNMENT == HPAGE_SIZE)
-    {
-        /* Has to be done before writing the first byte */
-        if(madvise( p, nbytes, MADV_HUGEPAGE ))
-        {
-            fprintf(stderr, "madvise failed\n");
-        }
-        if(0){ /* Would this decrease the chances of fragmentation? */
-            /* Set one byte to allocate */
-            /* Set one byte of each page to allocate */
-            for (size_t kk = 0; kk < nbytes; kk += HPAGE_SIZE) {
-                memset(p + kk, 0, 1);
-            }
-        }
-    }
-#endif
-
     memset(p, 0, nbytes);
 
     return p;
@@ -2709,6 +2690,10 @@ fim_dot_snr1(const float * restrict V,
     i64 m = (M-1)/2;
     i64 n = (N-1)/2;
     i64 p = (P-1)/2;
+
+    // Consider weighting together the central pixels
+    // for "signal" value
+
     double signal = V[m + n*M + p*M*N];
     //printf("%f, %f, %f\n", signal, mean, std);
     return (signal - mean) / std;

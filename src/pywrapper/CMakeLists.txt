@@ -1,4 +1,7 @@
+# sudo dnf install python3.13-devel or similar needed
+
 cmake_minimum_required(VERSION 3.28 FATAL_ERROR)
+
 project(deconwolf_python
   VERSION 1.0
   DESCRIPTION "Python module for deconwolf"
@@ -14,12 +17,8 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 # Happy to load libdeconwolf from the same folder.
 set(CMAKE_INSTALL_RPATH "./")
 
-# Prefer that Python use whatever environment that
-# is active. Especially the system version of Numpy can old.
-# sudo dnf install python3.13-devel
-# or install cmake via pip?
-# why not numpy-config and python3.13-config ?
-set (Python_FIND_VIRTUALENV FIRST) # Note: Python, not Python3 here
+# Only look in the active virtual environment
+set(Python3_FIND_VIRTUALENV ONLY)
 find_package(Python3 3.8 REQUIRED
   COMPONENTS Development.Module NumPy)
 

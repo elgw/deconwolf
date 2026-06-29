@@ -237,6 +237,7 @@ MacOS.
 3. Install
 
 .. code:: shell
+
    sudo cmake --install . --prefix /usr
 
 Once again, see the :ref:`installation notes <installation-notes>` for more options.

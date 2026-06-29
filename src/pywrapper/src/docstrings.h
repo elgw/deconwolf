@@ -62,3 +62,8 @@ PyDoc_STRVAR(gsmooth__doc__,
              );
 
 
+PyDoc_STRVAR(std__doc__,
+             "standard deviation");
+
+PyDoc_STRVAR(std_masked__doc__,
+             "standard deviation using a u8 mask to select values to use.");

@@ -51,6 +51,48 @@ typedef float f32;
 static PyObject *pydw_error;
 
 static int
+check_input_object(PyArrayObject * obj,
+                   int dtype,
+                   int ndim,
+                   int square)
+{
+
+    if(!PyArray_Check(obj)) {
+        PyErr_SetString(PyExc_RuntimeError,
+                        "Not a numpy array\n");
+        return 1;
+    }
+
+    if(PyArray_TYPE(obj) != dtype)
+    {
+        PyErr_SetString(PyExc_RuntimeError,
+                        "Wong data type\n");
+        return 1;
+    }
+
+    if(ndim > -1) {
+        if(PyArray_NDIM(obj) != ndim) {
+            PyErr_SetString(PyExc_RuntimeError,
+                            "Wrong number of dimensions\n");
+            return 1;
+        }
+    }
+
+    if(square == 1)
+    { // obviously ndim should be 2 to use this test
+        int n_vertex = PyArray_DIM(obj, 0);
+        if(PyArray_DIM(obj, 1) != n_vertex)
+        {
+            PyErr_SetString(PyExc_RuntimeError,
+                            "Not square\n");
+            return 1;
+        }
+    }
+    return 0;
+}
+
+
+static int
 check_matrix_argument(PyObject * _obj, int mindim, int maxdim)
 {
     assert(mindim <= maxdim);
@@ -152,8 +194,8 @@ x_bw(PyObject * UNUSED(self), PyObject *args, PyObject *keywds)
     bw_conf * conf = bw_conf_new();
 
     static char *kwlist[] = {"NA", "ni",
-                             "emission", "dx", "dz",
-                             "nplanes", "size", "verbose", NULL};
+        "emission", "dx", "dz",
+        "nplanes", "size", "verbose", NULL};
     if (!PyArg_ParseTupleAndKeywords(args, keywds, "fffff|iii", kwlist,
                                      &conf->NA, &conf->ni,
                                      &conf->lambda, &conf->resLateral, &conf->resAxial,
@@ -237,6 +279,72 @@ x_gsmooth(PyObject * UNUSED(self), PyObject *args, PyObject *keywds)
     fim_gsmooth_aniso((f32*) PyArray_DATA(array), M, N, P, sigmaxy, sigmaz);
 
     Py_RETURN_NONE;
+}
+
+static PyObject * x_std(PyObject * UNUSED(self), PyObject *args, PyObject *keywds)
+{
+    PyObject * _array;
+    static char *kwlist[] = {"image", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, keywds, "O", kwlist,
+                                     &_array))
+    {
+        PyErr_SetString(pydw_error,
+                        "Error parsing the arguments\n");
+        return NULL;
+    }
+
+    PyArrayObject * array = (PyArrayObject*) _array;
+
+    if(check_input_object(array, NPY_FLOAT32, -1, -1)) {
+        return NULL;
+    }
+    i64 n = PyArray_Size(_array);
+    double std = fim_std(PyArray_DATA(array), n);
+    Py_BuildValue("d", std);
+}
+
+static PyObject * x_std_masked(PyObject * UNUSED(self), PyObject *args, PyObject *keywds)
+{
+    PyObject * _array1, *_array2;
+    static char *kwlist[] = {"image", "mask", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, keywds, "OO", kwlist,
+                                     &_array1, &_array2))
+    {
+        PyErr_SetString(pydw_error,
+                        "Error parsing the arguments\n");
+        return NULL;
+    }
+
+    PyArrayObject * array1 = (PyArrayObject*) _array1;
+    PyArrayObject * array2 = (PyArrayObject*) _array2;
+
+    if(check_input_object(array1, NPY_FLOAT32, -1, -1)) {
+        return NULL;
+    }
+
+    if(check_input_object(array2, NPY_UINT8, -1, -1)) {
+        return NULL;
+    }
+
+    if(PyArray_Size(_array1) != PyArray_Size(_array2)) {
+        PyErr_SetString(pydw_error,
+                        "The arrays should have the same number of elements\n");
+        return NULL;
+    }
+
+    i64 n = PyArray_Size(_array1);
+
+    float * image = PyArray_DATA(array1);
+    u8 * mask = PyArray_DATA(array2);
+    double mean, std;
+    if(fim_std_masked(image, mask, n, &mean, &std) == 0)
+    {
+        return Py_BuildValue("(d, d)", std, mean);
+    }
+
+    PyErr_SetString(pydw_error,
+                    "Something went wrong\n");
+    return NULL;
 }
 
 
@@ -395,15 +503,21 @@ x_deconvolve(PyObject * UNUSED(self), PyObject *args, PyObject *keywds)
 }
 
 
-// The 2nd element is allowed to be a PyCFunctionWithKeywords
+// The 2nd element is allowed to be a PyCFunctionWithKeywords, however gcc does
+// not know that.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-function-type"
 static PyMethodDef pydeconwolf_methods[] = {
     {"imread",      (PyCFunction) x_imread,     METH_VARARGS | METH_KEYWORDS, imread__doc__},
     {"imwrite",     (PyCFunction) x_imwrite,    METH_VARARGS | METH_KEYWORDS, imwrite__doc__},
     {"gen_psf_bw",  (PyCFunction) x_bw,         METH_VARARGS | METH_KEYWORDS, bw__doc__},
     {"deconvolve",  (PyCFunction) x_deconvolve, METH_VARARGS | METH_KEYWORDS, deconvolve__doc__},
     {"gsmooth",     (PyCFunction) x_gsmooth,    METH_VARARGS | METH_KEYWORDS, gsmooth__doc__},
+    {"std",         (PyCFunction) x_std,    METH_VARARGS | METH_KEYWORDS, std__doc__},
+    {"std_masked",  (PyCFunction) x_std_masked,    METH_VARARGS | METH_KEYWORDS, std_masked__doc__},
     {NULL, NULL, 0, NULL},
 };
+#pragma GCC diagnostic pop
 
 /* Module definition structure */
 static struct PyModuleDef
@@ -438,7 +552,7 @@ PyInit_pydeconwolf(void)
 
     import_array();
 
-    pydw_error = PyExc_RuntimeError;
+    pydw_error = PyExc_Exception;
 
     return module;
 }
