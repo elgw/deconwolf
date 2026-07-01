@@ -346,7 +346,8 @@ void fim_argmax0_max(const float * I,
     max_value[0] = max;
 }
 
-float fim_sum(const float * restrict A, size_t N)
+float
+fim_sum(const float * restrict A, size_t N)
 {
     double sum = 0;
 #pragma omp parallel for shared(A) reduction(+:sum)
@@ -356,6 +357,31 @@ float fim_sum(const float * restrict A, size_t N)
     }
 
     return (float) sum;
+}
+
+int
+fim_sum_masked(const float * restrict A,
+                   const u8 * restrict mask,
+               const size_t N,
+               float * ret_sum,
+               float * ret_nvalues)
+{
+    if(mask == NULL) {
+        return 1;
+    }
+
+    double sum = 0;
+    double nvalues = 0;
+#pragma omp parallel for shared(A) reduction(+:sum)
+    for(size_t kk = 0; kk<N; kk++) {
+        sum+=(double) A[kk]*( (double) mask[kk] == 1);
+        nvalues += (double) (mask[kk] == 1);
+    }
+
+    *ret_sum = sum;
+    *ret_nvalues = nvalues;
+
+    return 0;
 }
 
 float fim_sum_double(const double * restrict A, size_t N)
@@ -720,9 +746,9 @@ fim_get_cuboid_masked(float * restrict patch,
 {
     // the size of the buffer must match the size of the
     // region that is asked for
-    assert(m1-m0 + 1 == mM);
-    assert(n1-n0 + 1 == mN);
-    assert(p1-p0 + 1 == mP);
+    if( !( (m1-m0 + 1 == mM) | (n1-n0 + 1 == mN) | (p1-p0 + 1 == mP)) ) {
+            return 1;
+        }
     //printf("M, N, P = %ld, %ld, %ld\n", M, N, P);
     //printf("mM, mN, mP = %ld, %ld, %ld\n", mM, mN, mP);
     //for(i64 kk = 0; kk < mM*mN*mP; kk++) { patch[kk] = 0; }
@@ -2659,33 +2685,39 @@ fim_std_masked(const float * restrict V,
     return 0;
 }
 
-float
-fim_dot_snr1(const float * restrict V,
-             const uint8_t * restrict mask,
-             i64 M, i64 N, i64 P)
+// V : a roi, centered around a spot
+// bg_mask: a mask that points out background pixels
+// s_mask : a mask that points out signal pixels
+//
+// On success:
+// Return 0 and set snr1 and snrs
+// On failure:
+// Return 1. Might set snr1 and/or snrs
+
+int
+fim_spot_snr(const float * restrict V,
+             const uint8_t * restrict bg_mask,
+            const uint8_t * restrict s_mask,
+            const i64 M, const i64 N, const i64 P,
+            float * snr1, float * snrs)
 {
-    if( (M < 1) | (N < 1) | (P < 1))
-    {
-        return NAN;
+    if( (M < 1) | (N < 1) | (P < 1)) {
+        return 1;
     }
-    if((M % 2 == 0) | (N % 2 == 0) | (P % 2 == 0) )
-    {
-        return NAN;
+    if((M % 2 == 0) | (N % 2 == 0) | (P % 2 == 0) ) {
+        return 1;
     }
 
-    if( (V == NULL) | (mask == NULL) )
-    {
-        return NAN;
+    if( (V == NULL) | (bg_mask == NULL) | (s_mask == NULL)) {
+        return 1;
     }
 
     double mean = 0, std = 0;
-    if(fim_std_masked(V, mask, M*N*P, &mean, &std))
-    {
-        return NAN;
+    if(fim_std_masked(V, bg_mask, M*N*P, &mean, &std)) {
+        return 1;
     }
-    if(std == 0)
-    {
-        return NAN;
+    if(std == 0) {
+        return 1;
     }
     i64 m = (M-1)/2;
     i64 n = (N-1)/2;
@@ -2695,8 +2727,17 @@ fim_dot_snr1(const float * restrict V,
     // for "signal" value
 
     double signal = V[m + n*M + p*M*N];
+    float ssignal = 0;
+    float nsignal = 0;
+    if(fim_sum_masked(V, s_mask, M*N*P, &ssignal, &nsignal))
+    {
+        return 1;
+    }
     //printf("%f, %f, %f\n", signal, mean, std);
-    return (signal - mean) / std;
+    // fim_sum_masked(V, object_mask, M*N*P, &sum, &values)
+    *snr1 = (signal - mean) / std;
+    *snrs = nsignal*(ssignal/nsignal - mean) / std;
+    return 0;
 }
 
 float
@@ -5132,9 +5173,11 @@ fim_std_ut(void)
     assert(fabs(fim_std(V, n) - 0.000502558) < 1e-6);
 
     // The mask is null, i.e. all elements should be used
+    #ifndef NDEBUG
     double mean, std;
     assert(fim_std_masked(V, NULL, n, &mean, &std) == 0);
     assert(fabs(std - 0.000502558) < 1e-6);
+    #endif
 
     // mask = [0, 0, ...] so there are not enough elements
     // to calculate the std
@@ -5161,34 +5204,39 @@ fim_std_ut(void)
     free(mask);
 }
 
-void fim_dot_snr1_ut(void)
+void fim_spot_snr_ut(void)
 {
     i64 M = 3, N = 1, P = 1;
     i64 n = M*N*P;
     f32 * V = calloc(n, sizeof(f32));
-    u8 * mask = calloc(n, sizeof(u8));
-    double snr = fim_dot_snr1(V, mask, M, N, P);
+    u8 * bg_mask = calloc(n, sizeof(u8));
+    u8 * s_mask = calloc(n, sizeof(u8));
+    float snr1, snrs;
+    assert( fim_spot_snr(V, bg_mask, s_mask, M, N, P, &snr1, &snrs) != 0);
     // zero pixels marked as background
-    assert(isnan(snr));
+
     for(int kk = 0; kk < n; kk++)
     {
-        mask[kk] = 1;
+        bg_mask[kk] = 1;
     }
     // std = 0, i.e. infinite SNR, that is not allowed
     // so we should get a NAN reply
-    snr = fim_dot_snr1(V, mask, M, N, P);
-    assert(isnan(snr));
+    assert(fim_spot_snr(V, bg_mask, s_mask, M, N, P, &snr1, &snrs) != 0);
+
     // The central pixels, i.e. the signal is not background
-    mask[(n-1)/2] = 0;
+    bg_mask[(n-1)/2] = 0;
     V[0] = 1; V[1] = 3; V[2] = 2;
     // signal = 3, mean_bg = 1.5, std_bg = 0.7071
     // (signal - mean_bg) / std_bg
-    snr = fim_dot_snr1(V, mask, M, N, P);
-    assert(fabs(snr - 2.121320344) < 1e-6);
+    if(fim_spot_snr(V, bg_mask, s_mask, M, N, P, &snr1, &snrs) == 0)
+    {
+        assert(fabs(snr1 - 2.121320344) < 1e-6);
+    }
 
 
     free(V);
-    free(mask);
+    free(bg_mask);
+    free(s_mask);
 }
 
 void fim_ut()
@@ -5209,7 +5257,7 @@ void fim_ut()
     fim_std_ut();
 
     printf("-> fim_dot_snr1_ut\n");
-    fim_dot_snr1_ut();
+    fim_spot_snr_ut();
 
     printf("-> DoH_ut\n");
     fim_DoH_ut();

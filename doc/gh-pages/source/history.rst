@@ -4,6 +4,7 @@ Version History
 0.4.8
 -----
 - Added the ``--snr1``option to ``dw dots``.
+- ``dw npy2tif`` can convert uint32 files to tif.
 
 
 0.4.6

@@ -172,6 +172,16 @@ float fim_mean(const float * restrict A, size_t N);
 float fim_max(const float * restrict A, size_t N);
 float fim_sum(const float * restrict A, size_t N);
 
+// On success: return 0 and set sum to \sum_k A[kk] where mask[kk] == 1
+// and nvalues to the \sum_k(mask[k] == 1)
+int
+fim_sum_masked(const float * restrict A,
+               const uint8_t * restrict mask,
+               const size_t N,
+               float * sum,
+               float * nvalues);
+
+
 /* Returns the value at the prct percentile where 0 <= prct <= 100
  * using quickselect */
 float fim_percentile(const float * restrict A, size_t N, float prct);
@@ -668,10 +678,12 @@ fim_dot_lateral_circularity(const float * ,
 // - V or mask is NULL.
 // - To few elements in mask set to 1 (at least 2 required)
 
-float
-fim_dot_snr1(const float * restrict V,
-             const uint8_t * restrict mask,
-             int64_t M, int64_t N, int64_t P);
+int
+fim_spot_snr(const float * restrict V,
+            const uint8_t * restrict bg_mask,
+            const uint8_t * restrict s_mask,
+            int64_t M, int64_t N, int64_t P,
+            float * snr1, float * snrs);
 
 
 // Generate a spheroid mask

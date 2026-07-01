@@ -98,6 +98,7 @@ static opts * opts_new()
     s->fitting = 0;
     s->nscale = 1;
     s->max_rel_scale = 2;
+    s->snr1 = 1;
     return s;
 }
 
@@ -362,6 +363,7 @@ static void argparsing(int argc, char ** argv, opts * s)
             s->nscale = 1;
             break;
         case 'S':
+            printf("--snr1 is depreciated, that feature is always on\n");
             s->snr1 = 1;
             break;
         case 't':
@@ -626,9 +628,11 @@ gen_spheroid_shell_mask(const i64 M, const i64 N, const i64 P,
 }
 
 // calculates snr1 for a single location, i.e.
-// returns (signal - bg ) / std(bg)
-// where signal is the value at (x, y, z)
+// snr1 =  (peak_signal - bg ) / std(bg)
+// peak_signal is the value at the center pixel
 // background are the pixels, p, where ||d-X|| > r0 and ||d-X|| > r1
+//
+// snrs = (\sum_k(signal_k - mean(bg)) / std(bg))
 //
 // Input arguments:
 // I : the image to extract the local patch from
@@ -644,32 +648,33 @@ gen_spheroid_shell_mask(const i64 M, const i64 N, const i64 P,
 // - The point (x,y,z) is outside of the image
 // - The background pixels has a standard deviation equal to 0
 
-static float
-snr1(const opts * s,
-     const float * restrict I,
-     const i64 M, const i64 N, const i64 P,
-     const float x, const float y, const float z,
-     const i64 mM, const i64 mN, const i64 mP,
-     const u8 * restrict mask,
-     u8 * restrict tmask, f32 * restrict tpatch) // buffers
+static int
+spot_snr(const opts * s,
+         const float * restrict I,
+         const i64 M, const i64 N, const i64 P,
+         const float x, const float y, const float z,
+         const i64 mM, const i64 mN, const i64 mP,
+         const u8 * restrict bg_mask,
+         const u8 * restrict s_mask,
+         u8 * restrict tmask, f32 * restrict tpatch, // buffers
+         float * snr1, float * snrs)
 {
     if(s->verbose > 2)
     {
         printf("snr1()\n");
     }
 
-    memcpy(tmask, mask, mM*mN*mP);
+    memcpy(tmask, bg_mask, mM*mN*mP);
 
     if(0){
 #pragma omp single
         {
-        float * tmaskf = malloc(mM*mN*mP*sizeof(float));
-        for(i64 kk = 0; kk < mM*mN*mP; kk++) { tmaskf[kk] = (float) tmask[kk];}
-        fim_tiff_write_float(s->ftif, "tmaskf.tif", tmaskf, NULL, mM, mN, mP);
-        free(tmaskf);
+            float * tmaskf = malloc(mM*mN*mP*sizeof(float));
+            for(i64 kk = 0; kk < mM*mN*mP; kk++) { tmaskf[kk] = (float) tmask[kk];}
+            fim_tiff_write_float(s->ftif, "tmaskf.tif", tmaskf, NULL, mM, mN, mP);
+            free(tmaskf);
         }
     }
-
 
     // Extract patch and set mask to 0 where outside of the
     // image
@@ -687,14 +692,19 @@ snr1(const opts * s,
                           n0, n1,
                           p0, p1);
     if(0){
-        #pragma omp single
+#pragma omp single
         {
             char outname[1024];
             sprintf(outname, "tpatch_%03d_%03d.tif", (int) x, (int) y);
             fim_tiff_write_float(s->ftif, outname, tpatch, NULL, mM, mN, mP);
         }
     }
-    float snr = fim_dot_snr1(tpatch, tmask, mM, mN, mP);
+
+    if(fim_spot_snr(tpatch, tmask, s_mask, mM, mN, mP, snr1, snrs))
+    {
+        return 1;
+    }
+
 #if 0
     printf("Got patch\n"); fflush(stdout);
     ftif_t * tif = fim_tiff_new(stdout, 1);
@@ -708,7 +718,7 @@ snr1(const opts * s,
     printf("snr = %f\n", snr);
     getchar();
 #endif
-    return snr;
+    return 0;
 }
 
 // estimate snr1 for all the spots in T,
@@ -754,11 +764,12 @@ append_snr1(const opts * s, ftab_t * T, const float * restrict I,
         return T;
     }
 
-    ftab_t * TC = ftab_new(1);
+    ftab_t * TC = ftab_new(2);
     ftab_set_colname(TC, 0, "snr1_orig");
+    ftab_set_colname(TC, 1, "snrs_orig");
     free(TC->T);
     TC->nrow = T->nrow;
-    TC->T = calloc(T->nrow, sizeof(float));
+    TC->T = calloc(T->nrow*2, sizeof(float));
     assert(TC->T != NULL);
 
     // maybe better to pass a list of coordinates of a
@@ -783,25 +794,34 @@ append_snr1(const opts * s, ftab_t * T, const float * restrict I,
     int mN = 2*ceil(lateral_r1) + 1;
     int mP = 2*ceil(axial_r1) + 1;
 
-    u8 * mask = gen_spheroid_shell_mask(mM, mN, mP,
-                                        lateral_r0, lateral_r0, axial_r0,
-                                        lateral_r1, lateral_r1, axial_r1);
+    u8 * bg_mask = gen_spheroid_shell_mask(mM, mN, mP,
+                                           lateral_r0, lateral_r0, axial_r0,
+                                           lateral_r1, lateral_r1, axial_r1);
 
-    i64 nmask = 0;
+    float r_xy_inner = s->fit_lsigma*2+0.5;
+    float r_z_inner = s->fit_asigma*2+0.5;
+    float * s_maskf = fim_gen_spheroid(mM, mN, mP,
+                                       r_xy_inner, r_xy_inner,
+                                       r_z_inner);
 
-    //float * fmask = fim_zeros(mM*mN*mP);
+    u8 * s_mask = malloc(mM*mN*mP);
     for(i64 kk = 0; kk < mM*mN*mP; kk++) {
-        nmask += mask[kk];
-        //  fmask[kk] = mask[kk];
+        s_mask[kk] = (u8) s_maskf[kk];
+    }
+    free(s_maskf);
+
+
+#if 0
+    float * fmask = fim_zeros(mM*mN*mP);
+    for(i64 kk = 0; kk < mM*mN*mP; kk++) {
+        fmask[kk] = bg_mask[kk] + 2*s_mask[kk];
     }
 
-    //    fim_tiff_write(s->ftif, "debug_mask.tif", fmask,
-    //             NULL,
-    //             mM, mN, mP);
-    //fim_free(fmask);
-    if(s->verbose > 1) {
-        printf("%ld mask elements set to 1\n", nmask);
-    }
+    fim_tiff_write(s->ftif, "debug_mask.tif", fmask,
+                   NULL,
+                   mM, mN, mP);
+    fim_free(fmask);
+#endif
 
     struct timespec t0, t1;
     dw_gettime(&t0);
@@ -816,13 +836,18 @@ append_snr1(const opts * s, ftab_t * T, const float * restrict I,
             double x = row[xcol];
             double y = row[ycol];
             double z = row[zcol];
-
-            TC->T[kk] = snr1(s,
-                             I, M, N, P,
-                             x,y,z,
-                             mM, mN, mP,
-                             mask,
-                             tmask, tpatch);
+            float snr1_value = 0;
+            float snrs_value = 0;
+            spot_snr(s,
+                     I, M, N, P,
+                     x,y,z,
+                     mM, mN, mP,
+                     bg_mask,
+                     s_mask,
+                     tmask, tpatch,
+                     &snr1_value, &snrs_value);
+            TC->T[2*kk] = snr1_value;
+            TC->T[2*kk+1] = snrs_value;
         }
 
         free(tpatch);
@@ -835,7 +860,7 @@ append_snr1(const opts * s, ftab_t * T, const float * restrict I,
         printf("snr1 took %f s\n", timespec_diff(&t1, &t0));
     }
 
-    free(mask);
+    free(bg_mask);
     ftab_t * TT = ftab_concatenate_columns(T, TC);
 
     ftab_free(T);

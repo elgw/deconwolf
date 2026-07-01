@@ -53,7 +53,7 @@
 #include "sparse_preprocess_cli.h"
 
 static int
-deconwolf_cli_help(int argc, char ** argv)
+deconwolf_cli_help(int __attribute__((unused)) argc, char ** argv)
 {
     printf("usage: %s [--version] <command> [<options>]\n", argv[0]);
     printf("\n");
@@ -82,38 +82,26 @@ deconwolf_cli_help(int argc, char ** argv)
     printf("   imshift      Shift/translate tif images\n");
     printf("   tif2npy      convert a tif file to a Numpy .npy file\n");
     printf("   npy2tif      convert a Numpy .npy file to a tif file\n");
+    printf("   tif2npy_bin  convert a Numpy .npy file to a tif file\n"
+           "                and map [..., -1, 0] => 0, [1, ...] => 1");
     printf("\n");
     printf("Web page: https://www.github.com/elgw/deconwolf/\n");
     return EXIT_SUCCESS;
 }
 
 static int
-deconwolf_cli_version(int argc, char ** argv)
+deconwolf_cli_version(void)
 {
     printf("deconwolf version %s\n", deconwolf_version);
     return EXIT_SUCCESS;
 }
 
-static int
-npy2tif(int argc, char ** argv)
+static int convert_npy_to_tif(const char * infile, const char * outfile, int binary)
 {
-    if(argc > 1 && strcmp(argv[1], "--help") == 0)
-    {
-        printf("Usage:\n");
-        printf("%s input.npy output.tif\n", argv[0]);
-        exit(EXIT_SUCCESS);
-    }
-    if(argc < 3)
-    {
-        printf("Usage:\n");
-        printf("%s input.npy output.tif\n", argv[0]);
-        return EXIT_FAILURE;
-    }
-
-    npio_t * npy = npio_load(argv[1]);
+    npio_t * npy = npio_load(infile);
     if(npy == NULL)
     {
-        printf("Failed to open %s as a npy file\n", argv[1]);
+        printf("Failed to open %s as a npy file\n", infile);
         return EXIT_FAILURE;
     }
 
@@ -176,6 +164,16 @@ npy2tif(int argc, char ** argv)
         goto success;
     }
 
+    if(npy->dtype == NPIO_U32)
+    {
+        uint32_t * IN = (uint32_t * ) npy->data;
+        for(size_t kk = 0; kk < nel; kk++)
+        {
+            V[kk] = (float) IN[kk];
+        }
+        goto success;
+    }
+
     if(npy->dtype == NPIO_I32)
     {
         int32_t * IN = (int32_t * ) npy->data;
@@ -185,8 +183,9 @@ npy2tif(int argc, char ** argv)
         }
         goto success;
     }
+    printf("Error: Conversion routine missing for the input data type\n");
 
-    printf("Unable to convert the following npy file to float\n");
+
     npio_print(stdout, npy);
     npio_free(npy);
     fim_free(V);
@@ -194,15 +193,70 @@ npy2tif(int argc, char ** argv)
 
 success:
     ;
+
+    if(binary) {
+        for(size_t kk = 0; kk < nel; kk++) {
+            if(V[kk] > 0) {
+                V[kk] = 1;
+            } else {
+                V[kk] = 0;
+            }
+        }
+    }
+
+
     ftif_t * ftif = fim_tiff_new(stdout, 1);
     fim_tiff_write_float(ftif,
-                         argv[2], V, NULL,
+                         outfile, V, NULL,
                          M, N, P);
     fim_tiff_destroy(ftif);
     ftif = NULL;
-
     fim_free(V);
     npio_free(npy);
+
+    return EXIT_SUCCESS;
+}
+
+
+static int
+npy2tif(int argc, char ** argv)
+{
+    if(argc > 1 && strcmp(argv[1], "--help") == 0)
+    {
+        printf("Usage:\n");
+        printf("%s input1.npy input2.npy ...\n", argv[0]);
+        exit(EXIT_SUCCESS);
+    }
+
+    for(int kk = 1; kk < argc; kk++)
+    {
+        char * outname = malloc(strlen(argv[kk]) + 16);
+        sprintf(outname, "%s.tif", argv[kk]);
+        printf("%s -> %s\n", argv[kk], outname);
+        convert_npy_to_tif(argv[kk], outname, 0);
+        free(outname);
+    }
+    return EXIT_SUCCESS;
+}
+
+static int
+npy2tif_bin(int argc, char ** argv)
+{
+    if(argc > 1 && strcmp(argv[1], "--help") == 0)
+    {
+        printf("Usage:\n");
+        printf("%s input1.npy input2.npy ...\n", argv[0]);
+        exit(EXIT_SUCCESS);
+    }
+
+    for(int kk = 1; kk < argc; kk++)
+    {
+        char * outname = malloc(strlen(argv[kk]) + 16);
+        sprintf(outname, "%s.tif", argv[kk]);
+        printf("%s -> %s\n", argv[kk], outname);
+        convert_npy_to_tif(argv[kk], outname, 1);
+        free(outname);
+    }
     return EXIT_SUCCESS;
 }
 
@@ -263,7 +317,7 @@ int main(int argc, char ** argv)
 
     if(strcmp(argv[1], "--version") == 0)
     {
-        return deconwolf_cli_version(argc, argv);
+        return deconwolf_cli_version();
     }
 
     if(strcmp(argv[1], "deconvolve") == 0)
@@ -353,9 +407,15 @@ int main(int argc, char ** argv)
         return tif2npy(argc-1, argv+1);
     }
 
+    // TODO: Give this utility function a proper command line parser
     if( strcmp(argv[1], "npy2tif") == 0)
     {
         return npy2tif(argc-1, argv+1);
+    }
+
+    if( strcmp(argv[1], "npy2tif_bin") == 0)
+    {
+        return npy2tif_bin(argc-1, argv+1);
     }
 
     // Fallback to 'deconvolve' if no command was specified
