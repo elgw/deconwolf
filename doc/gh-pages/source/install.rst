@@ -141,103 +141,103 @@ Nerd info:
         /opt/homebrew/opt/libomp/lib/libomp.dylib (compatibility version 5.0.0, current version 5.0.0)
         /usr/lib/libz.1.dylib (compatibility version 1.0.0, current version 1.2.12)
 
-macOS fix for Library not loaded: @rpath/libkdtree.dylib
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-On macOS, after installing deconwolf, running dw may fail with an error similar to:
+macOS fix for `Library not loaded: @rpath/libkdtree.dylib`
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. code-block:: bash
+On macOS, after installing deconwolf, running `dw` may fail with an error similar to:
 
-dyld[64091]: Library not loaded: @rpath/libkdtree.dylib
-Referenced from: /usr/local/bin/dw-0.4.7
-Reason: no LC_RPATH's found
-zsh: abort dw --help
+.. code:: shell
 
-This happens because the dw executable is linked against @rpath/libkdtree.dylib,
-but the installed binary does not contain a runtime library search path
-(LC_RPATH) pointing to the location where libkdtree.dylib was installed.
+   dyld[64091]: Library not loaded: @rpath/libkdtree.dylib
+   Referenced from: /usr/local/bin/dw-0.4.7
+   Reason: no LC_RPATH's found
+   zsh: abort      dw --help
 
-Locate the installed dw binary
+This happens because the `dw` executable is linked against
+`@rpath/libkdtree.dylib`, but the installed binary does not contain a runtime
+library search path, `LC_RPATH`, pointing to the location where
+`libkdtree.dylib` was installed.
 
-.. code-block:: bash
+Locate the installed `dw` binary:
 
-which dw
-ls -l /usr/local/bin/dw /usr/local/bin/dw-0.4.7
+.. code:: shell
 
-In a typical install, dw is a symlink to the versioned binary:
+   which dw
+   ls -l /usr/local/bin/dw /usr/local/bin/dw-0.4.7
 
-.. code-block:: bash
+   In a typical install, `dw` is a symlink to the versioned binary:
 
-/usr/local/bin/dw -> /usr/local/bin/dw-0.4.7
+.. code:: shell
 
-Confirm the missing runtime path
+   /usr/local/bin/dw -> /usr/local/bin/dw-0.4.7
 
-.. code-block:: bash
+Confirm the missing runtime path:
 
-otool -L /usr/local/bin/dw-0.4.7
-otool -l /usr/local/bin/dw-0.4.7 | grep -A3 LC_RPATH
+.. code:: shell
+
+   otool -L /usr/local/bin/dw-0.4.7
+   otool -l /usr/local/bin/dw-0.4.7 | grep -A3 LC_RPATH
 
 If the second command prints nothing, the binary has no runtime search path.
 
-Locate libkdtree.dylib
+Locate `libkdtree.dylib`:
 
-.. code-block:: bash
+.. code:: shell
 
-find /usr/local /opt/homebrew "$HOME" -name 'libkdtree.dylib' 2>/dev/null
+   find /usr/local /opt/homebrew "$HOME" -name 'libkdtree.dylib' 2>/dev/null
 
 A successful install may show something like:
 
-.. code-block:: bash
+.. code:: shell
 
-/usr/local/lib/libkdtree.dylib
-/Users/<user>/Documents/Repositories/deconwolf/builddir/src/kdtree/libkdtree.dylib
+   /usr/local/lib/libkdtree.dylib
+   /Users/<user>/Documents/Repositories/deconwolf/builddir/src/kdtree/libkdtree.dylib
 
 Prefer the installed library location, usually:
 
-.. code-block:: bash
+.. code:: shell
 
-/usr/local/lib/libkdtree.dylib
+   /usr/local/lib/libkdtree.dylib
 
-Add the missing runtime search path
+Add the missing runtime search path. Use `install_name_tool`, not `make`:
 
-Use install_name_tool, not make.
+.. code:: shell
 
-.. code-block:: bash
+   sudo install_name_tool -add_rpath /usr/local/lib /usr/local/bin/dw-0.4.7
 
-sudo install_name_tool -add_rpath /usr/local/lib /usr/local/bin/dw-0.4.7
-
-If your libkdtree.dylib is installed somewhere else, replace /usr/local/lib
-with the directory containing libkdtree.dylib.
+If `libkdtree.dylib` is installed somewhere else, replace `/usr/local/lib`
+with the directory containing `libkdtree.dylib`.
 
 For example, if using Homebrew on Apple Silicon:
 
-.. code-block:: bash
+.. code:: shell
 
-sudo install_name_tool -add_rpath /opt/homebrew/lib /usr/local/bin/dw-0.4.7
+   sudo install_name_tool -add_rpath /opt/homebrew/lib /usr/local/bin/dw-0.4.7
 
 Or, if using the build-directory copy:
 
-.. code-block:: bash
+.. code:: shell
 
-sudo install_name_tool
--add_rpath /Users/<user>/Documents/Repositories/deconwolf/builddir/src/kdtree
-/usr/local/bin/dw-0.4.7
+   sudo install_name_tool 
+   -add_rpath /Users/<user>/Documents/Repositories/deconwolf/builddir/src/kdtree 
+   /usr/local/bin/dw-0.4.7
 
-Verify the fix
+Verify the fix:
 
-.. code-block:: bash
+.. code:: shell
 
-otool -l /usr/local/bin/dw-0.4.7 | grep -A3 LC_RPATH
-dw --help
+   otool -l /usr/local/bin/dw-0.4.7 | grep -A3 LC_RPATH
+   dw --help
 
-You should now see an LC_RPATH entry similar to:
+You should now see an `LC_RPATH` entry similar to:
 
-.. code-block:: bash
+.. code:: shell
 
-cmd LC_RPATH
-cmdsize ...
-path /usr/local/lib
+   cmd LC_RPATH
+   cmdsize ...
+   path /usr/local/lib
 
-and dw --help should run without the dyld error.
+and `dw --help` should run without the `dyld` error.
 
 
 Windows 10/11
