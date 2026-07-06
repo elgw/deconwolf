@@ -343,6 +343,13 @@ set(dw_bw_SOURCES
   set(CMAKE_BUILD_WITH_INSTALL_RPATH 1)
 
   include(GNUInstallDirs)
+
+  if(APPLE)
+    set_target_properties(dw PROPERTIES
+      INSTALL_RPATH "@loader_path/../${CMAKE_INSTALL_LIBDIR}"
+    )
+  endif()
+
   install(TARGETS dw)
   install(TARGETS dw_bw)
   install(FILES "${CMAKE_SOURCE_DIR}/doc/man/dw.1"
