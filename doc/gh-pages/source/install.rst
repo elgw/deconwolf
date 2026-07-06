@@ -141,10 +141,71 @@ Nerd info:
         /opt/homebrew/opt/libomp/lib/libomp.dylib (compatibility version 5.0.0, current version 5.0.0)
         /usr/lib/libz.1.dylib (compatibility version 1.0.0, current version 1.2.12)
 
+macOS
+^^^^^
+
+Deconwolf can be built on macOS using Homebrew dependencies. The following
+instructions were tested on Apple Silicon macOS.
+
+Install `Homebrew <https://brew.sh/>`__, then install the required dependencies:
+
+.. code:: shell
+
+   brew install cmake fftw libpng gsl libtiff libomp
+
+On macOS, OpenMP support is provided by Homebrew's `libomp` package. If CMake
+does not find OpenMP automatically, set `OpenMP_ROOT` before configuring the
+build:
+
+.. code:: shell
+
+   export OpenMP_ROOT="$(brew --prefix libomp)"
+
+For persistent use, this can be added to `~/.zshrc`:
+
+.. code:: shell
+
+   echo 'export OpenMP_ROOT="$(brew --prefix libomp)"' >> ~/.zshrc
+
+Then configure and build deconwolf:
+
+.. code:: shell
+
+   mkdir builddir
+   cd builddir
+   cmake ..
+   cmake --build .
+
+To install into the default prefix, use:
+
+.. code:: shell
+
+   sudo cmake --install .
+
+Alternatively, install into a custom prefix:
+
+.. code:: shell
+
+   cmake --install . --prefix "$HOME/.local"
+
+If the build fails with an error such as `fatal error: 'omp.h' file not
+found`, explicitly provide the Homebrew `libomp` include and library paths:
+
+.. code:: shell
+
+   export OpenMP_ROOT="$(brew --prefix libomp)"
+
+   cmake .. 
+   -DOpenMP_C_FLAGS="-Xpreprocessor -fopenmp -I${OpenMP_ROOT}/include" 
+   -DOpenMP_C_LIB_NAMES="omp" 
+   -DOpenMP_omp_LIBRARY="${OpenMP_ROOT}/lib/libomp.dylib"
+
+   cmake --build .
+
 macOS fix for `Library not loaded: @rpath/libkdtree.dylib`
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-On macOS, after installing deconwolf, running `dw` may fail with an error similar to:
+After installation, running `dw` may fail with an error similar to:
 
 .. code:: shell
 
@@ -153,25 +214,25 @@ On macOS, after installing deconwolf, running `dw` may fail with an error simila
    Reason: no LC_RPATH's found
    zsh: abort      dw --help
 
-This happens because the `dw` executable is linked against
-`@rpath/libkdtree.dylib`, but the installed binary does not contain a runtime
-library search path, `LC_RPATH`, pointing to the location where
-`libkdtree.dylib` was installed.
+This happens because the installed `dw` executable is linked against
+`@rpath/libkdtree.dylib`, but the binary does not contain a runtime library
+search path, `LC_RPATH`, pointing to the location where `libkdtree.dylib`
+was installed.
 
-Locate the installed `dw` binary:
+First, locate the installed `dw` binary:
 
 .. code:: shell
 
    which dw
    ls -l /usr/local/bin/dw /usr/local/bin/dw-0.4.7
 
-   In a typical install, `dw` is a symlink to the versioned binary:
+In a typical install, `dw` is a symlink to the versioned binary:
 
 .. code:: shell
 
    /usr/local/bin/dw -> /usr/local/bin/dw-0.4.7
 
-Confirm the missing runtime path:
+Then check whether the installed binary contains an RPATH:
 
 .. code:: shell
 
@@ -199,7 +260,7 @@ Prefer the installed library location, usually:
 
    /usr/local/lib/libkdtree.dylib
 
-Add the missing runtime search path. Use `install_name_tool`, not `make`:
+Add the missing runtime search path with `install_name_tool`:
 
 .. code:: shell
 
@@ -208,7 +269,7 @@ Add the missing runtime search path. Use `install_name_tool`, not `make`:
 If `libkdtree.dylib` is installed somewhere else, replace `/usr/local/lib`
 with the directory containing `libkdtree.dylib`.
 
-For example, if using Homebrew on Apple Silicon:
+For example, if using the Homebrew library directory on Apple Silicon:
 
 .. code:: shell
 
