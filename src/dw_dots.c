@@ -1246,14 +1246,12 @@ void detect_dots(opts * s, char * inFile, char * origFile)
         free(LoG);
     }
 
-    if(T == NULL)
-    {
+    if(T == NULL) {
         printf("Unable to continue, table could not be read\n");
         exit(EXIT_FAILURE);
     }
 
-    if(s->verbose > 1)
-    {
+    if(s->verbose > 1) {
         printf("Found %zu points\n", T->nrow);
         printf("Sorting the local maxima by value\n");
     }
@@ -1261,21 +1259,18 @@ void detect_dots(opts * s, char * inFile, char * origFile)
     /* Sort with highest value first */
     ftab_sort(T, ftab_get_col(T, "value"));
 
-    if(s->verbose > 1)
-    {
+    if(s->verbose > 1) {
         printf("Looking for a threshold\n");
     }
     /* Get a threshold suggestion */
     float * values = malloc(sizeof(float)*T->nrow);
     assert(values != NULL);
-    for(size_t kk = 0; kk<T->nrow; kk++)
-    {
+    for(size_t kk = 0; kk<T->nrow; kk++) {
         values[kk] = T->T[kk*T->ncol + 3];
     }
     float mean = fim_mean(values, T->nrow);
     float std = fim_std(values, T->nrow);
-    if(s->verbose > 1)
-    {
+    if(s->verbose > 1) {
         printf("Extracted %zu dots: Mean=%f, std=%f\n", T->nrow, mean, std);
     }
     fprintf(s->log, "Extracted %zu dots: Mean=%f, std=%f\n", T->nrow, mean, std);
@@ -1283,16 +1278,14 @@ void detect_dots(opts * s, char * inFile, char * origFile)
     fim_histogram_t * H = fim_histogram(values, T->nrow);
     free(values);
     //s->th = fim_histogram_otsu(H);
-    if(H != NULL)
-    {
+    if(H != NULL) {
         fim_histogram_log(H);
         s->th = fim_histogram_otsu(H);
     } else {
         fprintf(stderr, "Warning: could not create a histogram for the dots\n");
         s->th = -1;
     }
-    if(s->verbose > 1)
-    {
+    if(s->verbose > 1) {
         printf("Suggested threshold (from %zu dots): %f\n", T->nrow, s->th);
     }
     fprintf(s->log, "Suggested threshold (from %zu dots): %f\n", T->nrow, s->th);
@@ -1301,8 +1294,7 @@ void detect_dots(opts * s, char * inFile, char * origFile)
     float * use = malloc(T->nrow*sizeof(float));
     assert(use != NULL);
     int vcol = ftab_get_col(T, "value");
-    for(size_t kk = 0; kk<T->nrow; kk++)
-    {
+    for(size_t kk = 0; kk<T->nrow; kk++) {
         use[kk] = T->T[T->ncol*kk + vcol] > s->th;
     }
     T = ftab_insert_col(T, use, "use");
@@ -1311,15 +1303,13 @@ void detect_dots(opts * s, char * inFile, char * origFile)
     /* Discard unwanted dots before the computationally demanding fitting */
     ftab_head(T, s->ndots);
 
-    if(s->fitting)
-    {
+    if(s->fitting) {
         T = append_fitting(s, T,
                            A, M, N, P);
     }
 
     /* Will use sub pixel locations if fitting was performed */
-    if(s->circularity)
-    {
+    if(s->circularity) {
         T = append_circularity(s, T, A, M, N, P);
     }
 
@@ -1328,13 +1318,11 @@ void detect_dots(opts * s, char * inFile, char * origFile)
         i64 M0, N0, P0;
         float * I_orig = fim_tiff_read(s->ftif, origFile,
                                        NULL, &M0, &N0, &P0);
-        if(I_orig == NULL)
-        {
+        if(I_orig == NULL) {
             fprintf(stderr, "Unable to open %s (--orig)\n", origFile);
             exit(EXIT_FAILURE);
         }
-        if( (M!=N0) | (N!=N0) | (P!=P0))
-        {
+        if( (M!=M0) | (N!=N0) | (P!=P0)){
             fprintf(stderr, "Image size mismatch between %s and %s\n",
                     s->image, origFile);
             exit(EXIT_FAILURE);
