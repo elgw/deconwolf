@@ -11,7 +11,7 @@ typedef int32_t i32;
 qalign_config * qalign_config_new(void)
 {
     qalign_config * qconf = malloc(sizeof(qalign_config));
-    qconf->localication_sigma = 0.2;
+    qconf->localization_sigma = 0.2;
     qconf->verbose = 1;
     qconf->npoint = 1000;
     qconf->rel_error = 1.0/1000.0;
@@ -57,16 +57,21 @@ static void get_pairs(const float * X, i64 nX, qalign_pair * P)
     /* Construct all $(nX-1)nX/2$ difference vectors from the points in X */
 
     i64 idx = 0;
-    for(i64 kk = 0; kk < nX; kk++)
-    {
-        for(i64 ll = kk+1; ll < nX; ll++)
-        {
-            for(i64 ii = 0; ii < 3; ii++)
-            {
-                P[idx].delta[ii] = X[3*kk + ii] - X[3*ll + ii];
+    for(i64 kk = 0; kk < nX; kk++){
+        for(i64 ll = kk+1; ll < nX; ll++){
+            if(X[3*kk] - X[3*ll] > 0){
+                for(i64 ii = 0; ii < 3; ii++){
+                    P[idx].delta[ii] = X[3*kk + ii] - X[3*ll + ii];
+                }
+                P[idx].idx1 = kk;
+                P[idx].idx2 = ll;
+            } else {
+                for(i64 ii = 0; ii < 3; ii++){
+                    P[idx].delta[ii] = X[3*ll + ii] - X[3*kk + ii];
+                }
+                P[idx].idx1 = ll;
+                P[idx].idx2 = kk;
             }
-            P[idx].idx1 = kk;
-            P[idx].idx2 = ll;
             idx++;
         }
     }
@@ -98,9 +103,9 @@ static float qpair_distance_swap(const qalign_pair * A,
                                  const qalign_pair * B)
 {
     float delta[3] = {
-        A->dx + B->dx,
-        A->dy + B->dy,
-        A->dz + B->dz};
+        B->dx - A->dx,
+        B->dy - A->dy,
+        B->dz - A->dz};
 
     return float3_norm(delta);
 }
@@ -113,15 +118,17 @@ static void find_hypotheses(qalign_config * config,
                             i64 npB,
                             float * S, float * SZ, qalign_pair * H, i64 nH_alloc, i64 * nH)
 {
-    /* Loop over all pairs in pA and see if we can find correponding
+    /* Loop over all pairs in pA and see if we can find corresponding
        pairs in pB. If found they are added to array of Hypotheses, H
     */
     i64 iB0 = 0; // range in B: [iB0, iB1]
     // if A, B has std sigma, then A-B has std \sqrt(2)*sigma
     // the factor 2.0 is to not loose too much.
-    float sigma = config->localication_sigma;
+    float sigma = config->localization_sigma;
     float deviation_x = sqrt(2.0)*2.0*sigma;
     float rel_error = config->rel_error;
+
+    //printf("npA = %ld, npB = %ld\n", npA, npB);
 
     for(i64 iA = 0; iA < npA; iA++)
     {
@@ -131,7 +138,7 @@ static void find_hypotheses(qalign_config * config,
         {
             qalign_pair B = pB[iB];
             //printf("iA=%ld, %f, %f, %f ", iA, A.dx, A.dy, A.dz);
-            //printf("iB=%ld, %f, %f, %f\n", iB, B.dx, B.dy, B.dz);
+            //printf(" iB=%ld, %f, %f, %f\n", iB, B.dx, B.dy, B.dz);
 
             /* Manage the start position in pB */
             if(B.dx + deviation_x < A.dx )
@@ -164,15 +171,16 @@ static void find_hypotheses(qalign_config * config,
             float dm = d1;
             dm < d2 ? dm = d2 : 0;
 
+
             if(dm > 1.0) // very short distance vectors ignored
             {
                 if( (diff / dm) < (rel_error + sigma/dm) )
                 {
                     S[*nH]= lat_d1/lat_d2;
                     SZ[*nH] = A.dz/B.dz;
-                    H[*nH].dx = config->A[3*idxA + 0] - config->B[3*idxB+0];
-                    H[*nH].dy = config->A[3*idxA + 1] - config->B[3*idxB+1];
-                    H[*nH].dz = config->A[3*idxA + 2] - config->B[3*idxB+2];
+                    H[*nH].dx = config->A[3*idxA + 0] - config->B[3*idxB + 0];
+                    H[*nH].dy = config->A[3*idxA + 1] - config->B[3*idxB + 1];
+                    H[*nH].dz = config->A[3*idxA + 2] - config->B[3*idxB + 2];
                     H[*nH].idx1 = iA;
                     H[*nH].idx2 = iB;
                     (*nH)++;
@@ -251,7 +259,7 @@ int qalign(qalign_config * conf)
     sort_pairs(pA, npA);
     sort_pairs(pB, npB);
 
-    i64 nH_alloc = 1000;
+    i64 nH_alloc = 1000; // Will stop when this number of corresponding pairs are found.
     i64 nH = 0;
     qalign_pair * H = malloc(nH_alloc*sizeof(qalign_pair));
     if(H == NULL)
@@ -263,10 +271,7 @@ int qalign(qalign_config * conf)
     conf->S = malloc(nH_alloc*sizeof(float));
     conf->SZ = malloc(nH_alloc*sizeof(float));
 
-
-
-    if(conf->verbose > 1)
-    {
+    if(conf->verbose > 1){
         printf("Building hypotheses\n");
     }
     find_hypotheses(conf,
@@ -276,11 +281,10 @@ int qalign(qalign_config * conf)
                     conf->SZ,
                     H, nH_alloc, &nH);
     conf->nH = nH;
-    if(conf->verbose > 1)
-    {
+    if(conf->verbose > 1){
         printf("Found %ld hypotheses\n", nH);
-
-
+    }
+    if(conf->verbose > 2){
         int nshow = nH;
         nshow > 10 ? nshow = 10 : 0;
         for(int kk = 0; kk < nshow; kk++)
@@ -289,6 +293,7 @@ int qalign(qalign_config * conf)
             printf("[%f, %f, %f]\n", h->dx, h->dy, h->dz);
         }
     }
+
 
     free(pA);
     free(pB);

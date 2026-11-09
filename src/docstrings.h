@@ -67,3 +67,6 @@ PyDoc_STRVAR(std__doc__,
 
 PyDoc_STRVAR(std_masked__doc__,
              "standard deviation using a u8 mask to select values to use.");
+
+PyDoc_STRVAR(qalign__doc__,
+             "Calls the low level routine qalign");

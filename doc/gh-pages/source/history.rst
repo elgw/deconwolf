@@ -1,6 +1,11 @@
 Version History
 ===============
 
+0.4.9
+-----
+- Fixed bug in ``dw align`` not finding all correspondences.
+- ``qalign`` exposed via the python API.
+
 0.4.8
 -----
 - Added the ``--snr1``option to ``dw dots``.

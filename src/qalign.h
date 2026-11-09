@@ -17,31 +17,42 @@ typedef struct
 
 
 typedef struct {
-    /* Input data */
-    const float * A; /* 3*nA elements, x, y, z for each point */
+    // Input data
+    const float * A; // 3*nA elements, x, y, z for each point
     const float * B;
     int64_t nA;
     int64_t nB;
 
-    /* Settings */
+    // Settings
     int verbose;
-    /* Largest expected delative difference in magnification. For example 1/1000  */
+    // Largest expected delative difference in magnification. For example 1/1000
     float rel_error;
-    /* Standard deviation of the localization accuracy
-     * given in pixels. */
-    float localication_sigma;
-    /* Number of points to use at most */
+    // Standard deviation of the localization accuracy
+    // given in pixels.
+    float localization_sigma;
+    // Number of points to use at most from each set
     int64_t npoint;
 
-    /* Results */
-    qalign_pair * H; /* Hypotheses */
-    float * S; /* Scaling */
+    // Results/Output
+    qalign_pair * H; // Hypotheses
+    float * S; // Scaling
     float * SZ;
-    int64_t nH; /* Number of hypotheses */
+    int64_t nH; // Number of hypotheses
 } qalign_config;
 
 qalign_config * qalign_config_new();
 
-int qalign(qalign_config *);
+// Find hypotheses on how to rigidly move pairs of points in A
+// so that they overlap pairs of points in B
+//
+// The algorithm will find displacements of any length
+//
+// Memory usage:
+// 3*(nA^2 + nB^2)*sizeof(float) + nH*sizeof(qalign_pair)
+//
+// Time complexity:
+// somewhere between n^4 and n^6, where n = max(nA, nB)
+int
+qalign(qalign_config *);
 
 void qalign_config_free(qalign_config *);

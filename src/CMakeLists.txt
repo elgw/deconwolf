@@ -22,6 +22,9 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
+# Happy to load libs from the same folder
+SET(CMAKE_INSTALL_RPATH "$\{ORIGIN\}")
+
 option (ENABLE_GPU "Enable GPU/OpenCL" ON)
 option (PYDECONWOLF "Build Python module" ON)
 
@@ -163,10 +166,16 @@ if (ENABLE_GPU)
 endif()
 
 if (PYDECONWOLF)
-  add_subdirectory(pywrapper)
+
+# Only look in the active virtual environment
+set(Python3_FIND_VIRTUALENV ONLY)
+find_package(Python3 3.8 REQUIRED
+  COMPONENTS Development.Module NumPy)
+
+Python3_add_library(pydeconwolf pydeconwolf.c)
+# link do libdeconwolf[.so/.dll] which needs be in place to use the module
+target_link_libraries(pydeconwolf PRIVATE deconwolf Python3::NumPy)
 endif()
-
-
 
 include("GNUInstallDirs")
 

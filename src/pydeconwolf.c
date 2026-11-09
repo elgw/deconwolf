@@ -40,6 +40,7 @@
 #include "../../dw_bwpsf.h"
 #include "../../dw.h"
 #include "../../fim.h"
+#include "../../qalign.h"
 
 typedef int64_t i64;
 typedef float f32;
@@ -66,7 +67,7 @@ check_input_object(PyArrayObject * obj,
     if(PyArray_TYPE(obj) != dtype)
     {
         PyErr_SetString(PyExc_RuntimeError,
-                        "Wong data type\n");
+                        "Wrong data type\n");
         return 1;
     }
 
@@ -155,7 +156,6 @@ x_imread(PyObject * UNUSED(self), PyObject *args, PyObject *keywds)
         return NULL;
     }
 
-
     i64 M = 0;
     i64 N = 0;
     i64 P = 0;
@@ -186,6 +186,68 @@ x_imread(PyObject * UNUSED(self), PyObject *args, PyObject *keywds)
     PyObject * result_obj =
         PyArray_SimpleNewFromData(3, outsize, NPY_FLOAT32, V);
     return result_obj;
+}
+
+static PyObject *
+x_qalign(PyObject * UNUSED(self), PyObject *args, PyObject *keywds)
+{
+    qalign_config * conf = qalign_config_new();
+
+    static char *kwlist[] = {"X", "Y",
+        "rel_error", "localization_sigma",
+            "npoint", "verbose", NULL};
+
+    PyArrayObject* X;
+    PyArrayObject* Y;
+
+    // see https://docs.python.org/3/c-api/arg.html
+    if (!PyArg_ParseTupleAndKeywords(args, keywds, "OO|ffii", kwlist,
+                                     (PyObject*) &X,
+                                     (PyObject*) &Y,
+                                     // Optional
+                                     &conf->rel_error,
+                                     &conf->localization_sigma,
+                                     &conf->npoint,
+                                     &conf->verbose)){
+        PyErr_SetString(pydw_error,
+                        "Something weird with the arguments\n");
+        return NULL;
+    }
+
+    if(check_input_object(X, NPY_FLOAT32, 2, 0)){
+        return NULL;
+    }
+    if(check_input_object((PyArrayObject*) Y, NPY_FLOAT32, 2, 0)){
+        return NULL;
+    }
+
+    conf->A = (f32*) PyArray_DATA(X);
+    conf->nA = PyArray_DIM(X, 0);
+    conf->B = (f32*) PyArray_DATA(Y);
+    conf->nB = PyArray_DIM(Y, 0);
+
+    if(qalign(conf)){
+        qalign_config_free(conf);
+        PyErr_SetString(pydw_error,
+                        "qalign failed\n");
+        return NULL;
+    }
+
+    const npy_intp outsize[2] = {conf->nH, 3};
+    PyArrayObject * result_obj =
+        (PyArrayObject*) PyArray_SimpleNew(2, outsize, NPY_FLOAT32);
+
+    float * V = (f32*) PyArray_DATA(result_obj);
+    for(int kk = 0; kk < conf->nH; kk++){
+        for(int ll = 0; ll < 3; ll++){
+            V[3*kk + ll] = conf->H[kk].delta[ll];
+            //printf("%f ", conf->H[kk].delta[ll]);
+        }
+        //printf("\n");
+    }
+
+    qalign_config_free(conf);
+    return (PyObject*) result_obj;
 }
 
 static PyObject *
@@ -515,6 +577,7 @@ static PyMethodDef pydeconwolf_methods[] = {
     {"gsmooth",     (PyCFunction) x_gsmooth,    METH_VARARGS | METH_KEYWORDS, gsmooth__doc__},
     {"std",         (PyCFunction) x_std,    METH_VARARGS | METH_KEYWORDS, std__doc__},
     {"std_masked",  (PyCFunction) x_std_masked,    METH_VARARGS | METH_KEYWORDS, std_masked__doc__},
+    {"qalign",      (PyCFunction) x_qalign,    METH_VARARGS | METH_KEYWORDS, qalign__doc__},
     {NULL, NULL, 0, NULL},
 };
 #pragma GCC diagnostic pop

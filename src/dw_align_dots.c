@@ -1079,7 +1079,7 @@ run_qalign(opts * s,
     qconf->nA = nXA;
     qconf->B = fXB;
     qconf->nB = nXB;
-    qconf->localication_sigma = s->sigma;
+    qconf->localization_sigma = s->sigma;
     qconf->verbose = s->verbose;
     if(s->mag_is_set)
     {
