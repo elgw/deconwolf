@@ -202,9 +202,9 @@ surface:
 .. math::
    S : \frac{x^2}{r_{x^2}} + \frac{y^2}{r_{y^2}} + \frac{x^2}{r_{x^2}} = 1
 
-For :math:`S_1` we set :math:`r_x=r_y=4\sigma_l`, and
-:math:`r_z=4\sigma_a`. For :math:`S_0` we set
-:math:`r_x=r_y=2\sigma_l`, and :math:`r_z=2\sigma_a`
+For :math:`S_0` we set :math:`r_x=r_y=4\sigma_l`, and
+:math:`r_z=4\sigma_a`, and then let the radius of :math:`S_1` be two
+pixels larger than for :math:`S_0`.
 
 This measurement should be run on non-deconvolved images but with the
 locations found in the deconvolved images. As long as the input images

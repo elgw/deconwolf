@@ -1,12 +1,13 @@
-# to build the python wrapper
+#!/bin/env python
+
+# v 0.4.9, to build the python wrapper
 # cd src
 # mkdir build
 # cd build
 # cmake ..
 # make
 
-
-
+import argparse
 import sys
 import pathlib
 
@@ -21,7 +22,7 @@ print(f"deconwolf {dw.VERSION_MAJOR}.{dw.VERSION_MINOR}.{dw.VERSION_PATCH}")
 import numpy as np
 import matplotlib.pyplot as plt
 
-def test_qalign():
+def test_qalign(conf):
 
     nX = 30
     nY = 60
@@ -63,4 +64,6 @@ def test_qalign():
 
     plt.show()
 
-test_qalign()
+if __name__ == '__main__':
+    breakpoint()
+    test_qalign()

@@ -1,0 +1,82 @@
+[pydeconwolf]
+Python interface to parts and pieces of deconwolf
+
+EXPERIMENTAL! Please validate the results against the CLI version of deconwolf
+
+[deconvolve]
+deconvolve(image, psf, iterations=0, gpu=False, verbose=0, bq=2)
+
+Required Arguments
+------------------
+        image : The 3D images to deconvolve
+        psf : the 3D PSF to used
+        iterations : The number of iterations to use
+
+Optional arguments
+------------------
+        gpu : Use GPU or not
+        verbose: Verbosity level
+        bq : The border handling method. 0=periodic, 1=compromise, 2=best
+
+[imread]
+imread(filename, verbose=0)
+
+Read a 2D or 3D tif file and return as a fp32 numpy array
+Using libtiff in the background
+
+[imwrite]
+imwrite(array, filename, verbose=0)
+
+Write a 2D or 3D fp32 numpy array as a tif file
+Using libtiff in the background
+
+
+[qalign]
+qalign(X, Y, rel_error, localization_sigma, npoint, verbose)
+
+Calls the low level routine qalign which is a PART of dw align_dots
+
+Required Arguments
+------------------
+  X : A [n x 3] numpy array of spots in the first image
+  Y : A [n x 3] numpy array of spots in the first image
+
+Optional arguments
+------------------
+   rel_error          : The upper bound on relative errors on the spot pairs
+   localization_sigma : The localization precision [pixels]
+   npoint             : Most number of points to use from X and Y
+   verbose            : The verbosity level
+
+[gsmooth]
+gsmooth(image, sigmaxy=None, sigmaz=None, verbose=0)
+
+Normalized anisotropic Gaussian smoothing ...
+
+[bw]
+gen_psf_bw(NA=None, ni=None, dx=None, dz=None, emission=None, nplanes=None, size=None, verbose=0)
+
+Generate a 3D PSF using the \"Born and Wolf\" model
+
+Required Arguments
+------------------
+   NA       : The numerical aperture of the objective, for example 1.45
+   ni       : The refractive index of the immersion/air, for example 1.515
+   dx       : The pixel size in [nm]
+   dz       : The distance between planes [nm]
+   emission : The emission wave length [nm]
+
+Optional arguments
+------------------
+   nplanes : The number of z planes to calculate [pixels]
+   size    : The lateral size of the output [pixels]
+   verbose : The verbosity level
+   bq      : Border handling, 0=circular, 1=compromise, 2=best
+
+[std]
+std(X)
+standard deviation of f32 data
+
+[std_masked]
+std_masked(X, mask)
+standard deviation of f32 data where the u8 mask is set to 1

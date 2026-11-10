@@ -14,11 +14,9 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* A thin wrapper around some of the functionality in deconwolf
- * TODO:
- * store docstrings in normal text files and use `xxd -i` to generate header files
- */
-
+// A thin wrapper around some of the functionality in deconwolf
+// The docstrings in pydocstrings.h are generated from pydocstrings.txt using
+// genpydocstrings.py that is not automated.
 
 #include <Python.h>
 
@@ -45,7 +43,7 @@
 typedef int64_t i64;
 typedef float f32;
 
-#include "docstrings.h"
+#include "pydocstrings.h"
 
 // TODO: use standard error types, this clutters the documentation and does
 // not add anything useful

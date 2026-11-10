@@ -15,42 +15,40 @@
 
 typedef struct{
     int verbose;
-    /* Largest shift, in pixels, to consider between
-     * the point clouds
-     */
+    // Largest shift, in pixels, to consider between
+    // the point clouds
     double capture_distance;
     double sigma;
     int optind;
-    /* Most number of points to use from each file.
-     * A value of 0 is interpreted as "use all"
-     */
+    // Most number of points to use from each file.
+    // A value of 0 is interpreted as "use all"
     size_t npoint;
-    /* Name of file to write to (optional) */
+    // Name of file to write to (optional)
     char * outfile;
-    /* Overwrite outfile ?  */
+    // Overwrite outfile ?
     int overwrite;
-    /* Append to the outfile ? */
+    // Append to the outfile ?
     int append;
 
-    /* Magnification factor for the list of dots */
+    // Magnification factor for the list of dots
     int mag_is_set;
     double mag1;
     double mag2;
 
-    /* Multiplier for the z-component to match the localization
-       accuracy in the lateral plane and the axial direction */
+    // Multiplier for the z-component to match the localization
+    // accuracy in the lateral plane and the axial direction
     double weightz;
 
-    /* Initial shifts for the dots */
+    // Initial shifts for the dots
     char * fname_d1;
     char * fname_d2;
     double delta1[3];
     double delta2[3];
 
-    /* Rotation about the z-axis, i.e. in the plane */
+    // Rotation about the z-axis, i.e. in the plane
     double rotz;
 
-    /* For storing the result */
+    // For storing the result
     union{
         double delta[3];
         struct{
@@ -60,14 +58,13 @@ typedef struct{
         };
     };
     double kde;
-    /* Some measurement on how certain the result is */
+    // Some measurement on how certain the result is
     double goodness;
 } opts;
 
 
-/* Poisson Probability Mass Function (PMF)
- * I.e. lambda^k*exp(-lambda)/k!
- */
+// Poisson Probability Mass Function (PMF)
+// I.e. lambda^k*exp(-lambda)/k!
 static double poisson_pmf(double k, double lambda)
 {
     return exp(k*log(lambda)-lambda-lgamma(k+1));
@@ -84,14 +81,14 @@ static double poisson_cdf(double k0, double lambda)
     return s;
 }
 
-/* Get the value of the linspace from a to b with n points at idx */
+// Get the value of the linspace from a to b with n points at idx
 static double linspace(double a, double b, size_t n, size_t idx)
 {
     return a + (b-a)*(double) idx/ (double) (n-1);
 }
 
-/* Return the smallest number of points, n, required for a
- * linspace [a, b] with dx being at most delta */
+// Return the smallest number of points, n, required for a
+// linspace [a, b] with dx being at most delta
 static size_t linspace_n(double a, double b, double delta)
 {
     return (size_t) ceil((b-a) / delta) + 1;
@@ -102,17 +99,17 @@ static void linspace_ut()
 
     for(int kk = 1; kk<5; kk+=kk)
     {
-        /* Middle point should be 0 */
+        // Middle point should be 0
         //printf("%f, %f, %zu, %zu, %f\n", -1.0, 1.0, 2*kk+1, kk, linspace(-1, 1, 2*kk+1, kk));
         assert( linspace(-1, 1, 2*kk+1, kk) == 0 );
-        /* 0 -> a */
+        // 0 -> a
         assert( linspace(-1, 1, 2*kk+1, 0) == -1 );
-        /* n-1 -> b */
+        // n-1 -> b
         assert( linspace(-1, 1, 2*kk+1, 2*kk) == 1);
     }
-    /* [0, 1] */
+    // [0, 1]
     assert(linspace_n(0, 1, 1) == 2);
-    /* [-1, 0] */
+    // [-1, 0]
     assert(linspace_n(-1,0, 1) == 2);
     assert(linspace_n(0, 5, 1) == 6);
 }
@@ -392,7 +389,7 @@ static void argparsing(int argc, char ** argv, opts * s)
     return;
 }
 
-/* Multiply the x and y coordinates in X by mag */
+// Multiply the x and y coordinates in X by mag
 static void
 magnify_dots(double * X, size_t n, double mag)
 {
@@ -441,7 +438,7 @@ static void rotz_dots(double * X, size_t n, double rot)
     }
 }
 
-/* Extract the X,Y,Z values from the table */
+// Extract the X,Y,Z values from the table
 static double * get_dots(opts * s, ftab_t * T)
 {
     if(s->verbose > 1)
@@ -524,7 +521,7 @@ static double * get_dots(opts * s, ftab_t * T)
     return X;
 }
 
-/* Dynamic vector array */
+// Dynamic vector array
 struct dvarray {
     double * data;
     size_t n_used;
@@ -596,12 +593,10 @@ static void align_dots_bf(opts * s,
                           const double * XA, size_t nXA,
                           const double * XB, size_t nXB)
 {
-    /* Brute Force (BF) alignment of dots from the two sets
-     */
-
+    // Brute Force (BF) alignment of dots from the two sets
     kdtree_t * TA = kdtree_new(XA, nXA, 20);
 
-    /* Detect all pairs of points within some distance */
+    // Detect all pairs of points within some distance
     struct dvarray * arr = dvarray_new(1024);
     size_t nfound_total = 0;
     for(size_t kk = 0; kk < nXB; kk++)
@@ -659,7 +654,7 @@ static void align_dots_bf(opts * s,
     double * KDE = calloc(n*n*n, sizeof(double));
     assert(KDE != NULL);
 
-    /* Initial grid search */
+    // Initial grid search
 #pragma omp parallel for
     for(size_t iz = 0; iz < n; iz++) {
         double z = linspace(-rs, rs, n, iz);
@@ -678,7 +673,7 @@ static void align_dots_bf(opts * s,
         }
     }
 
-    /* Search through the grid to determine the max pos and value */
+    // Search through the grid to determine the max pos and value
     for(size_t iz = 0; iz < n; iz++) {
         for(size_t iy = 0; iy < n; iy ++) {
             for(size_t ix = 0; ix < n; ix++) {
@@ -701,7 +696,7 @@ static void align_dots_bf(opts * s,
                maxpos[0], maxpos[1], maxpos[2], maxkde);
     }
 
-    /* Refinement over the grid search */
+    // Refinement over the grid search
     rs = 1.0*s->sigma; // Region size
     rs2 = pow(rs, 2.0);
     while(rs > 1e-4)
@@ -737,11 +732,11 @@ static void align_dots_bf(opts * s,
     }
 
 
-    /* 2nd grid search to figure out what the 2nd best position is */
+    // 2nd grid search to figure out what the 2nd best position is
     double maxkde2 = 0;
     double maxpos2[3] = {0};
     {
-        /* We will exclude points withing 1 + s->sigma */
+        // We will exclude points withing 1 + s->sigma
         double sigma2 = pow(2.0 + s->sigma, 2.0);
         if(s->verbose > 1)
         {
@@ -767,7 +762,7 @@ static void align_dots_bf(opts * s,
                     if(v3_norm_sq(P) > rs2){
                         continue;
                     }
-                    /* Don't compare close the maxima that we found */
+                    // Don't compare close the maxima that we found
                     if(eudist3_sq(P, maxpos) < sigma2)
                     {
                         continue;
@@ -818,11 +813,11 @@ static void align_dots_bf(opts * s,
     s->dy = maxpos[1];
     s->dz = maxpos[2];
 
-    /* Please note that these values will be overwritten by the
-       function determine_alignment_quality */
+    // Please note that these values will be overwritten by the
+    // function determine_alignment_quality
 
     s->kde = maxkde;
-    /* Gap / combined height */
+    // Gap / combined height
     s->goodness = (maxkde-maxkde2) / (maxkde + maxkde2);
 
     if(s->verbose > 1)
@@ -852,7 +847,7 @@ static void align_dots_bf(opts * s,
 }
 
 
-/* Add a D=[dx, dy, dz] to each point in X */
+// Add a D=[dx, dy, dz] to each point in X
 static void shift_dots(double * X, double * D, i64 n)
 {
     double s = fabs(D[0]) + fabs(D[1]) + fabs(D[2]);
@@ -876,8 +871,9 @@ get_displacement_from_qalign_result(opts * s,
                                     i64 nqD,
                                     double * Q1) // return value
 {
-    /* Use mean shift to find a single displacement vector from the
-       hypotheses returned from qalign */
+    // Use mean shift to find a single displacement vector from the
+    // hypotheses returned from qalign.
+    // Note: Does not handle outliers (possible improvement)
 
     if(s->verbose > 1)
     {
@@ -886,9 +882,7 @@ get_displacement_from_qalign_result(opts * s,
     kdtree_t * T = kdtree_new(qD, nqD, 20);
     i64 start_idx = 0;
     double best_kde = -1;
-    for(i64 kk = 0; kk < nqD; kk++)
-    {
-        //printf("%f, %f, %f\n", qD[3*kk], qD[3*kk+1], qD[3*kk+2]);
+    for(i64 kk = 0; kk < nqD; kk++){
         double kde = kdtree_kde(T, qD+3*kk, s->sigma, -1);
         if(kde > best_kde)
         {
@@ -896,8 +890,7 @@ get_displacement_from_qalign_result(opts * s,
             start_idx = kk;
         }
     }
-    if(s->verbose > 1)
-    {
+    if(s->verbose > 1){
         printf("Best start point at %ld (kde=%f)\n", start_idx, best_kde);
     }
 
@@ -905,8 +898,7 @@ get_displacement_from_qalign_result(opts * s,
                     qD[start_idx*3 + 1],
                     qD[start_idx*3 + 2]};
 
-    for(i64 kk = 0; kk < 100; kk++)
-    {
+    for(i64 kk = 0; kk < 100; kk++){
         kdtree_kde_mean(T,
                         Q0,
                         s->sigma, // radius
@@ -917,8 +909,7 @@ get_displacement_from_qalign_result(opts * s,
 
     s->kde = kdtree_kde(T, Q1, s->sigma, -1);
 
-    if(s->verbose > 1)
-    {
+    if(s->verbose > 1){
         printf("qalign -> [%f, %f, %f] (kde=%.2f)\n", Q1[0], Q1[1], Q1[2], s->kde);
     }
 
@@ -926,7 +917,7 @@ get_displacement_from_qalign_result(opts * s,
     return;
 }
 
-/* Volume of a point cloud calculated via the bounding box */
+// Volume of a point cloud calculated via the bounding box
 static double
 bbx_volume(const double * X, i64 nX)
 {
@@ -956,31 +947,27 @@ static int determine_alignment_quality(opts * s,
                                        const double * XA, i64 nXA,
                                        const double * XB, i64 nXB)
 {
-    /* Determine the number of times that points overlap calculate the
-     * probability for assuming that the dots are uniformly randomly
-     * distributed and placed in bins so that the number of dots per
-     * bin is distributed according to Poisson.  Finally calculate a
-     * goodness score in [0, 1] such that a value of 1 indicates that
-     * this could not happen if XA and XB were uncorrelated.
-     */
+    // Determine the number of times that points overlap calculate the
+    // probability for assuming that the dots are uniformly randomly
+    // distributed and placed in bins so that the number of dots per
+    // bin is distributed according to Poisson.  Finally calculate a
+    // goodness score in [0, 1] such that a value of 1 indicates that
+    // this could not happen if XA and XB were uncorrelated.
 
-    /* Number of times that a point from B overlaps a point in A after
-       shift correction */
+    // Number of times that a point from B overlaps a point in A after
+    // shift correction
     double overlap_threshold = 0.7;
     kdtree_t * T = kdtree_new(XA, nXA, 20);
     i64 nalign = 0;
     double kde = 0;
-    for(i64 kk = 0; kk < nXB; kk++)
-    {
+    for(i64 kk = 0; kk < nXB; kk++){
         double Q[3];
-        for(int ii = 0; ii < 3; ii++)
-        {
+        for(int ii = 0; ii < 3; ii++){
             Q[ii] = XB[3*kk + ii] - s->delta[ii];
         }
         double kde0 = kdtree_kde(T, Q, s->sigma, -1);
         kde += kde0;
-        if(kde0 > overlap_threshold)
-        {
+        if(kde0 > overlap_threshold){
             nalign++;
         }
     }
@@ -989,9 +976,9 @@ static int determine_alignment_quality(opts * s,
     s->kde = kde;
 
 
-    /* If there was a 3D grid over the images, how many bins would it have?
-     * We assume that the images have the same size. Would be more accurate
-     * to calculate the bbx from all points directly */
+    // If there was a 3D grid over the images, how many bins would it
+    // have? We assume that the images have the same size. Would be
+    // more accurate to calculate the bbx from all points directly
     double ncell = bbx_volume(XA, nXA) / pow(s->sigma, 3);
     {
         double ncell2 = bbx_volume(XB, nXB) / pow(s->sigma, 3);
@@ -999,8 +986,7 @@ static int determine_alignment_quality(opts * s,
     }
 
 
-    if(ncell < 1e-6 )
-    {
+    if(ncell < 1e-6 ){
         fprintf(stderr,
                 "Failed to calculate the goodness value since the dot coordinates "
                 "in combination with sigma does not make sense\n");
@@ -1008,25 +994,23 @@ static int determine_alignment_quality(opts * s,
         return EXIT_FAILURE;
     }
 
-    /* We substract 1 since there will always be one aligned dot when
-       successful and that should not count */
+    // We substract 1 since there will always be one aligned dot when
+    // successful and that should not count
     double observed = nalign-1.0;
-    if(observed < 1.0)
-    {
+    if(observed < 1.0){
         s->goodness = 0;
         return EXIT_FAILURE;
     }
 
-    /* If the points in XA and XB are uniformly random and uncorrelated
-     * how many times do we expect two dots in the same bin? */
+    // If the points in XA and XB are uniformly random and uncorrelated
+    // how many times do we expect two dots in the same bin?
     double lambda1 = nXA / ncell;
     double lambda2 = nXB / ncell;
     double prob1 = 1.0 - poisson_cdf(0, lambda1); // == 1 - poisson_pmf(0, lambda)
     double prob2 = 1.0 - poisson_cdf(0, lambda2);
     double expected = ncell*prob1*prob2;
 
-    if(s->verbose > 1)
-    {
+    if(s->verbose > 1){
         printf("ncell: %f\n", ncell);
         printf("lambda1: %e, lambda2: %e\n", lambda1, lambda2);
         printf("prob1: %e, prob2: %e\n", prob1, prob2);
@@ -1048,8 +1032,7 @@ run_qalign(opts * s,
            const double * XB,
            i64 nXB)
 {
-    if( (nXA < 3) || (nXB < 3) )
-    {
+    if( (nXA < 3) || (nXB < 3) ){
         printf("Too few dots for qalign (%ld in set A, %ld in set B)\n", nXA, nXB);
         return EXIT_FAILURE;
     }
@@ -1081,8 +1064,7 @@ run_qalign(opts * s,
     qconf->nB = nXB;
     qconf->localization_sigma = s->sigma;
     qconf->verbose = s->verbose;
-    if(s->mag_is_set)
-    {
+    if(s->mag_is_set){
         qconf->rel_error = 0;
     }
 
@@ -1090,27 +1072,19 @@ run_qalign(opts * s,
     free(fXA);
     free(fXB);
 
-    if(res != EXIT_SUCCESS)
-    {
-        if(s->verbose > 1)
-        {
+    if(res != EXIT_SUCCESS){
+        if(s->verbose > 1){
             printf("qalign failed\n");
         }
         qalign_config_free(qconf);
         return EXIT_FAILURE;
     }
 
-
+    // Check lateral scaling/magnification
     float scaling = qselect_f32(qconf->S, qconf->nH, qconf->nH/2);
-#if 0
-    float scalingZ = qselect_f32(qconf->SZ, qconf->nH, qconf->nH/2);
-    printf("S: %f, SZ: %f\n", scaling, scalingZ);
-#endif
 
-    if(scaling > (1.0+1e-4) || (1.0 / scaling) > (1.0+1e-4))
-    {
-        if(s->verbose > 0)
-        {
+    if(scaling > (1.0+1e-4) || (1.0 / scaling) > (1.0+1e-4)){
+        if(s->verbose > 0){
             printf("\n");
             printf("!!! Lateral magnification mismatch: "
                    "median(mag A/ mag B) = %f\n", scaling);
@@ -1122,10 +1096,8 @@ run_qalign(opts * s,
 
     nqD = qconf->nH;
     qD = malloc(nqD*3*sizeof(double));
-    for(i64 kk = 0; kk < nqD; kk++)
-    {
-        for(i64 ii = 0; ii < 3; ii++)
-        {
+    for(i64 kk = 0; kk < nqD; kk++){
+        for(i64 ii = 0; ii < 3; ii++){
             qD[3*kk + ii] = qconf->H[kk].delta[ii];
         }
     }
@@ -1133,15 +1105,12 @@ run_qalign(opts * s,
 
     qalign_config_free(qconf);
     dw_gettime(&t1);
-    if(s->verbose > 1)
-    {
+    if(s->verbose > 1){
         printf("qalign took %f s\n", timespec_diff(&t1, &t0));
     }
 
-    if(nqD < 2)
-    {
-        if(s->verbose > 0)
-        {
+    if(nqD < 2){
+        if(s->verbose > 0){
             printf("qalign could not find any correspondences\n");
         }
         free(qD);
@@ -1155,15 +1124,12 @@ run_qalign(opts * s,
                                         Q1);
     free(qD);
     qD = NULL;
-    for(int i = 0; i < 3; i++)
-    {
+    for(int i = 0; i < 3; i++){
         s->delta[i] = -Q1[i];
     }
 
-    if(s->kde < 2)
-    {
-        if(s->verbose > 0)
-        {
+    if(s->kde < 2){
+        if(s->verbose > 0){
             printf("qalign could not find anything\n");
             return EXIT_FAILURE;
         }
@@ -1176,7 +1142,6 @@ static void print_results(FILE * fid, opts * s,
                           const char * file1,
                           const char * file2)
 {
-
     fprintf(fid, "%f, %f, %f", s->dx, s->dy, s->dz);
     fprintf(fid, ", %f, %f", s->kde, s->goodness);
     fprintf(fid, ", '%s'", file1);
@@ -1191,74 +1156,64 @@ static void print_results(FILE * fid, opts * s,
 
 int dw_align_dots(int argc, char ** argv)
 {
-
     opts * s = opts_new();
     argparsing(argc, argv, s);
 
-    if(s->optind + 2 != argc)
-    {
+    if(s->optind + 2 != argc){
         printf("Please pass exactly two tsv files to process\n");
         opts_free(s);
         return EXIT_FAILURE;
     }
 
-    if(!dw_isfile(argv[optind]))
-    {
+    if(!dw_isfile(argv[optind])){
         fprintf(stderr, "%s does not exist or can not be opened\n",
                 argv[optind]);
         opts_free(s);
         exit(EXIT_FAILURE);
     }
 
-    if(!dw_isfile(argv[optind+1]))
-    {
+    if(!dw_isfile(argv[optind+1])){
         fprintf(stderr, "%s does not exist or can not be opened\n",
                 argv[optind+1]);
         opts_free(s);
         exit(EXIT_FAILURE);
     }
 
-    if(s->verbose > 1)
-    {
+    if(s->verbose > 1){
         opts_print(s, stdout);
     }
 
-    /* Load the tables */
-    if(s->verbose > 1)
-    {
+    // Load the tables
+    if(s->verbose > 1){
         printf("Reading %s\n", argv[optind]);
     }
     ftab_t * TA = ftab_from_tsv(argv[optind]);
-    if(TA == NULL)
-    {
+    if(TA == NULL){
         opts_free(s);
         exit(EXIT_FAILURE);
     }
 
     double * XA = get_dots(s, TA);
-    if(XA == NULL)
-    {
+    if(XA == NULL){
         ftab_free(TA);
         opts_free(s);
         return EXIT_FAILURE;
     }
+
     size_t nXA = TA->nrow;
     ftab_free(TA); TA = NULL;
 
-    if(s->verbose > 1)
-    {
+    if(s->verbose > 1){
         printf("Reading %s\n", argv[optind+1]);
     }
     ftab_t * TB = ftab_from_tsv(argv[optind+1]);
-    if(TB == NULL)
-    {
+    if(TB == NULL){
         opts_free(s);
         free(XA);
         exit(EXIT_FAILURE);
     }
     double * XB = get_dots(s, TB);
-    if(XB == NULL)
-    {
+    if(XB == NULL){
         free(XA);
         opts_free(s);
         ftab_free(TB);
@@ -1268,10 +1223,8 @@ int dw_align_dots(int argc, char ** argv)
     size_t nXB = TB->nrow;
     ftab_free(TB); TB = NULL;
 
-
-    /* Limit the number of dots to use? */
-    if(s->npoint > 0)
-    {
+    // Limit the number of dots to use?
+    if(s->npoint > 0){
         nXA > s->npoint ? nXA = s->npoint : 0;
         nXB > s->npoint ? nXB = s->npoint : 0;
     }
@@ -1286,41 +1239,35 @@ int dw_align_dots(int argc, char ** argv)
 
     rotz_dots(XB, nXB, s->rotz);
 
-    if(s->verbose > 1)
-    {
+    if(s->verbose > 1){
         printf("Will align %zu dots vs %zu\n", nXA, nXB);
     }
 
-    /* Only try the brute force algorithm if the quick does not find
-       anything. It seems like the brute force is never better so it
-       should be removed eventually. */
-    if(run_qalign(s, XA, nXA, XB, nXB) != EXIT_SUCCESS)
-    {
-        if(s->verbose > 0)
-        {
+    // Only try the brute force algorithm if the quick does not find
+    // anything. It seems like the brute force is never better so it
+    // should be removed eventually.
+    if(run_qalign(s, XA, nXA, XB, nXB) != EXIT_SUCCESS){
+        if(s->verbose > 0){
             printf("Trying the fallback algorithm\n");
         }
         align_dots_bf(s, XA, nXA, XB, nXB);
     }
 
-    /* evaluate s->delta to set s->goodness and s->kde
-     */
+    // evaluate s->delta to set s->goodness and s->kde
     determine_alignment_quality(s, XA, nXA, XB, nXB);
 
-    /* Here we could make a higher order estimation from correspondence points */
+    // Here we could make a higher order estimation from correspondence points
 
-    /* Scale back the z-component */
+    // Scale back the z-component
     s->dz /= s->weightz;
 
     free(XA);
     free(XB);
 
-    /* Present the result */
-    if(s->outfile != NULL)
-    {
+    // Present the result
+    if(s->outfile != NULL){
         FILE * fid;
-        if(s->append)
-        {
+        if(s->append){
             fid = fopen(s->outfile, "a");
         } else {
             fid = fopen(s->outfile, "w");
@@ -1328,12 +1275,10 @@ int dw_align_dots(int argc, char ** argv)
         print_results(fid, s, argv[optind], argv[optind+1]);
         fclose(fid);
     }
-    if(s->verbose > 0)
-    {
+    if(s->verbose > 0){
         printf("Shift: [%.2f, %.2f, %.2f]", s->dx, s->dy, s->dz);
         printf(", goodness = %.2e ", s->goodness);
-        if(s->goodness > 0.999)
-        {
+        if(s->goodness > 0.999){
             printf("(high confidence)");
         } else {
             printf("(low confidence)");
