@@ -1,7 +1,26 @@
-[pydeconwolf]
-Python interface to parts and pieces of deconwolf
+// The text of this file can be parsed by genpydocstrings.py to
+// create pydocstrings.h
+// and yeah, lines starting with // are ignored.
 
-EXPERIMENTAL! Please validate the results against the CLI version of deconwolf
+[[pydeconwolf]]
+
+This is an EXPERIMENTAL interface to parts and pieces
+of deconwolf [https://github.com/elgw/deconwolf]
+
+The use of this module is encouraged only for debugging and
+development, nor for your daily analysis.
+
+Most of the functions accepts only f32 numpy arrays as input
+and return back f32 numpy arrays.
+
+Example Usage:
+
+>>> Img = dw.imread('../demo/dapi_001.tif')
+>>> PSF = dw.gen_psf_bw(NA=1.45, ni=1.512, dx=130, dz=300, emission=461)
+>>> dw_Img = dw.deconvolve(image=Img, psf=PSF, iterations=20)
+>>> dw.imwrite(array=dw_Img, filename='test.tif')
+
+For more examples and tests, see the file util/test_pydw.py in the repository.
 
 [deconvolve]
 deconvolve(image, psf, iterations=0, gpu=False, verbose=0, bq=2)
@@ -38,8 +57,8 @@ Calls the low level routine qalign which is a PART of dw align_dots
 
 Required Arguments
 ------------------
-  X : A [n x 3] numpy array of spots in the first image
-  Y : A [n x 3] numpy array of spots in the first image
+  X : [n x 3] numpy array of spots in the first image
+  Y : [n x 3] numpy array of spots in the first image
 
 Optional arguments
 ------------------
@@ -47,6 +66,12 @@ Optional arguments
    localization_sigma : The localization precision [pixels]
    npoint             : Most number of points to use from X and Y
    verbose            : The verbosity level
+
+Returns
+-------
+
+A list of 3D vectors, each giving a proposal on how to shift the points in Y
+to align with the points in X.
 
 [gsmooth]
 gsmooth(image, sigmaxy=None, sigmaz=None, verbose=0)

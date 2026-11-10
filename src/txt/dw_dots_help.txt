@@ -76,15 +76,15 @@ Additional options
         without the dw_ prefix. If the file name does not start with dw_, you
         can specify the image to apply the operation on with the --orig flag.
         Note: The --background correction is not applied before this measurement
-              since we are after the inherent spot quality.
+        since we are after the inherent spot quality.
   --orig file.tif
         The origin of the image, i.e. if the program is run on a deconvolved,
         image, this would be the non-deconvolved file. Currently only used to
         calculate the 'snr1_orig' feature when combined with --snr1.
         Note1: Will not work when processing more than one file.
         Note2: If the file contains 'dw_' the program automatically look
-               for an orig file without that prefix. Making this argument
-               superfluous.
+        for an orig file without that prefix. Making this argument
+        superfluous.
 
 
 If you want to control the filter size for the Laplacian of Gaussian,

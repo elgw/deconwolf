@@ -159,27 +159,6 @@ set(dw_bw_SOURCES
   target_link_libraries(dw PRIVATE trafo)
 
   #
-  # Parse version number from src/dw_version.h
-  #
-
-  file(STRINGS ${CMAKE_CURRENT_SOURCE_DIR}/src/dw_version.h DW_VERSION_MAJOR
-    REGEX "#define[ ]+DW_VERSION_MAJOR[ ]+\"[0-9]+\"")
-  string(REGEX MATCH "\"([0-9]+)\"" _ ${DW_VERSION_MAJOR})
-  set(DW_VERSION_MAJOR "${CMAKE_MATCH_1}")
-
-  file(STRINGS ${CMAKE_CURRENT_SOURCE_DIR}/src/dw_version.h DW_VERSION_MINOR
-    REGEX "#define[ ]+DW_VERSION_MINOR[ ]+\"[0-9]+\"")
-  string(REGEX MATCH "\"([0-9]+)\"" _ ${DW_VERSION_MINOR})
-  set(DW_VERSION_MINOR "${CMAKE_MATCH_1}")
-
-  file(STRINGS ${CMAKE_CURRENT_SOURCE_DIR}/src/dw_version.h DW_VERSION_PATCH
-    REGEX "#define[ ]+DW_VERSION_PATCH[ ]+\"[0-9]+\"")
-  string(REGEX MATCH "\"([0-9]+)\"" _ ${DW_VERSION_PATCH})
-  set(DW_VERSION_PATCH "${CMAKE_MATCH_1}")
-
-  project(deconwolf VERSION "${DW_VERSION_MAJOR}.${DW_VERSION_MINOR}.${DW_VERSION_PATCH}")
-
-  #
   # Set MSVC runtime to MultiThreaded (/MT)
   #
 

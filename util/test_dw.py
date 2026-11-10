@@ -1,3 +1,5 @@
+#!/bin/env python
+
 main_help_msg = """
 Tests expected behavior of a deconwolf binary
 
@@ -124,7 +126,8 @@ def test_tif_npy(image):
     tempdir0.cleanup()
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=main_help_msg)
+    parser = argparse.ArgumentParser(description=main_help_msg,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--dw',
                         help='path to the dw binary',
                         required=True)
