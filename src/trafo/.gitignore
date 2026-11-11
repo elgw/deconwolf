@@ -1,2 +1,3 @@
-*.trafo
+*.trf
+*.o
 build

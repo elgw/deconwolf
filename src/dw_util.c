@@ -195,12 +195,6 @@ int dw_isfile(const char * fname)
 }
 
 
-float timespec_diff(struct timespec* end, struct timespec * start)
-{
-    double elapsed = (end->tv_sec - start->tv_sec);
-    elapsed += (end->tv_nsec - start->tv_nsec) / 1000000000.0;
-    return elapsed;
-}
 
 #ifdef WINDOWS
 int get_peakMemoryKB(size_t * physical, size_t * virtual)

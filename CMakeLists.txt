@@ -145,6 +145,7 @@ set(dw_bw_SOURCES
   #
   # kdtree
   #
+  set(BUILD_SHARED_LIBS OFF)
   add_subdirectory("src/kdtree/")
   target_include_directories(dw PUBLIC "src/kdtree/include/")
   target_link_directories(dw PUBLIC "src/kdtree/")
@@ -153,6 +154,7 @@ set(dw_bw_SOURCES
   #
   # trafo
   #
+  set(BUILD_SHARED_LIBS OFF)
   add_subdirectory("src/trafo")
   target_include_directories(dw PUBLIC "src/trafo/src/")
   target_link_directories(dw PUBLIC "src/trafo/")

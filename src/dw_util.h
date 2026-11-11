@@ -45,6 +45,15 @@
 
 #include <string.h>
 
+// Difference between two timepoints
+static float
+timespec_diff(struct timespec* end, struct timespec * start)
+{
+    double elapsed = (end->tv_sec - start->tv_sec);
+    elapsed += (end->tv_nsec - start->tv_nsec) / 1000000000.0;
+    return elapsed;
+}
+
 
 #define tictoc struct timespec tictoc_start, tictoc_end;
 #define tic dw_gettime(&tictoc_start);
@@ -99,8 +108,7 @@ int dw_get_threads(void);
  */
 int dw_isfile(const char * fname);
 
-/* Difference between two timepoints */
-float timespec_diff(struct timespec* end, struct timespec * start);
+
 
 /* On Linux:
  * Reads /proc/self/status and assumes that the unit will be kb

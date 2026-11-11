@@ -16,6 +16,7 @@
 #include "sortbox.h"
 #include "trafo.h"
 #include "trafo_util.h"
+#include "timespec_diff.h"
 
 /* Compile with -fvisibility=hidden
  * then only functions decorated with this macro will be visible

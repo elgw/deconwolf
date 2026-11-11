@@ -1,8 +1,12 @@
 CFLAGS=-Wall -Wextra
-CFLAGS+=-pedantic -std=gnu11 -fopenmp -D_DEFAULT_SOURCE
+CFLAGS+=-pedantic -std=gnu11 -D_DEFAULT_SOURCE
 DEBUG?=0
 
+CFLAGS+=-fopenmp
+
+
 CFLAGS+=-fvisibility=hidden
+
 
 ifeq ($(DEBUG),1)
 CFLAGS += -O0 -Wno-unknown-pragmas -g3 -fanalyzer
@@ -13,7 +17,6 @@ endif
 LTRAFO_SRC=src/trafo.c \
 src/qsort.c \
 src/sortbox.c \
-src/trafo_util.c \
 src/ftab.c \
 src/gini.c \
 src/entropy.c
@@ -21,15 +24,15 @@ src/entropy.c
 LTRAFO_OBJ=trafo.o \
 qsort.o \
 sortbox.o \
-trafo_util.o \
 ftab.o \
 gini.o \
 entropy.o
 
+ifeq ($(CC),gcc)
 VISIBILITY=-DHAVE___ATTRIBUTE__VISIBILITY_HIDDEN -fvisibility=hidden
-
 # For visibility of static library
 CFLAGS+=-Wl,--exclude-libs=ALL
+endif
 
 # $(OBJDIR)/%.o : %.c | $(OBJDIR)
 
@@ -54,3 +57,6 @@ clean:
 	rm -rf *.o
 	rm -rf *.a
 	rm -rf *.so
+
+# make CC='zig cc' CFLAGS='-I/usr/lib/gcc/x86_64-linux-gnu/14/include/' -B
+# make CC='clang' -B
