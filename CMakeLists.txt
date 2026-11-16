@@ -9,18 +9,16 @@
 #   cd build
 #   cmake ..
 #   cmake --build .
+#   sudo cmake install
 #
-#   Either install directly with
-#   cmake --install .
-#   which will install into /usr/local/
-#   or possibly set the prefix yourself, using, e.g.
-#   cmake --install . --prefix='/usr/'
-#
+# Options: (cmake .. -DOPTION=VALUE)
+# ENABLE_NATIVE_OPTIMIZATION, OFF (default), ON
+# ENABLE_GPU,               , ON (default), OFF
+# CMAKE_BUILD_TYPE          , Release (default), Debug
 #   Or produce a package that can be installed with the
 #   system package manager, for example
 #   cpack -G RPM
 #   cpack -G DEB
-#
 #
 #  On Windows, use:
 #
@@ -38,12 +36,10 @@
 # - See what is defined with
 #   cmake -L . or cmake --LAH .
 #
-#
 # cmake documentation and tutorials:
 # https://cmake.org/cmake/help/latest/
 # https://cliutils.gitlab.io/modern-cmake/
 #
-
 # TODO:
 # Check https://learn.microsoft.com/en-us/cpp/error-messages/compiler-warnings/compiler-warning-level-3-c4996?view=msvc-170
 
@@ -51,13 +47,15 @@ cmake_minimum_required(VERSION 3.9)
 
 project(deconwolf
   DESCRIPTION "Deconvolution of wide field images"
-  VERSION 0.4.9
+  VERSION 0.5.0
   LANGUAGES C)
 
 set (CMAKE_C_STANDARD 99)
 
 option (ENABLE_GPU "Enable GPU/OpenCL" ON)
 option (ENABLE_NATIVE_OPTIMIZATION "Enable non-portable optimizations" OFF)
+
+message(STATUS "ENABLE_NATIVE_OPTIMIZATION: ${ENABLE_NATIVE_OPTIMIZATION}")
 
 # UNIX, WIN32, WINRT, CYGWIN, APPLE are environment variables
 # as flags set by default system
@@ -71,58 +69,49 @@ endif()
 # Default build type is RELEASE
 #
 # Set at command line with commands like:
-# cmake .. -DCMAKE_BUILD_TYPE=Debug
+# cmake ..
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
-message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 if (NOT CMAKE_BUILD_TYPE MATCHES Debug)
   add_definitions(-DNDEBUG)
 endif()
 
 set(dw_SOURCES
+  src/bw_gsl.c
   src/deconwolf_cli.c
   src/dw.c
+  src/dw_align_dots.c # kdtree
   src/dw_background.c
+  src/dw_bwpsf.c
   src/dw_dots.c
   src/dw_imshift.c # kdtree
   src/dw_maxproj.c
+  src/dw_nuclei.c # trafo
+  src/dw_png.c
   src/dw_psf.c
   src/dw_psf_sted.c
   src/dw_tiff_merge.c
-  src/dw_png.c
+  src/dw_time.c
   src/dw_util.c
-  src/dw_nuclei.c # trafo
-  src/dw_align_dots.c # kdtree
+  src/fft.c
   src/fim.c
   src/fim_tiff.c
   src/ftab.c
+  src/gmlfit.c
+  src/lanczos.c
+  src/li.c
   src/method_identity.c
   src/method_rl.c
   src/method_shb.c
-  src/tiling.c
-  src/fft.c
-  src/gmlfit.c
+  src/npio.c
+  src/qalign.c
+  src/quickselect.c
   src/sparse_preprocess.c
   src/sparse_preprocess_cli.c
-  src/quickselect.c
-  src/dw_align_dots.c
-  src/npio.c
-  src/qalign.c)
-
-set(dw_bw_SOURCES
-    src/bw_gsl.c
-    src/dw_bwpsf.c
-    src/dw_util.c
-    src/fft.c
-    src/fim.c
-    src/fim_tiff.c
-    src/li.c
-    src/ftab.c
-    src/lanczos.c
-    src/quickselect.c
-  src/npio.c)
+  src/tiling.c
+)
 
   if(UNIX)
     set(dw_SOURCES ${dw_SOURCES} src/dw_nuclei.c)
@@ -131,16 +120,11 @@ set(dw_bw_SOURCES
   add_executable(dw ${dw_SOURCES})
   set_target_properties(dw PROPERTIES VERSION ${PROJECT_VERSION})
 
-  add_executable(dw_bw ${dw_bw_SOURCES})
-  set_target_properties(dw_bw PROPERTIES VERSION ${PROJECT_VERSION})
-  target_compile_definitions(dw_bw PUBLIC STANDALONE) # set -DSTANDALONE
-
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/dw_version.h.in
     ${CMAKE_CURRENT_SOURCE_DIR}/src/dw_version.h)
 
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/doc/gh-pages/source/version.rst.in
     ${CMAKE_CURRENT_SOURCE_DIR}//doc/gh-pages/source/version.rst)
-
 
   #
   # kdtree
@@ -163,7 +147,6 @@ set(dw_bw_SOURCES
   #
   # Set MSVC runtime to MultiThreaded (/MT)
   #
-
   if(WIN32)
     cmake_policy(SET CMP0091 NEW)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -179,7 +162,6 @@ set(dw_bw_SOURCES
   if(result)
     message("Enabling IPO")
     set_property(TARGET dw PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
-    set_property(TARGET dw_bw PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_JOBS 8)
   else()
     message(WARNING "IPO is not supported: ${output}")
@@ -222,11 +204,7 @@ set(dw_bw_SOURCES
   target_link_libraries(dw PRIVATE FFTW::Double)
   target_link_libraries(dw PRIVATE FFTW::Float)
 
-
-  target_link_libraries(dw_bw PRIVATE FFTW::Float)
-
   if(UNIX)
-    target_link_libraries(dw_bw PRIVATE FFTW::FloatOpenMP)
     target_link_libraries(dw PRIVATE FFTW::FloatOpenMP)
   endif()
 
@@ -245,7 +223,6 @@ set(dw_bw_SOURCES
   find_library(MATH_LIBRARY m)
   if(MATH_LIBRARY)
     target_link_libraries(dw PRIVATE ${MATH_LIBRARY})
-    target_link_libraries(dw_bw PRIVATE ${MATH_LIBRARY})
   endif()
 
   #
@@ -253,14 +230,12 @@ set(dw_bw_SOURCES
   #
   find_package(TIFF)
   target_link_libraries(dw PRIVATE ${TIFF_LIBRARIES})
-  target_link_libraries(dw_bw PRIVATE ${TIFF_LIBRARIES})
 
   #
   # Gnu Scientific Library
   #
   find_package(GSL)
   target_link_libraries(dw PRIVATE ${GSL_LIBRARIES})
-  target_link_libraries(dw_bw PRIVATE ${GSL_LIBRARIES})
 
   #
   # OpenCL
@@ -292,7 +267,6 @@ set(dw_bw_SOURCES
   if(OpenMP_C_FOUND)
     message("Found OpenMP")
     target_link_libraries(dw PRIVATE OpenMP::OpenMP_C)
-    target_link_libraries(dw_bw PRIVATE OpenMP::OpenMP_C)
   endif()
 
   #
@@ -325,7 +299,7 @@ set(dw_bw_SOURCES
 
   include(GNUInstallDirs)
   install(TARGETS dw)
-  install(TARGETS dw_bw)
+
   install(FILES "${CMAKE_SOURCE_DIR}/doc/man/dw.1"
     DESTINATION "${CMAKE_INSTALL_MANDIR}/man1/" )
   install(FILES "${CMAKE_SOURCE_DIR}/doc/man/dw_bw.1"
@@ -356,3 +330,16 @@ set(dw_bw_SOURCES
 # The produced deb files are not perfectly portable,
 # dpkg -I ./deconwolf-0.3.8-Linux.deb
 # reveals ocl-icd-libopencl1-amdgpu-pro
+
+# AppImage (first make sure that we generate a single binary...)
+#
+# mkdir build
+# cd build
+# cmake .. -DCMAKE_INSTALL_PREFIX=/usr
+# make -j$(nproc)
+# make install DESTDIR=AppDir
+# wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+# chmod +x linuxdeploy-x86_64.AppImage
+# ./linuxdeploy-x86_64.AppImage --appdir AppDir
+# ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage --create-desktop-file --executable=AppDir/usr/bin/dw -i ../dw.png
+# ./dw-x86_64.AppImage

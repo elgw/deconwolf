@@ -1,10 +1,17 @@
 Version History
 ===============
 
+0.5.0
+-----
+- Deconwolf is now a single binary, the command ``dw_bw`` is now ``dw
+  bw`` or ``dw bwpsf``.
+- Fixed bug in ``dw maxproj`` writing junk under some conditions.
+
 0.4.9
 -----
 - Fixed bug in ``dw align`` not finding all correspondences.
 - ``qalign`` exposed via the python API.
+- Fixed `CMakeLists.txt` not to look for a C++ compiler.
 
 0.4.8
 -----

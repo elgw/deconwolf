@@ -18,7 +18,6 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 #include <fftw3.h>
 #include <string.h>
 #include <errno.h>
@@ -28,6 +27,7 @@
 
 #include "fim.h"
 #include "dw_util.h"
+#include "dw_time.h"
 
 typedef int64_t i64;
 
@@ -634,7 +634,7 @@ double * fft_bench_1d(int64_t from, int64_t to, int niter)
     assert(from > 0);
     assert(niter > 0);
 
-    struct timespec tictoc_start, tictoc_end;
+    dw_time tictoc_start, tictoc_end;
 
     double * t = fim_malloc(sizeof(double) * (to + 1 - from));
     assert( t != NULL);
@@ -655,11 +655,11 @@ double * fft_bench_1d(int64_t from, int64_t to, int niter)
                                                     fft_in, fft_out,
                                                     FFTW_ESTIMATE);
 
-            dw_gettime(&tictoc_start);
+            dw_time_get(&tictoc_start);
             fftwf_execute(plan);
-            dw_gettime(&tictoc_end);
+            dw_time_get(&tictoc_end);
 
-            double took = timespec_diff(&tictoc_end, &tictoc_start);
+            double took = dw_time_delta(&tictoc_end, &tictoc_start);
 
             if(kk > 0)
             {

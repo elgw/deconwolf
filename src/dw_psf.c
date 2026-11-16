@@ -719,7 +719,6 @@ fimo * gen_psf(opts * s, double lambda)
     if(s->oversampling > 1)
     {
         assert(s->M > 0);
-        assert(s->N > 0);
         assert(s->P > 0);
         float * Vout = calloc(s->M*s->M*s->P, sizeof(float));
         assert(Vout != NULL);

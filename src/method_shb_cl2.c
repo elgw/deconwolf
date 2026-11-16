@@ -1,5 +1,6 @@
 #include "method_shb_cl2.h"
 #include "dw_util.h"
+#include "dw_time.h"
 
 /* Still work to do before this can be enabled */
 #define use_inplace_clfft 1
@@ -181,8 +182,8 @@ float * deconvolve_shb_cl2(float * restrict im,
     }
 
     fprintf(s->log, "Deconvolving with shbcl2\n");
-    struct timespec t_deconvolution_start, t_deconvolution_end;
-    dw_gettime(&t_deconvolution_start);
+    dw_time t_deconvolution_start, t_deconvolution_end;
+    dw_time_get(&t_deconvolution_start);
     ftif_t * ftif = fim_tiff_new(s->log, s->verbosity);
 
     if(s->nIter == 0)
@@ -592,8 +593,8 @@ float * deconvolve_shb_cl2(float * restrict im,
 
     clu_destroy(clu);
 
-    dw_gettime(&t_deconvolution_end);
-    float dt_deconvolution = clockdiff(&t_deconvolution_end,
+    dw_time_get(&t_deconvolution_end);
+    float dt_deconvolution = dw_time_delta(&t_deconvolution_end,
                                        &t_deconvolution_start);
     fprintf(s->log, "Deconvolution took %.2f s\n", dt_deconvolution);
     fim_tiff_destroy(ftif);

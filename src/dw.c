@@ -26,6 +26,7 @@
 #include "dw_nuclei.h"
 #endif
 #include "dw_background.h"
+#include "dw_time.h"
 
 /* Uncomment to include, requires linking with libpng and libz
  * can be build separately by the makefile in the src folder
@@ -398,7 +399,7 @@ dw_opts * dw_opts_new(void)
     s->psigma = 0;
     s->biggs = 1;
     s->metric = DW_METRIC_IDIV;
-    dw_gettime(&s->tstart);
+    dw_time_get(&s->tstart);
     s->fftw3_planning = FFTW_MEASURE;
     s->alphamax = 1;
 
@@ -1363,9 +1364,9 @@ void benchmark_write(dw_opts * s, int iter, double fMSE,
         }
     }
     free(x);
-    struct timespec tnow;
-    dw_gettime(&tnow);
-    double time = clockdiff(&tnow, &s->tstart);
+    dw_time tnow;
+    dw_time_get(&tnow);
+    double time = dw_time_delta(&tnow, &s->tstart);
     fprintf(s->tsv, "%d\t%f\t%f\t%f\n", iter, time, fMSE, KL);
 
     return;
@@ -1582,13 +1583,6 @@ void dw_usage(__attribute__((unused)) const int argc,
 {
     printf("%s\n", dw_help_txt);
     return;
-}
-
-double clockdiff(struct timespec* end, struct timespec * start)
-{
-    double elapsed = (end->tv_sec - start->tv_sec);
-    elapsed += (end->tv_nsec - start->tv_nsec) / 1000000000.0;
-    return elapsed;
 }
 
 
@@ -2473,8 +2467,8 @@ static float * acquire_psf(dw_opts *s, i64 * pM, i64 * pN, i64 *pP)
 
 int dw_run(dw_opts * s)
 {
-    struct timespec tstart, tend;
-    dw_gettime(&tstart);
+    dw_time tstart, tend;
+    dw_time_get(&tstart);
     dcw_init_log(s);
 
     if(s->verbosity > 1)
@@ -2835,8 +2829,8 @@ int dw_run(dw_opts * s)
     fim_free(out);
 
 
-    dw_gettime(&tend);
-    fprintf(s->log, "Took: %f s\n", timespec_diff(&tend, &tstart));
+    dw_time_get(&tend);
+    fprintf(s->log, "Took: %f s\n", dw_time_delta(&tend, &tstart));
     dcw_close_log(s);
 
     if(s->verbosity > 1)

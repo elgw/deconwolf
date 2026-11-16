@@ -34,7 +34,6 @@
 
 #include <string.h>
 #include <sys/types.h>
-#include <time.h>
 #include <wchar.h>
 #include "fft.h"
 

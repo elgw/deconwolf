@@ -21,13 +21,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
-#include <time.h>
 #include <wchar.h>
 #include <locale.h>
 #include <gsl/gsl_integration.h>
+#include <gsl/gsl_linalg.h>
+
 #include <omp.h>
 
 #include "dw_util.h"
+#include "dw_time.h"
 #include "fim_tiff.h"
 #include "dw_version.h"
 #include "lanczos.h"
@@ -37,16 +39,13 @@
 #include "dw_bwpsf.h"
 #include "npio.h"
 
-/* Windows does not agree on the definition of complex numbers,
- * we will call them dcomplex regardless of the underlying library
- */
 #ifdef WINDOWS
 typedef _Dcomplex dcomplex;
 #else
 typedef double complex dcomplex;
 #endif
 
-int GLOB_N_GSL_EROUND = 0; /* Counter for GSL_EROUND */
+int GLOB_N_GSL_EROUND = 0; // Counter for GSL_EROUND
 
 static void BW_slice(float * , float z, bw_conf * conf);
 static void bw_argparsing(int , char ** , bw_conf * conf);
@@ -55,7 +54,7 @@ static void bw_argparsing(int , char ** , bw_conf * conf);
 static void getCmdLine(int argc, char ** argv, bw_conf * s);
 
 
-/* Integration over pixel */
+// Integration over pixel
 typedef struct {
     bw_conf * conf;
     double * radprofile;
@@ -74,10 +73,9 @@ static void dw_bw_gsl_err_handler(const char * reason,
                            int line,
                            int gsl_errno)
 {
-    /* The model oscillate heavily when far from the origin.
-     * We use high precision when possible and accept that the
-     * numerical integration sometimes can't reach that.
-     */
+    // The model oscillate heavily when far from the origin.
+    // We use high precision when possible and accept that the
+    // numerical integration sometimes can't reach that.
 
     if(gsl_errno == GSL_EROUND)
     {
@@ -155,14 +153,14 @@ bw_conf * bw_conf_new()
     bw_conf * conf = calloc(1, sizeof(bw_conf));
     assert(conf != NULL);
 
-    /* Physical settings */
+    // Physical settings
     conf->lambda = 600;
     conf->NA = 1.45;
     conf->ni = 1.515;
     conf->resAxial = 300;
     conf->resLateral = 130;
 
-    /* Output image Settings*/
+    // Output image Setting
     conf->M = 181;
     conf->N = 181;
     conf->P = 181; // Does only need to be 2*size(I,3)+1
@@ -177,15 +175,15 @@ bw_conf * bw_conf_new()
     conf->overwrite = 0;
     conf->testing = 0;
 
-    /* BW integration */
+    // BW integration
     conf->oversampling_R = 17; /* Expose from CLI? */
     conf->mode_bw = MODE_BW_GSL;
 
-    /* For XY integration */
-    conf->epsabs = 1e-6; /* As good as we can get without any GSL_EROUND */
+    // For XY integration
+    conf->epsabs = 1e-6; // As good as we can get without any GSL_EROUND
     conf->epsrel = 1e-6;
     conf->key = 1;
-    /* For XY integration and BW integration */
+    // For XY integration and BW integration
     conf->limit = 10000000;
 
     return conf;
@@ -302,7 +300,7 @@ static void usage(__attribute__((unused)) int argc, char ** argv, bw_conf * s)
     return;
 }
 
-/* Returns 0 on success */
+// Returns 0 on success
 int bw_conf_validate(bw_conf * s)
 {
     if(s->lambda < 50)
@@ -338,7 +336,7 @@ int bw_conf_validate(bw_conf * s)
         s->P++;
     }
 
-    /* Not more threads than slices */
+    // Not more threads than slices
     if(s->nThreads > s->P)
     {
         s->nThreads = s->P;
@@ -519,11 +517,9 @@ static void bw_argparsing(int argc, char ** argv, bw_conf * s)
                 s->NA, s->ni, s->lambda, s->resLateral, s->resAxial);
     }
 
-
     s->logFile = malloc(strlen(s->outFile) + 10);
     assert(s->logFile != NULL);
     sprintf(s->logFile, "%s.log.txt", s->outFile);
-
 
     return;
 }
@@ -532,7 +528,6 @@ static double cabs2(dcomplex v)
 {
     return pow(creal(v), 2) + pow(cimag(v), 2);
 }
-
 
 
 void BW(bw_conf * conf)
@@ -549,7 +544,7 @@ void BW(bw_conf * conf)
         BW_slice(conf->V + z*conf->M*conf->N, defocus, conf);
     }
 
-    /* symmetry in Z */
+    // symmetry in Z
     for(int z = 0; z< (conf->P-1)/2; z++)
     {
         memcpy(conf->V+(conf->P-z-1)*conf->M*conf->N,
@@ -561,7 +556,7 @@ void BW(bw_conf * conf)
 
 static double pixelpointfun(double y, void * _conf)
 {
-    /* interpolate radial profile at (x,y) */
+    // interpolate radial profile at (x,y)
     pixely_t * iconf = (pixely_t *) _conf;
     double r2 = pow(iconf->x, 2) + pow(y, 2);
     double r = 0;
@@ -637,11 +632,10 @@ static double integrate_pixel(bw_conf * conf,
 
 static void BW_slice(float * V, float z, bw_conf * conf)
 {
-    /* Calculate the PSF for a single plane/slice
-     * V is a pointer to the _slice_ not the whole volume
-     * This function is called from different threads with
-     * a copy of the initial conf
-     */
+    // Calculate the PSF for a single plane/slice
+    // V is a pointer to the _slice_ not the whole volume
+    // This function is called from different threads with
+    // a copy of the initial conf
 
     gsl_integration_workspace * wspx =
         gsl_integration_workspace_alloc(conf->limit);
@@ -649,13 +643,12 @@ static void BW_slice(float * V, float z, bw_conf * conf)
         gsl_integration_workspace_alloc(conf->limit);
 
 
-    /* The center of the image in units of [pixels] */
+    // The center of the image in units of [pixels]
     double x0 = ((double) conf->M - 1.0) / 2.0;
     double y0 = ((double) conf->N - 1.0) / 2.0;
 
-    /* The bw integral will be sampled up to radmax,
-     * with radnsamples samples per pixel
-     */
+    // The bw integral will be sampled up to radmax,
+    // with radnsamples samples per pixel
     int radmax = (int) round(sqrt(pow(conf->M - x0, 2) + pow(conf->N - y0, 2))) + 1;
     int radnsamples = conf->oversampling_R;
 
@@ -667,15 +660,15 @@ static void BW_slice(float * V, float z, bw_conf * conf)
     double * radprofile = malloc(nr * sizeof(double));
     assert(radprofile != NULL);
 
-    /* Calculate the radial profile
-       possibly by integrating over Z */
+    // Calculate the radial profile
+    // possibly by integrating over Z
 
     for(size_t n = 0; n < nr; n++)
     {
         r[n] = ((double) n) / ((double) radnsamples);
     }
 
-    /* 1D integral using Bessel series, li */
+    // 1D integral using Bessel series, li
     if(conf->mode_bw == MODE_BW_LI)
     {
         li_conf * L = li_new(z);
@@ -690,8 +683,7 @@ static void BW_slice(float * V, float z, bw_conf * conf)
         li_free(&L);
     }
 
-
-    /* BW integral by GSL */
+    // BW integral by GSL
     if(conf->mode_bw == MODE_BW_GSL)
     {
         bw_gsl_conf_t * bw_gsl_conf = bw_gsl_new(conf->limit);
@@ -702,14 +694,13 @@ static void BW_slice(float * V, float z, bw_conf * conf)
         bw_gsl_conf->lambda = conf->lambda;
 
 
-        if(z == 0 && (conf->log != NULL) ) /* Only write from the thread that processes z==0 */
+        if(z == 0 && (conf->log != NULL) ) // Only write from the thread that processes z==0
         {
             fprintf(conf->log, "Settings for BW integration over Z:\n");
             bw_gsl_fprint(conf->log, bw_gsl_conf);
         }
 
-
-        /* Integrate bw for a equidistant set of radii */
+        // Integrate bw for a equidistant set of radii
         for(size_t n = 0; n < nr; n++)
         {
             double radius = r[n]*conf->resLateral;
@@ -721,20 +712,20 @@ static void BW_slice(float * V, float z, bw_conf * conf)
     }
     assert(r[0] == 0);
 
-    /*
-     * For each pixel in the quadrant integrate over x and y
-     */
+
+    // For each pixel in the quadrant integrate over x and y
+
 
     //printf("!\n");
     for (int x = 0; 2*x <= conf->M; x++) {
         for (int y = x; 2*y <= conf->N; y++) {
 
-            /* radius of the current pixel in units of [pixels] */
+            // radius of the current pixel in units of [pixels]
             double rPixel = sqrt( pow((double) x - x0, 2)
                                   + pow((double) y - y0, 2));
 
 
-            /* Pixel integration */
+            // Pixel integration
             double pIntensity = 0;
             if(rPixel < radmax)
             {
@@ -749,7 +740,7 @@ static void BW_slice(float * V, float z, bw_conf * conf)
                                              (double) y - 0.5 - y0, (double) y + 0.5 - y0);
             }
 
-            /* Use symmetry to fill the output image plane */
+            // Use symmetry to fill the output image plane
             int xf = conf->M-x-1;
             int yf = conf->N-y-1;
             V[x + conf->M * y] = pIntensity;
@@ -782,8 +773,8 @@ static void unit_tests(bw_conf * conf)
 
 int dw_bwpsf(int argc, char ** argv)
 {
-    struct timespec tstart, tend;
-    dw_gettime(&tstart);
+    dw_time tstart, tend;
+    dw_time_get(&tstart);
 
     bw_conf * conf = bw_conf_new();
     bw_argparsing(argc, argv, conf);
@@ -825,14 +816,13 @@ int dw_bwpsf(int argc, char ** argv)
         exit(0);
     }
 
-    /* Turn off error handling in GSL. Otherwise GSL will close the program
-     * if the tolerances can't be achieved. We set it back later on.
-     */
+    // Turn off error handling in GSL. Otherwise GSL will close the program
+    // if the tolerances can't be achieved. We set it back later on.
 
     gsl_error_handler_t * old_handler =
-        gsl_set_error_handler(dw_bw_gsl_err_handler); /* ignore GSL_EROUND */
-    /* Do the calculations */
-    BW(conf);
+        gsl_set_error_handler(dw_bw_gsl_err_handler); // ignore GSL_EROUND
+
+    BW(conf);// Do the calculations
 
     gsl_set_error_handler(old_handler);
     if(GLOB_N_GSL_EROUND > 0)
@@ -842,18 +832,16 @@ int dw_bwpsf(int argc, char ** argv)
         fprintf(conf->log, "GSL_EROUND was raised %d times\n", GLOB_N_GSL_EROUND);
     }
 
-    /* Write to disk  */
+    // Write to disk
     if(conf->verbose > 0) {
         printf("Writing '%s' (32-bit float)\n", conf->outFile);
     }
-
 
     if(npyfilename(conf->outFile))
     {
         int shape[3] = {conf->P, conf->N, conf->M};
         npio_write(conf->outFile, 3, shape, conf->V, NPIO_F32, NPIO_F32);
-    } else
-    {
+    } else {
         ttags * T = ttags_new();
         char * swstring = malloc(1024);
         assert(swstring != NULL);
@@ -868,12 +856,12 @@ int dw_bwpsf(int argc, char ** argv)
     }
 
     fprint_time(conf->log);
-    dw_gettime(&tend);
-    fprintf(conf->log, "Took: %f s\n", timespec_diff(&tend, &tstart));
+    dw_time_get(&tend);
+    fprintf(conf->log, "Took: %f s\n", dw_time_delta(&tend, &tstart));
     fprint_peak_memory(conf->log);
     fprintf(conf->log, "done!\n");
 
-    /* Clean up */
+    // Clean up
     free(conf->V);
     bw_conf_free(&conf);
 

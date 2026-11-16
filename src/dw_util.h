@@ -28,7 +28,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <time.h>
 #ifdef WINDOWS
 
 #include <io.h>
@@ -45,19 +44,6 @@
 
 #include <string.h>
 
-// Difference between two timepoints
-static float
-timespec_diff(struct timespec* end, struct timespec * start)
-{
-    double elapsed = (end->tv_sec - start->tv_sec);
-    elapsed += (end->tv_nsec - start->tv_nsec) / 1000000000.0;
-    return elapsed;
-}
-
-
-#define tictoc struct timespec tictoc_start, tictoc_end;
-#define tic dw_gettime(&tictoc_start);
-#define toc(X) dw_gettime(&tictoc_end); printf(#X); printf(" %f s\n", timespec_diff(&tictoc_end, &tictoc_start)); fflush(stdout);
 
 #ifdef WINDOWS
 #define FILESEP '\\'
@@ -82,9 +68,6 @@ typedef float f32;
 #define ANSI_COLOR_CYAN    "\x1b[36m"
 #define ANSI_COLOR_RESET   "\x1b[0m"
 #define ANSI_UNDERSCORE    "\x1b[4m"
-
-/* Get the current time  */
-void dw_gettime(struct timespec *);
 
 /* Create dir if it does not exist.
  * Returns 0 if the dir already existed or could be created

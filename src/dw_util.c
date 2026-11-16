@@ -14,7 +14,6 @@
  *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-
 #include "dw_util.h"
 
 #ifdef WINDOWS
@@ -74,15 +73,6 @@ int dw_ensuredir(const char * dir)
     return 1;
 }
 
-void dw_gettime(struct timespec * t)
-{
-#ifdef WINDOWS
-    timespec_get(t, TIME_UTC); // since C11
-#else
-    clock_gettime(CLOCK_REALTIME, t);
-#endif
-    return;
-}
 
 char * dw_dirname(const char * path)
 {

@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <cairo.h>
 #include <cairo-svg.h>
 #include <omp.h>

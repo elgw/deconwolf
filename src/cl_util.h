@@ -14,7 +14,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 
 /* VkFFT targets version 1.20 */
 #define CL_TARGET_OPENCL_VERSION 120

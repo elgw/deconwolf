@@ -9,6 +9,7 @@
 #include "ftab.h"
 #include "dw_version.h"
 #include "dw_util.h"
+#include "dw_time.h"
 #include "npio.h"
 #include "qalign.h"
 #include "quickselect.h"
@@ -1037,8 +1038,8 @@ run_qalign(opts * s,
         return EXIT_FAILURE;
     }
 
-    struct timespec t0, t1;
-    dw_gettime(&t0);
+    dw_time t0, t1;
+    dw_time_get(&t0);
     float * fXA = malloc(3*nXA*sizeof(float));
     for(i64 kk = 0; kk < nXA; kk++)
     {
@@ -1104,9 +1105,9 @@ run_qalign(opts * s,
 
 
     qalign_config_free(qconf);
-    dw_gettime(&t1);
+    dw_time_get(&t1);
     if(s->verbose > 1){
-        printf("qalign took %f s\n", timespec_diff(&t1, &t0));
+        printf("qalign took %f s\n", dw_time_delta(&t1, &t0));
     }
 
     if(nqD < 2){

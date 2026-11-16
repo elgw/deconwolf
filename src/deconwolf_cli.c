@@ -34,6 +34,7 @@
 #include "dw_nuclei.h"
 #endif
 #include "dw_background.h"
+#include "dw_bwpsf.h"
 
 /* Uncomment to include, requires linking with libpng and libz
  * can be build separately by the makefile in the src folder
@@ -52,6 +53,24 @@
 #include "tiling.h"
 #include "sparse_preprocess_cli.h"
 
+
+#if defined(__clang__)
+#define COMPILER_NAME "Clang"
+#define COMPILER_VERSION __clang_version__
+#elif defined(__GNUC__)
+#define COMPILER_NAME "GCC"
+#define COMPILER_VERSION __VERSION__
+#elif defined(_MSC_VER)
+#define COMPILER_NAME "MSVC"
+/* _MSC_VER is an integer (e.g., 1939), so we convert it to a string */
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+#define COMPILER_VERSION TOSTRING(_MSC_VER)
+#else
+#define COMPILER_NAME "Unknown"
+#define COMPILER_VERSION "Unknown"
+#endif
+
 static int
 deconwolf_cli_help(int __attribute__((unused)) argc, char ** argv)
 {
@@ -63,6 +82,7 @@ deconwolf_cli_help(int __attribute__((unused)) argc, char ** argv)
 #ifdef dw_module_dots
     printf("   dots         detect dots with sub pixel precision\n");
 #endif
+    printf("   bw           generate a PSF according to the \"Born & Wolf\" model\n");
     printf("\n");
     printf("also available\n");
     printf("   merge        merge individual slices to volume\n");
@@ -308,37 +328,38 @@ int main(int argc, char ** argv)
        be assumed.
     */
 
-    if(argc <= 1)
-    {
+    if(argc <= 1){
         return deconwolf_cli_help(argc, argv);
     }
 
     assert(argc > 1);
 
-    if(strcmp(argv[1], "--version") == 0)
-    {
+    if(strcmp(argv[1], "--version") == 0){
         return deconwolf_cli_version();
     }
 
-    if(strcmp(argv[1], "deconvolve") == 0)
-    {
+    if(strcmp(argv[1], "--info") == 0){
+        printf("Build with %s (%s)\n", COMPILER_NAME, COMPILER_VERSION);
+        return 0;
+    }
+
+    if(strcmp(argv[1], "deconvolve") == 0){
         return dw_deconvolve_cli(argc-1, argv+1);
     }
-    if(strcmp(argv[1], "maxproj") == 0)
-    {
+    if(strcmp(argv[1], "maxproj") == 0){
         return dw_tiff_max(argc-1, argv+1);
     }
-    if(strcmp(argv[1], "imshift") == 0)
-    {
+    if( (strcmp(argv[1], "bwpsf") == 0) || (strcmp(argv[1], "bw") == 0)){
+        return dw_bwpsf(argc-1, argv+1);
+    }
+    if(strcmp(argv[1], "imshift") == 0){
         return dw_imshift(argc-1, argv+1);
     }
-    if(strcmp(argv[1], "merge") == 0)
-    {
+    if(strcmp(argv[1], "merge") == 0){
         return dw_tiff_merge(argc-1, argv+1);
     }
 
-    if(strcmp(argv[1], "nuclei") == 0)
-    {
+    if(strcmp(argv[1], "nuclei") == 0){
 #ifdef dw_module_nuclei
         return dw_nuclei(argc-1, argv+1);
 #else
@@ -347,8 +368,7 @@ int main(int argc, char ** argv)
 #endif
     }
 
-    if(strcmp(argv[1], "dots") == 0)
-    {
+    if(strcmp(argv[1], "dots") == 0){
 #ifdef dw_module_dots
         return dw_dots(argc-1, argv+1);
 #else
@@ -357,8 +377,7 @@ int main(int argc, char ** argv)
 #endif
     }
 
-    if(strcmp(argv[1], "psf") == 0)
-    {
+    if(strcmp(argv[1], "psf") == 0){
 #ifdef dw_module_psf
         return dw_psf_cli(argc-1, argv+1);
 #else
@@ -367,8 +386,7 @@ int main(int argc, char ** argv)
 #endif
     }
 
-    if(strcmp(argv[1], "psf-STED") == 0)
-    {
+    if(strcmp(argv[1], "psf-STED") == 0){
 #ifdef dw_module_psf_sted
         return dw_psf_sted_cli(argc-1, argv+1);
 #else
@@ -377,13 +395,11 @@ int main(int argc, char ** argv)
 #endif
     }
 
-    if(strcmp(argv[1], "noise1") == 0)
-    {
+    if(strcmp(argv[1], "noise1") == 0){
         return sparse_preprocess_cli(argc-1, argv+1);
     }
 
-    if( strcmp(argv[1], "align-dots") == 0)
-    {
+    if( strcmp(argv[1], "align-dots") == 0){
 #ifdef dw_module_align_dots
         return dw_align_dots(argc-1, argv+1);
 #else
@@ -392,8 +408,7 @@ int main(int argc, char ** argv)
 #endif
     }
 
-    if( strcmp(argv[1], "background") == 0)
-    {
+    if( strcmp(argv[1], "background") == 0){
 #ifdef dw_module_background
         return dw_background(argc-1, argv+1);
 #else
@@ -402,19 +417,16 @@ int main(int argc, char ** argv)
 #endif
     }
 
-    if( strcmp(argv[1], "tif2npy") == 0)
-    {
+    if( strcmp(argv[1], "tif2npy") == 0){
         return tif2npy(argc-1, argv+1);
     }
 
     // TODO: Give this utility function a proper command line parser
-    if( strcmp(argv[1], "npy2tif") == 0)
-    {
+    if( strcmp(argv[1], "npy2tif") == 0){
         return npy2tif(argc-1, argv+1);
     }
 
-    if( strcmp(argv[1], "npy2tif_bin") == 0)
-    {
+    if( strcmp(argv[1], "npy2tif_bin") == 0){
         return npy2tif_bin(argc-1, argv+1);
     }
 

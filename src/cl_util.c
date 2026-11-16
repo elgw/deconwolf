@@ -16,6 +16,7 @@
 #include "kernels/cl_update_y_kernel.h"
 
 #include "dw_util.h"
+#include "dw_time.h"
 
 #define check_CL(x) if(x != CL_SUCCESS)                         \
     {                                                           \
@@ -32,7 +33,7 @@
 #define here(x) ;
 
 static char * read_program(const char * fname, size_t * size);
-static double clockdiff(struct timespec* start, struct timespec * finish);
+static double clockdiff(dw_time* start, dw_time * finish);
 
 /* Number of complex values required for Hermitian representation */
 static size_t fimcl_ncx(fimcl_t * X);
@@ -1119,12 +1120,12 @@ float * clu_convolve(clu_env_t * clu,
                buf_mem, 15*buf_mem/10);
     }
     // Note full size specified for in-place transformations
-    struct timespec t0, t1, t2;
-    dw_gettime(&t0);
+    dw_time t0, t1, t2;
+    dw_time_get(&t0);
     fimcl_t * gX = fimcl_new(clu, fimcl_real, X, M, N, P);
-    dw_gettime(&t1);
+    dw_time_get(&t1);
     fimcl_t * gY = fimcl_new(clu, fimcl_real, Y, M, N, P);
-    dw_gettime(&t2);
+    dw_time_get(&t2);
 
     float  dt0 = clockdiff(&t0, &t1);
     float  dt1 = clockdiff(&t1, &t2);
@@ -1145,7 +1146,7 @@ float * clu_convolve(clu_env_t * clu,
     return Z;
 }
 
-static double clockdiff(struct timespec* start, struct timespec * finish)
+static double clockdiff(dw_time* start, dw_time * finish)
 {
     double elapsed = (finish->tv_sec - start->tv_sec);
     elapsed += (finish->tv_nsec - start->tv_nsec) / 1000000000.0;
@@ -1577,10 +1578,10 @@ void clu_prepare_kernels(clu_env_t * clu,
         load_vkfft_from_file = 1;
     }
 
-    struct timespec t0, t1;
+    dw_time t0, t1;
 
 
-    dw_gettime(&t0);
+    dw_time_get(&t0);
     VkFFTConfiguration configuration = {};
 
     //Device management + code submission
@@ -1684,11 +1685,11 @@ void clu_prepare_kernels(clu_env_t * clu,
             fclose(kernelCache);
         }
     }
-    dw_gettime(&t1);
+    dw_time_get(&t1);
     if(clu->verbose > 2)
     {
         // 0.6 s for 512x256x128
-        printf("VkFFT intialization took %f s\n", timespec_diff(&t1, &t0));
+        printf("VkFFT intialization took %f s\n", dw_time_delta(&t1, &t0));
     }
 
     free(vkfft_cache_file_name);
@@ -1907,9 +1908,9 @@ cl_uint clu_wait_for_event(cl_event clev, size_t ns)
     cl_uint ret = CL_SUCCESS;
     size_t param_value_size = sizeof(cl_int);
     size_t param_value_size_ret = 0;
-    struct timespec sleep_req = {};
+    dw_time sleep_req = {};
     sleep_req.tv_nsec = ns;
-    struct timespec sleep_rem = {};
+    dw_time sleep_rem = {};
     cl_uint status = CL_QUEUED;
 
     /* No sleeping at all if it is already done
@@ -2301,7 +2302,7 @@ void clu_benchmark_transfer(clu_env_t * clu)
     {
         buf[kk] = rand() % 256;
     }
-    struct timespec t0, t1;
+    dw_time t0, t1;
     cl_int ret;
     cl_mem buf_gpu = clCreateBuffer(clu->context,
                                     mem_flag,
@@ -2310,18 +2311,18 @@ void clu_benchmark_transfer(clu_env_t * clu)
     clu->nb_allocated += buf_size_nf*sizeof(float);
     clu->n_alloc++;
     check_CL(ret);
-    dw_gettime(&t0);
+    dw_time_get(&t0);
     check_CL( clEnqueueWriteBuffer( clu->command_queue,
                                     buf_gpu,
                                     CL_TRUE, // block
                                     0,
                                     buf_size_nf*sizeof(float), buf, 0,
                                     NULL, NULL));
-    dw_gettime(&t1);
+    dw_time_get(&t1);
     float dt = clockdiff(&t0, &t1);
     printf("    Upload speed: %f GB/s\n", sizeof(float) * 1.0/dt);
 
-    dw_gettime(&t0);
+    dw_time_get(&t0);
     check_CL( clEnqueueReadBuffer( clu->command_queue,
                                    buf_gpu,
                                    CL_TRUE, // block
@@ -2331,7 +2332,7 @@ void clu_benchmark_transfer(clu_env_t * clu)
                                    0,
                                    NULL,
                                    NULL));
-    dw_gettime(&t1);
+    dw_time_get(&t1);
     dt = clockdiff(&t0, &t1);
     printf("    Download speed: %f GB/s\n", sizeof(float)*1.0/dt);
     for(size_t kk = 0; kk<buf_size_nf; kk++)
@@ -2417,11 +2418,11 @@ void fimcl_update_y(fimcl_t * gy, fimcl_t * image)
 float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
 {
     int timers = 0;
-    struct timespec tstart, tend, t0, t1;
+    dw_time tstart, tend, t0, t1;
 
     if(timers){
         printf("\n");
-        dw_gettime(&tstart);
+        dw_time_get(&tstart);
     }
 
     /* Number of voxels to process per work item
@@ -2468,7 +2469,7 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
     assert(image->P <= forward->P);
 
     /* Create a buffer for the partial sums */
-    if(timers){dw_gettime(&t0);}
+    if(timers){dw_time_get(&t0);}
     cl_mem partial_sums_gpu = clCreateBuffer(forward->clu->context,
                                              CL_MEM_WRITE_ONLY,
                                              numWorkGroups * sizeof(float),
@@ -2477,8 +2478,8 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
     forward->clu->n_alloc++;
 
     if(timers){
-        dw_gettime(&t1);
-        printf("Create buffer: %f \n", timespec_diff(&t1, &t0));
+        dw_time_get(&t1);
+        printf("Create buffer: %f \n", dw_time_delta(&t1, &t0));
     }
 
     check_CL( clSetKernelArg(kernel,
@@ -2496,7 +2497,7 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
 
     check_CL( clSetKernelArg(kernel,
                              3, sizeof(cl_mem), &partial_sums_gpu));
-    dw_gettime(&t0);
+    dw_time_get(&t0);
     check_CL( clEnqueueNDRangeKernel(forward->clu->command_queue,
                                      kernel,
                                      1,
@@ -2510,12 +2511,12 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
     fimcl_sync(forward);
     if(timers)
     {
-        dw_gettime(&t1);
-        printf("Reduce: %f \n", timespec_diff(&t1, &t0));
+        dw_time_get(&t1);
+        printf("Reduce: %f \n", dw_time_delta(&t1, &t0));
     }
 
     /* Download the result */
-    if(timers){dw_gettime(&t0);}
+    if(timers){dw_time_get(&t0);}
     float * partial_sums = malloc(numWorkGroups*sizeof(float));
     status = clEnqueueReadBuffer(forward->clu->command_queue,
                                  partial_sums_gpu,
@@ -2529,17 +2530,17 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
     clFinish(forward->clu->command_queue);
     if(timers)
     {
-        dw_gettime(&t1);
-        printf("Download: %f \n", timespec_diff(&t1, &t0));
+        dw_time_get(&t1);
+        printf("Download: %f \n", dw_time_delta(&t1, &t0));
     }
 
-    if(timers){dw_gettime(&t0);}
+    if(timers){dw_time_get(&t0);}
     clu_release(forward->clu, partial_sums_gpu);
 
     if(timers)
     {
-        dw_gettime(&t1);
-        printf("Release buffer: %f \n", timespec_diff(&t1, &t0));
+        dw_time_get(&t1);
+        printf("Release buffer: %f \n", dw_time_delta(&t1, &t0));
     }
 
     float sum_gpu = 0;
@@ -2552,8 +2553,8 @@ float fimcl_error_idiv(fimcl_t * forward, fimcl_t * image)
 
     if(timers)
     {
-        dw_gettime(&tend);
-        printf("Total: %f \n", timespec_diff(&tend, &tstart));
+        dw_time_get(&tend);
+        printf("Total: %f \n", dw_time_delta(&tend, &tstart));
     }
 
     return sum_gpu / (float) (image->M*image->N*image->P);

@@ -24,7 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#include <time.h>
+#include "dw_time.h"
 
 #ifdef __linux__
 #include <sys/mman.h>
@@ -142,7 +142,7 @@ void fim_set_verbose(int v)
     fim_verbose = v;
 }
 
-static double clockdiff(struct timespec* end, struct timespec * start)
+static double clockdiff(dw_time* end, dw_time * start)
 {
     double elapsed = (end->tv_sec - start->tv_sec);
     elapsed += (end->tv_nsec - start->tv_nsec) / 1000000000.0;
@@ -1604,7 +1604,7 @@ void fim_conv1_vector_ut()
 void fim_LoG_ut()
 {
     printf("-> fim_LoG_ut\n");
-    struct timespec tstart, tend;
+    dw_time tstart, tend;
     size_t M = 256;
     size_t N = 512;
     size_t P = 128;
@@ -1650,9 +1650,9 @@ void fim_LoG_ut()
 
     float * Vpre = fim_copy(V, M*N*P);
 
-    dw_gettime(&tstart);
+    dw_time_get(&tstart);
     float * LoG2 = fim_LoG_S(V, M, N, P, sigma_l, sigma_a);
-    dw_gettime(&tend);
+    dw_time_get(&tend);
     for(size_t kk = 0; kk<M*N*P; kk++)
     {
         if(V[kk] != Vpre[kk])
@@ -1664,9 +1664,9 @@ void fim_LoG_ut()
     }
     float tLoG_S = clockdiff(&tend, &tstart);
 
-    dw_gettime(&tstart);
+    dw_time_get(&tstart);
     float * LoG = fim_LoG(V, M, N, P, sigma_l, sigma_a);
-    dw_gettime(&tend);
+    dw_time_get(&tend);
     for(size_t kk = 0; kk<M*N*P; kk++)
     {
         if(V[kk] != Vpre[kk])
@@ -1717,9 +1717,9 @@ void fim_LoG_ut()
         fim_show(LoG2, M, N, P);
     }
 
-    dw_gettime(&tstart);
+    dw_time_get(&tstart);
     float * LoGS2 = fim_LoG_S2(V, M, N, P, sigma_l, sigma_a);
-    dw_gettime(&tend);
+    dw_time_get(&tend);
     free(LoGS2);
     printf("fim_LoG_S2 took %f s\n", clockdiff(&tend, &tstart));
     fim_free(V);
@@ -4619,7 +4619,7 @@ void fim_features_2d_ut()
 
 void fim_argmax_max_ut()
 {
-    struct timespec tstart, tend;
+    dw_time tstart, tend;
     size_t M = 2048;
     size_t N = 2048;
     size_t P = 60;
@@ -4631,7 +4631,7 @@ void fim_argmax_max_ut()
     {
         A[kk] = (float) rand()/ (float) RAND_MAX;
     }
-    dw_gettime(&tstart);
+    dw_time_get(&tstart);
 
     float ref_max = A[0];
     size_t ref_argmax = 0;
@@ -4646,17 +4646,17 @@ void fim_argmax_max_ut()
     int64_t ref_amP = ref_argmax / (M*N);
     int64_t ref_amN = (ref_argmax - (ref_amP*M*N)) / M;
     int64_t ref_amM = ref_argmax - ref_amP*M*N - ref_amN*M;
-    dw_gettime(&tend);
+    dw_time_get(&tend);
 
     double t_ref_amax = clockdiff(&tend, &tstart);
 
 
-    dw_gettime(&tstart);
+    dw_time_get(&tstart);
     int64_t amM, amN, amP;
     float lib_max;
     fim_argmax_max(A, M, N, P, &amM, &amN, &amP, &lib_max);
 
-    dw_gettime(&tend);
+    dw_time_get(&tend);
     double t_lib_amax = clockdiff(&tend, &tstart);
 
     if( (lib_max == ref_max) &&
@@ -4681,7 +4681,7 @@ void fim_argmax_max_ut()
 
 void fim_max_ut()
 {
-    struct timespec tstart, tend;
+    dw_time tstart, tend;
     size_t N = 2024*1024*60;
     float * A = fim_malloc(N*sizeof(float));
     assert(A != NULL);
@@ -4691,7 +4691,7 @@ void fim_max_ut()
         A[kk] = (float) rand()/ (float) RAND_MAX;
     }
 
-    dw_gettime(&tstart);
+    dw_time_get(&tstart);
     float ref_max = A[0];
     for(size_t kk = 0 ; kk < N; kk++)
     {
@@ -4701,12 +4701,12 @@ void fim_max_ut()
         }
     }
 
-    dw_gettime(&tend);
+    dw_time_get(&tend);
     double t_ref_max = clockdiff(&tend, &tstart);
 
-    dw_gettime(&tstart);
+    dw_time_get(&tstart);
     float lib_max = fim_max(A, N);
-    dw_gettime(&tend);
+    dw_time_get(&tend);
     double t_lib_max = clockdiff(&tend, &tstart);
 
     if(lib_max == ref_max)
@@ -4722,7 +4722,7 @@ void fim_max_ut()
 
 void fim_min_ut()
 {
-    struct timespec tstart, tend;
+    dw_time tstart, tend;
     size_t N = 2024*1024*60;
     float * A = fim_malloc(N*sizeof(float));
     assert(A != NULL);
@@ -4731,7 +4731,7 @@ void fim_min_ut()
     {
         A[kk] = (float) rand()/ (float) RAND_MAX;
     }
-    dw_gettime(&tstart);
+    dw_time_get(&tstart);
     float ref_min = A[0];
     for(size_t kk = 0 ; kk < N; kk++)
     {
@@ -4740,12 +4740,12 @@ void fim_min_ut()
             ref_min = A[kk];
         }
     }
-    dw_gettime(&tend);
+    dw_time_get(&tend);
     double t_ref_min = clockdiff(&tend, &tstart);
 
-    dw_gettime(&tstart);
+    dw_time_get(&tstart);
     float lib_min = fim_min(A, N);
-    dw_gettime(&tend);
+    dw_time_get(&tend);
     double t_lib_min = clockdiff(&tend, &tstart);
 
     if(lib_min == ref_min)
@@ -5196,6 +5196,7 @@ fim_std_ut(void)
     tic
     double t = fim_std(V, n);
     toc("fim_std")
+    printf("t=%f\n", t);
     tic
     t = fim_std_ref(V, n);
     toc("fim_std_ref")

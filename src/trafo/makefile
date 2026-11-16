@@ -4,7 +4,6 @@ DEBUG?=0
 
 CFLAGS+=-fopenmp
 
-
 CFLAGS+=-fvisibility=hidden
 
 

@@ -2,9 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 
 #include "dw_util.h"
+#include "dw_time.h"
 #include "fim.h"
 #include "fim_tiff.h"
 #include "ftab.h"
@@ -823,8 +823,8 @@ append_snr1(const opts * s, ftab_t * T, const float * restrict I,
     fim_free(fmask);
 #endif
 
-    struct timespec t0, t1;
-    dw_gettime(&t0);
+    dw_time t0, t1;
+    dw_time_get(&t0);
 
 #pragma omp parallel
     {
@@ -854,10 +854,10 @@ append_snr1(const opts * s, ftab_t * T, const float * restrict I,
         free(tmask);
     }
 
-    dw_gettime(&t1);
+    dw_time_get(&t1);
     if(s->verbose > 1)
     {
-        printf("snr1 took %f s\n", timespec_diff(&t1, &t0));
+        printf("snr1 took %f s\n", dw_time_delta(&t1, &t0));
     }
 
     free(bg_mask);

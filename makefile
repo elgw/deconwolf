@@ -22,7 +22,6 @@ UNAME_S := $(shell uname -s)
 $(info Host type: $(UNAME_S))
 
 dw = dw
-dwbw = dw_bw
 
 CFLAGS += -std=gnu11 -Wall -Wextra
 
@@ -147,14 +146,13 @@ endif
 #
 # Set up for linking
 #
+LIBRARIES=
 
-dw_LIBRARIES=
-dwbw_LIBRARIES=
 
 #
 # kd tree
 #
-dw_LIBRARIES+=-Lsrc/kdtree/ -lkdtree
+LIBRARIES+=-Lsrc/kdtree/ -lkdtree
 kdtree:
 	$(MAKE) -C src/kdtree/ libkdtree.a
 
@@ -162,7 +160,7 @@ kdtree:
 # trafo
 #
 
-dw_LIBRARIES+=-Lsrc/trafo/ -ltrafo
+LIBRARIES+=-Lsrc/trafo/ -ltrafo
 trafo:
 	$(MAKE) -C src/trafo libtrafo.a
 
@@ -177,7 +175,7 @@ $(info -- Math (-lm) library?)
 LD_HAS_LM=$(call check_ld_flag,-lm)
 ifneq ($(LD_HAS_LM),)
 $(info will use -lm)
-dw_libraries+=-lm
+libraries+=-lm
 else
 $(info Not available, might be built in)
 endif
@@ -222,8 +220,7 @@ endif
 ifneq ($(TIFFLIB),)
 $(info found $(TIFFLIB))
 CFLAGS+=$(shell $(PKGCONF) ${TIFFLIB} --cflags)
-dw_LIBRARIES+=$(shell $(PKGCONF) ${TIFFLIB} --libs)
-dwbw_LIBRARIES+=$(shell $(PKGCONF) ${TIFFLIB} --libs)
+LIBRARIES+=$(shell $(PKGCONF) ${TIFFLIB} --libs)
 endif
 
 ifeq ($(TIFFLIB),)
@@ -247,11 +244,9 @@ GSLFLAGS=`gsl-config --cflags`
 CFLAGS += $(GSLFLAGS)
 MOSTLYSTATIC?=0
 ifeq ($(MOSTLYSTATIC), 0)
-    dwbw_LIBRARIES += `gsl-config --libs`
-    dw_LIBRARIES += `gsl-config --libs`
+    LIBRARIES += `gsl-config --libs`
 else
-   dwbw_LIBRARIES += -l:libgsl.a -l:libgslcblas.a
-   dw_LIBRARIES += -l:libgsl.a -l:libgslcblas.a
+   LIBRARIES += -l:libgsl.a -l:libgslcblas.a
 endif
 
 ##
@@ -271,8 +266,7 @@ endif
 ifeq ($(MKL), 1)
 $(info FFTW backend: MKL)
 CFLAGS += -DMKL $(shell $(PKGCONF) mkl-static-lp64-iomp --cflags )
-dw_LIBRARIES += $(shell $(PKGCONF) mkl-static-lp64-iomp --cflags --libs)
-dwbw_LIBRARIES += $(shell $(PKGCONF) mkl-static-lp64-iomp --cflags --libs)
+LIBRARIES += $(shell $(PKGCONF) mkl-static-lp64-iomp --cflags --libs)
 endif
 
 ifeq ($(FFTW3), 1)
@@ -286,18 +280,15 @@ endif
 
 CFLAGS += $(shell $(PKGCONF) fftw3 fftw3f --cflags)
 ifeq ($(MOSTLYSTATIC), 0)
-dw_LIBRARIES += $(shell $(PKGCONF) fftw3 fftw3f --libs)
-dwbw_LIBRARIES += $(shell $(PKGCONF) fftw3 fftw3f --libs)
+LIBRARIES += $(shell $(PKGCONF) fftw3 fftw3f --libs)
 else
-dw_LIBRARIES += -l:libfftw3.a -l:libfftw3f.a
-dwbw_LIBRARIES += -l:libfftw3.a -l:libfftw3f.a
+LIBRARIES += -l:libfftw3.a -l:libfftw3f.a
 endif
 ifneq ($(WINDOWS),1)
 # _omp is faster than _threads on my machines
-dw_LIBRARIES += -lfftw3f_omp
-dwbw_LIBRARIES += -lfftw3f_omp
-#dw_LIBRARIES += -lfftw3f_threads
-#dwbw_LIBRARIES += -lfftw3f_threads
+LIBRARIES += -lfftw3f_omp
+#LIBRARIES += -lfftw3f_threads
+
 endif
 endif
 
@@ -311,8 +302,7 @@ endif
 $(info -- Enabling OpenMP (OMP))
 ifeq ($(UNAME_S), Darwin)
 CFLAGS+=-Xpreprocessor -fopenmp
-dw_LIBRARIES += -lomp
-dwbw_LIBRARIES += -lomp
+LIBRARIES += -lomp
 else
 ifeq ($(CC),clang)
 # Ubuntu 24: requires also
@@ -326,7 +316,7 @@ endif
 ##
 ## libPNG
 ##
-dw_LIBRARIES += `pkg-config libpng --libs`
+LIBRARIES += `pkg-config libpng --libs`
 CFLAGS += `pkg-config libpng --cflags`
 
 
@@ -350,20 +340,20 @@ ifeq ($(OPENCL), 1)
 $(info -- OpenCL enabled)
 CFLAGS+=-DOPENCL
 ifeq ($(UNAME_S), Darwin)
-dw_LIBRARIES+=-framework OpenCL
+LIBRARIES+=-framework OpenCL
 else
 $(info -- Looking for OpenCL)
 OPENCL_EXISTS = $(shell $(PKGCONF) OpenCL --exists ; echo $$?)
 ifeq ($(OPENCL_EXISTS),0)
 
 CFLAGS+=$(shell $(PKGCONF) OpenCL --cflags)
-dw_LIBRARIES+=$(shell $(PKGCONF) OpenCL --libs)
+LIBRARIES+=$(shell $(PKGCONF) OpenCL --libs)
 else
 $(info Try building with OPENCL=0 ?)
 $(error ERROR: Could not find OpenCL)
 endif
 endif
-dw_OBJECTS+=method_shb_cl.o method_shb_cl2.o cl_util.o
+OBJECTS+=method_shb_cl.o method_shb_cl2.o cl_util.o
 endif
 
 
@@ -383,7 +373,7 @@ endif
 
 SRCDIR = src/
 
-dw_OBJECTS += fim.o \
+OBJECTS += fim.o \
 tiling.o \
 fft.o \
 fim_tiff.o \
@@ -410,27 +400,21 @@ dw_png.o \
 quickselect.o \
 dw_background.o \
 npio.o \
-qalign.o
-
-dwbw_OBJECTS = fim.o \
-fim_tiff.o \
+dw_time.o \
+qalign.o \
 bw_gsl.o \
 lanczos.o \
-li.o fft.o \
+li.o  \
 dw_util.o \
-ftab.o \
 quickselect.o \
-npio.o
+dw_bwpsf.o
 
 $(info Everything looks ok)
 
-all: trafo kdtree $(dw) $(dwbw)
+all: trafo kdtree $(dw)
 
-$(dw): $(dw_OBJECTS) $(dw_DEPENDS)
-	$(CC) $(CFLAGS) -o $@ $^ $(dw_LIBRARIES)
-
-$(dwbw): $(dwbw_OBJECTS)
-	$(CC) $(CFLAGS) -DSTANDALONE src/dw_bwpsf.c -o $@ $^ $(dwbw_LIBRARIES)
+$(dw): $(OBJECTS) $(DEPENDS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LIBRARIES)
 
 %.o: $(SRCDIR)%.c
 	$(CC) $(CFLAGS) -c $<
@@ -438,7 +422,6 @@ $(dwbw): $(dwbw_OBJECTS)
 clean:
 	rm -f *.o
 	rm -f dw
-	rm -f dw_bw
 
 # the kernels are mostly included by cl_util.c some in method_shb_cl*
 # TODO: this is a silly list
@@ -473,21 +456,16 @@ kernels:
 	xxd -i src/kernels/cl_shb_update.c > src/kernels/cl_shb_update.h
 	xxd -i src/kernels/cl_preprocess_image.c > src/kernels/cl_preprocess_image.h
 
-
 install:
 	# Binaries
-	cp dw_bw $(DESTDIR)/dw_bw
 	cp dw $(DESTDIR)/dw
 	# Man pages
 	cp doc/man/dw.1 $(MANPATH)/dw.1
 	cp doc/man/dw.1 $(MANPATH)/deconwolf.1
 	cp doc/man/dw_bw.1 $(MANPATH)/dw_bw.1
 
-
 uninstall:
 	rm -f $(DESTDIR)/dw
-	rm -f $(DESTDIR)/dw_bw
-	rm -f $(DESTDIR)/dw_batch
 	rm -f $(MANPATH)/dw.1
 	rm -f $(MANPATH)/deconwolf.1
 	rm -f $(MANPATH)/dw_bw.1

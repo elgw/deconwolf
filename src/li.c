@@ -16,6 +16,11 @@
 
 #include "li.h"
 
+#include <gsl/gsl_matrix.h>
+#include <gsl/gsl_permutation.h>
+#include <gsl/gsl_linalg.h>
+#include <gsl/gsl_blas.h>
+
 static dcomplex build_complex(double vreal, double vcomp)
 {
 #ifdef WINDOWS

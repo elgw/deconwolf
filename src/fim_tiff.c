@@ -2026,19 +2026,25 @@ int fim_tiff_maxproj_XYZ(ftif_t * ftif, const char * in, const char * out)
 /* The output will be written as a single strip */
 int fim_tiff_maxproj(ftif_t * ftif, const char * in, const char * out)
 {
-    int64_t M, N, P;
-    int verbose = 0;
+    assert(ftif != NULL);
+    assert(in != NULL);
+    assert(out != NULL);
 
-    if(fim_tiff_get_size(ftif, in, &M, &N, &P))
-    {
+    int64_t M, N, P;
+    int verbose = ftif->verbose - 1;
+
+    if(fim_tiff_get_size(ftif, in, &M, &N, &P)){
         printf("Can't open %s to get image dimension\n", in);
         return -1;
     }
 
+    if(ftif->verbose > 2){
+        printf("%s size: [%ld, %ld, %ld]\n", in, M, N, P);
+    }
+
     TIFF * input = TIFFOpen(in, "r");
     char * errStr = tiff_is_supported(input);
-    if(errStr != NULL)
-    {
+    if(errStr != NULL){
         printf("Can't process %s\n", in);
         printf("Error: %s\n", errStr);
         free(errStr);
@@ -2051,31 +2057,29 @@ int fim_tiff_maxproj(ftif_t * ftif, const char * in, const char * out)
     ttags_set_software(ftif, T, "deconwolf " deconwolf_version);
     T->P = 1; /* As we will only write one plane eventually */
 
-
     uint32_t SF = SAMPLEFORMAT_UINT;
     int gotSF = TIFFGetField(input, TIFFTAG_SAMPLEFORMAT, &SF);
-    if(gotSF != 1)
-    {
+    if(gotSF != 1){
         printf("Warning: Unable to determine the sample format "
                "of %s\n, assuming uint but that could be wrong.\n", in);
     }
 
     uint32_t BPS;
     int gotBPS = TIFFGetField(input, TIFFTAG_BITSPERSAMPLE, &BPS);
-    if(gotBPS != 1)
-    {
+    if(gotBPS != 1){
         fprintf(stderr, "Unable to get the number of bits per sample\n");
-
     }
 
     TIFF * output = TIFFOpen(out, "w");
-    if(output == NULL)
-    {
+    if(output == NULL){
         printf("Unable to open %s for writing\n", out);
         TIFFClose(input);
         ttags_free(&T);
         return EXIT_FAILURE;
     }
+
+    tmsize_t ssize = TIFFStripSize(input); // unit: bytes
+    uint32_t nstrips = TIFFNumberOfStrips(input);
 
     ttags_fix_ij_3d_to_2d(T);
 
@@ -2085,33 +2089,24 @@ int fim_tiff_maxproj(ftif_t * ftif, const char * in, const char * out)
     TIFFSetField(output, TIFFTAG_IMAGEWIDTH, M);
     TIFFSetField(output, TIFFTAG_IMAGELENGTH, N);
     TIFFSetField(output, TIFFTAG_SAMPLESPERPIXEL, 1);
-    TIFFSetField(output, TIFFTAG_ROWSPERSTRIP, M);
-    if(SF == SAMPLEFORMAT_UINT)
-    {
+
+    if(SF == SAMPLEFORMAT_UINT) {
         TIFFSetField(output, TIFFTAG_BITSPERSAMPLE, 16);
         TIFFSetField(output, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_UINT);
+        TIFFSetField(output, TIFFTAG_ROWSPERSTRIP, ssize/2);
     }
 
-    if(SF == SAMPLEFORMAT_IEEEFP)
-    {
+    if(SF == SAMPLEFORMAT_IEEEFP){
         TIFFSetField(output, TIFFTAG_BITSPERSAMPLE, 32);
         TIFFSetField(output, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_IEEEFP);
+        TIFFSetField(output, TIFFTAG_ROWSPERSTRIP, ssize/4);
     }
 
     TIFFSetField(output, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);
-    // Irrelevant if samples per pixel is set to 1
     TIFFSetField(output, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
     TIFFSetField(output, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
-    //TIFFSetField(output, TIFFTAG_SUBFILETYPE, FILETYPE_PAGE);
-    //TIFFSetField(output, TIFFTAG_PAGENUMBER, 0, 1);
 
-    tmsize_t ssize = TIFFStripSize(input); // Seems to be in bytes
-    //  printf("Strip size: %zu b\n", (size_t) ssize);
-
-    uint32_t nstrips = TIFFNumberOfStrips(input);
-
-    if(verbose > 1)
-    {
+    if(verbose > 1){
         printf("strip size: %" PRId64 "\n", ssize);
         printf("number of strips: %u\n", nstrips);
         printf("sample format: %s\n", tiff_sampleformat_to_string((SF)));
@@ -2124,39 +2119,33 @@ int fim_tiff_maxproj(ftif_t * ftif, const char * in, const char * out)
     // Input is 16 bit unsigned int.
     if(SF == SAMPLEFORMAT_UINT)
     {
-
         uint16_t * mstrip = _TIFFmalloc(ssize); // For max over all directories
         assert(mstrip != NULL);
-        uint16_t * strip    = _TIFFmalloc(ssize);
+        uint16_t * strip = _TIFFmalloc(ssize);
         assert(strip != NULL);
 
-        for(int64_t nn = 0; nn<nstrips; nn++) // Each strip
-        {
+        for(int64_t nn = 0; nn<nstrips; nn++){
             memset(mstrip, 0, ssize);
             tsize_t read = 0;
-            for(int64_t pp = 0; pp<P; pp++) // For each directory
-            {
+            for(int64_t pp = 0; pp<P; pp++){ // For each directory
                 TIFFSetDirectory(input, pp); // Does it keep the location for each directory?
-                read = TIFFReadEncodedStrip(input, nn, strip, (tsize_t)-1);
-                for(int64_t kk = 0; kk<read/2; kk++)
-                {
-                    if(strip[kk] > mstrip[kk])
-                    {
+                read = TIFFReadEncodedStrip(input, nn,
+                                            strip, (tsize_t)-1);
+                for(int64_t kk = 0; kk<read/2; kk++){
+                    if(strip[kk] > mstrip[kk]){
                         mstrip[kk] = strip[kk];
                     }
                 }
             }
 
             tsize_t written = TIFFWriteRawStrip(output,
-                                                0, /* append to strip number 0 */
-                                                mstrip, /* data */
-                                                read); /* data size */
-            if(written != read)
-            {
+                                                nn,
+                                                mstrip, // data
+                                                read); // data size, bytes
+            if(written != read){
                 fprintf(stderr, "Failed to write to %s\n", out);
                 exit(EXIT_FAILURE);
             }
-
         }
 
         _TIFFfree(strip);
@@ -2164,50 +2153,40 @@ int fim_tiff_maxproj(ftif_t * ftif, const char * in, const char * out)
     }
 
     // Input is 32-bit float
-    if(SF == SAMPLEFORMAT_IEEEFP)
-    {
+    if(SF == SAMPLEFORMAT_IEEEFP){
         float * mstrip = _TIFFmalloc(ssize); // For max over all directories
         assert(mstrip != NULL);
         float * strip    = _TIFFmalloc(ssize);
 
-        for(int64_t ss = 0; ss < nstrips; ss++) // Each strip
-        {
+        for(int64_t ss = 0; ss < nstrips; ss++){ // Each strip
             memset(mstrip, 0, ssize);
             tsize_t read = 0;
-            for(int64_t pp = 0; pp<P; pp++) // For each directory
-            {
+            for(int64_t pp = 0; pp<P; pp++){ // For each directory
+
                 TIFFSetDirectory(input, pp); // Does it keep the location for each directory?
                 read = TIFFReadEncodedStrip(input, ss, strip, (tsize_t)-1);
-                for(int64_t kk = 0; kk<read/4; kk++)
-                {
-                    if(strip[kk] > mstrip[kk])
-                    {
+                for(int64_t kk = 0; kk<read/4; kk++){
+                    if(strip[kk] > mstrip[kk]){
                         mstrip[kk] = strip[kk];
                     }
                 }
             }
 
-
             tsize_t written = TIFFWriteRawStrip(output,
-                                                0,
+                                                ss,
                                                 mstrip, read);
-            if(written != read)
-            {
+            if(written != read){
                 fprintf(stderr, "Failed to write to %s\n", out);
                 exit(EXIT_FAILURE);
             }
-
         }
         _TIFFfree(strip);
         _TIFFfree(mstrip);
-
     }
 
     TIFFClose(input);
-
     TIFFWriteDirectory(output);
     TIFFClose(output);
-
     return 0;
 }
 
